@@ -4,7 +4,10 @@
   "description": "Primus Labs Claude Code usage tracker",
   "type": "module",
   "bin": {
-    "ai-usage-tracker": "./cli/src/index.mjs"
+    "ai-usage-tracker": "./cli/bin/cli.mjs"
+  },
+  "dependencies": {
+    "keytar": "^7.9.0"
   },
   "workspaces": [
     "web",

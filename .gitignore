@@ -26,7 +26,7 @@ cli/tsconfig.tsbuildinfo
 web/drizzle/             # drizzle-kit generate 결과 (재생성 가능)
 
 # ── CLI 빌드 결과 ─────────────────────────────────
-cli/bin/
+# cli/bin/ 은 커밋 대상 (npx 실행용 번들)
 
 # ── 하네스 내부 상태 ──────────────────────────────
 .claude/settings.local.json
