@@ -87,6 +87,17 @@ export default function DashboardPage() {
       .then((d) => { setData(d); setLoading(false); });
   }, [session, period]);
 
+  // Poll every 4s while lastSyncedAt is null (waiting for first CLI sync)
+  useEffect(() => {
+    if (!session || !data || data.user.lastSyncedAt) return;
+    const timer = setInterval(() => {
+      fetch(`/api/dashboard?period=${period}`)
+        .then((r) => r.json())
+        .then((d) => { if (d.user?.lastSyncedAt) setData(d); });
+    }, 4000);
+    return () => clearInterval(timer);
+  }, [session, data, period]);
+
   if (status === "loading" || !data) return (
     <div className="min-h-screen">
       <Nav />
@@ -103,20 +114,15 @@ export default function DashboardPage() {
       <div className="min-h-screen">
         <Nav />
         <main className="max-w-xl mx-auto px-4 py-20 text-center space-y-6">
-          <div className="text-4xl">🚀</div>
-          <h1 className="text-2xl font-bold text-slate-100">시작해볼까요?</h1>
+          <div className="text-4xl animate-pulse">⏳</div>
+          <h1 className="text-2xl font-bold text-slate-100">데이터 수집 중...</h1>
           <p className="text-slate-400">
-            Claude Code 사용량을 자동으로 수집하려면<br />
-            CLI를 한 번만 설치하면 됩니다.
+            CLI가 과거 사용량을 백그라운드에서 수집하고 있습니다.<br />
+            잠시 후 자동으로 대시보드가 표시됩니다.
           </p>
-          <Link
-            href="/setup"
-            className="inline-block px-6 py-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg font-medium transition-colors"
-          >
-            CLI 설치하기 →
-          </Link>
           <p className="text-xs text-slate-600">
-            설치 후 Claude Code 세션을 종료하면 자동으로 이 화면이 채워집니다
+            CLI가 아직 설치되지 않았다면 →{" "}
+            <Link href="/setup" className="underline hover:text-slate-400">CLI 설치하기</Link>
           </p>
         </main>
       </div>
