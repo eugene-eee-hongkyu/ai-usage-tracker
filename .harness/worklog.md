@@ -4,6 +4,28 @@
 
 ---
 
+## Session 2026-04-25 22:25 — Google OAuth, Setup UX 수정, 브랜딩 정리, README 작성
+
+### 작업 요약
+- **Google OAuth 추가**: GoogleProvider 등록, 로그인 버튼 추가, 동일 이메일이면 GitHub/Google 계정 공유 (DB row 유지)
+- **Setup 페이지 즉시 fetch**: 마운트 시 2초 대기 없이 poll 즉시 실행 → 이미 설치된 유저가 체크박스 ⏳로 보이던 문제 해결
+- **Setup 페이지 자동 리다이렉트 제거**: `ready: true` 시 대시보드 강제 이동 → "대시보드로 가기" 버튼으로 교체 (상태 확인 후 본인이 이동)
+- **primuslabs 브랜딩 제거 (임팩트 없는 곳만)**:
+  - `login/page.tsx`: "Primus Labs 멤버 전용" → "팀 멤버 전용"
+  - `layout.tsx`: 탭 제목/설명 일반화
+  - `auth.ts`: 주석 도메인 예시 일반화
+  - `setup-status/page.tsx`: npx 명령어 4곳 → `eugene-eee-hongkyu/ai-usage-tracker`
+  - `package.json` (루트+cli), `cli/src/index.mjs`: description 일반화
+  - keytar 서비스명, STABLE_DIR, 설치 경로 — 기존 설치 유지 위해 변경하지 않음
+- **README.md 작성**: Vercel+Supabase 배포 가이드, CLI 설치, 로컬 개발, 기술 스택, Supabase 주의사항 포함
+
+### 다음 액션
+1. 팀원에게 `https://ai-usage-tracker-web-psi.vercel.app` 공유 및 초대
+2. B-1 §3 Hold 플래그: Windows 환경 친구 1명 확보 — SessionEnd hook 발화 검증
+3. 프로덕션 사용 중 발견되는 UX 버그 수집 및 수정
+
+---
+
 ## Session 2026-04-25 21:48 — 프로덕션 로그인 연결 디버깅 및 UX 개선
 
 ### 작업 요약

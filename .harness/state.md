@@ -6,8 +6,8 @@
 
 ---
 
-## 마지막 실행: 2026-04-25 21:48
-## 마지막 업데이트: 2026-04-25 21:48
+## 마지막 실행: 2026-04-25 22:25
+## 마지막 업데이트: 2026-04-25 22:25
 ## 현재 모드: bypassPermissions
 
 ### 현재 집중
@@ -47,5 +47,8 @@
 - [x] CLI init 프로덕션 연결 성공 (API 키 발급 + hook 등록 + 백필 완료)
 - [x] §10 시나리오 2: CLI init → 백그라운드 백필 → 프로덕션 대시보드 데이터 PASS
 - [x] 탭 전환 로딩 UX 개선 (dimming + neverSynced polling)
+- [x] Google OAuth 추가 (GitHub 없는 팀원도 로그인 가능)
+- [x] Setup 페이지 UX 수정 (즉시 fetch, 자동 리다이렉트 제거 → 버튼으로 이동)
+- [x] primuslabs 브랜딩 제거 (비임팩트 영역), README.md 작성
 - [ ] 팀원 초대 및 팀랭킹 화면 검증
 - [ ] Windows SessionEnd hook 발화 검증 (Hold 플래그)
