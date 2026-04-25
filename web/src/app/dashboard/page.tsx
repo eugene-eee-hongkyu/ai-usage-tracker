@@ -173,7 +173,7 @@ export default function DashboardPage() {
         </div>
       )}
 
-      <main className="max-w-3xl mx-auto px-4 py-6 space-y-6">
+      <main className={`max-w-3xl mx-auto px-4 py-6 space-y-6 transition-opacity duration-150 ${loading ? "opacity-40 pointer-events-none" : "opacity-100"}`}>
         {/* Summary line */}
         <div>
           <div className="text-lg font-semibold text-slate-200">
