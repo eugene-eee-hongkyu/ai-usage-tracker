@@ -15,12 +15,13 @@ type Period = "today" | "week" | "month" | "all";
 interface DashboardData {
   user: { name: string; lastSyncedAt: string | null };
   summary: { totalTokens: number; totalCost: number; oneShotRate: number; cacheHitRate: number; sessionsCount: number };
-  daily: Array<{ date: string; totalTokens: number; totalCost: number }>;
+  daily: Array<{ date: string; totalTokens: number; totalCost: number; cacheRead: number; cacheWrite: number }>;
   models: Record<string, { tokens: number; cost: number }>;
   suggestions: Suggestion[];
 }
 
 function fmtTokens(n: number) {
+  if (n >= 1_000_000_000) return `${(n / 1_000_000_000).toFixed(1)}B`;
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
   if (n >= 1_000) return `${(n / 1_000).toFixed(0)}K`;
   return String(n);
@@ -28,8 +29,39 @@ function fmtTokens(n: number) {
 
 function staleBanner(lastSyncedAt: string | null) {
   if (!lastSyncedAt) return false;
-  const diff = Date.now() - new Date(lastSyncedAt).getTime();
-  return diff > 24 * 60 * 60 * 1000;
+  return Date.now() - new Date(lastSyncedAt).getTime() > 24 * 60 * 60 * 1000;
+}
+
+function periodLabel(period: Period) {
+  return period === "today" ? "오늘" : period === "week" ? "이번 주" : period === "month" ? "이번 달" : "전체";
+}
+
+function chartDayLabel(period: Period) {
+  return period === "today" ? "오늘 토큰" : period === "week" ? "일별 토큰 (7일)" : period === "month" ? "일별 토큰 (30일)" : "일별 토큰 (전체)";
+}
+
+// Recharts custom tooltip
+function ChartTooltip({ active, payload, label }: { active?: boolean; payload?: { value: number }[]; label?: string }) {
+  if (!active || !payload?.length) return null;
+  const val = payload[0].value;
+  const display = val >= 1000 ? `${(val / 1000).toFixed(1)}B tok` : `${val}M tok`;
+  return (
+    <div className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-xs shadow-lg">
+      <p className="text-slate-400 mb-1">{label}</p>
+      <p className="text-indigo-300 font-semibold">{display}</p>
+    </div>
+  );
+}
+
+// Status badge for efficiency metrics
+function MetricStatus({ value, thresholdGood, thresholdOk, inverse = false }: {
+  value: number; thresholdGood: number; thresholdOk: number; inverse?: boolean;
+}) {
+  const good = inverse ? value <= thresholdGood : value >= thresholdGood;
+  const ok = inverse ? value <= thresholdOk : value >= thresholdOk;
+  if (good) return <span className="text-green-400 text-xs">● 좋음</span>;
+  if (ok) return <span className="text-yellow-400 text-xs">● 보통</span>;
+  return <span className="text-slate-500 text-xs">● 낮음</span>;
 }
 
 export default function DashboardPage() {
@@ -60,7 +92,6 @@ export default function DashboardPage() {
     </div>
   );
 
-  // 미설치 상태: CLI를 한 번도 연결한 적 없음
   const neverSynced = !data.user.lastSyncedAt;
 
   if (neverSynced) {
@@ -88,13 +119,15 @@ export default function DashboardPage() {
     );
   }
 
+  // Chart: include cache tokens, unit = M
   const chartData = data.daily.map((d) => ({
     date: d.date.slice(5),
-    tokens: Math.round((d.totalTokens ?? 0) / 1000),
+    tokensM: Math.round(((d.totalTokens ?? 0) + (d.cacheRead ?? 0) + (d.cacheWrite ?? 0)) / 1_000_000),
+    cost: d.totalCost ?? 0,
   }));
 
   const totalTokens = data.summary.totalTokens;
-  const activeHours = Math.round(data.summary.sessionsCount * 0.8);
+  const { cacheHitRate, oneShotRate, sessionsCount } = data.summary;
 
   return (
     <div className="min-h-screen">
@@ -111,9 +144,12 @@ export default function DashboardPage() {
 
       <main className="max-w-3xl mx-auto px-4 py-6 space-y-6">
         {/* Summary line */}
-        <div className="text-lg font-semibold text-slate-200">
-          {period === "today" ? "오늘" : period === "week" ? "이번 주" : period === "month" ? "이번 달" : "전체"}{" "}
-          {fmtTokens(totalTokens)} tok · ${data.summary.totalCost.toFixed(2)} · {activeHours}시간 활동
+        <div>
+          <div className="text-lg font-semibold text-slate-200">
+            {periodLabel(period)}{" "}
+            {fmtTokens(totalTokens)} tok · ${data.summary.totalCost.toFixed(2)} · {sessionsCount}회 세션
+          </div>
+          <p className="text-xs text-slate-600 mt-0.5">캐시 포함 토큰 총계 (입력 + 출력 + 캐시 읽기/쓰기)</p>
         </div>
 
         {/* Period tabs */}
@@ -131,22 +167,22 @@ export default function DashboardPage() {
 
         {/* Daily token chart */}
         <div className="bg-slate-900 rounded-lg p-4">
-          <p className="text-sm text-slate-400 mb-3">
-            {period === "today" ? "오늘 토큰" : period === "week" ? "일별 토큰 (7일)" : period === "month" ? "일별 토큰 (30일)" : "일별 토큰 (전체)"}
-          </p>
+          <p className="text-sm text-slate-400 mb-3">{chartDayLabel(period)}</p>
           {loading ? (
             <div className="h-32 bg-slate-800 animate-pulse rounded" />
           ) : (
             <ResponsiveContainer width="100%" height={120}>
-              <BarChart data={chartData}>
-                <XAxis dataKey="date" tick={{ fill: "#94a3b8", fontSize: 11 }} axisLine={false} tickLine={false} />
-                <YAxis hide />
-                <Tooltip
-                  contentStyle={{ background: "#1e293b", border: "1px solid #334155", borderRadius: 6 }}
-                  labelStyle={{ color: "#94a3b8" }}
-                  formatter={(v) => [`${v}K tok`]}
+              <BarChart data={chartData} margin={{ top: 4, right: 4, left: 4, bottom: 0 }}>
+                <XAxis
+                  dataKey="date"
+                  tick={{ fill: "#94a3b8", fontSize: 11 }}
+                  axisLine={false}
+                  tickLine={false}
+                  interval="preserveStartEnd"
                 />
-                <Bar dataKey="tokens" fill="#6366f1" radius={[3, 3, 0, 0]} />
+                <YAxis hide />
+                <Tooltip content={<ChartTooltip />} cursor={{ fill: "rgba(99,102,241,0.1)" }} />
+                <Bar dataKey="tokensM" fill="#6366f1" radius={[3, 3, 0, 0]} maxBarSize={40} />
               </BarChart>
             </ResponsiveContainer>
           )}
@@ -154,7 +190,9 @@ export default function DashboardPage() {
 
         {/* Model breakdown */}
         <div className="bg-slate-900 rounded-lg p-4 space-y-2">
-          <p className="text-sm text-slate-400 mb-2">모델별 ({period === "week" ? "이번 주" : period})</p>
+          <p className="text-sm text-slate-400 mb-2">
+            모델별 ({periodLabel(period)})
+          </p>
           {Object.entries(data.models)
             .sort(([, a], [, b]) => b.tokens - a.tokens)
             .map(([model, stat]) => {
@@ -173,38 +211,60 @@ export default function DashboardPage() {
         </div>
 
         {/* Efficiency metrics */}
-        <div className="bg-slate-900 rounded-lg p-4 space-y-2">
-          <p className="text-sm text-slate-400 mb-2">효율 지표</p>
-          <div className="grid grid-cols-3 gap-4 text-sm">
-            <div>
-              <p className="text-slate-500 text-xs">One-shot rate</p>
-              <p className="text-slate-200 font-semibold">{data.summary.oneShotRate}%</p>
+        <div className="bg-slate-900 rounded-lg p-4">
+          <p className="text-sm text-slate-400 mb-4">효율 지표</p>
+          <div className="grid grid-cols-3 gap-4">
+            {/* One-shot rate */}
+            <div className="space-y-1">
+              <p className="text-xs text-slate-500">One-shot rate</p>
+              <p className="text-xl font-semibold text-slate-200">{oneShotRate}%</p>
+              <MetricStatus value={oneShotRate} thresholdGood={70} thresholdOk={40} />
+              <p className="text-xs text-slate-600 leading-relaxed mt-1">
+                첫 번째 코드 편집 시도가 바로 성공하는 비율.<br />
+                높을수록 AI가 요구사항을 정확히 파악한다는 신호.<br />
+                <span className="text-slate-500">목표 70%+</span>
+              </p>
             </div>
-            <div>
-              <p className="text-slate-500 text-xs">Cache hit</p>
-              <p className="text-slate-200 font-semibold">{data.summary.cacheHitRate}%</p>
+            {/* Cache hit */}
+            <div className="space-y-1">
+              <p className="text-xs text-slate-500">Cache hit</p>
+              <p className="text-xl font-semibold text-slate-200">{cacheHitRate}%</p>
+              <MetricStatus value={cacheHitRate} thresholdGood={80} thresholdOk={50} />
+              <p className="text-xs text-slate-600 leading-relaxed mt-1">
+                이전에 처리한 내용을 재사용한 비율.<br />
+                높을수록 API 비용이 절감됨.<br />
+                CLAUDE.md를 짧게 유지하면 올라감.<br />
+                <span className="text-slate-500">목표 80%+</span>
+              </p>
             </div>
-            <div>
-              <p className="text-slate-500 text-xs">세션</p>
-              <p className="text-slate-200 font-semibold">{data.summary.sessionsCount}회</p>
+            {/* Sessions */}
+            <div className="space-y-1">
+              <p className="text-xs text-slate-500">세션 수</p>
+              <p className="text-xl font-semibold text-slate-200">{sessionsCount}회</p>
+              <p className="text-xs text-slate-600 leading-relaxed mt-1">
+                이 기간에 수집된<br />
+                일별 사용 레코드 수.
+              </p>
             </div>
           </div>
         </div>
 
-        {/* Suggestions preview */}
+        {/* Suggestions */}
         {data.suggestions.length > 0 && (
-          <div className="bg-slate-900 rounded-lg p-4 space-y-2">
+          <div className="bg-slate-900 rounded-lg p-4 space-y-3">
             <div className="flex items-center justify-between">
-              <p className="text-sm text-slate-400">💡 제안 ({data.suggestions.length}건)</p>
+              <p className="text-sm text-slate-400">💡 절감 제안 ({data.suggestions.length}건)</p>
               <Link href="/dashboard/detail" className="text-xs text-indigo-400 hover:text-indigo-300">더보기 →</Link>
             </div>
             {data.suggestions.slice(0, 3).map((s, i) => (
-              <div key={i} className="text-sm text-slate-300 flex items-start gap-2">
-                <span className="text-slate-500">•</span>
-                <span>
-                  {s.title}
-                  {s.confidence === "low" && <span className="ml-2 text-xs text-yellow-500">[신뢰도:낮음]</span>}
-                </span>
+              <div key={i} className="border-l-2 border-slate-700 pl-3 space-y-1">
+                <div className="flex items-start gap-2 text-sm">
+                  <span className="text-slate-200 font-medium">{s.title}</span>
+                  {s.confidence === "low" && (
+                    <span className="shrink-0 text-xs text-yellow-600 bg-yellow-950 px-1.5 py-0.5 rounded">신뢰도 낮음</span>
+                  )}
+                </div>
+                <p className="text-xs text-slate-500">{s.detail}</p>
               </div>
             ))}
           </div>
