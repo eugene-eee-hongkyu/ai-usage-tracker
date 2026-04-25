@@ -137,7 +137,7 @@ export default function DashboardPage() {
   }));
 
   const totalTokens = data.summary.totalTokens;
-  const { cacheHitRate, sessionsCount, inputTokens, outputTokens, cacheRead } = data.summary;
+  const { cacheHitRate, sessionsCount, cacheRead } = data.summary;
   const activeDays = data.daily.filter((d) =>
     ((d.totalTokens ?? 0) + (d.cacheRead ?? 0) + (d.cacheWrite ?? 0)) > 0
   ).length;
