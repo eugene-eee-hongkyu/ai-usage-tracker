@@ -40,7 +40,7 @@ export async function POST(req: NextRequest) {
   for (const s of sessionList) {
     const hash = s.sessionIdHash ?? hashSessionId(s.sessionId ?? `${s.startedAt}-${s.model}`);
     try {
-      await db
+      const rows = await db
         .insert(sessions)
         .values({
           userId: user[0].id,
@@ -57,10 +57,11 @@ export async function POST(req: NextRequest) {
           startedAt: new Date(s.startedAt),
           endedAt: new Date(s.endedAt),
         })
-        .onConflictDoNothing();
-      inserted++;
+        .onConflictDoNothing()
+        .returning({ id: sessions.id });
+      if (rows.length > 0) inserted++;
     } catch {
-      // skip duplicates
+      // skip on unexpected error
     }
   }
 
