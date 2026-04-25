@@ -39,6 +39,7 @@ export default function TeamPage() {
   const router = useRouter();
   const [period, setPeriod] = useState<Period>("today");
   const [data, setData] = useState<TeamData | null>(null);
+  const [loading, setLoading] = useState(true);
   const [selectedProject, setSelectedProject] = useState<string>("");
 
   useEffect(() => {
@@ -47,10 +48,12 @@ export default function TeamPage() {
 
   useEffect(() => {
     if (!session) return;
+    setLoading(true);
     fetch(`/api/team?period=${period}`)
       .then((r) => r.json())
       .then((d) => {
         setData(d);
+        setLoading(false);
         const projects = Object.keys(d.projects ?? {});
         if (projects.length > 0 && !selectedProject) setSelectedProject(projects[0]);
       });
@@ -71,7 +74,7 @@ export default function TeamPage() {
   return (
     <div className="min-h-screen">
       <Nav />
-      <main className="max-w-3xl mx-auto px-4 py-6 space-y-6">
+      <main className={`max-w-3xl mx-auto px-4 py-6 space-y-6 transition-opacity duration-150 ${loading ? "opacity-40 pointer-events-none" : "opacity-100"}`}>
         {/* Period tabs */}
         <div className="flex gap-2">
           {(["today", "week", "month", "all"] as Period[]).map((p) => (
