@@ -3,7 +3,18 @@ import GithubProvider from "next-auth/providers/github";
 import { db, users } from "@/lib/db";
 import { eq } from "drizzle-orm";
 
-const ALLOWED_DOMAIN = process.env.ALLOWED_EMAIL_DOMAIN ?? "primuslabs.gg";
+// ALLOWED_EMAIL_DOMAINS: 쉼표 구분 (예: "primuslabs.gg,primuslabs.io")
+// 비어 있으면 모든 도메인 허용
+const rawDomains = process.env.ALLOWED_EMAIL_DOMAINS ?? process.env.ALLOWED_EMAIL_DOMAIN ?? "";
+const ALLOWED_DOMAINS = rawDomains
+  .split(",")
+  .map((d) => d.trim())
+  .filter(Boolean);
+
+function isEmailAllowed(email: string) {
+  if (ALLOWED_DOMAINS.length === 0) return true;
+  return ALLOWED_DOMAINS.some((d) => email.endsWith(`@${d}`));
+}
 
 export const authOptions: NextAuthOptions = {
   providers: [
@@ -15,7 +26,7 @@ export const authOptions: NextAuthOptions = {
   callbacks: {
     async signIn({ user, account, profile }) {
       const email = user.email ?? "";
-      if (!email.endsWith(`@${ALLOWED_DOMAIN}`)) {
+      if (!isEmailAllowed(email)) {
         return `/login?error=domain`;
       }
 

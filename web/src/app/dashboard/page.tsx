@@ -15,7 +15,7 @@ type Period = "today" | "week" | "month" | "all";
 interface DashboardData {
   user: { name: string; lastSyncedAt: string | null };
   summary: { totalTokens: number; totalCost: number; oneShotRate: number; cacheHitRate: number; sessionsCount: number };
-  daily: Array<{ date: string; total_tokens: number; total_cost: number }>;
+  daily: Array<{ date: string; totalTokens: number; totalCost: number }>;
   models: Record<string, { tokens: number; cost: number }>;
   suggestions: Suggestion[];
 }
@@ -38,7 +38,6 @@ export default function DashboardPage() {
   const [period, setPeriod] = useState<Period>("week");
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
-  const [bannerDismissed, setBannerDismissed] = useState(false);
 
   useEffect(() => {
     if (status === "unauthenticated") router.push("/login");
@@ -61,9 +60,37 @@ export default function DashboardPage() {
     </div>
   );
 
+  // 미설치 상태: CLI를 한 번도 연결한 적 없음
+  const neverSynced = !data.user.lastSyncedAt;
+
+  if (neverSynced) {
+    return (
+      <div className="min-h-screen">
+        <Nav />
+        <main className="max-w-xl mx-auto px-4 py-20 text-center space-y-6">
+          <div className="text-4xl">🚀</div>
+          <h1 className="text-2xl font-bold text-slate-100">시작해볼까요?</h1>
+          <p className="text-slate-400">
+            Claude Code 사용량을 자동으로 수집하려면<br />
+            CLI를 한 번만 설치하면 됩니다.
+          </p>
+          <Link
+            href="/setup"
+            className="inline-block px-6 py-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg font-medium transition-colors"
+          >
+            CLI 설치하기 →
+          </Link>
+          <p className="text-xs text-slate-600">
+            설치 후 Claude Code 세션을 종료하면 자동으로 이 화면이 채워집니다
+          </p>
+        </main>
+      </div>
+    );
+  }
+
   const chartData = data.daily.map((d) => ({
     date: d.date.slice(5),
-    tokens: Math.round(d.total_tokens / 1000),
+    tokens: Math.round((d.totalTokens ?? 0) / 1000),
   }));
 
   const totalTokens = data.summary.totalTokens;
@@ -73,16 +100,12 @@ export default function DashboardPage() {
     <div className="min-h-screen">
       <Nav />
 
-      {!bannerDismissed && !data.user.lastSyncedAt && (
-        <div className="bg-slate-800 border-b border-slate-700 px-4 py-2 flex items-center justify-between text-sm text-slate-300">
-          <span>ⓘ 과거 데이터 수집 중 · 잠시 후 추가됩니다</span>
-          <button onClick={() => setBannerDismissed(true)} className="text-slate-500 hover:text-slate-300">✕</button>
-        </div>
-      )}
-
       {staleBanner(data.user.lastSyncedAt) && (
         <div className="bg-yellow-950 border-b border-yellow-800 px-4 py-2 flex items-center justify-between text-sm text-yellow-300">
-          <span>마지막 수집: {data.user.lastSyncedAt ? new Date(data.user.lastSyncedAt).toLocaleDateString("ko") : "없음"} · <Link href="/setup-status" className="underline">셋업 확인 →</Link></span>
+          <span>
+            마지막 수집: {new Date(data.user.lastSyncedAt!).toLocaleDateString("ko")} ·{" "}
+            <Link href="/setup-status" className="underline">셋업 확인 →</Link>
+          </span>
         </div>
       )}
 
@@ -182,14 +205,6 @@ export default function DashboardPage() {
                 </span>
               </div>
             ))}
-          </div>
-        )}
-
-        {data.summary.sessionsCount === 0 && (
-          <div className="bg-slate-900 rounded-lg p-8 text-center text-slate-400">
-            <p>아직 Claude Code 세션이 없네요.</p>
-            <p className="text-sm mt-1">한 번 사용 후 종료해보세요.</p>
-            <Link href="/setup" className="text-indigo-400 text-sm mt-2 block hover:underline">셋업 가이드 →</Link>
           </div>
         )}
       </main>
