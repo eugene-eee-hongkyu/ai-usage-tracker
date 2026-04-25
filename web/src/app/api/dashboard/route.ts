@@ -54,7 +54,7 @@ export async function GET(req: NextRequest) {
     .where(and(eq(sessions.userId, userId), gte(sessions.startedAt, since)));
 
   const totalTokens = periodSessions.reduce(
-    (s, r) => s + r.inputTokens + r.outputTokens,
+    (s, r) => s + r.inputTokens + r.outputTokens + r.cacheRead + r.cacheWrite,
     0
   );
   const totalCost = periodSessions.reduce((s, r) => s + r.costUsd, 0);
@@ -77,7 +77,7 @@ export async function GET(req: NextRequest) {
       ? "Haiku"
       : "Sonnet";
     if (!modelMap[key]) modelMap[key] = { tokens: 0, cost: 0 };
-    modelMap[key].tokens += s.inputTokens + s.outputTokens;
+    modelMap[key].tokens += s.inputTokens + s.outputTokens + s.cacheRead + s.cacheWrite;
     modelMap[key].cost += s.costUsd;
   }
 
