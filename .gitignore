@@ -36,3 +36,8 @@ cli/bin/
 
 # ── 테스트 / 커버리지 ─────────────────────────────
 coverage/
+
+# ── MCP / 디버깅 임시 파일 ────────────────────────
+.playwright-mcp/
+verify-*.png
+*.screenshot.png
