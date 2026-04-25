@@ -4,6 +4,22 @@
 
 ---
 
+## Session 2026-04-26 02:07 — 팀랭킹 탭 전환 dimming 추가 + 5h utilization 보류 결정
+
+### 작업 요약
+- **팀랭킹 탭 전환 dimming 구현**: `team/page.tsx`에 `loading` 상태 추가 → 탭 전환 시 `opacity-40 pointer-events-none` 적용 (대시보드와 동일 패턴)
+- **5h utilization 카드 논의**: API vs Max/Pro 플랜 구분 가능성 검토
+  - ccusage JSONL에 플랜 정보 없음 — `costUsd` 간접 신호는 신뢰도 낮음
+  - `activeHours`가 `submit.mjs`에서 하드코딩 0 → 데이터 자체 없음
+  - **결론: 구현 안 함** (사용자 명시 결정)
+
+### 다음 액션
+1. 팀원에게 `https://ai-usage-tracker-web-psi.vercel.app` 공유 및 초대
+2. B-1 §3 Hold 플래그: Windows 환경 친구 1명 확보 — SessionEnd hook 발화 검증
+3. 프로덕션 사용 중 발견되는 UX 버그 수집 및 수정
+
+---
+
 ## Session 2026-04-26 01:59 — 최고 효율 지표 교체 및 셋업 상태 버그 수정
 
 ### 작업 요약
