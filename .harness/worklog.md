@@ -4,6 +4,24 @@
 
 ---
 
+## Session 2026-04-26 01:59 — 최고 효율 지표 교체 및 셋업 상태 버그 수정
+
+### 작업 요약
+- **최고 효율 계산식 전면 교체** (oneShotRate → cache hit% × 100 / 세션당 비용):
+  - `lib/rules/index.ts`: `computeTodayMvpScore(tokens, oneShotRate)` → `computeEfficiencyScore(cacheRead, cacheWrite, totalCost, sessionsCount)`, `generateMvpBlurb` 시그니처도 `cacheHitPct + costPerSession` 인자로 교체
+  - `api/team/route.ts`: cacheRead/cacheWrite 집계 추가, efficiencyScore·cacheHitPct·costPerSession 반환, `byEfficiency` / MVP 정렬 기준 모두 새 점수로 교체
+  - `team/page.tsx`: MemberStat 타입 교체, 최고 효율 목록에 점수 + `cache XX%·$YY` 분해 표시, MVP 카드 subline도 교체
+- **셋업 상태 API 버그 수정** (`/api/setup/status`):
+  - `steps` 반환형을 배열 → 객체(`{ cli_installed, hook_registered, first_session }`)로 수정 (페이지 기대값과 불일치로 전부 빈 칸 표시되던 버그)
+  - `sessionsCount`, `lastSyncedAt` 필드 누락 추가 (배너에 "세션 undefined개", "마지막 수집: 없음" 표시되던 버그)
+
+### 다음 액션
+1. 팀원에게 `https://ai-usage-tracker-web-psi.vercel.app` 공유 및 초대
+2. B-1 §3 Hold 플래그: Windows 환경 친구 1명 확보 — SessionEnd hook 발화 검증
+3. 프로덕션 사용 중 발견되는 UX 버그 수집 및 수정
+
+---
+
 ## Session 2026-04-26 01:44 — 지표 팝업 모달 추가 및 컨텍스트 압박률 제거
 
 ### 작업 요약
