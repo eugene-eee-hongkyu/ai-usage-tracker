@@ -6,19 +6,19 @@
 
 ---
 
-## 마지막 실행: 2026-04-25 17:45
-## 마지막 업데이트: 2026-04-25 18:17
+## 마지막 실행: 2026-04-25 19:15
+## 마지막 업데이트: 2026-04-25 19:15
 ## 현재 모드: bypassPermissions
 
 ### 현재 집중
 
-- B-1 로컬 검증 — dev 서버 정상 기동 확인, §10 시나리오 1·2 PASS 필요
+- B-1 로컬 검증 — §10 시나리오 2 (CLI init → SessionEnd hook 발화 → 데이터 수집) PASS 필요
 
 ### 이어서 할 것
 
-1. dev 서버 재시작 (`web/.env.local` 복사 완료) → DB 연결 확인
-2. §10 시나리오 1: 브라우저에서 GitHub 로그인 → 대시보드 렌더링 확인
-3. §10 시나리오 2: Claude Code 세션 종료 → `/api/ingest` 호출 → 데이터 수집 확인
+1. `USAGE_TRACKER_URL=http://localhost:3000 npx github:eugene-eee-hongkyu/ai-usage-tracker init` 실행 → CLI 전체 플로우 검증
+2. §10 시나리오 2: Claude Code 세션 종료 → hook 발화 → 대시보드 데이터 표시 확인
+3. B-2: Vercel + Supabase 배포 진입
 
 ### 막힌 것
 
@@ -36,5 +36,8 @@
 - [x] B-1 §1 체크리스트 완료 (Node / Claude Code / Docker / GitHub OAuth / repo private / .env.local)
 - [x] bypassPermissions 모드 전환
 - [x] B-1 §5 빌드 순서 20단계 — 전체 코드 구현 완료 (53파일 커밋·푸시)
-- [ ] B-1 §10 검증 (시나리오 1·2 PASS + 포터빌리티 13개 체크)
+- [x] §10 시나리오 1: GitHub 로그인 → 대시보드 렌더링 확인
+- [x] CLI npx 실행 오류 수정 (bin 엔트리, .mjs 전환, bun 번들)
+- [x] UX 개선: 미설치 대시보드 CTA, setup 2단 카드, 다중 도메인 auth
+- [ ] §10 시나리오 2: CLI init → SessionEnd hook → 데이터 수집 PASS
 - [ ] B-2 Vercel + Supabase 배포

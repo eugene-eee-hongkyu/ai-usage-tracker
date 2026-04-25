@@ -4,6 +4,34 @@
 
 ---
 
+## Session 2026-04-25 19:15 — CLI npx 실행 오류 수정 및 UX 개선
+
+### 작업 요약
+- **UX 수정 (이전 세션 피드백 반영)**:
+  - `dashboard/page.tsx`: `lastSyncedAt === null`이면 차트 전체 숨기고 "CLI 설치하기" CTA만 표시
+  - `setup/page.tsx`: Step 1(인디고 카드, 명령어+복사 버튼 강조) / Step 2(상태 폴링) 2단 레이아웃으로 전면 개편
+  - `auth.ts`: 단일 도메인 → 다중 도메인 지원 (`ALLOWED_EMAIL_DOMAINS=a.com,b.com`)
+- **CLI npx 오류 수정 3단계**:
+  1. root `package.json`에 `bin` 엔트리 없음 → `"bin": { "ai-usage-tracker": "./cli/src/index.mjs" }` 추가
+  2. CLI TypeScript → `.mjs` 전환 (`init.mjs`, `reset.mjs`, `sync.mjs`, `index.mjs`) — 빌드 불필요
+     - `init.mjs`: `submit.mjs`를 `~/.primus-usage-tracker/`에 복사 설치 (npx 캐시 로테이션 대응)
+     - `sync.mjs`: 직접 실행 모드 지원 (백그라운드 백필)
+  3. `commander` 패키지 누락 (`Cannot find package 'commander'`) → bun으로 번들, JS 의존성 인라인, `keytar`만 외부 → `cli/bin/cli.mjs` 커밋
+- **.gitignore 정리**: `.playwright-mcp/`, `verify-*.png` 추가
+- 포트 3000·3001 기존 프로세스 종료 후 3000으로 재기동, API 401 정상 확인
+- 4회 커밋·푸시 완료
+
+### 실패한 시도
+- root `package.json`에 `bin` 추가 후 `cli/src/index.mjs`(번들 없음) 참조 → `commander` 누락 오류
+  → bun 번들(`cli/bin/cli.mjs`)로 해결
+
+### 다음 액션
+1. `USAGE_TRACKER_URL=http://localhost:3000 npx github:eugene-eee-hongkyu/ai-usage-tracker init` 실제 실행 — CLI 전체 플로우 검증
+2. §10 시나리오 2: Claude Code 세션 종료 → SessionEnd hook 발화 → `/api/ingest` 데이터 수집 확인
+3. B-2: Vercel + Supabase 배포
+
+---
+
 ## Session 2026-04-25 18:17 — B-1 MVP 전체 빌드 완료 및 깃허브 푸시
 
 ### 작업 요약
