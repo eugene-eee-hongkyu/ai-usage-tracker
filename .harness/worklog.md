@@ -4,6 +4,14 @@
 
 ---
 
+## Session 2026-04-26 07:25 — `ALLOWED_EMAIL_DOMAIN` 멀티 도메인 설정 방법 확인
+
+### 작업 요약
+- `ALLOWED_EMAIL_DOMAIN` 환경변수의 다중 도메인 허용 방법 확인
+- 코드베이스에서 해당 변수 처리 로직 검색
+- 쉼표 구분자 지원 확인 → `ALLOWED_EMAIL_DOMAIN=primuslabs.gg,gmail.com` 형식으로 설정 가능
+
+
 ## Session 2026-04-26 04:08 — 워크로그/상태 파일 정리 및 커밋
 
 ### 작업 요약

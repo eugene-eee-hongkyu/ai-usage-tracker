@@ -6,8 +6,8 @@
 
 ---
 
-## 마지막 실행: 2026-04-26 04:08
-## 마지막 업데이트: 2026-04-26 04:08
+## 마지막 실행: 2026-04-26 07:25
+## 마지막 업데이트: 2026-04-26 07:25
 ## 현재 모드: bypassPermissions
 
 ### 현재 집중
@@ -58,5 +58,6 @@
 - [x] 팀랭킹 탭 전환 dimming 추가 (대시보드와 동일 패턴)
 - [x] worklog.md, state.md 갱신 후 git commit & push
 - [x] 5h utilization 기능 — "안 한다"로 확정 (백로그 미등록)
+- [x] `ALLOWED_EMAIL_DOMAIN` 쉼표 구분자 다중 도메인 지원 확인 (`primuslabs.gg,gmail.com` 형식)
 - [ ] 팀원 초대 및 팀랭킹 화면 검증
 - [ ] Windows SessionEnd hook 발화 검증 (Hold 플래그)
