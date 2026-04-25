@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { db, sessions, users, dailyAgg } from "@/lib/db";
-import { eq, and, sql } from "drizzle-orm";
+import { db, sessions, users } from "@/lib/db";
+import { eq, sql } from "drizzle-orm";
 import crypto from "crypto";
 
 function hashSessionId(id: string) {

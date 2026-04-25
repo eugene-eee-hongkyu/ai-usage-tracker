@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { db, sessions, dailyAgg, users } from "@/lib/db";
-import { eq, gte, sql, and, asc } from "drizzle-orm";
+import { eq, gte, and, asc } from "drizzle-orm";
 import { generateSuggestions } from "@/lib/rules";
 
 type Period = "today" | "week" | "month" | "all";

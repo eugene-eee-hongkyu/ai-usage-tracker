@@ -53,6 +53,7 @@ export default function TeamPage() {
         const projects = Object.keys(d.projects ?? {});
         if (projects.length > 0 && !selectedProject) setSelectedProject(projects[0]);
       });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session, period]);
 
   if (!data) return (
