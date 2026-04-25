@@ -45,7 +45,7 @@ var SERVER_URL2 = process.env.USAGE_TRACKER_URL ?? "https://usage.primuslabs.gg"
 function spawnCcusage(since) {
   return new Promise((resolve, reject) => {
     const chunks = [];
-    const proc = spawn("npx", ["ccusage", "--json", "--since", since], {
+    const proc = spawn("npx", ["ccusage", "daily", "--json", "--since", since], {
       stdio: ["ignore", "pipe", "pipe"],
       shell: false
     });
@@ -67,26 +67,48 @@ function spawnCcusage(since) {
     }, 120000);
   });
 }
-function toRecord(session) {
-  const raw = JSON.stringify({
-    project: session.projectPath ?? session.project ?? "unknown",
-    startedAt: session.startTime ?? session.created_at ?? new Date().toISOString()
-  });
-  const sessionIdHash = createHash("sha256").update(raw).digest("hex").slice(0, 32);
-  return {
-    sessionIdHash,
-    project: session.projectPath ?? session.project ?? "unknown",
-    model: session.model ?? "unknown",
-    inputTokens: session.inputTokens ?? session.input_tokens ?? 0,
-    outputTokens: session.outputTokens ?? session.output_tokens ?? 0,
-    cacheRead: session.cacheReadTokens ?? session.cache_read_tokens ?? 0,
-    cacheWrite: session.cacheWriteTokens ?? session.cache_write_tokens ?? 0,
-    costUsd: session.costUsd ?? session.cost ?? 0,
-    oneShotEdits: session.oneShotEdits ?? 0,
-    totalEdits: session.totalEdits ?? 0,
-    startedAt: session.startTime ?? session.created_at ?? new Date().toISOString(),
-    endedAt: session.endTime ?? session.ended_at ?? new Date().toISOString()
-  };
+function dailyToRecords(dailyData) {
+  const records = [];
+  for (const day of dailyData) {
+    const date = day.date;
+    const breakdowns = day.modelBreakdowns ?? [];
+    for (const model of breakdowns) {
+      const key = `${date}|${model.modelName}`;
+      const sessionIdHash = createHash("sha256").update(key).digest("hex").slice(0, 32);
+      records.push({
+        sessionIdHash,
+        project: "claude-code",
+        model: model.modelName,
+        inputTokens: model.inputTokens ?? 0,
+        outputTokens: model.outputTokens ?? 0,
+        cacheRead: model.cacheReadTokens ?? 0,
+        cacheWrite: model.cacheCreationTokens ?? 0,
+        costUsd: model.cost ?? 0,
+        oneShotEdits: 0,
+        totalEdits: 0,
+        startedAt: `${date}T00:00:00.000Z`,
+        endedAt: `${date}T23:59:59.000Z`
+      });
+    }
+    if (breakdowns.length === 0) {
+      const sessionIdHash = createHash("sha256").update(date).digest("hex").slice(0, 32);
+      records.push({
+        sessionIdHash,
+        project: "claude-code",
+        model: (day.modelsUsed ?? ["unknown"])[0],
+        inputTokens: day.inputTokens ?? 0,
+        outputTokens: day.outputTokens ?? 0,
+        cacheRead: day.cacheReadTokens ?? 0,
+        cacheWrite: day.cacheCreationTokens ?? 0,
+        costUsd: day.totalCost ?? 0,
+        oneShotEdits: 0,
+        totalEdits: 0,
+        startedAt: `${date}T00:00:00.000Z`,
+        endedAt: `${date}T23:59:59.000Z`
+      });
+    }
+  }
+  return records;
 }
 async function runSync(days = 90) {
   const apiKey = process.env.USAGE_TRACKER_API_KEY ?? await loadApiKey();
@@ -96,32 +118,30 @@ async function runSync(days = 90) {
   }
   const since = new Date;
   since.setDate(since.getDate() - days);
-  const sinceStr = since.toISOString().slice(0, 10);
+  const sinceStr = since.toISOString().slice(0, 10).replace(/-/g, "");
   console.log(`${days}일치 데이터 수집 중... (${sinceStr} 이후)`);
-  let rawSessions;
+  let result;
   try {
-    rawSessions = await spawnCcusage(sinceStr);
+    result = await spawnCcusage(sinceStr);
   } catch (err) {
     console.error("ccusage 실행 실패:", err.message);
     process.exit(1);
   }
-  if (!Array.isArray(rawSessions) || rawSessions.length === 0) {
-    console.log("수집할 세션이 없습니다.");
+  const dailyData = result?.daily ?? [];
+  if (dailyData.length === 0) {
+    console.log("수집할 데이터가 없습니다.");
     return;
   }
-  const sessions = rawSessions.map(toRecord);
-  console.log(`${sessions.length}개 세션 전송 중...`);
+  const sessions = dailyToRecords(dailyData);
+  console.log(`${sessions.length}개 레코드 전송 중...`);
   const resp = await fetch(`${SERVER_URL2}/api/ingest`, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-api-key": apiKey
-    },
+    headers: { "Content-Type": "application/json", "x-api-key": apiKey },
     body: JSON.stringify({ sessions })
   });
   if (resp.ok) {
     const data = await resp.json();
-    console.log(`✅ ${data.inserted ?? sessions.length}개 세션 전송 완료`);
+    console.log(`✅ ${data.inserted ?? sessions.length}개 레코드 전송 완료`);
   } else {
     console.error(`❌ 전송 실패: ${resp.status}`);
     process.exit(1);

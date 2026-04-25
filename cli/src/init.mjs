@@ -26,13 +26,14 @@ async function getKeytar() {
 }
 
 export async function saveApiKey(apiKey) {
+  // Always save to fallback file so standalone scripts can read it without keytar
+  const fallbackPath = path.join(os.homedir(), ".primus-usage-key");
+  fs.writeFileSync(fallbackPath, apiKey, { mode: 0o600 });
+  // Also try keytar for better security
   const keytar = await getKeytar();
   if (keytar) {
     await keytar.setPassword(KEYTAR_SERVICE, KEYTAR_ACCOUNT, apiKey);
-    return;
   }
-  const fallbackPath = path.join(os.homedir(), ".primus-usage-key");
-  fs.writeFileSync(fallbackPath, apiKey, { mode: 0o600 });
 }
 
 export async function loadApiKey() {
