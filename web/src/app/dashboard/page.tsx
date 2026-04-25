@@ -14,7 +14,7 @@ type Period = "today" | "week" | "month" | "all";
 
 interface DashboardData {
   user: { name: string; lastSyncedAt: string | null };
-  summary: { totalTokens: number; totalCost: number; oneShotRate: number; cacheHitRate: number; sessionsCount: number; totalEdits: number };
+  summary: { totalTokens: number; outputTokens: number; totalCost: number; oneShotRate: number; cacheHitRate: number; sessionsCount: number; totalEdits: number; cacheRead: number };
   daily: Array<{ date: string; totalTokens: number; totalCost: number; cacheRead: number; cacheWrite: number }>;
   models: Record<string, { tokens: number; cost: number }>;
   suggestions: Suggestion[];
@@ -130,10 +130,19 @@ export default function DashboardPage() {
   }));
 
   const totalTokens = data.summary.totalTokens;
-  const { cacheHitRate, oneShotRate, sessionsCount, totalEdits } = data.summary;
+  const { cacheHitRate, oneShotRate, sessionsCount, totalEdits, outputTokens, cacheRead } = data.summary;
   const activeDays = data.daily.filter((d) =>
     ((d.totalTokens ?? 0) + (d.cacheRead ?? 0) + (d.cacheWrite ?? 0)) > 0
   ).length;
+
+  const periodTotalDays = period === "today" ? 1
+    : period === "week" ? 7
+    : period === "month" ? 30
+    : chartData.length;
+
+  const avgDailyCost = activeDays > 0 ? data.summary.totalCost / activeDays : 0;
+  const cacheSavingUsd = (cacheRead / 1_000_000) * 2.70;
+  const outputDensity = totalTokens > 0 ? Math.round(outputTokens / totalTokens * 100) : 0;
 
   return (
     <div className="min-h-screen">
@@ -220,49 +229,51 @@ export default function DashboardPage() {
         <div className="bg-slate-900 rounded-lg p-4">
           <p className="text-sm text-slate-400 mb-4">사용 지표</p>
           <div className="grid grid-cols-3 gap-4">
-            {/* One-shot rate */}
-            <div className="space-y-1">
-              <p className="text-xs text-slate-500">One-shot rate</p>
-              {totalEdits > 0 ? (
-                <>
-                  <p className="text-xl font-semibold text-slate-200">{oneShotRate}%</p>
-                  <MetricStatus value={oneShotRate} thresholdGood={70} thresholdOk={40} />
-                  <p className="text-xs text-slate-600 leading-relaxed mt-1">
-                    첫 번째 코드 편집 시도가 바로 성공하는 비율.<br />
-                    높을수록 AI가 요구사항을 정확히 파악한다는 신호.<br />
-                    <span className="text-slate-500">목표 70%+</span>
-                  </p>
-                </>
-              ) : (
-                <>
-                  <p className="text-xl font-semibold text-slate-500">측정 불가</p>
-                  <p className="text-xs text-slate-600 leading-relaxed mt-1">
-                    현재 버전에서는 편집 성공 여부를<br />
-                    ccusage가 수집하지 않습니다.
-                  </p>
-                </>
-              )}
-            </div>
             {/* Cache hit */}
             <div className="space-y-1">
               <p className="text-xs text-slate-500">Cache hit</p>
               <p className="text-xl font-semibold text-slate-200">{cacheHitRate}%</p>
               <MetricStatus value={cacheHitRate} thresholdGood={80} thresholdOk={50} />
               <p className="text-xs text-slate-600 leading-relaxed mt-1">
-                이전에 처리한 내용을 재사용한 비율.<br />
-                높을수록 API 비용이 절감됨.<br />
+                이전 내용을 재사용한 비율.<br />
                 CLAUDE.md를 짧게 유지하면 올라감.<br />
                 <span className="text-slate-500">목표 80%+</span>
+              </p>
+            </div>
+            {/* Avg daily cost */}
+            <div className="space-y-1">
+              <p className="text-xs text-slate-500">평균 일비용</p>
+              <p className="text-xl font-semibold text-slate-200">${avgDailyCost.toFixed(2)}</p>
+              <p className="text-xs text-slate-600 leading-relaxed mt-1">
+                활성 일수 기준 하루 평균 비용.<br />
+                캐시 hit가 높을수록 낮아짐.
+              </p>
+            </div>
+            {/* Cache saving */}
+            <div className="space-y-1">
+              <p className="text-xs text-slate-500">캐시 절감 추정</p>
+              <p className="text-xl font-semibold text-slate-200">${cacheSavingUsd.toFixed(2)}</p>
+              <p className="text-xs text-slate-600 leading-relaxed mt-1">
+                캐시 읽기로 아낀 비용 추정.<br />
+                (캐시 읽기 = 일반 입력의 10% 단가)
+              </p>
+            </div>
+            {/* Output density */}
+            <div className="space-y-1">
+              <p className="text-xs text-slate-500">출력 밀도</p>
+              <p className="text-xl font-semibold text-slate-200">{outputDensity}%</p>
+              <p className="text-xs text-slate-600 leading-relaxed mt-1">
+                전체 토큰 중 Claude 출력 비중.<br />
+                높을수록 Claude가 더 많이 생성.
               </p>
             </div>
             {/* Active days */}
             <div className="space-y-1">
               <p className="text-xs text-slate-500">활성 일수</p>
-              <p className="text-xl font-semibold text-slate-200">{activeDays}일</p>
+              <p className="text-xl font-semibold text-slate-200">{activeDays}/{periodTotalDays}일</p>
               <p className="text-xs text-slate-600 leading-relaxed mt-1">
-                이 기간 중 실제로<br />
-                사용한 날 수.<br />
-                <span className="text-slate-500">(전체 {sessionsCount}회 수집)</span>
+                이 기간 중 실제로 사용한 날.<br />
+                <span className="text-slate-500">({sessionsCount}회 수집)</span>
               </p>
             </div>
           </div>

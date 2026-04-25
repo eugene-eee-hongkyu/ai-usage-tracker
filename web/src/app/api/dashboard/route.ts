@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { db, sessions, dailyAgg, users } from "@/lib/db";
-import { eq, gte, sql, and } from "drizzle-orm";
+import { eq, gte, sql, and, asc } from "drizzle-orm";
 import { generateSuggestions } from "@/lib/rules";
 
 type Period = "today" | "week" | "month" | "all";
@@ -53,7 +53,8 @@ export async function GET(req: NextRequest) {
   const dailyRows = await db
     .select()
     .from(dailyAgg)
-    .where(and(eq(dailyAgg.userId, userId), gte(dailyAgg.date, localDateStr(chartSince))));
+    .where(and(eq(dailyAgg.userId, userId), gte(dailyAgg.date, localDateStr(chartSince))))
+    .orderBy(asc(dailyAgg.date));
 
   // aggregate for period
   const periodSessions = await db
@@ -65,6 +66,7 @@ export async function GET(req: NextRequest) {
     (s, r) => s + r.inputTokens + r.outputTokens + r.cacheRead + r.cacheWrite,
     0
   );
+  const outputTokens = periodSessions.reduce((s, r) => s + r.outputTokens, 0);
   const totalCost = periodSessions.reduce((s, r) => s + r.costUsd, 0);
   const cacheRead = periodSessions.reduce((s, r) => s + r.cacheRead, 0);
   const cacheWrite = periodSessions.reduce((s, r) => s + r.cacheWrite, 0);
@@ -116,7 +118,7 @@ export async function GET(req: NextRequest) {
 
   return NextResponse.json({
     user: { name: user[0].name, email: user[0].email, avatarUrl: user[0].avatarUrl, lastSyncedAt: user[0].lastSyncedAt },
-    summary: { totalTokens, totalCost, oneShotRate, cacheHitRate, sessionsCount: periodSessions.length, totalEdits },
+    summary: { totalTokens, outputTokens, totalCost, oneShotRate, cacheHitRate, sessionsCount: periodSessions.length, totalEdits, cacheRead },
     daily: dailyRows,
     models: modelMap,
     projects: projectMap,

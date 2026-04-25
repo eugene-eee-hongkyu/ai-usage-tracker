@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { Nav } from "@/components/nav";
@@ -131,8 +131,27 @@ const GUIDES: Record<string, { why: string; steps: string[] }> = {
 
 function SuggestionCard({ suggestion, index }: { suggestion: Suggestion; index: number }) {
   const [acted, setActs] = useState<string | null>(null);
-  const [expanded, setExpanded] = useState(false);
+  const [expanded, setExpanded] = useState(true);
+  const storageKey = `guide-${suggestion.type}`;
+  const initialized = useRef(false);
   const guide = GUIDES[suggestion.type];
+
+  useEffect(() => {
+    if (initialized.current) return;
+    initialized.current = true;
+    try {
+      if (localStorage.getItem(storageKey) === "closed") setExpanded(false);
+    } catch {}
+  }, [storageKey]);
+
+  const toggleExpanded = () => {
+    const next = !expanded;
+    setExpanded(next);
+    try {
+      if (!next) localStorage.setItem(storageKey, "closed");
+      else localStorage.removeItem(storageKey);
+    } catch {}
+  };
 
   const feedback = async (action: string) => {
     setActs(action);
@@ -158,10 +177,10 @@ function SuggestionCard({ suggestion, index }: { suggestion: Suggestion; index: 
       {guide && (
         <div className="space-y-2">
           <button
-            onClick={() => setExpanded(!expanded)}
+            onClick={toggleExpanded}
             className="text-xs text-indigo-400 hover:text-indigo-300 transition-colors"
           >
-            {expanded ? "▲ 가이드 닫기" : "▼ 어떻게 개선하나요?"}
+            {expanded ? "▲ 닫기" : "▼ 어떻게 개선하나요?"}
           </button>
           {expanded && (
             <div className="bg-slate-800 rounded-lg p-3 space-y-3">
