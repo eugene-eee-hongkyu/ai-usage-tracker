@@ -4,6 +4,31 @@
 
 ---
 
+## Session 2026-04-25 21:48 — 프로덕션 로그인 연결 디버깅 및 UX 개선
+
+### 작업 요약
+- **프로덕션 DB 연결 3단계 디버깅**:
+  1. `ENOTFOUND db.ifgncizkzojddguxwksd.supabase.co` → Supabase direct URL은 Vercel(IPv4) 에서 DNS 실패 → Transaction Pooler + IPv4 Shared Pooler URL로 교체
+  2. `password authentication failed for user "postgres"` → URL 직접 파싱 시 `postgres.ifgncizkzojddguxwksd` 유저명 처리 오류 → `connectionString` 직접 전달로 수정
+  3. 비밀번호 특수문자 (`!`, `@`) URL 인코딩 필요 → `%21`, `%40`으로 인코딩 후 Vercel 환경변수 업데이트
+- **auth.ts try/catch 추가**: DB 에러가 `Headers.set` 500으로 뻗는 버그 수정 → `/login?error=db` 클린 리디렉트
+- **db/index.ts SSL 수정**: localhost 외 환경에서 SSL 자동 활성화
+- **프로덕션 GitHub 로그인 성공** → 대시보드 데이터 정상 표시 확인
+- **CLI init 프로덕션 연결 성공**: `npx github:eugene-eee-hongkyu/ai-usage-tracker init` → API 키 발급, hook 등록, 백그라운드 백필 완료
+- **dashboard neverSynced UX 개선**: "데이터 수집 중..." 화면 + 4초 polling으로 자동 전환
+- **탭 전환 로딩 UX 개선**: period 탭 전환 시 `opacity-40 + pointer-events-none`으로 stale data dimming
+
+### 실패한 시도
+- `db/index.ts` URL 수동 파싱 방식 → Supabase pooler 유저명(`postgres.ifgncizkzojddguxwksd`) 잘못 처리 → `connectionString` 직접 전달로 교체
+- SSL 조건을 `sslmode=require` URL 파라미터로만 체크 → Supabase URL에 파라미터 없으면 SSL 비활성화 → hostname 기반 자동 활성화로 변경
+
+### 다음 액션
+1. 팀원 초대 및 다른 멤버 데이터 수집 확인
+2. B-1 §3 Hold 플래그: Windows 환경 친구 1명 확보 — SessionEnd hook 발화 검증
+3. 필요 시 추가 UI 피드백 반영
+
+---
+
 ## Session 2026-04-25 21:10 — 대시보드 UI 버그 수정 및 B-2 Vercel+Supabase 배포 완료
 
 ### 작업 요약
