@@ -131,7 +131,9 @@ export default function DashboardPage() {
 
         {/* Daily token chart */}
         <div className="bg-slate-900 rounded-lg p-4">
-          <p className="text-sm text-slate-400 mb-3">일별 토큰 (7일)</p>
+          <p className="text-sm text-slate-400 mb-3">
+            {period === "today" ? "오늘 토큰" : period === "week" ? "일별 토큰 (7일)" : period === "month" ? "일별 토큰 (30일)" : "일별 토큰 (전체)"}
+          </p>
           {loading ? (
             <div className="h-32 bg-slate-800 animate-pulse rounded" />
           ) : (

@@ -40,8 +40,8 @@ export async function GET(req: NextRequest) {
 
   const userId = user[0].id;
 
-  // daily chart (last 7 days regardless of period for chart)
-  const chartSince = sinceDate("week");
+  // daily chart — use same period as summary
+  const chartSince = sinceDate(period);
   const dailyRows = await db
     .select()
     .from(dailyAgg)
