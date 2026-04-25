@@ -14,7 +14,7 @@ type Period = "today" | "week" | "month" | "all";
 
 interface DashboardData {
   user: { name: string; lastSyncedAt: string | null };
-  summary: { totalTokens: number; totalCost: number; oneShotRate: number; cacheHitRate: number; sessionsCount: number };
+  summary: { totalTokens: number; totalCost: number; oneShotRate: number; cacheHitRate: number; sessionsCount: number; totalEdits: number };
   daily: Array<{ date: string; totalTokens: number; totalCost: number; cacheRead: number; cacheWrite: number }>;
   models: Record<string, { tokens: number; cost: number }>;
   suggestions: Suggestion[];
@@ -36,8 +36,11 @@ function periodLabel(period: Period) {
   return period === "today" ? "오늘" : period === "week" ? "이번 주" : period === "month" ? "이번 달" : "전체";
 }
 
-function chartDayLabel(period: Period) {
-  return period === "today" ? "오늘 토큰" : period === "week" ? "일별 토큰 (7일)" : period === "month" ? "일별 토큰 (30일)" : "일별 토큰 (전체)";
+function chartDayLabel(period: Period, totalDays: number) {
+  if (period === "today") return "오늘 토큰";
+  if (period === "week") return "일별 토큰 (7일)";
+  if (period === "month") return "일별 토큰 (30일)";
+  return `일별 토큰 (전체 ${totalDays}일)`;
 }
 
 // Recharts custom tooltip
@@ -127,7 +130,10 @@ export default function DashboardPage() {
   }));
 
   const totalTokens = data.summary.totalTokens;
-  const { cacheHitRate, oneShotRate, sessionsCount } = data.summary;
+  const { cacheHitRate, oneShotRate, sessionsCount, totalEdits } = data.summary;
+  const activeDays = data.daily.filter((d) =>
+    ((d.totalTokens ?? 0) + (d.cacheRead ?? 0) + (d.cacheWrite ?? 0)) > 0
+  ).length;
 
   return (
     <div className="min-h-screen">
@@ -167,7 +173,7 @@ export default function DashboardPage() {
 
         {/* Daily token chart */}
         <div className="bg-slate-900 rounded-lg p-4">
-          <p className="text-sm text-slate-400 mb-3">{chartDayLabel(period)}</p>
+          <p className="text-sm text-slate-400 mb-3">{chartDayLabel(period, chartData.length)}</p>
           {loading ? (
             <div className="h-32 bg-slate-800 animate-pulse rounded" />
           ) : (
@@ -210,20 +216,32 @@ export default function DashboardPage() {
             })}
         </div>
 
-        {/* Efficiency metrics */}
+        {/* Metrics */}
         <div className="bg-slate-900 rounded-lg p-4">
-          <p className="text-sm text-slate-400 mb-4">효율 지표</p>
+          <p className="text-sm text-slate-400 mb-4">사용 지표</p>
           <div className="grid grid-cols-3 gap-4">
             {/* One-shot rate */}
             <div className="space-y-1">
               <p className="text-xs text-slate-500">One-shot rate</p>
-              <p className="text-xl font-semibold text-slate-200">{oneShotRate}%</p>
-              <MetricStatus value={oneShotRate} thresholdGood={70} thresholdOk={40} />
-              <p className="text-xs text-slate-600 leading-relaxed mt-1">
-                첫 번째 코드 편집 시도가 바로 성공하는 비율.<br />
-                높을수록 AI가 요구사항을 정확히 파악한다는 신호.<br />
-                <span className="text-slate-500">목표 70%+</span>
-              </p>
+              {totalEdits > 0 ? (
+                <>
+                  <p className="text-xl font-semibold text-slate-200">{oneShotRate}%</p>
+                  <MetricStatus value={oneShotRate} thresholdGood={70} thresholdOk={40} />
+                  <p className="text-xs text-slate-600 leading-relaxed mt-1">
+                    첫 번째 코드 편집 시도가 바로 성공하는 비율.<br />
+                    높을수록 AI가 요구사항을 정확히 파악한다는 신호.<br />
+                    <span className="text-slate-500">목표 70%+</span>
+                  </p>
+                </>
+              ) : (
+                <>
+                  <p className="text-xl font-semibold text-slate-500">측정 불가</p>
+                  <p className="text-xs text-slate-600 leading-relaxed mt-1">
+                    현재 버전에서는 편집 성공 여부를<br />
+                    ccusage가 수집하지 않습니다.
+                  </p>
+                </>
+              )}
             </div>
             {/* Cache hit */}
             <div className="space-y-1">
@@ -237,13 +255,14 @@ export default function DashboardPage() {
                 <span className="text-slate-500">목표 80%+</span>
               </p>
             </div>
-            {/* Sessions */}
+            {/* Active days */}
             <div className="space-y-1">
-              <p className="text-xs text-slate-500">세션 수</p>
-              <p className="text-xl font-semibold text-slate-200">{sessionsCount}회</p>
+              <p className="text-xs text-slate-500">활성 일수</p>
+              <p className="text-xl font-semibold text-slate-200">{activeDays}일</p>
               <p className="text-xs text-slate-600 leading-relaxed mt-1">
-                이 기간에 수집된<br />
-                일별 사용 레코드 수.
+                이 기간 중 실제로<br />
+                사용한 날 수.<br />
+                <span className="text-slate-500">(전체 {sessionsCount}회 수집)</span>
               </p>
             </div>
           </div>

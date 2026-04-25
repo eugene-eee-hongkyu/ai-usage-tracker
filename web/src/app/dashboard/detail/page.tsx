@@ -81,8 +81,58 @@ export default function DashboardDetailPage() {
   );
 }
 
+const GUIDES: Record<string, { why: string; steps: string[] }> = {
+  cache_hit: {
+    why: "캐시 읽기 토큰은 일반 입력 토큰의 약 10% 가격입니다. Cache hit 80%이면 입력 비용의 약 70%를 절감할 수 있습니다. Claude는 동일한 시스템 프롬프트(CLAUDE.md + 파일 내용)가 반복될 때 이전 결과를 캐시에서 읽습니다.",
+    steps: [
+      "CLAUDE.md를 5KB 이하로 줄이기 — 파일이 클수록 캐시 분할 포인트가 자주 바뀌어 hit율이 떨어집니다",
+      "세션 간 간격 5분 이내 유지 — 캐시 TTL은 5분입니다. 쉬었다 오면 캐시가 만료됩니다",
+      "/compact 또는 세션 재시작 최소화 — 새 컨텍스트가 시작되면 캐시를 처음부터 다시 씁니다",
+      "불필요한 대형 파일 참조 제거 — CONTEXT.md, 대용량 로그 파일을 프롬프트에 넣으면 캐시 효율이 떨어집니다",
+    ],
+  },
+  opus_heavy: {
+    why: "Opus는 Sonnet 대비 약 5배 비쌉니다. 코드 편집, 리팩터링, 테스트 작성, 버그 수정 등 대부분의 일상 작업은 Sonnet으로 충분합니다. Opus의 강점은 새로운 아키텍처 설계, 복잡한 알고리즘 구상 등 고난도 추론이 필요한 경우입니다.",
+    steps: [
+      "Claude Code에서 /model 명령으로 기본 모델을 Sonnet으로 변경하세요",
+      "Opus는 새 프로젝트 아키텍처 설계, 복잡한 알고리즘 설계 시에만 선택적으로 사용하세요",
+      "\"이 작업에 Opus가 꼭 필요한가?\" 스스로 물어보고, 코드 구현·편집 작업이라면 Sonnet으로 전환하세요",
+      "CLAUDE.md에 defaultModel 힌트를 추가해 Claude가 자동으로 적절한 모델을 선택하도록 도울 수 있습니다",
+    ],
+  },
+  high_retry: {
+    why: "재시도가 많다는 것은 Claude가 첫 번째 시도에서 요구사항을 파악하지 못했다는 신호입니다. 재시도마다 동일한 컨텍스트를 반복 처리하므로 토큰과 시간이 낭비됩니다.",
+    steps: [
+      "\"수정해줘\" 대신 \"A 파일의 B 함수를 C로 바꿔줘, D는 유지\" 형태로 구체적으로 지시하세요",
+      "CLAUDE.md에 자주 쓰는 패턴, 코드 컨벤션, 금지 사항을 미리 정의해두세요",
+      "복잡한 작업은 단계별로 나눠서 각 단계를 확인한 후 다음 단계를 지시하세요",
+      "관련 파일을 먼저 Read하거나 \"이 파일을 먼저 읽어봐\" 라고 요청해 맥락을 공유한 후 작업을 지시하세요",
+    ],
+  },
+  low_utilization: {
+    why: "Claude Code Pro/Max 요금제는 5시간 슬라이딩 윈도우로 heavy usage limit이 적용됩니다. 짧은 세션이 분산되면 매월 정액을 내면서 실제 사용량은 적어지는 비효율이 발생합니다.",
+    steps: [
+      "짧은 1-2분 세션 여러 개 대신 20-30분 집중 세션으로 묶어서 사용하세요",
+      "세션 시작 전 작업 목록을 3-5개 미리 준비해 유휴 시간을 최소화하세요",
+      "한 세션에서 연관된 작업을 연속으로 처리하세요 (파일 수정 → 테스트 → 리뷰 → 문서 업데이트)",
+      "\"잠깐 다른 일 하고 올게\"보다 세션 완결 후 재시작이 캐시 효율도 높습니다",
+    ],
+  },
+  mcp_unused: {
+    why: "MCP(Model Context Protocol) 서버를 통해 Claude가 브라우저, 데이터베이스, 외부 서비스에 직접 접근할 수 있습니다. 반복적으로 하는 수동 작업(UI 확인, DB 조회, API 테스트)을 Claude에게 위임할 수 있습니다.",
+    steps: [
+      "Playwright MCP: 브라우저 자동화 — UI 테스트, 웹 스크래핑, 폼 입력을 Claude가 직접 실행",
+      "DB MCP: 데이터베이스 직접 쿼리 — 스키마 확인, 데이터 조회, 마이그레이션 검증",
+      "Filesystem MCP: 대용량 파일 조작, 디렉터리 전체 탐색 효율화",
+      "설치 방법: Claude Code에서 /mcp 명령으로 사용 가능한 MCP 서버 확인 후 추가하세요",
+    ],
+  },
+};
+
 function SuggestionCard({ suggestion, index }: { suggestion: Suggestion; index: number }) {
   const [acted, setActs] = useState<string | null>(null);
+  const [expanded, setExpanded] = useState(false);
+  const guide = GUIDES[suggestion.type];
 
   const feedback = async (action: string) => {
     setActs(action);
@@ -104,7 +154,38 @@ function SuggestionCard({ suggestion, index }: { suggestion: Suggestion; index: 
         </p>
       </div>
       <p className="text-xs text-slate-400">{suggestion.detail}</p>
-      <div className="flex items-center gap-3 text-xs">
+
+      {guide && (
+        <div className="space-y-2">
+          <button
+            onClick={() => setExpanded(!expanded)}
+            className="text-xs text-indigo-400 hover:text-indigo-300 transition-colors"
+          >
+            {expanded ? "▲ 가이드 닫기" : "▼ 어떻게 개선하나요?"}
+          </button>
+          {expanded && (
+            <div className="bg-slate-800 rounded-lg p-3 space-y-3">
+              <div>
+                <p className="text-xs text-slate-300 font-medium mb-1">왜 중요한가요?</p>
+                <p className="text-xs text-slate-400 leading-relaxed">{guide.why}</p>
+              </div>
+              <div>
+                <p className="text-xs text-slate-300 font-medium mb-1">개선 방법</p>
+                <ol className="space-y-1">
+                  {guide.steps.map((step, i) => (
+                    <li key={i} className="text-xs text-slate-400 leading-relaxed flex gap-2">
+                      <span className="text-slate-500 shrink-0">{i + 1}.</span>
+                      <span>{step}</span>
+                    </li>
+                  ))}
+                </ol>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      <div className="flex items-center gap-3 text-xs pt-1">
         {acted === "done" ? (
           <span className="text-green-400">✅ 완료 처리됨</span>
         ) : acted === "dismiss" ? (
