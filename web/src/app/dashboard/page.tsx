@@ -9,6 +9,7 @@ import {
 import { Nav } from "@/components/nav";
 import Link from "next/link";
 import type { Suggestion } from "@/lib/rules";
+import { CacheHitModal, CostPerSessionModal } from "@/components/metric-modal";
 
 type Period = "today" | "week" | "month" | "all";
 
@@ -74,6 +75,7 @@ export default function DashboardPage() {
   const [period, setPeriod] = useState<Period>("week");
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [openModal, setOpenModal] = useState<"cacheHit" | "costPerSession" | null>(null);
 
   useEffect(() => {
     if (status === "unauthenticated") router.push("/login");
@@ -243,15 +245,16 @@ export default function DashboardPage() {
           <p className="text-sm text-slate-400 mb-4">사용 지표</p>
           <div className="grid grid-cols-3 gap-4">
             {/* Cache hit */}
-            <div className="space-y-1">
-              <p className="text-xs text-slate-500">Cache hit</p>
+            <div
+              className="space-y-1 cursor-pointer group"
+              onClick={() => setOpenModal("cacheHit")}
+            >
+              <p className="text-xs text-slate-500 group-hover:text-slate-400 transition-colors">Cache hit</p>
               <p className="text-xl font-semibold text-slate-200">{cacheHitRate}%</p>
               <MetricStatus value={cacheHitRate} thresholdGood={80} thresholdOk={50} />
-              <p className="text-xs text-slate-600 leading-relaxed mt-1">
-                이전 내용을 재사용한 비율.<br />
-                CLAUDE.md를 짧게 유지하면 올라감.<br />
-                <span className="text-slate-500">목표 80%+</span>
-              </p>
+              <span className="inline-block text-xs text-indigo-500 group-hover:text-indigo-400 mt-1 transition-colors">
+                올리는 방법 →
+              </span>
             </div>
             {/* Avg daily cost */}
             <div className="space-y-1">
@@ -292,13 +295,15 @@ export default function DashboardPage() {
               </p>
             </div>
             {/* Cost per session */}
-            <div className="space-y-1">
-              <p className="text-xs text-slate-500">세션당 평균 비용</p>
-              <p className="text-xl font-semibold text-slate-200">${costPerSession.toFixed(3)}</p>
-              <p className="text-xs text-slate-600 leading-relaxed mt-1">
-                총 비용 ÷ 세션 수.<br />
-                낮을수록 효율적으로 사용 중.
-              </p>
+            <div
+              className="space-y-1 cursor-pointer group"
+              onClick={() => setOpenModal("costPerSession")}
+            >
+              <p className="text-xs text-slate-500 group-hover:text-slate-400 transition-colors">세션당 평균 비용</p>
+              <p className="text-xl font-semibold text-slate-200">${costPerSession.toFixed(2)}</p>
+              <span className="inline-block text-xs text-indigo-500 group-hover:text-indigo-400 mt-1 transition-colors">
+                줄이는 방법 →
+              </span>
             </div>
             {/* Active days */}
             <div className="space-y-1">
@@ -332,6 +337,18 @@ export default function DashboardPage() {
           </div>
         )}
       </main>
+
+      {openModal === "cacheHit" && (
+        <CacheHitModal value={cacheHitRate} onClose={() => setOpenModal(null)} />
+      )}
+      {openModal === "costPerSession" && (
+        <CostPerSessionModal
+          value={costPerSession}
+          sessionsCount={sessionsCount}
+          totalCost={data.summary.totalCost}
+          onClose={() => setOpenModal(null)}
+        />
+      )}
     </div>
   );
 }
