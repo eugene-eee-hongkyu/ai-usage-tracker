@@ -10,7 +10,7 @@ import { existsSync, readFileSync } from "fs";
 import { join } from "path";
 import { homedir } from "os";
 
-const SERVER_URL = process.env.USAGE_TRACKER_URL ?? "https://usage.primuslabs.gg";
+const SERVER_URL = process.env.USAGE_TRACKER_URL ?? "https://ai-usage-tracker-web-psi.vercel.app";
 const KEYTAR_SERVICE = "primus-usage-tracker";
 const KEYTAR_ACCOUNT = "api-key";
 

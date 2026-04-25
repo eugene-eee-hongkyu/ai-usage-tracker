@@ -3,7 +3,7 @@ import { spawn } from "child_process";
 import { createHash } from "crypto";
 import { loadApiKey } from "./init.mjs";
 
-const SERVER_URL = process.env.USAGE_TRACKER_URL ?? "https://usage.primuslabs.gg";
+const SERVER_URL = process.env.USAGE_TRACKER_URL ?? "https://ai-usage-tracker-web-psi.vercel.app";
 
 function spawnCcusage(since) {
   return new Promise((resolve, reject) => {

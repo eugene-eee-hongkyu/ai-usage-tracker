@@ -876,7 +876,7 @@ import * as path from "path";
 import * as readline from "readline";
 import { fileURLToPath } from "url";
 var __dirname2 = path.dirname(fileURLToPath(import.meta.url));
-var SERVER_URL = process.env.USAGE_TRACKER_URL ?? "https://usage.primuslabs.gg";
+var SERVER_URL = process.env.USAGE_TRACKER_URL ?? "https://ai-usage-tracker-web-psi.vercel.app";
 var KEYTAR_SERVICE = "primus-usage-tracker";
 var KEYTAR_ACCOUNT = "api-key";
 var CLAUDE_SETTINGS_PATH = path.join(os.homedir(), ".claude", "settings.json");
@@ -1075,7 +1075,7 @@ async function runReset() {
 // cli/src/sync.mjs
 import { spawn as spawn2 } from "child_process";
 import { createHash } from "crypto";
-var SERVER_URL2 = process.env.USAGE_TRACKER_URL ?? "https://usage.primuslabs.gg";
+var SERVER_URL2 = process.env.USAGE_TRACKER_URL ?? "https://ai-usage-tracker-web-psi.vercel.app";
 function spawnCcusage(since) {
   return new Promise((resolve, reject) => {
     const chunks = [];
