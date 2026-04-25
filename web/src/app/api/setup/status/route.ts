@@ -22,15 +22,18 @@ export async function GET() {
     .from(sessions)
     .where(eq(sessions.userId, user[0].id));
 
-  const hasSessions = (sessionCount?.value ?? 0) > 0;
+  const sessionsCount = sessionCount?.value ?? 0;
+  const hasSessions = sessionsCount > 0;
   const hasSynced = !!user[0].lastSyncedAt;
 
   return NextResponse.json({
     ready: hasSessions,
-    steps: [
-      { label: "Node 18+ 확인", done: true },
-      { label: "keytar 설치", done: hasSynced },
-      { label: "hook 등록", done: hasSessions },
-    ],
+    lastSyncedAt: user[0].lastSyncedAt ?? null,
+    sessionsCount,
+    steps: {
+      cli_installed: hasSynced,
+      hook_registered: hasSynced,
+      first_session: hasSessions,
+    },
   });
 }
