@@ -30,22 +30,26 @@ export const authOptions: NextAuthOptions = {
         return `/login?error=domain`;
       }
 
-      // Upsert user
-      const existing = await db
-        .select()
-        .from(users)
-        .where(eq(users.email, email))
-        .limit(1);
+      try {
+        const existing = await db
+          .select()
+          .from(users)
+          .where(eq(users.email, email))
+          .limit(1);
 
-      if (existing.length === 0) {
-        await db.insert(users).values({
-          githubId: String((profile as Record<string, unknown>)?.id ?? account?.providerAccountId),
-          email,
-          name: user.name ?? email.split("@")[0],
-          avatarUrl: user.image ?? null,
-        });
+        if (existing.length === 0) {
+          await db.insert(users).values({
+            githubId: String((profile as Record<string, unknown>)?.id ?? account?.providerAccountId),
+            email,
+            name: user.name ?? email.split("@")[0],
+            avatarUrl: user.image ?? null,
+          });
+        }
+        return true;
+      } catch (err) {
+        console.error("[auth] signIn DB error:", err);
+        return "/login?error=db";
       }
-      return true;
     },
     async session({ session }) {
       if (session.user?.email) {
