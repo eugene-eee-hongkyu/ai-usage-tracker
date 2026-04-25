@@ -154,8 +154,6 @@ export default function DashboardPage() {
   const avgDailyCost = activeDays > 0 ? data.summary.totalCost / activeDays : 0;
   const cacheSavingUsd = (cacheRead / 1_000_000) * 2.70;
   const costPerSession = sessionsCount > 0 ? data.summary.totalCost / sessionsCount : 0;
-  // Proxy: avg cache tokens per session / 200K context window → how "full" sessions tend to get
-  const contextPressure = sessionsCount > 0 ? Math.round((cacheRead / sessionsCount) / 200_000 * 100) : 0;
   const { platformAvg } = data;
   const showPlatformAvg = platformAvg.userCount > 1;
 
@@ -300,17 +298,6 @@ export default function DashboardPage() {
               <p className="text-xs text-slate-600 leading-relaxed mt-1">
                 총 비용 ÷ 세션 수.<br />
                 낮을수록 효율적으로 사용 중.
-              </p>
-            </div>
-            {/* Context pressure */}
-            <div className="space-y-1">
-              <p className="text-xs text-slate-500">컨텍스트 압박률</p>
-              <p className="text-xl font-semibold text-slate-200">{contextPressure}%</p>
-              <MetricStatus value={contextPressure} thresholdGood={30} thresholdOk={70} inverse={true} />
-              <p className="text-xs text-slate-600 leading-relaxed mt-1">
-                세션당 캐시 토큰 / 200K 컨텍스트.<br />
-                높을수록 대화가 길어지는 경향.<br />
-                <span className="text-slate-500">proxy 측정값</span>
               </p>
             </div>
             {/* Active days */}
