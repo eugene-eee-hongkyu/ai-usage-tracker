@@ -4,6 +4,44 @@
 
 ---
 
+## Session 2026-04-25 21:10 — 대시보드 UI 버그 수정 및 B-2 Vercel+Supabase 배포 완료
+
+### 작업 요약
+- **대시보드 UI/UX 버그 수정 (6배치)**:
+  - 차트 x축 날짜 정렬 오류 → `ORDER BY date ASC` 추가
+  - 오늘 그래프 어제 데이터 표시 버그 → UTC 시프트 문제, `localDateStr()` 헬퍼 추가
+  - 토큰 수 크게 낮게 표시 (11.7M vs 2.375B) → cacheRead/cacheWrite 누락, `totalTokens = input+output+cache` 전체 합산으로 수정
+  - 출력밀도 항상 0% → 분모를 `totalTokens`(캐시 포함) 대신 `inputTokens+outputTokens`로 수정
+  - 전체 기간 활성일수 30/30일 → `allDayRange` 첫 레코드 날짜~오늘 기준으로 수정
+  - one-shot 측정 불가 지표 제거 → 캐시히트/평균일비용/캐시절감/출력밀도/활성일수 5개 지표로 교체
+  - 플랫폼 평균 비교 추가 (↑높음/↓낮음/비슷)
+- **절감 제안 룰 버그 수정**:
+  - `mcp_unused` 룰 삭제 (ccusage 데이터로 MCP 감지 불가 — 무조건 발화)
+  - `low_utilization` 룰에 `activeHours > 0` 가드 추가 (하드코딩 0으로 항상 발화)
+- **더보기 페이지 개선**: 각 제안 유형별 rich 설명 + 기본 펼침 + localStorage 상태 유지
+- **Vercel + Supabase 배포 (B-2)**:
+  - Supabase 프로젝트 생성 (ifgncizkzojddguxwksd.supabase.co)
+  - drizzle-kit push 무응답 → SQL Editor에서 4개 테이블 직접 생성
+  - Vercel 배포 성공 (ai-usage-tracker-web-psi.vercel.app)
+  - 환경변수 설정: DATABASE_URL, NEXTAUTH_SECRET, NEXTAUTH_URL, GITHUB_CLIENT_ID/SECRET, ALLOWED_EMAIL_DOMAINS
+- **프로덕션 설정 완료**:
+  - GitHub OAuth App 콜백 URL + 홈페이지 URL → Vercel 도메인으로 업데이트
+  - Vercel `NEXTAUTH_URL` → `https://ai-usage-tracker-web-psi.vercel.app`로 업데이트
+  - CLI 소스 기본 SERVER_URL `usage.primuslabs.gg` → `ai-usage-tracker-web-psi.vercel.app`으로 교체
+  - `cli/bin/cli.mjs` 재번들 후 커밋·푸시
+
+### 실패한 시도
+- drizzle-kit push — spinner 후 무응답, 테이블 미생성 (DB 초기화 중 unhealthy 상태 추정) → SQL Editor 직접 실행으로 우회
+- zsh에서 `DATABASE_URL="...!..."` 환경변수 설정 시 `!` 히스토리 확장 오류 → 싱글 쿼트로 해결
+- `bun build cli/src/init.mjs cli/src/submit.mjs --outdir cli/bin` → `.js`로 출력, 기존 `cli.mjs` 단일 번들 구조와 불일치 → `bun build cli/src/index.mjs --outfile cli/bin/cli.mjs`로 재빌드
+
+### 다음 액션
+1. 프로덕션 GitHub 로그인 테스트 (`https://ai-usage-tracker-web-psi.vercel.app`)
+2. CLI init 프로덕션 연결 검증 (`npx github:eugene-eee-hongkyu/ai-usage-tracker init`)
+3. B-1 §3 Hold 플래그: Windows 환경 친구 1명 확보 — SessionEnd hook 발화 검증
+
+---
+
 ## Session 2026-04-25 19:15 — CLI npx 실행 오류 수정 및 UX 개선
 
 ### 작업 요약

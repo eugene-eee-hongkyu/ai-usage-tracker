@@ -6,19 +6,19 @@
 
 ---
 
-## 마지막 실행: 2026-04-25 19:15
-## 마지막 업데이트: 2026-04-25 19:15
+## 마지막 실행: 2026-04-25 21:10
+## 마지막 업데이트: 2026-04-25 21:10
 ## 현재 모드: bypassPermissions
 
 ### 현재 집중
 
-- B-1 로컬 검증 — §10 시나리오 2 (CLI init → SessionEnd hook 발화 → 데이터 수집) PASS 필요
+- B-2 배포 완료 — 프로덕션 로그인 검증 및 CLI init 프로덕션 연결 확인 필요
 
 ### 이어서 할 것
 
-1. `USAGE_TRACKER_URL=http://localhost:3000 npx github:eugene-eee-hongkyu/ai-usage-tracker init` 실행 → CLI 전체 플로우 검증
-2. §10 시나리오 2: Claude Code 세션 종료 → hook 발화 → 대시보드 데이터 표시 확인
-3. B-2: Vercel + Supabase 배포 진입
+1. `https://ai-usage-tracker-web-psi.vercel.app` 에서 GitHub 로그인 테스트
+2. `npx github:eugene-eee-hongkyu/ai-usage-tracker init` 프로덕션 연결 검증
+3. B-1 §3 Hold 플래그: Windows 환경 친구 1명 확보 — SessionEnd hook 발화 검증
 
 ### 막힌 것
 
@@ -39,5 +39,10 @@
 - [x] §10 시나리오 1: GitHub 로그인 → 대시보드 렌더링 확인
 - [x] CLI npx 실행 오류 수정 (bin 엔트리, .mjs 전환, bun 번들)
 - [x] UX 개선: 미설치 대시보드 CTA, setup 2단 카드, 다중 도메인 auth
-- [ ] §10 시나리오 2: CLI init → SessionEnd hook → 데이터 수집 PASS
-- [ ] B-2 Vercel + Supabase 배포
+- [x] 대시보드 UI 버그 수정 6배치 (차트 정렬, 타임존, 토큰 집계, 출력밀도, 활성일수, 지표 교체)
+- [x] 절감 제안 룰 버그 수정 (mcp_unused 삭제, low_utilization 가드)
+- [x] B-2 Vercel + Supabase 배포 완료 (ai-usage-tracker-web-psi.vercel.app)
+- [x] GitHub OAuth App + NEXTAUTH_URL + CLI SERVER_URL 프로덕션 도메인으로 업데이트
+- [ ] 프로덕션 GitHub 로그인 테스트
+- [ ] CLI init 프로덕션 연결 검증
+- [ ] §10 시나리오 2: CLI init → SessionEnd hook → 데이터 수집 PASS (로컬 or 프로덕션)
