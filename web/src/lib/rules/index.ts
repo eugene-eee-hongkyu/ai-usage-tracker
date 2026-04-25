@@ -81,17 +81,6 @@ export function generateSuggestions(stats: SessionStats): Suggestion[] {
     });
   }
 
-  // Rule 5: MCP unused (confidence: high — binary check)
-  // Placeholder: if no MCP tool calls detected in recent sessions
-  if (stats.sessionsCount >= 5 && suggestions.length < 5) {
-    suggestions.push({
-      type: "mcp_unused",
-      title: "MCP 서버 미사용 — Browser/DB 도구 연동 권장",
-      detail: "Playwright MCP, DB MCP 등을 연결하면 반복 작업을 자동화할 수 있습니다.",
-      confidence: "high",
-    });
-  }
-
   return suggestions.slice(0, 5);
 }
 

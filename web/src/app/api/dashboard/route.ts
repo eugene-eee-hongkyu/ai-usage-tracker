@@ -23,6 +23,14 @@ function sinceDate(period: Period): Date {
   return new Date("2000-01-01");
 }
 
+// Local YYYY-MM-DD string (avoids UTC shift when comparing daily_agg.date strings)
+function localDateStr(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
 export async function GET(req: NextRequest) {
   const session = await getServerSession(authOptions);
   if (!session?.user?.email)
@@ -45,7 +53,7 @@ export async function GET(req: NextRequest) {
   const dailyRows = await db
     .select()
     .from(dailyAgg)
-    .where(and(eq(dailyAgg.userId, userId), gte(dailyAgg.date, chartSince.toISOString().slice(0, 10))));
+    .where(and(eq(dailyAgg.userId, userId), gte(dailyAgg.date, localDateStr(chartSince))));
 
   // aggregate for period
   const periodSessions = await db
@@ -108,7 +116,7 @@ export async function GET(req: NextRequest) {
 
   return NextResponse.json({
     user: { name: user[0].name, email: user[0].email, avatarUrl: user[0].avatarUrl, lastSyncedAt: user[0].lastSyncedAt },
-    summary: { totalTokens, totalCost, oneShotRate, cacheHitRate, sessionsCount: periodSessions.length },
+    summary: { totalTokens, totalCost, oneShotRate, cacheHitRate, sessionsCount: periodSessions.length, totalEdits },
     daily: dailyRows,
     models: modelMap,
     projects: projectMap,
