@@ -1,9 +1,39 @@
+# ── 환경변수 / 시크릿 ─────────────────────────────
 .env
 .env.*
 !.env.example
+
+# ── macOS ─────────────────────────────────────────
 .DS_Store
 **/.DS_Store
+
+# ── Node / npm ────────────────────────────────────
+node_modules/
+**/node_modules/
+npm-debug.log*
+
+# ── Next.js ───────────────────────────────────────
+web/.next/
+web/out/
+web/.vercel/
+web/next-env.d.ts
+
+# ── TypeScript 빌드 캐시 ──────────────────────────
+web/tsconfig.tsbuildinfo
+cli/tsconfig.tsbuildinfo
+
+# ── Drizzle 마이그레이션 생성물 ───────────────────
+web/drizzle/             # drizzle-kit generate 결과 (재생성 가능)
+
+# ── CLI 빌드 결과 ─────────────────────────────────
+cli/src/index.mjs
+cli/src/*.mjs            # Bun build 산출물
+
+# ── 하네스 내부 상태 ──────────────────────────────
 .claude/settings.local.json
 .claude/scheduled_tasks.lock
 .harness/.last-worklog
 .harness/.last-notified
+
+# ── 테스트 / 커버리지 ─────────────────────────────
+coverage/

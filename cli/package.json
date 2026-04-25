@@ -1,0 +1,22 @@
+{
+  "name": "@primus/usage-tracker",
+  "version": "0.1.0",
+  "description": "Primus Labs Claude Code usage tracker CLI",
+  "type": "module",
+  "bin": {
+    "usage-tracker": "./src/index.mjs"
+  },
+  "scripts": {
+    "build": "bun build src/index.ts --outfile src/index.mjs --target node",
+    "dev": "bun run src/index.ts"
+  },
+  "dependencies": {
+    "commander": "^12.1.0",
+    "keytar": "^7.9.0",
+    "open": "^10.1.0"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "typescript": "^5.0.0"
+  }
+}
