@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { db, sessions, users } from "@/lib/db";
-import { gte, eq, and } from "drizzle-orm";
+import { gte } from "drizzle-orm";
 import { computeTodayMvpScore, generateMvpBlurb } from "@/lib/rules";
 
 type Period = "today" | "week" | "month" | "all";
