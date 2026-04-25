@@ -41,7 +41,7 @@ export default function SetupStatusPage() {
     });
   };
 
-  const npxCmd = "npx github:primus-labs/usage-tracker init";
+  const npxCmd = "npx github:eugene-eee-hongkyu/ai-usage-tracker init";
 
   if (!data) return (
     <div className="min-h-screen">
@@ -94,7 +94,7 @@ export default function SetupStatusPage() {
               <ul className="list-disc list-inside space-y-1 text-yellow-400">
                 <li>Claude Code SessionEnd hook이 등록되어 있는지 확인</li>
                 <li>네트워크 연결 상태 확인</li>
-                <li>CLI 재설치: <code className="bg-yellow-900 px-1 rounded">npx github:primus-labs/usage-tracker init</code></li>
+                <li>CLI 재설치: <code className="bg-yellow-900 px-1 rounded">npx github:eugene-eee-hongkyu/ai-usage-tracker init</code></li>
               </ul>
             </div>
           </div>
@@ -156,7 +156,7 @@ export default function SetupStatusPage() {
                 데이터가 보이지 않아요
               </summary>
               <div className="mt-2 ml-4 space-y-1 text-slate-400 text-xs">
-                <p>1. CLI가 설치되어 있는지 확인: <code className="text-slate-300">npx github:primus-labs/usage-tracker init</code></p>
+                <p>1. CLI가 설치되어 있는지 확인: <code className="text-slate-300">npx github:eugene-eee-hongkyu/ai-usage-tracker init</code></p>
                 <p>2. Claude Code 세션을 완전히 종료해야 수집됩니다 (Ctrl+C 또는 /quit)</p>
                 <p>3. 재설치 후 Claude Code를 재시작하세요</p>
               </div>
@@ -169,7 +169,7 @@ export default function SetupStatusPage() {
               </summary>
               <div className="mt-2 ml-4 space-y-1 text-slate-400 text-xs">
                 <p>CLI를 재실행하면 새 API 키가 자동으로 발급되고 저장됩니다:</p>
-                <code className="text-slate-300">npx github:primus-labs/usage-tracker reset</code>
+                <code className="text-slate-300">npx github:eugene-eee-hongkyu/ai-usage-tracker reset</code>
               </div>
             </details>
 
@@ -181,7 +181,7 @@ export default function SetupStatusPage() {
               <div className="mt-2 ml-4 space-y-1 text-slate-400 text-xs">
                 <p>init 실행 시 자동으로 최근 90일치 데이터를 백그라운드에서 수집합니다.</p>
                 <p>수동으로 재실행하려면:</p>
-                <code className="text-slate-300">npx github:primus-labs/usage-tracker sync</code>
+                <code className="text-slate-300">npx github:eugene-eee-hongkyu/ai-usage-tracker sync</code>
               </div>
             </details>
 

@@ -1,7 +1,7 @@
 {
   "name": "ai-usage-tracker",
   "version": "0.1.0",
-  "description": "Primus Labs Claude Code usage tracker",
+  "description": "Claude Code usage tracker for teams",
   "type": "module",
   "bin": {
     "ai-usage-tracker": "./cli/bin/cli.mjs"

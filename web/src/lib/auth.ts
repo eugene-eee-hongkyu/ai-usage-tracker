@@ -4,7 +4,7 @@ import GoogleProvider from "next-auth/providers/google";
 import { db, users } from "@/lib/db";
 import { eq } from "drizzle-orm";
 
-// ALLOWED_EMAIL_DOMAINS: 쉼표 구분 (예: "primuslabs.gg,primuslabs.io")
+// ALLOWED_EMAIL_DOMAINS: 쉼표 구분 (예: "yourcompany.com,yourcompany.io")
 // 비어 있으면 모든 도메인 허용
 const rawDomains = process.env.ALLOWED_EMAIL_DOMAINS ?? process.env.ALLOWED_EMAIL_DOMAIN ?? "";
 const ALLOWED_DOMAINS = rawDomains

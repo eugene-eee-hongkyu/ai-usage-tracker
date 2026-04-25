@@ -1,7 +1,7 @@
 {
   "name": "@primus/usage-tracker",
   "version": "0.1.0",
-  "description": "Primus Labs Claude Code usage tracker CLI",
+  "description": "Claude Code usage tracker CLI",
   "type": "module",
   "bin": {
     "usage-tracker": "./src/index.mjs"

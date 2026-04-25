@@ -8,7 +8,7 @@ const program = new Command();
 
 program
   .name("ai-usage-tracker")
-  .description("Primus Labs Claude Code usage tracker")
+  .description("Claude Code usage tracker for teams")
   .version("0.1.0");
 
 program

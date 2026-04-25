@@ -22,21 +22,21 @@ export default function SetupPage() {
 
   useEffect(() => {
     if (!session) return;
-    const interval = setInterval(async () => {
+
+    const poll = async () => {
       try {
         const res = await fetch("/api/setup/status");
         const data = await res.json();
         if (data.steps) setSteps(data.steps);
-        if (data.ready) {
-          clearInterval(interval);
-          router.push("/dashboard");
-        }
       } catch {
         // ignore
       }
-    }, 2000);
+    };
+
+    poll();
+    const interval = setInterval(poll, 2000);
     return () => clearInterval(interval);
-  }, [session, router]);
+  }, [session]);
 
   const initCmd = `npx github:${process.env.NEXT_PUBLIC_GITHUB_ORG ?? "eugene-eee-hongkyu"}/ai-usage-tracker init`;
 
@@ -94,9 +94,15 @@ export default function SetupPage() {
           </p>
         )}
         {allDone && (
-          <p className="text-xs text-green-400 pt-1">
-            ✓ 설치 완료 — 대시보드로 이동합니다…
-          </p>
+          <div className="pt-2">
+            <p className="text-xs text-green-400 mb-3">✓ 설치 완료</p>
+            <a
+              href="/dashboard"
+              className="block w-full text-center px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium rounded-lg transition-colors"
+            >
+              대시보드로 가기 →
+            </a>
+          </div>
         )}
       </div>
 
