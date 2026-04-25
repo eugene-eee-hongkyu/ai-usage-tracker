@@ -6,8 +6,8 @@
 
 ---
 
-## 마지막 실행: 2026-04-26 02:07
-## 마지막 업데이트: 2026-04-26 02:07
+## 마지막 실행: 2026-04-26 04:08
+## 마지막 업데이트: 2026-04-26 04:08
 ## 현재 모드: bypassPermissions
 
 ### 현재 집중
@@ -56,5 +56,7 @@
 - [x] 최고 효율 지표 교체: oneShotRate → cache hit% × 100 / 세션당 비용 (합성 점수)
 - [x] 셋업 상태 API 버그 수정: steps 배열→객체 불일치, sessionsCount/lastSyncedAt 누락
 - [x] 팀랭킹 탭 전환 dimming 추가 (대시보드와 동일 패턴)
+- [x] worklog.md, state.md 갱신 후 git commit & push
+- [x] 5h utilization 기능 — "안 한다"로 확정 (백로그 미등록)
 - [ ] 팀원 초대 및 팀랭킹 화면 검증
 - [ ] Windows SessionEnd hook 발화 검증 (Hold 플래그)
