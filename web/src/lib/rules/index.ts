@@ -69,10 +69,10 @@ export function generateSuggestions(stats: SessionStats): Suggestion[] {
     });
   }
 
-  // Rule 4: 5h window utilization (confidence: high — direct metric)
+  // Rule 4: 5h window utilization — only fire when activeHours is actually tracked
   const utilization5h =
     stats.sessionsCount > 0 ? stats.activeHours / (stats.sessionsCount * 5) : 0;
-  if (utilization5h < 0.3 && stats.sessionsCount >= 5) {
+  if (stats.activeHours > 0 && utilization5h < 0.3 && stats.sessionsCount >= 5) {
     suggestions.push({
       type: "low_utilization",
       title: `5h 활용률 ${Math.round(utilization5h * 100)}% — 세션 집중도 개선 권장`,
