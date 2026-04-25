@@ -14,7 +14,8 @@ type Period = "today" | "week" | "month" | "all";
 
 interface DashboardData {
   user: { name: string; lastSyncedAt: string | null };
-  summary: { totalTokens: number; outputTokens: number; totalCost: number; oneShotRate: number; cacheHitRate: number; sessionsCount: number; totalEdits: number; cacheRead: number };
+  summary: { totalTokens: number; inputTokens: number; outputTokens: number; totalCost: number; oneShotRate: number; cacheHitRate: number; sessionsCount: number; totalEdits: number; cacheRead: number };
+  platformAvg: { userCount: number; dailyCost: number; cacheSavingUsd: number };
   daily: Array<{ date: string; totalTokens: number; totalCost: number; cacheRead: number; cacheWrite: number }>;
   models: Record<string, { tokens: number; cost: number }>;
   suggestions: Suggestion[];
@@ -130,7 +131,7 @@ export default function DashboardPage() {
   }));
 
   const totalTokens = data.summary.totalTokens;
-  const { cacheHitRate, oneShotRate, sessionsCount, totalEdits, outputTokens, cacheRead } = data.summary;
+  const { cacheHitRate, oneShotRate, sessionsCount, totalEdits, inputTokens, outputTokens, cacheRead } = data.summary;
   const activeDays = data.daily.filter((d) =>
     ((d.totalTokens ?? 0) + (d.cacheRead ?? 0) + (d.cacheWrite ?? 0)) > 0
   ).length;
@@ -142,7 +143,12 @@ export default function DashboardPage() {
 
   const avgDailyCost = activeDays > 0 ? data.summary.totalCost / activeDays : 0;
   const cacheSavingUsd = (cacheRead / 1_000_000) * 2.70;
-  const outputDensity = totalTokens > 0 ? Math.round(outputTokens / totalTokens * 100) : 0;
+  // Output density: outputTokens / (input + output) — excludes cache to show meaningful ratio
+  const outputDensity = (inputTokens + outputTokens) > 0
+    ? Math.round(outputTokens / (inputTokens + outputTokens) * 100)
+    : 0;
+  const { platformAvg } = data;
+  const showPlatformAvg = platformAvg.userCount > 1;
 
   return (
     <div className="min-h-screen">
@@ -244,6 +250,16 @@ export default function DashboardPage() {
             <div className="space-y-1">
               <p className="text-xs text-slate-500">평균 일비용</p>
               <p className="text-xl font-semibold text-slate-200">${avgDailyCost.toFixed(2)}</p>
+              {showPlatformAvg && (
+                <p className="text-xs text-slate-500">
+                  전체 평균 ${platformAvg.dailyCost.toFixed(2)}
+                  {avgDailyCost > platformAvg.dailyCost * 1.2
+                    ? " · ↑ 높음"
+                    : avgDailyCost < platformAvg.dailyCost * 0.8
+                    ? " · ↓ 낮음"
+                    : " · 비슷"}
+                </p>
+              )}
               <p className="text-xs text-slate-600 leading-relaxed mt-1">
                 활성 일수 기준 하루 평균 비용.<br />
                 캐시 hit가 높을수록 낮아짐.
@@ -253,6 +269,16 @@ export default function DashboardPage() {
             <div className="space-y-1">
               <p className="text-xs text-slate-500">캐시 절감 추정</p>
               <p className="text-xl font-semibold text-slate-200">${cacheSavingUsd.toFixed(2)}</p>
+              {showPlatformAvg && (
+                <p className="text-xs text-slate-500">
+                  전체 평균 ${platformAvg.cacheSavingUsd.toFixed(2)}
+                  {cacheSavingUsd > platformAvg.cacheSavingUsd * 1.2
+                    ? " · ↑ 높음"
+                    : cacheSavingUsd < platformAvg.cacheSavingUsd * 0.8
+                    ? " · ↓ 낮음"
+                    : " · 비슷"}
+                </p>
+              )}
               <p className="text-xs text-slate-600 leading-relaxed mt-1">
                 캐시 읽기로 아낀 비용 추정.<br />
                 (캐시 읽기 = 일반 입력의 10% 단가)
@@ -263,8 +289,9 @@ export default function DashboardPage() {
               <p className="text-xs text-slate-500">출력 밀도</p>
               <p className="text-xl font-semibold text-slate-200">{outputDensity}%</p>
               <p className="text-xs text-slate-600 leading-relaxed mt-1">
-                전체 토큰 중 Claude 출력 비중.<br />
-                높을수록 Claude가 더 많이 생성.
+                입력+출력 중 Claude 출력 비중.<br />
+                높을수록 Claude가 더 많이 생성.<br />
+                <span className="text-slate-500">목표 20%+</span>
               </p>
             </div>
             {/* Active days */}
@@ -272,8 +299,7 @@ export default function DashboardPage() {
               <p className="text-xs text-slate-500">활성 일수</p>
               <p className="text-xl font-semibold text-slate-200">{activeDays}/{periodTotalDays}일</p>
               <p className="text-xs text-slate-600 leading-relaxed mt-1">
-                이 기간 중 실제로 사용한 날.<br />
-                <span className="text-slate-500">({sessionsCount}회 수집)</span>
+                이 기간 중 실제로 사용한 날.
               </p>
             </div>
           </div>

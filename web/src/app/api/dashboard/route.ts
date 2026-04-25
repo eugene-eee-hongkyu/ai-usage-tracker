@@ -66,6 +66,7 @@ export async function GET(req: NextRequest) {
     (s, r) => s + r.inputTokens + r.outputTokens + r.cacheRead + r.cacheWrite,
     0
   );
+  const inputTokens = periodSessions.reduce((s, r) => s + r.inputTokens, 0);
   const outputTokens = periodSessions.reduce((s, r) => s + r.outputTokens, 0);
   const totalCost = periodSessions.reduce((s, r) => s + r.costUsd, 0);
   const cacheRead = periodSessions.reduce((s, r) => s + r.cacheRead, 0);
@@ -116,9 +117,34 @@ export async function GET(req: NextRequest) {
     activeHours: 0,
   });
 
+  // Platform averages for comparison.
+  // Real-time aggregation — fine for ≤100 users.
+  // For scale (1k+ users), move to a pre-aggregated daily table updated by cron.
+  const allPeriodSessions = await db
+    .select({ userId: sessions.userId, costUsd: sessions.costUsd, cacheRead: sessions.cacheRead, startedAt: sessions.startedAt })
+    .from(sessions)
+    .where(gte(sessions.startedAt, since));
+
+  const pMap: Record<number, { cost: number; days: Set<string>; cacheRead: number }> = {};
+  for (const s of allPeriodSessions) {
+    if (!pMap[s.userId]) pMap[s.userId] = { cost: 0, days: new Set(), cacheRead: 0 };
+    pMap[s.userId].cost += s.costUsd;
+    pMap[s.userId].days.add(new Date(s.startedAt).toISOString().slice(0, 10));
+    pMap[s.userId].cacheRead += s.cacheRead;
+  }
+  const pEntries = Object.values(pMap);
+  const platformUserCount = pEntries.length;
+  const platformAvgDailyCost = platformUserCount > 0
+    ? pEntries.reduce((sum, u) => sum + u.cost / Math.max(u.days.size, 1), 0) / platformUserCount
+    : 0;
+  const platformAvgCacheSaving = platformUserCount > 0
+    ? pEntries.reduce((sum, u) => sum + (u.cacheRead / 1_000_000) * 2.70, 0) / platformUserCount
+    : 0;
+
   return NextResponse.json({
     user: { name: user[0].name, email: user[0].email, avatarUrl: user[0].avatarUrl, lastSyncedAt: user[0].lastSyncedAt },
-    summary: { totalTokens, outputTokens, totalCost, oneShotRate, cacheHitRate, sessionsCount: periodSessions.length, totalEdits, cacheRead },
+    summary: { totalTokens, inputTokens, outputTokens, totalCost, oneShotRate, cacheHitRate, sessionsCount: periodSessions.length, totalEdits, cacheRead },
+    platformAvg: { userCount: platformUserCount, dailyCost: platformAvgDailyCost, cacheSavingUsd: platformAvgCacheSaving },
     daily: dailyRows,
     models: modelMap,
     projects: projectMap,
