@@ -136,10 +136,14 @@ export default function DashboardPage() {
     ((d.totalTokens ?? 0) + (d.cacheRead ?? 0) + (d.cacheWrite ?? 0)) > 0
   ).length;
 
+  // For "all": compute actual date range from first record to today, not just active-day count
+  const allDayRange = data.daily.length > 0
+    ? Math.round((Date.now() - new Date(data.daily[0].date + "T00:00:00").getTime()) / (1000 * 60 * 60 * 24)) + 1
+    : chartData.length;
   const periodTotalDays = period === "today" ? 1
     : period === "week" ? 7
     : period === "month" ? 30
-    : chartData.length;
+    : allDayRange;
 
   const avgDailyCost = activeDays > 0 ? data.summary.totalCost / activeDays : 0;
   const cacheSavingUsd = (cacheRead / 1_000_000) * 2.70;
@@ -188,7 +192,7 @@ export default function DashboardPage() {
 
         {/* Daily token chart */}
         <div className="bg-slate-900 rounded-lg p-4">
-          <p className="text-sm text-slate-400 mb-3">{chartDayLabel(period, chartData.length)}</p>
+          <p className="text-sm text-slate-400 mb-3">{chartDayLabel(period, allDayRange)}</p>
           {loading ? (
             <div className="h-32 bg-slate-800 animate-pulse rounded" />
           ) : (
