@@ -14,8 +14,9 @@ interface MemberStat {
   avatarUrl: string | null;
   totalTokens: number;
   totalCost: number;
-  oneShotRate: number;
-  mvpScore: number;
+  cacheHitPct: number;
+  costPerSession: number;
+  efficiencyScore: number;
   topProject: string;
   sessionsCount: number;
 }
@@ -91,7 +92,7 @@ export default function TeamPage() {
               <p className="text-yellow-400 font-semibold text-sm mb-1">🏆 {periodLabel} MVP</p>
               <p className="text-xl font-bold text-slate-100">{data.mvp.name}</p>
               <p className="text-sm text-slate-400 mt-1">
-                one-shot {data.mvp.oneShotRate}% × {fmtTokens(data.mvp.totalTokens)} tok
+                cache {Math.round(data.mvp.cacheHitPct)}% · 세션당 ${data.mvp.costPerSession.toFixed(1)}
               </p>
               <p className="text-xs text-slate-500 mt-1 italic">&ldquo;{data.mvp.blurb}&rdquo;</p>
             </div>
@@ -119,11 +120,13 @@ export default function TeamPage() {
 
               <div className="bg-slate-900 rounded-lg p-4 space-y-2">
                 <p className="text-sm text-slate-400 font-medium">최고 효율</p>
+                <p className="text-xs text-slate-600">캐시 히트율 ÷ 세션당 비용</p>
                 {data.byEfficiency.filter(m => m.sessionsCount > 0).map((m, i) => (
-                  <Link key={m.userId} href={`/team/${m.userId}`} className="flex items-center justify-between text-sm hover:bg-slate-800 px-1 rounded transition-colors">
+                  <Link key={m.userId} href={`/team/${m.userId}`} className="flex items-center gap-1 text-sm hover:bg-slate-800 px-1 rounded transition-colors">
                     <span className="text-slate-400 w-5">{i + 1}.</span>
                     <span className="text-slate-200 flex-1">{m.name}</span>
-                    <span className="text-slate-400">{m.oneShotRate}%</span>
+                    <span className="text-slate-300 font-medium">{m.efficiencyScore}</span>
+                    <span className="text-slate-600 text-xs">{Math.round(m.cacheHitPct)}%·${m.costPerSession.toFixed(0)}</span>
                   </Link>
                 ))}
               </div>

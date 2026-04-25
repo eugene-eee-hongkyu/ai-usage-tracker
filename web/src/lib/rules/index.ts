@@ -84,23 +84,31 @@ export function generateSuggestions(stats: SessionStats): Suggestion[] {
   return suggestions.slice(0, 5);
 }
 
-export function computeTodayMvpScore(
-  tokens: number,
-  oneShotRate: number
+// efficiency score = cache hit% × 100 / cost-per-session
+export function computeEfficiencyScore(
+  cacheRead: number,
+  cacheWrite: number,
+  totalCost: number,
+  sessionsCount: number
 ): number {
-  return tokens * (oneShotRate / 100);
+  if (sessionsCount === 0 || totalCost === 0) return 0;
+  const totalCacheable = cacheRead + cacheWrite;
+  const cacheHitPct = totalCacheable > 0 ? (cacheRead / totalCacheable) * 100 : 0;
+  const costPerSession = totalCost / sessionsCount;
+  return Math.round((cacheHitPct * 100) / costPerSession);
 }
 
 export function generateMvpBlurb(
   name: string,
   project: string,
-  oneShotRate: number
+  cacheHitPct: number,
+  costPerSession: number
 ): string {
-  if (oneShotRate >= 90) {
-    return `${name}님이 ${project}에서 one-shot ${oneShotRate}%로 깔끔하게 끝냈어요`;
+  if (cacheHitPct >= 90 && costPerSession < 30) {
+    return `${name}님이 ${project}에서 캐시 ${Math.round(cacheHitPct)}%·세션당 $${costPerSession.toFixed(0)}으로 효율적으로 끝냈어요`;
   }
-  if (oneShotRate >= 75) {
-    return `${name}님이 ${project}에서 착실하게 진행했어요`;
+  if (cacheHitPct >= 80) {
+    return `${name}님이 ${project}에서 캐시를 잘 활용했어요`;
   }
   return `${name}님이 오늘 열심히 달렸어요`;
 }

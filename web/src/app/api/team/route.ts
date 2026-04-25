@@ -3,7 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { db, sessions, users } from "@/lib/db";
 import { gte } from "drizzle-orm";
-import { computeTodayMvpScore, generateMvpBlurb } from "@/lib/rules";
+import { computeEfficiencyScore, generateMvpBlurb } from "@/lib/rules";
 
 type Period = "today" | "week" | "month" | "all";
 
@@ -33,10 +33,13 @@ export async function GET(req: NextRequest) {
     const userSessions = allSessions.filter((s) => s.userId === u.id);
     const totalTokens = userSessions.reduce((acc, s) => acc + s.inputTokens + s.outputTokens, 0);
     const totalCost = userSessions.reduce((acc, s) => acc + s.costUsd, 0);
-    const oneShotEdits = userSessions.reduce((acc, s) => acc + s.oneShotEdits, 0);
-    const totalEdits = userSessions.reduce((acc, s) => acc + s.totalEdits, 0);
-    const oneShotRate = totalEdits > 0 ? Math.round((oneShotEdits / totalEdits) * 100) : 0;
-    const mvpScore = computeTodayMvpScore(totalTokens, oneShotRate);
+    const cacheRead = userSessions.reduce((acc, s) => acc + s.cacheRead, 0);
+    const cacheWrite = userSessions.reduce((acc, s) => acc + s.cacheWrite, 0);
+    const sessionsCount = userSessions.length;
+    const totalCacheable = cacheRead + cacheWrite;
+    const cacheHitPct = totalCacheable > 0 ? (cacheRead / totalCacheable) * 100 : 0;
+    const costPerSession = sessionsCount > 0 ? totalCost / sessionsCount : 0;
+    const efficiencyScore = computeEfficiencyScore(cacheRead, cacheWrite, totalCost, sessionsCount);
     const topProject = Object.entries(
       userSessions.reduce((acc, s) => {
         acc[s.project] = (acc[s.project] ?? 0) + s.inputTokens + s.outputTokens;
@@ -44,17 +47,17 @@ export async function GET(req: NextRequest) {
       }, {} as Record<string, number>)
     ).sort(([, a], [, b]) => b - a)[0]?.[0] ?? "unknown";
 
-    return { userId: u.id, name: u.name, avatarUrl: u.avatarUrl, totalTokens, totalCost, oneShotRate, mvpScore, topProject, sessionsCount: userSessions.length };
+    return { userId: u.id, name: u.name, avatarUrl: u.avatarUrl, totalTokens, totalCost, cacheHitPct, costPerSession, efficiencyScore, topProject, sessionsCount };
   });
 
   const byTokens = [...memberStats].sort((a, b) => b.totalTokens - a.totalTokens);
-  const byEfficiency = [...memberStats].sort((a, b) => b.oneShotRate - a.oneShotRate);
-  const mvpCandidate = [...memberStats].sort((a, b) => b.mvpScore - a.mvpScore)[0];
+  const byEfficiency = [...memberStats].sort((a, b) => b.efficiencyScore - a.efficiencyScore);
+  const mvpCandidate = [...memberStats].sort((a, b) => b.efficiencyScore - a.efficiencyScore)[0];
 
   const mvp = mvpCandidate
     ? {
         ...mvpCandidate,
-        blurb: generateMvpBlurb(mvpCandidate.name, mvpCandidate.topProject, mvpCandidate.oneShotRate),
+        blurb: generateMvpBlurb(mvpCandidate.name, mvpCandidate.topProject, mvpCandidate.cacheHitPct, mvpCandidate.costPerSession),
       }
     : null;
 
