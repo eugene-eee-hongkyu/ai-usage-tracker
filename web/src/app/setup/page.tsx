@@ -6,6 +6,104 @@ import { useRouter } from "next/navigation";
 
 type Step = { label: string; done: boolean };
 
+function NodeInstallGuide() {
+  const [os, setOs] = useState<"mac" | "windows" | "other">("other");
+  const [hasNode, setHasNode] = useState(false);
+
+  useEffect(() => {
+    const ua = navigator.userAgent.toLowerCase();
+    if (ua.includes("mac")) setOs("mac");
+    else if (ua.includes("win")) setOs("windows");
+  }, []);
+
+  if (hasNode) return null;
+
+  return (
+    <div className="w-full max-w-md bg-amber-950 border border-amber-800 rounded-xl p-5 space-y-4">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-xs text-amber-400 font-semibold tracking-wide uppercase">사전 준비</p>
+          <p className="text-slate-100 font-medium mt-1">Node.js가 필요해요</p>
+          <p className="text-sm text-slate-400 mt-1">
+            명령어를 실행하려면 Node.js가 설치되어 있어야 합니다.
+          </p>
+        </div>
+      </div>
+
+      {os === "mac" && (
+        <div className="space-y-2">
+          <div className="flex items-center gap-2 text-sm text-slate-300">
+            <span className="text-amber-400 font-bold">1.</span>
+            <span>아래 버튼을 눌러 설치 파일을 다운로드하세요 <span className="text-slate-500">(.pkg)</span></span>
+          </div>
+          <a
+            href="https://nodejs.org/ko/download"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center justify-center gap-2 w-full px-4 py-2.5 bg-green-700 hover:bg-green-600 text-white text-sm font-semibold rounded-lg transition-colors"
+          >
+            Node.js 다운로드 (LTS) →
+          </a>
+          <div className="flex items-center gap-2 text-sm text-slate-300">
+            <span className="text-amber-400 font-bold">2.</span>
+            <span>다운받은 <strong>.pkg</strong> 파일을 더블클릭해서 설치하세요</span>
+          </div>
+          <div className="flex items-center gap-2 text-sm text-slate-300">
+            <span className="text-amber-400 font-bold">3.</span>
+            <span>설치 완료 후 아래 버튼을 눌러 계속하세요</span>
+          </div>
+        </div>
+      )}
+
+      {os === "windows" && (
+        <div className="space-y-2">
+          <div className="flex items-center gap-2 text-sm text-slate-300">
+            <span className="text-amber-400 font-bold">1.</span>
+            <span>아래 버튼을 눌러 설치 파일을 다운로드하세요 <span className="text-slate-500">(.msi)</span></span>
+          </div>
+          <a
+            href="https://nodejs.org/ko/download"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center justify-center gap-2 w-full px-4 py-2.5 bg-green-700 hover:bg-green-600 text-white text-sm font-semibold rounded-lg transition-colors"
+          >
+            Node.js 다운로드 (LTS) →
+          </a>
+          <div className="flex items-center gap-2 text-sm text-slate-300">
+            <span className="text-amber-400 font-bold">2.</span>
+            <span>다운받은 <strong>.msi</strong> 파일을 더블클릭해서 설치하세요</span>
+          </div>
+          <div className="flex items-center gap-2 text-sm text-slate-300">
+            <span className="text-amber-400 font-bold">3.</span>
+            <span>설치 완료 후 아래 버튼을 눌러 계속하세요</span>
+          </div>
+        </div>
+      )}
+
+      {os === "other" && (
+        <div className="space-y-2">
+          <a
+            href="https://nodejs.org/ko/download"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center justify-center gap-2 w-full px-4 py-2.5 bg-green-700 hover:bg-green-600 text-white text-sm font-semibold rounded-lg transition-colors"
+          >
+            Node.js 다운로드 (LTS) →
+          </a>
+          <p className="text-xs text-slate-400">설치 파일을 다운로드해서 실행하세요</p>
+        </div>
+      )}
+
+      <button
+        onClick={() => setHasNode(true)}
+        className="w-full text-center px-4 py-2 border border-slate-600 hover:border-slate-400 text-slate-400 hover:text-slate-200 text-sm rounded-lg transition-colors"
+      >
+        ✓ Node.js 이미 설치됨 — 다음 단계로
+      </button>
+    </div>
+  );
+}
+
 export default function SetupPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
@@ -51,13 +149,16 @@ export default function SetupPage() {
   const allDone = steps.every((s) => s.done);
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen gap-6 px-4">
+    <div className="flex flex-col items-center justify-center min-h-screen gap-6 px-4 py-12">
       <div className="text-center">
         <h1 className="text-2xl font-bold text-slate-100">
           안녕 {session?.user?.name?.split(" ")[0]} 👋
         </h1>
         <p className="text-slate-400 mt-2">딱 한 번만 설치하면 자동 수집 시작됩니다</p>
       </div>
+
+      {/* 사전 준비 — Node.js */}
+      <NodeInstallGuide />
 
       {/* Step 1 — 핵심 액션 */}
       <div className="w-full max-w-md bg-indigo-950 border border-indigo-700 rounded-xl p-5 space-y-3">
@@ -73,7 +174,7 @@ export default function SetupPage() {
           </button>
         </div>
         <p className="text-xs text-slate-500">
-          브라우저가 열리면 GitHub 로그인 → 완료
+          브라우저가 열리면 로그인 → 완료
         </p>
       </div>
 
