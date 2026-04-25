@@ -7,8 +7,8 @@ const geistSans = localFont({ src: "./fonts/GeistVF.woff", variable: "--font-gei
 const geistMono = localFont({ src: "./fonts/GeistMonoVF.woff", variable: "--font-geist-mono", weight: "100 900" });
 
 export const metadata: Metadata = {
-  title: "Primus Usage Tracker",
-  description: "Claude Code usage dashboard for Primus Labs",
+  title: "AI Usage Tracker",
+  description: "Claude Code usage dashboard for your team",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

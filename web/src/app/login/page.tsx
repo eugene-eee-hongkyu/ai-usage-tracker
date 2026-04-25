@@ -13,7 +13,7 @@ function LoginContent() {
       <div className="text-center space-y-2">
         <h1 className="text-3xl font-bold text-slate-100">Primus Usage Tracker</h1>
         <p className="text-slate-400">AI 코딩 도구를 얼마나, 어떻게 쓰고 있는지 한눈에</p>
-        <p className="text-xs text-slate-500">Primus Labs 멤버 전용</p>
+        <p className="text-xs text-slate-500">팀 멤버 전용</p>
       </div>
 
       {error === "domain" && (
