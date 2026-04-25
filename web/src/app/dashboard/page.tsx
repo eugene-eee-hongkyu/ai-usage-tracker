@@ -245,16 +245,28 @@ export default function DashboardPage() {
           <p className="text-sm text-slate-400 mb-4">사용 지표</p>
           <div className="grid grid-cols-3 gap-4">
             {/* Cache hit */}
-            <div
-              className="space-y-1 cursor-pointer group"
-              onClick={() => setOpenModal("cacheHit")}
-            >
-              <p className="text-xs text-slate-500 group-hover:text-slate-400 transition-colors">Cache hit</p>
-              <p className="text-xl font-semibold text-slate-200">{cacheHitRate}%</p>
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                <p className="text-xs text-slate-500">Cache hit</p>
+                <button
+                  onClick={() => setOpenModal("cacheHit")}
+                  className="text-xs text-indigo-400 hover:text-indigo-300 bg-indigo-950/50 hover:bg-indigo-950 px-1.5 py-0.5 rounded transition-colors leading-none"
+                >
+                  올리는법
+                </button>
+              </div>
+              <p
+                className="text-xl font-semibold text-slate-200 cursor-pointer hover:text-indigo-200 transition-colors"
+                onClick={() => setOpenModal("cacheHit")}
+              >
+                {cacheHitRate}%
+              </p>
               <MetricStatus value={cacheHitRate} thresholdGood={80} thresholdOk={50} />
-              <span className="inline-block text-xs text-indigo-500 group-hover:text-indigo-400 mt-1 transition-colors">
-                올리는 방법 →
-              </span>
+              <p className="text-xs text-slate-600 leading-relaxed mt-1">
+                이전 내용을 재사용한 비율.<br />
+                CLAUDE.md를 짧게 유지하면 올라감.<br />
+                <span className="text-slate-500">목표 80%+</span>
+              </p>
             </div>
             {/* Avg daily cost */}
             <div className="space-y-1">
@@ -295,15 +307,26 @@ export default function DashboardPage() {
               </p>
             </div>
             {/* Cost per session */}
-            <div
-              className="space-y-1 cursor-pointer group"
-              onClick={() => setOpenModal("costPerSession")}
-            >
-              <p className="text-xs text-slate-500 group-hover:text-slate-400 transition-colors">세션당 평균 비용</p>
-              <p className="text-xl font-semibold text-slate-200">${costPerSession.toFixed(2)}</p>
-              <span className="inline-block text-xs text-indigo-500 group-hover:text-indigo-400 mt-1 transition-colors">
-                줄이는 방법 →
-              </span>
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                <p className="text-xs text-slate-500">세션당 평균 비용</p>
+                <button
+                  onClick={() => setOpenModal("costPerSession")}
+                  className="text-xs text-indigo-400 hover:text-indigo-300 bg-indigo-950/50 hover:bg-indigo-950 px-1.5 py-0.5 rounded transition-colors leading-none"
+                >
+                  줄이는법
+                </button>
+              </div>
+              <p
+                className="text-xl font-semibold text-slate-200 cursor-pointer hover:text-indigo-200 transition-colors"
+                onClick={() => setOpenModal("costPerSession")}
+              >
+                ${costPerSession.toFixed(2)}
+              </p>
+              <p className="text-xs text-slate-600 leading-relaxed mt-1">
+                총 비용 ÷ 세션 수.<br />
+                낮을수록 효율적으로 사용 중.
+              </p>
             </div>
             {/* Active days */}
             <div className="space-y-1">
