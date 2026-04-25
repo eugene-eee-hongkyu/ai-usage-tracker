@@ -20,7 +20,6 @@ export default function SetupPage() {
     if (status === "unauthenticated") router.push("/login");
   }, [status, router]);
 
-  // Poll for init completion
   useEffect(() => {
     if (!session) return;
     const interval = setInterval(async () => {
@@ -49,52 +48,60 @@ export default function SetupPage() {
 
   if (status === "loading") return null;
 
+  const allDone = steps.every((s) => s.done);
+
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen gap-8 px-4">
+    <div className="flex flex-col items-center justify-center min-h-screen gap-6 px-4">
       <div className="text-center">
-        <h1 className="text-2xl font-bold">안녕 {session?.user?.name?.split(" ")[0]} 👋</h1>
-        <p className="text-slate-400 mt-2">터미널에서 아래 명령어 한 줄 실행하세요</p>
+        <h1 className="text-2xl font-bold text-slate-100">
+          안녕 {session?.user?.name?.split(" ")[0]} 👋
+        </h1>
+        <p className="text-slate-400 mt-2">딱 한 번만 설치하면 자동 수집 시작됩니다</p>
       </div>
 
-      <div className="flex items-center gap-2 bg-slate-900 border border-slate-700 rounded-lg px-4 py-3 w-full max-w-md">
-        <code className="flex-1 text-sm text-slate-200 font-mono">{initCmd}</code>
-        <button
-          onClick={copy}
-          className="text-slate-400 hover:text-slate-200 transition-colors shrink-0"
-          title="복사"
-        >
-          {copied ? (
-            <span className="text-green-400 text-xs">복사됨</span>
-          ) : (
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-            </svg>
-          )}
-        </button>
+      {/* Step 1 — 핵심 액션 */}
+      <div className="w-full max-w-md bg-indigo-950 border border-indigo-700 rounded-xl p-5 space-y-3">
+        <p className="text-xs text-indigo-400 font-semibold tracking-wide uppercase">Step 1</p>
+        <p className="text-slate-100 font-medium">터미널을 열고 아래 명령어를 실행하세요</p>
+        <div className="flex items-center gap-2 bg-slate-900 rounded-lg px-4 py-3">
+          <code className="flex-1 text-sm text-indigo-300 font-mono break-all">{initCmd}</code>
+          <button
+            onClick={copy}
+            className="shrink-0 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white text-xs rounded-md transition-colors font-medium"
+          >
+            {copied ? "✓ 복사됨" : "복사"}
+          </button>
+        </div>
+        <p className="text-xs text-slate-500">
+          브라우저가 열리면 GitHub 로그인 → 완료
+        </p>
       </div>
 
-      <div className="w-full max-w-md space-y-2">
-        <p className="text-sm text-slate-400">⚙️ 진행 상태</p>
+      {/* Step 2 — 진행 상태 */}
+      <div className="w-full max-w-md bg-slate-900 border border-slate-800 rounded-xl p-5 space-y-3">
+        <p className="text-xs text-slate-500 font-semibold tracking-wide uppercase">Step 2 — 자동 완료 대기 중</p>
         {steps.map((step, i) => (
           <div key={i} className="flex items-center gap-3 text-sm">
-            {step.done ? (
-              <span className="text-green-400">✅</span>
-            ) : (
-              <span className="text-slate-500 animate-pulse">⏳</span>
-            )}
-            <span className={step.done ? "text-slate-300" : "text-slate-500"}>{step.label}</span>
+            <span className={step.done ? "text-green-400" : "text-slate-600 animate-pulse"}>
+              {step.done ? "✅" : "⏳"}
+            </span>
+            <span className={step.done ? "text-slate-200" : "text-slate-500"}>{step.label}</span>
           </div>
         ))}
-        <p className="text-xs text-slate-500 mt-4">
-          완료되면 자동으로 다음 단계로 이동합니다
-        </p>
-        <p className="text-xs text-slate-500">
-          ※ 과거 데이터는 백그라운드에서 모이므로 먼저 대시보드를 둘러보세요
-        </p>
+        {!allDone && (
+          <p className="text-xs text-slate-600 pt-1">
+            명령어 실행 후 여기가 자동으로 체크됩니다
+          </p>
+        )}
+        {allDone && (
+          <p className="text-xs text-green-400 pt-1">
+            ✓ 설치 완료 — 대시보드로 이동합니다…
+          </p>
+        )}
       </div>
 
-      <a href="/setup-status" className="text-xs text-slate-500 hover:text-slate-300 underline">
-        💡 잘 안 되면? 트러블슈팅 →
+      <a href="/setup-status" className="text-xs text-slate-600 hover:text-slate-400 underline">
+        잘 안 되면? 트러블슈팅 →
       </a>
     </div>
   );

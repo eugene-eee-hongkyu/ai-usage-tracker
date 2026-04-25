@@ -1,6 +1,11 @@
 {
   "name": "ai-usage-tracker",
-  "private": true,
+  "version": "0.1.0",
+  "description": "Primus Labs Claude Code usage tracker",
+  "type": "module",
+  "bin": {
+    "ai-usage-tracker": "./cli/src/index.mjs"
+  },
   "workspaces": [
     "web",
     "cli"
