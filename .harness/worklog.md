@@ -4,6 +4,26 @@
 
 ---
 
+## Session 2026-04-26 01:44 — 지표 팝업 모달 추가 및 컨텍스트 압박률 제거
+
+### 작업 요약
+- **컨텍스트 압박률 카드 완전 제거**: 원샷 성공률도 `oneShotEdits`/`totalEdits`가 `submit.mjs`에서 하드코딩 0이라 사용 불가 확인 → 대안 없이 제거 결정
+- **Cache hit 상세 모달 추가**: "올리는법" 버튼 + 숫자(95%) 클릭 → 팝업
+  - 캐시 원리 설명, 올리는 방법 5가지, 등급표(현재 위치 하이라이트)
+- **세션당 평균 비용 상세 모달 추가**: "줄이는법" 버튼 + 숫자($49.xx) 클릭 → 팝업
+  - 계산식(실제 값 표시), 줄이는 방법 5가지, Sonnet 기준 등급표
+- **UX 반복 수정**:
+  - 전체 카드 클릭 → 제목 옆 인라인 버튼 + 숫자만 클릭으로 변경
+  - 기존 간단 설명 텍스트 복원 (제거됐던 것)
+- `web/src/components/metric-modal.tsx` 신규 생성 (301줄)
+
+### 다음 액션
+1. 팀원에게 `https://ai-usage-tracker-web-psi.vercel.app` 공유 및 초대
+2. B-1 §3 Hold 플래그: Windows 환경 친구 1명 확보 — SessionEnd hook 발화 검증
+3. 프로덕션 사용 중 발견되는 UX 버그 수집 및 수정
+
+---
+
 ## Session 2026-04-26 01:29 — 대시보드 효율 지표 개선 (출력밀도 제거 + 신규 지표 추가)
 
 ### 작업 요약
@@ -106,7 +126,7 @@
   - 환경변수 설정: DATABASE_URL, NEXTAUTH_SECRET, NEXTAUTH_URL, GITHUB_CLIENT_ID/SECRET, ALLOWED_EMAIL_DOMAINS
 - **프로덕션 설정 완료**:
   - GitHub OAuth App 콜백 URL + 홈페이지 URL → Vercel 도메인으로 업데이트
-  - Vercel `NEXTAUTH_URL` → `https://ai-usage-tracker-web-psi.vercel.app`로 업데이트
+  - Vercel `NEXTAUTH_URL` → `https://ai-usage-tracker-web-psi.vercel.app`으로 업데이트
   - CLI 소스 기본 SERVER_URL `usage.primuslabs.gg` → `ai-usage-tracker-web-psi.vercel.app`으로 교체
   - `cli/bin/cli.mjs` 재번들 후 커밋·푸시
 
