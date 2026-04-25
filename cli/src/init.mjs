@@ -67,20 +67,24 @@ function openBrowser(url) {
 
 function getApiKeyViaLocalServer() {
   return new Promise((resolve, reject) => {
+    let timeoutId;
+
     const server = http.createServer((req, res) => {
       const url = new URL(req.url ?? "/", `http://127.0.0.1:${CLI_PORT}`);
       const apiKey = url.searchParams.get("apiKey");
 
-      res.writeHead(200, { "Content-Type": "text/html" });
+      res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
       if (apiKey) {
         res.end(
-          "<html><body style='font-family:sans-serif;padding:2em'>" +
+          "<html><head><meta charset='utf-8'></head>" +
+          "<body style='font-family:sans-serif;padding:2em'>" +
           "<h2>✅ 인증 완료</h2><p>이 창을 닫아도 됩니다.</p></body></html>"
         );
+        clearTimeout(timeoutId);
         server.close();
         resolve(apiKey);
       } else {
-        res.end("<html><body><h2>대기 중...</h2></body></html>");
+        res.end("<html><head><meta charset='utf-8'></head><body><h2>대기 중...</h2></body></html>");
       }
     });
 
@@ -99,7 +103,7 @@ function getApiKeyViaLocalServer() {
       }
     });
 
-    setTimeout(() => {
+    timeoutId = setTimeout(() => {
       server.close();
       reject(new Error("인증 시간 초과 (5분)"));
     }, 5 * 60 * 1000);
@@ -208,4 +212,5 @@ export async function runInit() {
   console.log("\n✨ 설치 완료!");
   console.log("   Claude Code 세션을 종료하면 자동으로 사용량이 수집됩니다.");
   console.log(`   대시보드: ${SERVER_URL}/dashboard\n`);
+  process.exit(0);
 }
