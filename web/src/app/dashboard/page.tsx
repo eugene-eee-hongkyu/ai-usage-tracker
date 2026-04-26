@@ -75,6 +75,7 @@ export default function DashboardPage() {
   const [period, setPeriod] = useState<Period>("week");
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState(false);
 
   useEffect(() => {
     if (status === "unauthenticated") router.push("/login");
@@ -85,7 +86,13 @@ export default function DashboardPage() {
     setLoading(true);
     fetch(`/api/dashboard?period=${period}`)
       .then((r) => r.json())
-      .then((d) => { setData(d); setLoading(false); });
+      .then((d) => {
+        if (d?.error) { setFetchError(true); setLoading(false); return; }
+        setFetchError(false);
+        setData(d);
+        setLoading(false);
+      })
+      .catch(() => { setFetchError(true); setLoading(false); });
   }, [session, period]);
 
   useEffect(() => {
@@ -97,6 +104,21 @@ export default function DashboardPage() {
     }, 4000);
     return () => clearInterval(timer);
   }, [session, data, period]);
+
+  if (fetchError) return (
+    <div className="min-h-screen">
+      <Nav />
+      <div className="flex flex-col items-center justify-center h-64 gap-4">
+        <p className="text-slate-400">데이터를 불러오지 못했습니다.</p>
+        <button
+          onClick={() => { setFetchError(false); setLoading(true); fetch(`/api/dashboard?period=${period}`).then((r) => r.json()).then((d) => { if (!d?.error) setData(d); setLoading(false); }); }}
+          className="px-4 py-2 bg-slate-700 rounded text-sm text-slate-200 hover:bg-slate-600"
+        >
+          다시 시도
+        </button>
+      </div>
+    </div>
+  );
 
   if (status === "loading" || !data) return (
     <div className="min-h-screen">
