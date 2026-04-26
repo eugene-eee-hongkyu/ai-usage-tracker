@@ -232,7 +232,7 @@ export default function DashboardPage() {
           <div className="flex items-center justify-between mb-4">
             <p className="text-sm text-slate-400">효율 지표 <span className="text-xs text-slate-600">(전체 기간)</span></p>
           </div>
-          <div className="grid grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
             <div className="space-y-1">
               <p className="text-xs text-slate-500">Cache hit</p>
               <p className="text-xl font-semibold text-slate-200">{Math.round(s.cacheHitPct)}%</p>

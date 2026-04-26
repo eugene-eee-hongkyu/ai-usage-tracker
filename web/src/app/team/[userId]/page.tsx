@@ -66,7 +66,7 @@ export default function MemberProfilePage() {
 
         {/* Summary */}
         <div className="bg-slate-900 rounded-lg p-4">
-          <div className="grid grid-cols-4 gap-4 text-sm">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm">
             <div>
               <p className="text-slate-500 text-xs">총 비용</p>
               <p className="text-slate-200 font-semibold">${data.summary.totalCost.toFixed(2)}</p>

@@ -78,7 +78,7 @@ export default function TeamPage() {
         )}
 
         {hasData && (
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             {/* 최고 정확도 */}
             <div className="bg-slate-900 rounded-lg p-4 space-y-2">
               <p className="text-sm text-slate-400 font-medium">최고 정확도</p>
