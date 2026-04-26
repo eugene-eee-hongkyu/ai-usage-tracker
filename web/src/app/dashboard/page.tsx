@@ -74,6 +74,27 @@ function formatPath(path: string): string {
 
 function fmt$(n: number) { return `$${n.toFixed(2)}`; }
 
+type GradeLevel = "탁월" | "양호" | "보통" | "개선 필요" | "경고";
+const GRADE_STYLES: Record<GradeLevel, string> = {
+  "탁월":    "bg-emerald-500/15 text-emerald-400 border-emerald-500/40",
+  "양호":    "bg-green-500/15 text-green-400 border-green-500/40",
+  "보통":    "bg-yellow-500/15 text-yellow-400 border-yellow-500/40",
+  "개선 필요": "bg-orange-500/15 text-orange-400 border-orange-500/40",
+  "경고":    "bg-red-500/15 text-red-400 border-red-500/40",
+};
+
+function computeGrade(cacheHitPct: number, oneShotRate: number, costPerSession: number): GradeLevel {
+  const cacheScore = cacheHitPct / 100;
+  const oneShotScore = oneShotRate;
+  const costScore = costPerSession <= 1 ? 1 : costPerSession <= 3 ? 0.8 : costPerSession <= 7 ? 0.6 : costPerSession <= 15 ? 0.4 : 0.2;
+  const composite = cacheScore * 0.4 + oneShotScore * 0.4 + costScore * 0.2;
+  if (composite >= 0.88) return "탁월";
+  if (composite >= 0.72) return "양호";
+  if (composite >= 0.52) return "보통";
+  if (composite >= 0.32) return "개선 필요";
+  return "경고";
+}
+
 function fmtSyncedAt(ts: string | null): string {
   if (!ts) return "—";
   const d = new Date(ts);
@@ -343,8 +364,16 @@ export default function DashboardPage() {
 
           {/* Efficiency Metrics */}
           <div className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-fuchsia-500 rounded">
-            <div className="px-3 py-2 border-b border-neutral-800">
+            <div className="px-3 py-2 border-b border-neutral-800 flex items-center justify-between">
               <span className="text-xs font-mono font-bold text-fuchsia-400 uppercase tracking-wider">Efficiency</span>
+              {(() => {
+                const grade = computeGrade(ov.cacheHitPct, ov.oneShotRate, ov.sessions > 0 ? ov.cost / ov.sessions : 0);
+                return (
+                  <span className={`text-xs font-mono font-bold px-2 py-0.5 rounded border ${GRADE_STYLES[grade]}`}>
+                    {grade}
+                  </span>
+                );
+              })()}
             </div>
             <div className="p-3 font-mono">
               <div className="flex text-xs text-neutral-600 mb-1.5">
