@@ -4,6 +4,15 @@
 
 ---
 
+## Session 2026-04-27 06:28 — lastSyncedAt 날짜/시간 표시 기능 추가 시작
+
+### 작업 요약
+- API 응답의 `lastSyncedAt` 필드 포맷 확인 시도
+
+### 다음 액션
+- 실제 `lastSyncedAt` 포맷 확인 후 UI 표시 구현
+
+
 ## Session 2026-04-26 21:50 — Daily Activity 스크롤 제거 및 커밋
 
 ### 작업 요약

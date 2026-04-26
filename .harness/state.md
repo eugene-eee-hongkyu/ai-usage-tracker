@@ -6,18 +6,19 @@
 
 ---
 
-## 마지막 실행: 2026-04-26 21:50
-## 마지막 업데이트: 2026-04-26 21:50
+## 마지막 실행: 2026-04-27 06:28
+## 마지막 업데이트: 2026-04-27 06:28
 ## 현재 모드: bypassPermissions
 
 ### 현재 집중
 
-- codeburn migration run 완료. 팀원 초대 대기.
+- lastSyncedAt 날짜/시간 표시 기능 추가 중
 
 ### 이어서 할 것
 
-1. 팀원 초대 (이메일 목록 확정 → Vercel/서비스 초대)
-2. Windows SessionEnd hook 발화 검증 (Windows 테스터 필요)
+1. API 응답 `lastSyncedAt` 실제 포맷 확인 후 UI 표시 구현
+2. 팀원 초대 (이메일 목록 확정 → Vercel/서비스 초대)
+3. Windows SessionEnd hook 발화 검증 (Windows 테스터 필요)
 
 ### 막힌 것
 
@@ -84,5 +85,6 @@
 - [x] codeburn migration run 완료 기준 3개 사용자 직접 검증 완료
 - [x] 대시보드 UX: Period 버튼 고정 너비, Daily Activity 세로 목록, Tabs/Overview 너비 정렬
 - [x] Daily Activity 목록 스크롤 제거 (max-h-52 overflow-y-auto 삭제 → 전체 표시)
+- [ ] lastSyncedAt 날짜/시간 UI 표시 구현 (API 포맷 확인 후 진행)
 - [ ] 팀원 초대 및 팀랭킹 화면 검증
 - [ ] Windows SessionEnd hook 발화 검증 (Hold 플래그)
