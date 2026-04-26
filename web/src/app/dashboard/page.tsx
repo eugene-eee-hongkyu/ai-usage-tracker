@@ -83,6 +83,34 @@ const GRADE_STYLES: Record<GradeLevel, string> = {
   "경고":    "bg-red-500/15 text-red-400 border-red-500/40",
 };
 
+function cacheHitGrade(v: number): GradeLevel {
+  if (v >= 96) return "탁월";
+  if (v >= 90) return "양호";
+  if (v >= 80) return "보통";
+  if (v >= 60) return "개선 필요";
+  return "경고";
+}
+function oneShotGrade(v: number): GradeLevel {
+  if (v >= 90) return "탁월";
+  if (v >= 80) return "양호";
+  if (v >= 70) return "보통";
+  if (v >= 60) return "개선 필요";
+  return "경고";
+}
+function costGrade(v: number): GradeLevel {
+  if (v < 10) return "탁월";
+  if (v < 25) return "양호";
+  if (v < 50) return "보통";
+  if (v < 100) return "개선 필요";
+  return "경고";
+}
+function callsGrade(v: number): GradeLevel {
+  if (v >= 30 && v <= 60) return "탁월";
+  if ((v >= 20 && v < 30) || (v > 60 && v <= 80)) return "양호";
+  if ((v >= 10 && v < 20) || (v > 80 && v <= 120)) return "보통";
+  if ((v >= 5 && v < 10) || (v > 120 && v <= 200)) return "개선 필요";
+  return "경고";
+}
 function computeGrade(cacheHitPct: number, oneShotRate: number, costPerSession: number): GradeLevel {
   const cacheScore = cacheHitPct / 100;
   const oneShotScore = oneShotRate;
@@ -380,38 +408,49 @@ export default function DashboardPage() {
                 <span className="flex-1">metric</span>
                 <span>value</span>
               </div>
-              {[
-                {
-                  label: "Cache hit",
-                  value: `${ov.cacheHitPct.toFixed(1)}%`,
-                  color: ov.cacheHitPct >= 80 ? "text-emerald-400" : ov.cacheHitPct >= 50 ? "text-yellow-400" : "text-red-400",
-                  btn: <TipBtn label="늘리는 법" onClick={() => setShowCacheModal(true)} />,
-                },
-                {
-                  label: "One-shot rate",
-                  value: `${Math.round(ov.oneShotRate * 100)}%`,
-                  color: ov.oneShotRate >= 0.7 ? "text-emerald-400" : ov.oneShotRate >= 0.4 ? "text-yellow-400" : "text-neutral-400",
-                  btn: <TipBtn label="늘리는 법" onClick={() => setShowOneShotModal(true)} />,
-                },
-                {
-                  label: "Cost / session",
-                  value: ov.sessions > 0 ? fmt$(ov.cost / ov.sessions) : "$0.00",
-                  color: "text-yellow-400",
-                  btn: <TipBtn label="줄이는 법" onClick={() => setShowCostModal(true)} />,
-                },
-                {
-                  label: "Calls / session",
-                  value: ov.sessions > 0 ? Math.round(ov.calls / ov.sessions).toString() : "0",
-                  color: "text-blue-400",
-                  btn: <TipBtn label="설명" onClick={() => setShowCallsModal(true)} />,
-                },
-              ].map(({ label, value, color, btn }) => (
-                <div key={label} className="flex items-center text-xs py-0.5 gap-2">
-                  <span className="text-neutral-400 w-28 shrink-0">{label}</span>
-                  <span className="w-20 shrink-0">{btn}</span>
-                  <span className={`font-bold ${color} ml-auto`}>{value}</span>
-                </div>
-              ))}
+              {(() => {
+                const costPerSession = ov.sessions > 0 ? ov.cost / ov.sessions : 0;
+                const callsPerSession = ov.sessions > 0 ? Math.round(ov.calls / ov.sessions) : 0;
+                return [
+                  {
+                    label: "Cache hit",
+                    value: `${ov.cacheHitPct.toFixed(1)}%`,
+                    color: "text-emerald-400",
+                    btn: <TipBtn label="늘리는 법" onClick={() => setShowCacheModal(true)} />,
+                    grade: cacheHitGrade(ov.cacheHitPct),
+                  },
+                  {
+                    label: "One-shot rate",
+                    value: `${Math.round(ov.oneShotRate * 100)}%`,
+                    color: "text-violet-400",
+                    btn: <TipBtn label="늘리는 법" onClick={() => setShowOneShotModal(true)} />,
+                    grade: oneShotGrade(Math.round(ov.oneShotRate * 100)),
+                  },
+                  {
+                    label: "Cost / session",
+                    value: ov.sessions > 0 ? fmt$(costPerSession) : "$0.00",
+                    color: "text-yellow-400",
+                    btn: <TipBtn label="줄이는 법" onClick={() => setShowCostModal(true)} />,
+                    grade: costGrade(costPerSession),
+                  },
+                  {
+                    label: "Calls / session",
+                    value: callsPerSession.toString(),
+                    color: "text-blue-400",
+                    btn: <TipBtn label="설명" onClick={() => setShowCallsModal(true)} />,
+                    grade: callsGrade(callsPerSession),
+                  },
+                ].map(({ label, value, color, btn, grade }) => (
+                  <div key={label} className="flex items-center text-xs py-0.5 gap-2">
+                    <span className="text-neutral-400 w-28 shrink-0">{label}</span>
+                    <span className="w-20 shrink-0">{btn}</span>
+                    <div className="ml-auto flex items-center gap-2">
+                      <span className={`font-bold ${color}`}>{value}</span>
+                      <span className={`text-[10px] font-mono font-bold px-1.5 py-0.5 rounded border w-16 text-center ${GRADE_STYLES[grade]}`}>{grade}</span>
+                    </div>
+                  </div>
+                ));
+              })()}
             </div>
           </div>
 
