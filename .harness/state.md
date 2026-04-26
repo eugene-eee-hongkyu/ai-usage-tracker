@@ -6,19 +6,20 @@
 
 ---
 
-## 마지막 실행: 2026-04-26 15:59
-## 마지막 업데이트: 2026-04-26 15:59
+## 마지막 실행: 2026-04-26 16:58
+## 마지막 업데이트: 2026-04-26 16:58
 ## 현재 모드: bypassPermissions
 
 ### 현재 집중
 
-- B-2 프로덕션 운영 중 — 팀원 초대 및 추가 UX 피드백 반영 단계
+- codeburn migration 진행 중 (run: docs/runs/2026-04-26-codeburn-migration_run.md)
+- 현재 run: docs/runs/2026-04-26-codeburn-migration_run.md — codeburn migration
 
 ### 이어서 할 것
 
-1. Vercel 환경변수 `ALLOWED_EMAIL_DOMAINS` 프로덕션 업데이트 (수동)
-2. 팀원에게 `https://ai-usage-tracker-web-psi.vercel.app` 공유 및 초대, 팀랭킹 화면 검증
-3. B-1 §3 Hold 플래그: Windows 환경 친구 1명 확보 — SessionEnd hook 발화 검증
+1. codeburn migration 구현 시작 — 1단계: DB 스키마 교체 (`lib/db/schema.ts`)
+2. 2단계: Supabase 마이그레이션 SQL 작성 → 사용자가 실행
+3. 이후 API → UI → CLI 순서로 16단계 진행
 
 ### 막힌 것
 
@@ -26,7 +27,7 @@
 
 ### 사람 판단 필요
 
-- B-1 §3 Hold 플래그: Windows 환경 친구 1명 확보 필요 (SessionEnd hook 발화 검증용)
+- Supabase SQL 에디터에서 마이그레이션 SQL 실행 (기존 테이블 DROP + user_snapshots CREATE)
 - Vercel 환경변수 `ALLOWED_EMAIL_DOMAINS` 업데이트 필요 (`iskra.world,primuslabs.world,z21labs.xyz`)
 
 ### 진행 상황
@@ -61,7 +62,10 @@
 - [x] `ALLOWED_EMAIL_DOMAIN` 허용 도메인 확정: `iskra.world,primuslabs.world,z21labs.xyz`
 - [x] ingest `onConflictDoUpdate` 수정 — 오늘 데이터 0 버그 해결
 - [x] CLI sync 명령 오류 수정 (`program.parse(process.argv)`)
-- [x] worklog.md 상단 잘못된 자동 생성 항목 교체 후 git commit & push
+- [x] 차트 툴팁에 cache hit%, 세션당 비용 추가 (Vercel 배포 완료)
+- [x] codeburn migration kickoff (docs/runs/2026-04-26-codeburn-migration_run.md)
+- [ ] codeburn migration 구현 (16단계 — run 파일 참조)
+- [ ] Supabase 마이그레이션 SQL 실행 (사람)
 - [ ] Vercel 환경변수 `ALLOWED_EMAIL_DOMAINS` 프로덕션 업데이트
 - [ ] 팀원 초대 및 팀랭킹 화면 검증
 - [ ] Windows SessionEnd hook 발화 검증 (Hold 플래그)

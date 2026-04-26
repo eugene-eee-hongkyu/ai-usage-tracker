@@ -4,6 +4,27 @@
 
 ---
 
+## 2026-04-26: ccusage → codeburn 마이그레이션 + DB 2-table JSONB 재설계
+
+- **선택**: codeburn으로 완전 교체, DB를 `users` + `user_snapshots`(JSONB) 2개 테이블로 재설계
+- **대안 검토**:
+  - ccusage 유지: one-shot rate가 항상 0 (하드코딩 버그), 개선 불가
+  - ccusage + codeburn 병행: 정합성 문제 + 의존성 2배, 원래 단일 의존성 목표에 반함
+  - 정규화 4개 테이블: 빌드 시간 증가, 10명 규모에서 JSONB 대비 이득 없음
+- **선택 이유**: codeburn이 activities별 one-shot rate를 정확히 제공함. JSONB는 스키마 변경 없이 신규 지표 추가 가능. mirror columns 5개(total_cost, sessions_count, calls_count, cache_hit_pct, overall_one_shot)로 팀랭킹 정렬 성능 확보.
+- **영향 범위**: 전체 웹 API, UI, CLI (16단계 구현)
+- **되돌리는 방법**: sessions/dailyAgg 테이블 복원 + 이전 ingest/dashboard/team API 복원
+
+## 2026-04-26: MVP 합성 점수 — one-shot × cache hit / 세션당 비용으로 교체
+
+- **선택**: `efficiencyScore = overallOneShot × cacheHitPct / (totalCost / sessionsCount)`
+- **대안 검토**: 이전 점수(cache hit% × 100 / 세션당 비용)는 one-shot rate를 포함 못 함 (ccusage에서 0으로 하드코딩됨)
+- **선택 이유**: codeburn activities에서 정확한 one-shot rate가 나오므로 3개 지표 합성이 가능해짐
+- **영향 범위**: `lib/rules/index.ts`, `api/team/route.ts`, `team/page.tsx`
+- **되돌리는 방법**: computeEfficiencyScore 인수를 cacheRead/cacheWrite/totalCost/sessionsCount로 복원
+
+---
+
 ## 2026-04-26: 최고 효율 지표 — cache hit% × 100 / 세션당 비용 채택
 
 - **선택**: `efficiencyScore = (cacheRead / (cacheRead + cacheWrite)) × 100 × 100 / (totalCost / sessionsCount)`

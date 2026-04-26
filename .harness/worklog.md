@@ -4,6 +4,24 @@
 
 ---
 
+## Session 2026-04-26 16:58 — codeburn migration kickoff + 차트 툴팁 개선
+
+### 작업 요약
+- codeburn 실제 JSON 출력 분석 (`overview`, `daily`, `activities`, `projects`, `topSessions`, `models`, `tools`, `mcpServers`)
+- 제안 검토: ccusage → codeburn 교체 타당성 확인, 3가지 제약 발견 (optimize JSON 미지원 / daily 토큰 없음 / planning rate 변별력 없음)
+- DB 재설계 확정: 2-table JSONB (users + user_snapshots), mirror columns 5개
+- 합성 MVP 점수 업데이트 결정: `one-shot × cache hit / 세션당 비용`
+- 대시보드 차트 툴팁에 cache hit%, 세션당 비용 추가 (`dashboard/page.tsx`) — Vercel 배포됨
+- codeburn migration run kickoff (`docs/runs/2026-04-26-codeburn-migration_run.md`)
+- bypassPermissions 모드 전환
+
+### 다음 액션
+1. codeburn migration 구현 시작 (16단계, run 파일 참조)
+2. 1단계: DB 스키마 교체 (`lib/db/schema.ts`)
+3. 2단계: Supabase 마이그레이션 SQL 작성 → 사용자가 실행
+
+---
+
 ## Session 2026-04-26 15:59 — worklog 정리 및 상태 파일 커밋
 
 ### 작업 요약
