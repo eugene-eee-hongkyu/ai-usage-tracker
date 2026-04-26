@@ -129,7 +129,7 @@ export default function DashboardPage() {
     </div>
   );
 
-  const neverSynced = !data.user.lastSyncedAt;
+  const neverSynced = !data.user.lastSyncedAt || !data.summary;
   if (neverSynced) {
     return (
       <div className="min-h-screen">
