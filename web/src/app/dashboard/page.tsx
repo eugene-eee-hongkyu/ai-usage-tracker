@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useSession } from "next-auth/react";
+import { useSession, signOut } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
@@ -139,7 +139,15 @@ export default function DashboardPage() {
     const syncCmd = `npx github:${process.env.NEXT_PUBLIC_GITHUB_ORG ?? "eugene-eee-hongkyu"}/ai-usage-tracker sync`;
     return (
       <div className="min-h-screen">
-        <Nav />
+        <header className="border-b border-slate-800 px-4 py-3 flex items-center justify-between">
+          <span className="font-bold text-slate-200">Primus Usage</span>
+          <button
+            onClick={() => signOut({ callbackUrl: "/login" })}
+            className="text-sm text-slate-500 hover:text-slate-300"
+          >
+            로그아웃
+          </button>
+        </header>
         <main className="max-w-md mx-auto px-4 py-20 text-center space-y-6">
           <div className="text-4xl">⏳</div>
           <h1 className="text-2xl font-bold text-slate-100">동기화가 필요합니다</h1>
