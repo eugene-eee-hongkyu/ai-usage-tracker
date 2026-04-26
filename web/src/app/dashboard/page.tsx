@@ -7,7 +7,7 @@ import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
 } from "recharts";
 import { Nav } from "@/components/nav";
-import { CacheHitModal } from "@/components/metric-modal";
+import { CacheHitModal, OneShotRateModal, CostPerSessionModal, CallsPerSessionModal } from "@/components/metric-modal";
 import Link from "next/link";
 
 type Period = "today" | "week" | "month" | "all";
@@ -77,6 +77,15 @@ function formatPath(path: string): string {
 
 function fmt$(n: number) { return `$${n.toFixed(2)}`; }
 
+function TipBtn({ label, onClick }: { label: string; onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      className="px-1.5 py-0.5 rounded text-[10px] font-mono font-semibold bg-indigo-600 text-white hover:bg-indigo-500 transition-colors leading-none"
+    >{label}</button>
+  );
+}
+
 function ChartTooltip({ active, payload, label }: {
   active?: boolean;
   payload?: Array<{ payload: { cost: number; sessions: number } }>;
@@ -102,6 +111,9 @@ export default function DashboardPage() {
   const [fetchError, setFetchError] = useState(false);
   const [syncCopied, setSyncCopied] = useState(false);
   const [showCacheModal, setShowCacheModal] = useState(false);
+  const [showOneShotModal, setShowOneShotModal] = useState(false);
+  const [showCostModal, setShowCostModal] = useState(false);
+  const [showCallsModal, setShowCallsModal] = useState(false);
 
   useEffect(() => {
     if (status === "unauthenticated") router.push("/login");
@@ -338,33 +350,31 @@ export default function DashboardPage() {
                   label: "Cache hit",
                   value: `${ov.cacheHitPct.toFixed(1)}%`,
                   color: ov.cacheHitPct >= 80 ? "text-emerald-400" : ov.cacheHitPct >= 50 ? "text-yellow-400" : "text-red-400",
-                  extra: (
-                    <button
-                      onClick={() => setShowCacheModal(true)}
-                      className="text-neutral-600 hover:text-indigo-400 text-xs font-mono underline underline-offset-2 transition-colors"
-                    >늘리는 법</button>
-                  ),
+                  btn: <TipBtn label="늘리는 법" onClick={() => setShowCacheModal(true)} />,
                 },
                 {
                   label: "One-shot rate",
                   value: `${Math.round(ov.oneShotRate * 100)}%`,
                   color: ov.oneShotRate >= 0.7 ? "text-emerald-400" : ov.oneShotRate >= 0.4 ? "text-yellow-400" : "text-neutral-400",
+                  btn: <TipBtn label="늘리는 법" onClick={() => setShowOneShotModal(true)} />,
                 },
                 {
                   label: "Cost / session",
                   value: ov.sessions > 0 ? fmt$(ov.cost / ov.sessions) : "$0.00",
                   color: "text-yellow-400",
+                  btn: <TipBtn label="줄이는 법" onClick={() => setShowCostModal(true)} />,
                 },
                 {
                   label: "Calls / session",
                   value: ov.sessions > 0 ? Math.round(ov.calls / ov.sessions).toString() : "0",
                   color: "text-blue-400",
+                  btn: <TipBtn label="설명" onClick={() => setShowCallsModal(true)} />,
                 },
-              ].map(({ label, value, color, extra = null }) => (
+              ].map(({ label, value, color, btn }) => (
                 <div key={label} className="flex items-center justify-between text-xs py-0.5">
                   <span className="flex items-center gap-1.5 text-neutral-400">
                     {label}
-                    {extra}
+                    {btn}
                   </span>
                   <span className={`font-bold ${color}`}>{value}</span>
                 </div>
@@ -536,6 +546,25 @@ export default function DashboardPage() {
 
       {showCacheModal && (
         <CacheHitModal value={ov.cacheHitPct} onClose={() => setShowCacheModal(false)} />
+      )}
+      {showOneShotModal && (
+        <OneShotRateModal value={Math.round(ov.oneShotRate * 100)} onClose={() => setShowOneShotModal(false)} />
+      )}
+      {showCostModal && (
+        <CostPerSessionModal
+          value={ov.sessions > 0 ? ov.cost / ov.sessions : 0}
+          sessionsCount={ov.sessions}
+          totalCost={ov.cost}
+          onClose={() => setShowCostModal(false)}
+        />
+      )}
+      {showCallsModal && (
+        <CallsPerSessionModal
+          value={ov.sessions > 0 ? Math.round(ov.calls / ov.sessions) : 0}
+          callsTotal={ov.calls}
+          sessionsCount={ov.sessions}
+          onClose={() => setShowCallsModal(false)}
+        />
       )}
     </div>
   );
