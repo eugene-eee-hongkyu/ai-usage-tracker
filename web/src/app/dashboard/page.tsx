@@ -74,6 +74,16 @@ function formatPath(path: string): string {
 
 function fmt$(n: number) { return `$${n.toFixed(2)}`; }
 
+function fmtSyncedAt(ts: string | null): string {
+  if (!ts) return "—";
+  const d = new Date(ts);
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  const hh = String(d.getHours()).padStart(2, "0");
+  const min = String(d.getMinutes()).padStart(2, "0");
+  return `${mm}-${dd} ${hh}:${min}`;
+}
+
 function TipBtn({ label, onClick }: { label: string; onClick: () => void }) {
   return (
     <button
@@ -212,7 +222,10 @@ export default function DashboardPage() {
           <span><span className="text-cyan-400 font-bold">{ov.sessions}</span><span className="text-neutral-500 ml-1 text-xs">sessions</span></span>
           <span><span className="text-emerald-400 font-bold">{ov.cacheHitPct.toFixed(1)}%</span><span className="text-neutral-500 ml-1 text-xs">cache hit</span></span>
           <span><span className="text-violet-400 font-bold">{Math.round(ov.oneShotRate * 100)}%</span><span className="text-neutral-500 ml-1 text-xs">1-shot</span></span>
-          <span className="text-neutral-600 text-xs self-center ml-auto">활성 {ov.activeDays}일</span>
+          <span className="text-neutral-600 text-xs self-center ml-auto flex items-center gap-3">
+            <span>활성 {ov.activeDays}일</span>
+            <span>마지막 수신 <span className="text-neutral-500">{fmtSyncedAt(data.user.lastSyncedAt)}</span></span>
+          </span>
         </div>
       </div>
 
