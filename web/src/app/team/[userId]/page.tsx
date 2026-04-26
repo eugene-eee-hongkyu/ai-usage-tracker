@@ -9,16 +9,10 @@ import { ActivityCalendar } from "react-activity-calendar";
 
 interface MemberData {
   user: { id: number; name: string; avatarUrl: string | null };
-  summary: { totalTokens: number; totalCost: number; oneShotRate: number; sessionsCount: number };
-  daily: Array<{ date: string; tokens: number; cost: number }>;
+  summary: { totalCost: number; sessionsCount: number; cacheHitPct: number };
+  daily: Array<{ date: string; cost: number; sessions: number }>;
   streak: number;
-  projects: Array<{ name: string; tokens: number }>;
-}
-
-function fmtTokens(n: number) {
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
-  if (n >= 1_000) return `${(n / 1_000).toFixed(0)}K`;
-  return String(n);
+  projects: Array<{ name: string; cost: number; sessions: number; avgCost: number }>;
 }
 
 export default function MemberProfilePage() {
@@ -48,7 +42,6 @@ export default function MemberProfilePage() {
     </div>
   );
 
-  // Build activity calendar data (need all dates in range)
   const today = new Date();
   const calData = [];
   for (let i = 27; i >= 0; i--) {
@@ -56,11 +49,10 @@ export default function MemberProfilePage() {
     d.setDate(d.getDate() - i);
     const key = d.toISOString().slice(0, 10);
     const found = data.daily.find((r) => r.date === key);
-    calData.push({
-      date: key,
-      count: found ? Math.min(Math.ceil(found.tokens / 100_000), 4) : 0,
-      level: found ? Math.min(Math.ceil(found.tokens / 500_000), 4) as 0 | 1 | 2 | 3 | 4 : 0 as 0 | 1 | 2 | 3 | 4,
-    });
+    const cost = found?.cost ?? 0;
+    // levels: 0=$0, 1=<$0.5, 2=<$2, 3=<$5, 4>=$5
+    const level: 0 | 1 | 2 | 3 | 4 = cost === 0 ? 0 : cost < 0.5 ? 1 : cost < 2 ? 2 : cost < 5 ? 3 : 4;
+    calData.push({ date: key, count: Math.round(cost * 100), level });
   }
 
   return (
@@ -76,16 +68,16 @@ export default function MemberProfilePage() {
         <div className="bg-slate-900 rounded-lg p-4">
           <div className="grid grid-cols-4 gap-4 text-sm">
             <div>
-              <p className="text-slate-500 text-xs">토큰 (4주)</p>
-              <p className="text-slate-200 font-semibold">{fmtTokens(data.summary.totalTokens)}</p>
-            </div>
-            <div>
-              <p className="text-slate-500 text-xs">비용</p>
+              <p className="text-slate-500 text-xs">총 비용</p>
               <p className="text-slate-200 font-semibold">${data.summary.totalCost.toFixed(2)}</p>
             </div>
             <div>
-              <p className="text-slate-500 text-xs">One-shot</p>
-              <p className="text-slate-200 font-semibold">{data.summary.oneShotRate}%</p>
+              <p className="text-slate-500 text-xs">세션 수</p>
+              <p className="text-slate-200 font-semibold">{data.summary.sessionsCount}회</p>
+            </div>
+            <div>
+              <p className="text-slate-500 text-xs">Cache hit</p>
+              <p className="text-slate-200 font-semibold">{Math.round(data.summary.cacheHitPct)}%</p>
             </div>
             <div>
               <p className="text-slate-500 text-xs">🔥 Streak</p>
@@ -94,27 +86,28 @@ export default function MemberProfilePage() {
           </div>
         </div>
 
-        {/* Heatmap */}
+        {/* Heatmap (cost-based) */}
         <div className="bg-slate-900 rounded-lg p-4">
-          <p className="text-sm text-slate-400 mb-4">활동 히트맵 (4주)</p>
+          <p className="text-sm text-slate-400 mb-4">활동 히트맵 (4주, 비용 기준)</p>
           <ActivityCalendar
             data={calData}
             colorScheme="dark"
             theme={{ dark: ["#1e293b", "#4338ca", "#6366f1", "#818cf8", "#a5b4fc"] }}
-            labels={{ legend: { less: "적음", more: "많음" } }}
+            labels={{ legend: { less: "낮음", more: "높음" } }}
             showWeekdayLabels
             blockSize={14}
           />
         </div>
 
-        {/* Projects */}
+        {/* Projects (cost-based) */}
         {data.projects.length > 0 && (
           <div className="bg-slate-900 rounded-lg p-4 space-y-2">
             <p className="text-sm text-slate-400 mb-2">주요 프로젝트</p>
-            {data.projects.slice(0, 5).map((p) => (
+            {data.projects.map((p) => (
               <div key={p.name} className="flex items-center justify-between text-sm">
-                <span className="text-slate-300">{p.name}</span>
-                <span className="text-slate-400">{fmtTokens(p.tokens)}</span>
+                <span className="text-slate-300 flex-1 truncate">{p.name}</span>
+                <span className="text-slate-400 w-16 text-right">${p.cost.toFixed(2)}</span>
+                <span className="text-slate-600 w-12 text-right text-xs">{p.sessions}회</span>
               </div>
             ))}
           </div>

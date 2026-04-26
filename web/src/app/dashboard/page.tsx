@@ -8,25 +8,30 @@ import {
 } from "recharts";
 import { Nav } from "@/components/nav";
 import Link from "next/link";
-import type { Suggestion } from "@/lib/rules";
-import { CacheHitModal, CostPerSessionModal } from "@/components/metric-modal";
 
 type Period = "today" | "week" | "month" | "all";
 
+interface Activity { name: string; sessions: number; cost: number; oneShotRate: number }
+interface Project { name: string; cost: number; sessions: number; avgCost: number }
+interface TopSession { id: string; date: string; project: string; cost: number; turns: number }
+interface DailyRow { date: string; cost: number; sessions: number }
+
 interface DashboardData {
   user: { name: string; lastSyncedAt: string | null };
-  summary: { totalTokens: number; inputTokens: number; outputTokens: number; totalCost: number; oneShotRate: number; cacheHitRate: number; sessionsCount: number; totalEdits: number; cacheRead: number };
-  platformAvg: { userCount: number; dailyCost: number; cacheSavingUsd: number };
-  daily: Array<{ date: string; totalTokens: number; totalCost: number; cacheRead: number; cacheWrite: number; sessionsCount: number }>;
-  models: Record<string, { tokens: number; cost: number }>;
-  suggestions: Suggestion[];
-}
-
-function fmtTokens(n: number) {
-  if (n >= 1_000_000_000) return `${(n / 1_000_000_000).toFixed(1)}B`;
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
-  if (n >= 1_000) return `${(n / 1_000).toFixed(0)}K`;
-  return String(n);
+  summary: {
+    totalCost: number;
+    sessionsCount: number;
+    activeDays: number;
+    cacheHitPct: number;
+    overallOneShot: number;
+    avgTurns: number;
+    allTimeCost: number;
+    allTimeSessions: number;
+  } | null;
+  daily: DailyRow[];
+  activities: Activity[];
+  projects: Project[];
+  topSessions: TopSession[];
 }
 
 function staleBanner(lastSyncedAt: string | null) {
@@ -38,37 +43,22 @@ function periodLabel(period: Period) {
   return period === "today" ? "오늘" : period === "week" ? "이번 주" : period === "month" ? "이번 달" : "전체";
 }
 
-function chartDayLabel(period: Period, totalDays: number) {
-  if (period === "today") return "오늘 토큰";
-  if (period === "week") return "일별 토큰 (7일)";
-  if (period === "month") return "일별 토큰 (30일)";
-  return `일별 토큰 (전체 ${totalDays}일)`;
-}
-
-// Recharts custom tooltip
 function ChartTooltip({ active, payload, label }: {
   active?: boolean;
-  payload?: Array<{ value: number; payload: { tokensM: number; cacheHitPct: number | null; costPerSession: number | null } }>;
+  payload?: Array<{ value: number; payload: { cost: number; sessions: number } }>;
   label?: string;
 }) {
   if (!active || !payload?.length) return null;
-  const { tokensM, cacheHitPct, costPerSession } = payload[0].payload;
-  const tokDisplay = tokensM >= 1000 ? `${(tokensM / 1000).toFixed(1)}B tok` : `${tokensM}M tok`;
+  const { cost, sessions } = payload[0].payload;
   return (
     <div className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-xs shadow-lg space-y-1">
       <p className="text-slate-400">{label}</p>
-      <p className="text-indigo-300 font-semibold">{tokDisplay}</p>
-      {cacheHitPct !== null && (
-        <p className="text-slate-300">Cache hit <span className="text-emerald-400 font-medium">{cacheHitPct}%</span></p>
-      )}
-      {costPerSession !== null && (
-        <p className="text-slate-300">세션당 비용 <span className="text-amber-400 font-medium">${costPerSession.toFixed(3)}</span></p>
-      )}
+      <p className="text-indigo-300 font-semibold">${cost.toFixed(3)}</p>
+      {sessions > 0 && <p className="text-slate-300">{sessions}회 세션</p>}
     </div>
   );
 }
 
-// Status badge for efficiency metrics
 function MetricStatus({ value, thresholdGood, thresholdOk, inverse = false }: {
   value: number; thresholdGood: number; thresholdOk: number; inverse?: boolean;
 }) {
@@ -85,7 +75,6 @@ export default function DashboardPage() {
   const [period, setPeriod] = useState<Period>("week");
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
-  const [openModal, setOpenModal] = useState<"cacheHit" | "costPerSession" | null>(null);
 
   useEffect(() => {
     if (status === "unauthenticated") router.push("/login");
@@ -99,7 +88,6 @@ export default function DashboardPage() {
       .then((d) => { setData(d); setLoading(false); });
   }, [session, period]);
 
-  // Poll every 4s while lastSyncedAt is null (waiting for first CLI sync)
   useEffect(() => {
     if (!session || !data || data.user.lastSyncedAt) return;
     const timer = setInterval(() => {
@@ -120,7 +108,6 @@ export default function DashboardPage() {
   );
 
   const neverSynced = !data.user.lastSyncedAt;
-
   if (neverSynced) {
     return (
       <div className="min-h-screen">
@@ -141,46 +128,26 @@ export default function DashboardPage() {
     );
   }
 
-  // Chart: include cache tokens, unit = M
-  const chartData = data.daily.map((d) => {
-    const cr = d.cacheRead ?? 0;
-    const cw = d.cacheWrite ?? 0;
-    const sc = d.sessionsCount ?? 0;
-    return {
-      date: d.date.slice(5),
-      tokensM: Math.round(((d.totalTokens ?? 0) + cr + cw) / 1_000_000),
-      cacheHitPct: cr + cw > 0 ? Math.round((cr / (cr + cw)) * 100) : null,
-      costPerSession: sc > 0 ? (d.totalCost ?? 0) / sc : null,
-    };
-  });
+  const s = data.summary!;
+  const chartData = data.daily.map((d) => ({
+    date: d.date.slice(5),
+    cost: d.cost,
+    sessions: d.sessions,
+  }));
 
-  const totalTokens = data.summary.totalTokens;
-  const { cacheHitRate, sessionsCount, cacheRead } = data.summary;
-  const activeDays = data.daily.filter((d) =>
-    ((d.totalTokens ?? 0) + (d.cacheRead ?? 0) + (d.cacheWrite ?? 0)) > 0
-  ).length;
-
-  // For "all": compute actual date range from first record to today, not just active-day count
-  const allDayRange = data.daily.length > 0
+  const costPerSession = s.allTimeSessions > 0 ? s.allTimeCost / s.allTimeSessions : 0;
+  const oneShotPct = Math.round(s.overallOneShot * 100);
+  const periodTotalDays = period === "today" ? 1 : period === "week" ? 7 : period === "month" ? 30
+    : data.daily.length > 0
     ? Math.round((Date.now() - new Date(data.daily[0].date + "T00:00:00").getTime()) / (1000 * 60 * 60 * 24)) + 1
-    : chartData.length;
-  const periodTotalDays = period === "today" ? 1
-    : period === "week" ? 7
-    : period === "month" ? 30
-    : allDayRange;
-
-  const avgDailyCost = activeDays > 0 ? data.summary.totalCost / activeDays : 0;
-  const cacheSavingUsd = (cacheRead / 1_000_000) * 2.70;
-  const costPerSession = sessionsCount > 0 ? data.summary.totalCost / sessionsCount : 0;
-  const { platformAvg } = data;
-  const showPlatformAvg = platformAvg.userCount > 1;
+    : 0;
 
   return (
     <div className="min-h-screen">
       <Nav />
 
       {staleBanner(data.user.lastSyncedAt) && (
-        <div className="bg-yellow-950 border-b border-yellow-800 px-4 py-2 flex items-center justify-between text-sm text-yellow-300">
+        <div className="bg-yellow-950 border-b border-yellow-800 px-4 py-2 flex items-center text-sm text-yellow-300">
           <span>
             마지막 수집: {new Date(data.user.lastSyncedAt!).toLocaleDateString("ko")} ·{" "}
             <Link href="/setup-status" className="underline">셋업 확인 →</Link>
@@ -189,13 +156,13 @@ export default function DashboardPage() {
       )}
 
       <main className={`max-w-3xl mx-auto px-4 py-6 space-y-6 transition-opacity duration-150 ${loading ? "opacity-40 pointer-events-none" : "opacity-100"}`}>
+
         {/* Summary line */}
         <div>
           <div className="text-lg font-semibold text-slate-200">
-            {periodLabel(period)}{" "}
-            {fmtTokens(totalTokens)} tok · ${data.summary.totalCost.toFixed(2)} · {sessionsCount}회 세션
+            {periodLabel(period)} ${s.totalCost.toFixed(2)} · {s.sessionsCount}회 세션
           </div>
-          <p className="text-xs text-slate-600 mt-0.5">캐시 포함 토큰 총계 (입력 + 출력 + 캐시 읽기/쓰기)</p>
+          <p className="text-xs text-slate-600 mt-0.5">기간 집계 (일별 합산)</p>
         </div>
 
         {/* Period tabs */}
@@ -211,183 +178,112 @@ export default function DashboardPage() {
           ))}
         </div>
 
-        {/* Daily token chart */}
+        {/* Daily cost chart */}
         <div className="bg-slate-900 rounded-lg p-4">
-          <p className="text-sm text-slate-400 mb-3">{chartDayLabel(period, allDayRange)}</p>
+          <p className="text-sm text-slate-400 mb-3">일별 비용 ({periodLabel(period)})</p>
           {loading ? (
             <div className="h-32 bg-slate-800 animate-pulse rounded" />
+          ) : chartData.length === 0 ? (
+            <div className="h-32 flex items-center justify-center text-slate-600 text-sm">이 기간에 데이터가 없습니다</div>
           ) : (
             <ResponsiveContainer width="100%" height={120}>
               <BarChart data={chartData} margin={{ top: 4, right: 4, left: 4, bottom: 0 }}>
-                <XAxis
-                  dataKey="date"
-                  tick={{ fill: "#94a3b8", fontSize: 11 }}
-                  axisLine={false}
-                  tickLine={false}
-                  interval="preserveStartEnd"
-                />
+                <XAxis dataKey="date" tick={{ fill: "#94a3b8", fontSize: 11 }} axisLine={false} tickLine={false} interval="preserveStartEnd" />
                 <YAxis hide />
                 <Tooltip content={<ChartTooltip />} cursor={{ fill: "rgba(99,102,241,0.1)" }} />
-                <Bar dataKey="tokensM" fill="#6366f1" radius={[3, 3, 0, 0]} maxBarSize={40} />
+                <Bar dataKey="cost" fill="#6366f1" radius={[3, 3, 0, 0]} maxBarSize={40} />
               </BarChart>
             </ResponsiveContainer>
           )}
         </div>
 
-        {/* Model breakdown */}
-        <div className="bg-slate-900 rounded-lg p-4 space-y-2">
-          <p className="text-sm text-slate-400 mb-2">
-            모델별 ({periodLabel(period)})
-          </p>
-          {Object.entries(data.models)
-            .sort(([, a], [, b]) => b.tokens - a.tokens)
-            .map(([model, stat]) => {
-              const pct = totalTokens > 0 ? Math.round((stat.tokens / totalTokens) * 100) : 0;
-              return (
-                <div key={model} className="flex items-center gap-3 text-sm">
-                  <span className="w-14 text-slate-300">{model}</span>
-                  <div className="flex-1 bg-slate-800 rounded h-2">
-                    <div className="bg-indigo-500 h-2 rounded" style={{ width: `${pct}%` }} />
-                  </div>
-                  <span className="w-8 text-slate-400 text-right">{pct}%</span>
-                  <span className="w-12 text-slate-400 text-right">${stat.cost.toFixed(2)}</span>
-                </div>
-              );
-            })}
-        </div>
-
-        {/* Metrics */}
+        {/* Efficiency metrics (all-time from snapshot) */}
         <div className="bg-slate-900 rounded-lg p-4">
-          <p className="text-sm text-slate-400 mb-4">사용 지표</p>
-          <div className="grid grid-cols-3 gap-4">
-            {/* Cache hit */}
+          <div className="flex items-center justify-between mb-4">
+            <p className="text-sm text-slate-400">효율 지표 <span className="text-xs text-slate-600">(전체 기간)</span></p>
+          </div>
+          <div className="grid grid-cols-4 gap-4">
             <div className="space-y-1">
-              <div className="flex items-center gap-2">
-                <p className="text-xs text-slate-500">Cache hit</p>
-                <button
-                  onClick={() => setOpenModal("cacheHit")}
-                  className="text-xs text-indigo-400 hover:text-indigo-300 bg-indigo-950/50 hover:bg-indigo-950 px-1.5 py-0.5 rounded transition-colors leading-none"
-                >
-                  올리는법
-                </button>
-              </div>
-              <p
-                className="text-xl font-semibold text-slate-200 cursor-pointer hover:text-indigo-200 transition-colors"
-                onClick={() => setOpenModal("cacheHit")}
-              >
-                {cacheHitRate}%
-              </p>
-              <MetricStatus value={cacheHitRate} thresholdGood={80} thresholdOk={50} />
-              <p className="text-xs text-slate-600 leading-relaxed mt-1">
-                이전 내용을 재사용한 비율.<br />
-                CLAUDE.md를 짧게 유지하면 올라감.<br />
-                <span className="text-slate-500">목표 80%+</span>
-              </p>
+              <p className="text-xs text-slate-500">Cache hit</p>
+              <p className="text-xl font-semibold text-slate-200">{Math.round(s.cacheHitPct)}%</p>
+              <MetricStatus value={s.cacheHitPct} thresholdGood={80} thresholdOk={50} />
             </div>
-            {/* Avg daily cost */}
             <div className="space-y-1">
-              <p className="text-xs text-slate-500">평균 일비용</p>
-              <p className="text-xl font-semibold text-slate-200">${avgDailyCost.toFixed(2)}</p>
-              {showPlatformAvg && (
-                <p className="text-xs text-slate-500">
-                  전체 평균 ${platformAvg.dailyCost.toFixed(2)}
-                  {avgDailyCost > platformAvg.dailyCost * 1.2
-                    ? " · ↑ 높음"
-                    : avgDailyCost < platformAvg.dailyCost * 0.8
-                    ? " · ↓ 낮음"
-                    : " · 비슷"}
-                </p>
-              )}
-              <p className="text-xs text-slate-600 leading-relaxed mt-1">
-                활성 일수 기준 하루 평균 비용.<br />
-                캐시 hit가 높을수록 낮아짐.
-              </p>
+              <p className="text-xs text-slate-500">세션당 비용</p>
+              <p className="text-xl font-semibold text-slate-200">${costPerSession.toFixed(2)}</p>
+              <MetricStatus value={costPerSession} thresholdGood={0.5} thresholdOk={2} inverse />
             </div>
-            {/* Cache saving */}
             <div className="space-y-1">
-              <p className="text-xs text-slate-500">캐시 절감 추정</p>
-              <p className="text-xl font-semibold text-slate-200">${cacheSavingUsd.toFixed(2)}</p>
-              {showPlatformAvg && (
-                <p className="text-xs text-slate-500">
-                  전체 평균 ${platformAvg.cacheSavingUsd.toFixed(2)}
-                  {cacheSavingUsd > platformAvg.cacheSavingUsd * 1.2
-                    ? " · ↑ 높음"
-                    : cacheSavingUsd < platformAvg.cacheSavingUsd * 0.8
-                    ? " · ↓ 낮음"
-                    : " · 비슷"}
-                </p>
-              )}
-              <p className="text-xs text-slate-600 leading-relaxed mt-1">
-                캐시 읽기로 아낀 비용 추정.<br />
-                (캐시 읽기 = 일반 입력의 10% 단가)
-              </p>
+              <p className="text-xs text-slate-500">One-shot rate</p>
+              <p className="text-xl font-semibold text-slate-200">{oneShotPct}%</p>
+              <MetricStatus value={oneShotPct} thresholdGood={70} thresholdOk={40} />
             </div>
-            {/* Cost per session */}
             <div className="space-y-1">
-              <div className="flex items-center gap-2">
-                <p className="text-xs text-slate-500">세션당 평균 비용</p>
-                <button
-                  onClick={() => setOpenModal("costPerSession")}
-                  className="text-xs text-indigo-400 hover:text-indigo-300 bg-indigo-950/50 hover:bg-indigo-950 px-1.5 py-0.5 rounded transition-colors leading-none"
-                >
-                  줄이는법
-                </button>
-              </div>
-              <p
-                className="text-xl font-semibold text-slate-200 cursor-pointer hover:text-indigo-200 transition-colors"
-                onClick={() => setOpenModal("costPerSession")}
-              >
-                ${costPerSession.toFixed(2)}
-              </p>
-              <p className="text-xs text-slate-600 leading-relaxed mt-1">
-                총 비용 ÷ 세션 수.<br />
-                낮을수록 효율적으로 사용 중.
-              </p>
+              <p className="text-xs text-slate-500">평균 턴/세션</p>
+              <p className="text-xl font-semibold text-slate-200">{s.avgTurns.toFixed(1)}</p>
+              <MetricStatus value={s.avgTurns} thresholdGood={3} thresholdOk={7} inverse />
             </div>
-            {/* Active days */}
-            <div className="space-y-1">
-              <p className="text-xs text-slate-500">활성 일수</p>
-              <p className="text-xl font-semibold text-slate-200">{activeDays}/{periodTotalDays}일</p>
-              <p className="text-xs text-slate-600 leading-relaxed mt-1">
-                이 기간 중 실제로 사용한 날.
-              </p>
-            </div>
+          </div>
+          <div className="mt-3 flex justify-between text-xs text-slate-600">
+            <span>활성 {s.activeDays}/{periodTotalDays}일</span>
+            <Link href="/dashboard/detail" className="text-indigo-500 hover:text-indigo-400">상세 →</Link>
           </div>
         </div>
 
-        {/* Suggestions */}
-        {data.suggestions.length > 0 && (
-          <div className="bg-slate-900 rounded-lg p-4 space-y-3">
-            <div className="flex items-center justify-between">
-              <p className="text-sm text-slate-400">💡 절감 제안 ({data.suggestions.length}건)</p>
-              <Link href="/dashboard/detail" className="text-xs text-indigo-400 hover:text-indigo-300">더보기 →</Link>
-            </div>
-            {data.suggestions.slice(0, 3).map((s, i) => (
-              <div key={i} className="border-l-2 border-slate-700 pl-3 space-y-1">
-                <div className="flex items-start gap-2 text-sm">
-                  <span className="text-slate-200 font-medium">{s.title}</span>
-                  {s.confidence === "low" && (
-                    <span className="shrink-0 text-xs text-yellow-600 bg-yellow-950 px-1.5 py-0.5 rounded">신뢰도 낮음</span>
-                  )}
+        {/* Activities */}
+        {data.activities.length > 0 && (
+          <div className="bg-slate-900 rounded-lg p-4 space-y-2">
+            <p className="text-sm text-slate-400 mb-3">활동별 one-shot rate</p>
+            {data.activities.map((a) => {
+              const pct = Math.round(a.oneShotRate * 100);
+              return (
+                <div key={a.name} className="flex items-center gap-3 text-sm">
+                  <span className="w-28 text-slate-300 truncate">{a.name}</span>
+                  <div className="flex-1 bg-slate-800 rounded h-2">
+                    <div className="bg-indigo-500 h-2 rounded" style={{ width: `${pct}%` }} />
+                  </div>
+                  <span className="w-10 text-slate-400 text-right">{pct}%</span>
+                  <span className="w-8 text-slate-500 text-right text-xs">{a.sessions}회</span>
                 </div>
-                <p className="text-xs text-slate-500">{s.detail}</p>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Projects */}
+        {data.projects.length > 0 && (
+          <div className="bg-slate-900 rounded-lg p-4 space-y-2">
+            <p className="text-sm text-slate-400 mb-3">프로젝트별 비용</p>
+            {data.projects.slice(0, 8).map((p) => (
+              <div key={p.name} className="flex items-center justify-between text-sm py-1 border-b border-slate-800 last:border-0">
+                <span className="text-slate-200 flex-1 truncate">{p.name}</span>
+                <span className="text-slate-400 w-16 text-right">${p.cost.toFixed(2)}</span>
+                <span className="text-slate-500 w-14 text-right">{p.sessions}회</span>
+                <span className="text-slate-600 w-18 text-right text-xs">${p.avgCost.toFixed(2)}/회</span>
+              </div>
+            ))}
+            {data.projects.length > 8 && (
+              <p className="text-xs text-slate-600 pt-1">+{data.projects.length - 8}개 더 · <Link href="/dashboard/detail" className="text-indigo-500">상세 보기</Link></p>
+            )}
+          </div>
+        )}
+
+        {/* Top sessions */}
+        {data.topSessions.length > 0 && (
+          <div className="bg-slate-900 rounded-lg p-4 space-y-2">
+            <p className="text-sm text-slate-400 mb-3">Top sessions</p>
+            {data.topSessions.slice(0, 5).map((s, i) => (
+              <div key={s.id ?? i} className="flex items-center justify-between text-sm py-1 border-b border-slate-800 last:border-0">
+                <span className="text-slate-500 w-5 text-xs">{i + 1}.</span>
+                <span className="text-slate-400 w-20 text-xs">{s.date}</span>
+                <span className="text-slate-300 flex-1 truncate">{s.project}</span>
+                <span className="text-slate-400 w-16 text-right">${s.cost.toFixed(2)}</span>
+                <span className="text-slate-600 w-12 text-right text-xs">{s.turns}턴</span>
               </div>
             ))}
           </div>
         )}
       </main>
-
-      {openModal === "cacheHit" && (
-        <CacheHitModal value={cacheHitRate} onClose={() => setOpenModal(null)} />
-      )}
-      {openModal === "costPerSession" && (
-        <CostPerSessionModal
-          value={costPerSession}
-          sessionsCount={sessionsCount}
-          totalCost={data.summary.totalCost}
-          onClose={() => setOpenModal(null)}
-        />
-      )}
     </div>
   );
 }
