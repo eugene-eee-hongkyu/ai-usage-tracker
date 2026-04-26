@@ -4,32 +4,42 @@ import { eq, sql } from "drizzle-orm";
 import crypto from "crypto";
 
 interface CodeburnActivity {
-  name: string;
-  sessions: number;
+  name?: string;
+  category?: string;
+  sessions?: number;
+  turns?: number;
   cost: number;
-  oneShotRate: number | null;
+  oneShotRate: number | null; // 0-100 scale
+}
+
+interface CodeburnOverview {
+  cost?: number;
+  sessions?: number;
+  calls?: number;
+  cacheHitPercent?: number;
+  // legacy field names
+  totalCost?: number;
+  totalSessions?: number;
+  callsCount?: number;
+  cacheHitPct?: number;
 }
 
 interface CodeburnReport {
-  summary?: {
-    totalCost?: number;
-    totalSessions?: number;
-    callsCount?: number;
-    cacheHitPct?: number;
-    avgTurns?: number;
-  };
+  overview?: CodeburnOverview;
+  summary?: CodeburnOverview; // legacy
   activities?: CodeburnActivity[];
   daily?: Array<{ date: string; cost: number; sessions: number }>;
-  projects?: Array<{ name: string; cost: number; sessions: number; avgCost: number }>;
-  topSessions?: Array<{ id: string; date: string; project: string; cost: number; turns: number }>;
+  projects?: Array<{ name: string; cost: number; sessions?: number; calls?: number; path?: string; avgCost?: number }>;
+  topSessions?: Array<{ sessionId?: string; id?: string; date: string; project: string; cost: number; calls?: number; turns?: number }>;
 }
 
 function computeOverallOneShot(activities: CodeburnActivity[]): number {
-  const filtered = activities.filter((a) => a.oneShotRate !== null && a.sessions > 0);
-  const totalSessions = filtered.reduce((s, a) => s + a.sessions, 0);
-  if (totalSessions === 0) return 0;
-  const weighted = filtered.reduce((s, a) => s + (a.oneShotRate! * a.sessions), 0);
-  return weighted / totalSessions;
+  const filtered = activities.filter((a) => a.oneShotRate != null);
+  const totalWeight = filtered.reduce((s, a) => s + (a.turns ?? a.sessions ?? 1), 0);
+  if (totalWeight === 0) return 0;
+  // normalize from 0-100 to 0-1
+  const weighted = filtered.reduce((s, a) => s + ((a.oneShotRate! / 100) * (a.turns ?? a.sessions ?? 1)), 0);
+  return weighted / totalWeight;
 }
 
 export async function POST(req: NextRequest) {
@@ -46,14 +56,16 @@ export async function POST(req: NextRequest) {
 
   const body: CodeburnReport = await req.json();
 
-  const summary = body.summary ?? {};
+  const overview = body.overview ?? body.summary ?? {};
   const activities = body.activities ?? [];
 
-  const totalCost = summary.totalCost ?? 0;
-  const sessionsCount = summary.totalSessions ?? 0;
-  const callsCount = summary.callsCount ?? 0;
-  const cacheHitPct = summary.cacheHitPct ?? 0;
-  const overallOneShot = computeOverallOneShot(activities);
+  const totalCost = overview.cost ?? overview.totalCost ?? 0;
+  const sessionsCount = overview.sessions ?? overview.totalSessions ?? 0;
+  const callsCount = overview.calls ?? overview.callsCount ?? 0;
+  // cacheHitPercent is 0-100; legacy cacheHitPct may be 0-1 or 0-100
+  const rawCacheHit = overview.cacheHitPercent ?? overview.cacheHitPct ?? 0;
+  const cacheHitPct = rawCacheHit > 1 ? rawCacheHit : rawCacheHit * 100;
+  const overallOneShot = computeOverallOneShot(activities); // 0-1 decimal
 
   await db
     .insert(userSnapshots)

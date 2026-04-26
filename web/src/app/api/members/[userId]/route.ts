@@ -7,10 +7,17 @@ import { eq } from "drizzle-orm";
 interface DailyRow { date: string; cost: number; sessions: number }
 interface ProjectRow { name: string; cost: number; sessions: number; avgCost: number }
 
+interface RawProject {
+  name?: string;
+  cost?: number;
+  sessions?: number;
+  calls?: number;
+  avgCost?: number;
+}
+
 interface RawJson {
-  summary?: { totalCost?: number; totalSessions?: number; cacheHitPct?: number };
   daily?: DailyRow[];
-  projects?: ProjectRow[];
+  projects?: RawProject[];
 }
 
 export async function GET(
@@ -43,12 +50,16 @@ export async function GET(
 
   const raw = snap[0].rawJson as RawJson;
   const allDaily: DailyRow[] = raw.daily ?? [];
-  const projects: ProjectRow[] = (raw.projects ?? []).map((p) => ({
-    name: p.name ?? "",
-    cost: p.cost ?? 0,
-    sessions: p.sessions ?? 0,
-    avgCost: p.avgCost ?? 0,
-  }));
+  const projects: ProjectRow[] = (raw.projects ?? []).map((p) => {
+    const cost = p.cost ?? 0;
+    const sessions = p.sessions ?? p.calls ?? 0;
+    return {
+      name: p.name ?? "",
+      cost,
+      sessions,
+      avgCost: p.avgCost ?? (sessions > 0 ? cost / sessions : 0),
+    };
+  });
 
   // 4 weeks of daily for heatmap
   const since = new Date();
