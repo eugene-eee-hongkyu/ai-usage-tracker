@@ -6,18 +6,18 @@
 
 ---
 
-## 마지막 실행: 2026-04-26 18:08
-## 마지막 업데이트: 2026-04-26 18:08
+## 마지막 실행: 2026-04-26 19:06
+## 마지막 업데이트: 2026-04-26 19:06
 ## 현재 모드: bypassPermissions
 
 ### 현재 집중
 
-- codeburn migration run 완료 기준 검증 대기 (npx sync 구버전 캐시 문제 수정 완료, 재실행 필요)
+- codeburn migration run 완료 기준 검증 대기 (multi-period sync 구현 완료, re-sync 필요)
 
 ### 이어서 할 것
 
-1. `npm cache clean --force` 후 `npx github:eugene-eee-hongkyu/ai-usage-tracker sync` 재실행 → "codeburn 데이터 수집 중..." 확인 후 대시보드 데이터 표시 검증 (run 완료 기준 #2)
-2. `npx github:eugene-eee-hongkyu/ai-usage-tracker init` 실행 → codeburn 설치 확인 + hook 등록 정상 완료 확인 (run 완료 기준 #1)
+1. `npm cache clean --force` + `npx github:eugene-eee-hongkyu/ai-usage-tracker sync` 재실행 → DB에 `{ today, week, month, all }` 구조 저장 확인, period 탭별 다른 데이터 표시 검증
+2. Vercel 재배포 후 대시보드 전체 UI 확인 (codeburn 스타일, By Model/MCP/Tools/Shell 섹션)
 3. 팀랭킹 `/api/team` efficiencyScore 필드 확인 (run 완료 기준 #3)
 
 ### 막힌 것
@@ -74,7 +74,11 @@
 - [x] Setup 체크 단계 2개로 정리 (hook 등록 + 첫 데이터 수신), API steps 버그 수정
 - [x] Nav 로그아웃 두 줄 버그 수정 + 모바일 반응형 grid 적용
 - [x] npx 구버전 캐시 원인 수정 (루트 package.json bin → cli/src/index.mjs, v0.2.0)
-- [ ] CLI sync 재실행 → 대시보드 데이터 확인 (run 완료 기준 #2)
+- [x] codeburn 실제 스키마 완전 정합 (overview/category/turns/sessionId 등 필드 매핑)
+- [x] multi-period sync 구현 (codeburn 4회 병렬 호출, today/week/month/all 중첩 저장)
+- [x] 대시보드 UI codeburn 스타일 전면 재설계 (neutral-950, font-mono, 컬러 border)
+- [x] By Model / MCP Servers / Core Tools / Shell Commands 섹션 추가
+- [ ] multi-period re-sync 실행 → period별 데이터 표시 검증 (run 완료 기준 #2)
 - [ ] npx init → codeburn 설치 + hook 등록 확인 (run 완료 기준 #1)
 - [ ] 팀랭킹 efficiencyScore 검증 (run 완료 기준 #3)
 - [ ] 팀원 초대 및 팀랭킹 화면 검증

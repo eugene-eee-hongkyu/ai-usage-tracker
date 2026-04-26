@@ -4,6 +4,39 @@
 
 ---
 
+## Session 2026-04-26 19:06 — 대시보드 codeburn 스키마 완전 정합 + 기간별 데이터 + UI 전면 재설계
+
+### 작업 요약
+- **npx sync 충돌 수정**: `program.parse()` → `program.parse(process.argv)`, CLI 번들 재빌드
+- **toFixed crash 수정**: `dashboard/route.ts`, `members/[userId]/route.ts`에서 `projects`/`topSessions` 필드 `?? 0` 정규화
+- **codeburn 실제 스키마 정합** (Supabase 직접 조회로 확인):
+  - `summary` → `overview`, `totalCost` → `cost`, `cacheHitPct` → `cacheHitPercent` (0-100 스케일)
+  - `activities[].name` → `category`, `sessions` → `turns`, `oneShotRate` 0-100 → 0-1 정규화
+  - `projects[]` `avgCost` 없음 → `cost/sessions` 직접 계산
+  - `topSessions[]` `id` → `sessionId`, `turns` → `calls`
+  - Supabase SQL로 기존 스냅샷 컬럼 (`total_cost`, `sessions_count`, `cache_hit_pct`, `overall_one_shot`) 재계산 업데이트
+- **multi-period sync 구현**: `sync.ts`에서 codeburn 4번 병렬 호출 (`today/week/month/all`)
+  - rawJson 구조: `{ today: {...}, week: {...}, month: {...}, all: {...} }`
+  - 기존 flat 포맷 하위호환 유지 (`getPeriodData` fallback)
+  - codeburn `--period week` vs `--period all` 실제로 다른 데이터 리턴 확인 (week $769 vs all $1395)
+- **dashboard API 전면 재작성**: `overview` 기반, `projectPath` 조회맵, `oneShotRate` period별 계산
+- **대시보드 UI codeburn 스타일 전면 재설계**:
+  - `bg-neutral-950` 다크 테마, `font-mono`, 섹션별 색상 좌측 border
+  - 레이아웃: Overview bar → Daily+Project 2열 → Top Sessions 전체폭 → Efficiency+Activity 2열
+  - 경로 포매팅: `/Users/xxx/` prefix 제거 표시
+- **4개 섹션 추가**: By Model (cache% 토큰 계산), MCP Servers, Core Tools, Shell Commands
+- **Efficiency 섹션 상단 정렬** 수정 (테이블 레이아웃)
+
+### 실패한 시도
+- multi-period sync 후 "아직 같다" → DB 확인 결과 이전 single-period 데이터 잔류, re-sync 필요 상태
+
+### 다음 액션
+1. `npm cache clean --force` + `npx sync` 재실행 → period별 데이터 DB 저장 확인 (오늘/이번주/이번달/전체 각기 다른 값)
+2. Vercel 재배포 후 대시보드 전체 UI 확인
+3. 팀랭킹 efficiencyScore 검증 (run 완료 기준 #3)
+
+---
+
 ## Session 2026-04-26 18:08 — 파비콘 적용, 대시보드 버그 수정, npx 구버전 캐시 문제 해결
 
 ### 작업 요약
