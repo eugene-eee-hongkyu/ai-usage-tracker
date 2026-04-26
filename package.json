@@ -1,10 +1,10 @@
 {
   "name": "ai-usage-tracker",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Claude Code usage tracker for teams",
   "type": "module",
   "bin": {
-    "ai-usage-tracker": "./cli/bin/cli.mjs"
+    "ai-usage-tracker": "./cli/src/index.mjs"
   },
   "dependencies": {
     "keytar": "^7.9.0"
