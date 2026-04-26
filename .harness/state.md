@@ -6,8 +6,8 @@
 
 ---
 
-## 마지막 실행: 2026-04-26 19:50
-## 마지막 업데이트: 2026-04-26 19:50
+## 마지막 실행: 2026-04-26 21:50
+## 마지막 업데이트: 2026-04-26 21:50
 ## 현재 모드: bypassPermissions
 
 ### 현재 집중
@@ -83,5 +83,6 @@
 - [x] By Activity 전체 항목 표시 + cost/turns/1-shot 컬럼 재설계
 - [x] codeburn migration run 완료 기준 3개 사용자 직접 검증 완료
 - [x] 대시보드 UX: Period 버튼 고정 너비, Daily Activity 세로 목록, Tabs/Overview 너비 정렬
+- [x] Daily Activity 목록 스크롤 제거 (max-h-52 overflow-y-auto 삭제 → 전체 표시)
 - [ ] 팀원 초대 및 팀랭킹 화면 검증
 - [ ] Windows SessionEnd hook 발화 검증 (Hold 플래그)

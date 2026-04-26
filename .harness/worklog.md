@@ -4,6 +4,17 @@
 
 ---
 
+## Session 2026-04-26 21:50 — Daily Activity 스크롤 제거 및 커밋
+
+### 작업 요약
+- 대시보드 daily activity 목록의 `max-h-52 overflow-y-auto` 제거 → 스크롤 없이 전체 표시
+- worklog.md / state.md 업데이트 후 커밋·푸시
+
+### 다음 액션
+- 팀원 초대
+- Windows SessionEnd hook 검증
+
+
 ## Session 2026-04-26 19:50 — 대시보드 UX 변경 커밋·푸시
 
 ### 작업 요약
