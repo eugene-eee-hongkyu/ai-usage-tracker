@@ -230,7 +230,7 @@ export default function DashboardPage() {
               {chartData.length === 0 ? (
                 <div className="h-32 flex items-center justify-center text-neutral-600 text-xs font-mono">no data</div>
               ) : (
-                <div className="space-y-1 max-h-52 overflow-y-auto">
+                <div className="space-y-1">
                   {(() => {
                     const maxCost = Math.max(...chartData.map((d) => d.cost), 0.01);
                     return chartData.map((d) => (
