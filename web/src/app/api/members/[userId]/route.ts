@@ -43,7 +43,12 @@ export async function GET(
 
   const raw = snap[0].rawJson as RawJson;
   const allDaily: DailyRow[] = raw.daily ?? [];
-  const projects: ProjectRow[] = raw.projects ?? [];
+  const projects: ProjectRow[] = (raw.projects ?? []).map((p) => ({
+    name: p.name ?? "",
+    cost: p.cost ?? 0,
+    sessions: p.sessions ?? 0,
+    avgCost: p.avgCost ?? 0,
+  }));
 
   // 4 weeks of daily for heatmap
   const since = new Date();

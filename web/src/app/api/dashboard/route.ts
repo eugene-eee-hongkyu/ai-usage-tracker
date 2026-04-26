@@ -78,8 +78,19 @@ export async function GET(req: NextRequest) {
   const raw = snap[0].rawJson as RawJson;
   const allDaily: DailyRow[] = raw.daily ?? [];
   const activities: Activity[] = (raw.activities ?? []).filter((a) => a.oneShotRate !== null);
-  const projects: Project[] = raw.projects ?? [];
-  const topSessions: TopSession[] = raw.topSessions ?? [];
+  const projects: Project[] = (raw.projects ?? []).map((p) => ({
+    name: p.name ?? "",
+    cost: p.cost ?? 0,
+    sessions: p.sessions ?? 0,
+    avgCost: p.avgCost ?? 0,
+  }));
+  const topSessions: TopSession[] = (raw.topSessions ?? []).map((s) => ({
+    id: s.id ?? "",
+    date: s.date ?? "",
+    project: s.project ?? "",
+    cost: s.cost ?? 0,
+    turns: s.turns ?? 0,
+  }));
   const summary = raw.summary ?? {};
 
   const filteredDaily = period === "all"
