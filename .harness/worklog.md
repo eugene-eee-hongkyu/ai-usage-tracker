@@ -4,6 +4,24 @@
 
 ---
 
+## Session 2026-04-26 19:43 — codeburn migration 완료 검증 + 대시보드 UX 개선
+
+### 작업 요약
+- **codeburn migration run 완료 기준 3개 사용자 직접 검증 완료**:
+  1. `npx github:eugene-eee-hongkyu/ai-usage-tracker init` → codeburn 설치 확인 + hook 등록 정상 완료
+  2. CLI submit.mjs → codeburn JSON POST → 대시보드 활동별 one-shot rate, 프로젝트별 비용, Top sessions 정상 표시
+  3. 팀랭킹 MVP 점수 = one-shot × cache hit / 세션당 비용 합성 점수 계산 확인
+- **대시보드 UX 개선**:
+  - Period 버튼 크기 통일: `px-3` 가변 → `w-16 text-center` 고정 (dashboard + team 양쪽)
+  - Daily Activity 세로 목록 전환: Recharts BarChart 제거 → `날짜 | 비례 bar | cost | sessions` 행 목록 (max-h-52 스크롤, 마우스오버 없음)
+  - Period Tabs / Overview Bar 너비 정렬: `max-w-6xl mx-auto` 래퍼 적용 (아래 그리드와 동일 너비)
+
+### 다음 액션
+1. 팀원 초대 (이메일 목록 확정 → Vercel/서비스 초대)
+2. Windows SessionEnd hook 발화 검증 (Windows 테스터 필요)
+
+---
+
 ## Session 2026-04-26 19:35 — 대시보드 UX 개선 (바 그래프·tip 모달·팀랭킹 period·By Activity 전체)
 
 ### 작업 요약

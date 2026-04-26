@@ -2,9 +2,9 @@
 name: codeburn migration
 slug: codeburn-migration
 type: deployment
-status: 진행중
+status: 완료
 created: 2026-04-26 16:30
-completed:
+completed: 2026-04-26
 ---
 
 # codeburn migration
@@ -14,9 +14,9 @@ DB를 2-table JSONB 구조로 재설계하고, 대시보드·팀랭킹 UI를 전
 
 ## 완료 기준
 
-- [ ] `npx github:eugene-eee-hongkyu/ai-usage-tracker init`이 codeburn 설치 확인 + hook 등록까지 정상 완료됨
-- [ ] CLI submit.mjs가 codeburn JSON을 POST → 대시보드에 활동별 one-shot rate, 프로젝트별 비용, Top sessions 표시됨
-- [ ] 팀랭킹 MVP 점수가 one-shot × cache hit / 세션당 비용 합성 점수로 계산됨
+- [x] `npx github:eugene-eee-hongkyu/ai-usage-tracker init`이 codeburn 설치 확인 + hook 등록까지 정상 완료됨
+- [x] CLI submit.mjs가 codeburn JSON을 POST → 대시보드에 활동별 one-shot rate, 프로젝트별 비용, Top sessions 표시됨
+- [x] 팀랭킹 MVP 점수가 one-shot × cache hit / 세션당 비용 합성 점수로 계산됨
 
 ## 한눈에 보기
 
@@ -65,7 +65,7 @@ DB를 2-table JSONB 구조로 재설계하고, 대시보드·팀랭킹 UI를 전
 
 ## 개발 계획
 
-1. **DB 스키마 교체**: `lib/db/schema.ts` — sessions/dailyAgg/suggestionFeedback 삭제, userSnapshots 테이블 추가 (user_id unique, raw_json JSONB, mirror 5컬럼)
+1. **DB 스키마 교체**: `lib/db/schema.ts` — sessions/dailyAgg/suggestionFeedback 삭제, `userSnapshots` 테이블 추가 (user_id unique, raw_json JSONB, mirror 5컬럼)
 2. **Supabase 마이그레이션 SQL**: `docs/migration.sql` 생성 — 기존 3개 테이블 DROP, user_snapshots CREATE
 3. **ingest API 재작성**: `api/ingest/route.ts` — codeburn JSON 전체 수신, overallOneShot 계산(activities 가중 평균), user_snapshots upsert, users.lastSyncedAt 갱신
 4. **dashboard API 재작성**: `api/dashboard/route.ts` — snapshot.rawJson 파싱, daily[] 기간 필터로 차트 데이터, 효율 지표는 overview에서
@@ -122,6 +122,30 @@ DB를 2-table JSONB 구조로 재설계하고, 대시보드·팀랭킹 UI를 전
 
 ## Report
 
-> /worklog 실행 시 완료 기준이 모두 충족되면 자동으로 작성 제안됨.
+**실행 결과**
+- codeburn migration 16단계 전체 구현 완료 (커밋 6846510, Vercel 배포)
+- DB 2-table JSONB 구조로 전환 (users + user_snapshots), mirror 5컬럼 유지
+- CLI init/submit/sync 전면 재작성 (ccusage → codeburn)
+- 대시보드·팀랭킹 UI codeburn 스키마 완전 정합, UX 전면 재설계
 
-_(진행중)_
+**완료 기준 검증 결과** (사용자 직접 확인 — 2026-04-26)
+1. `npx init` → codeburn 설치 확인 + hook 등록 정상 완료 ✅
+2. CLI submit.mjs → 대시보드 activities/projects/topSessions 표시 ✅
+3. 팀랭킹 MVP = one-shot × cache hit / 세션당 비용 합성 점수 ✅
+
+**이슈**
+- codeburn 실제 스키마가 예상과 달라 필드 리매핑 필요 (summary→overview, cacheHitPercent 0-100 스케일, activities.name→category 등)
+- multi-period sync 중 기존 flat 포맷 잔류 데이터와 충돌 → fallback 로직으로 하위호환 유지
+- npx 구버전 캐시: 루트 package.json bin이 ccusage 기반 구버전 가리키던 것 수정 필요
+
+**결정**
+- planning rate 제거 (변별력 없음), turns/session으로 대체
+- activities oneShotRate 0-100 → 0-1 정규화, 모든 카테고리 표시
+- optimize findings 대시보드 표시 제거, codeburn optimize 터미널 링크로 대체
+
+**다음 액션**
+- 팀원 초대 (이메일 목록 확정 → Vercel/서비스 초대)
+- Windows SessionEnd hook 발화 검증 (Windows 테스터 필요)
+
+**남은 리스크**
+- Windows hook 발화 미검증 (테스터 필요)
