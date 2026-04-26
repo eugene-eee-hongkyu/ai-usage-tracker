@@ -6,6 +6,12 @@ import { useRouter } from "next/navigation";
 import { Nav } from "@/components/nav";
 import Link from "next/link";
 
+type Period = "today" | "week" | "month" | "all";
+
+const PERIOD_LABELS: Record<Period, string> = {
+  today: "오늘", week: "이번주", month: "이번달", all: "전체",
+};
+
 interface MemberStat {
   userId: number;
   name: string;
@@ -28,6 +34,7 @@ interface TeamData {
 export default function TeamPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
+  const [period, setPeriod] = useState<Period>("all");
   const [data, setData] = useState<TeamData | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -38,10 +45,10 @@ export default function TeamPage() {
   useEffect(() => {
     if (!session) return;
     setLoading(true);
-    fetch("/api/team")
+    fetch(`/api/team?period=${period}`)
       .then((r) => r.json())
       .then((d) => { setData(d); setLoading(false); });
-  }, [session]);
+  }, [session, period]);
 
   if (!data) return (
     <div className="min-h-screen">
@@ -57,6 +64,18 @@ export default function TeamPage() {
   return (
     <div className="min-h-screen">
       <Nav />
+
+      {/* Period Tabs */}
+      <div className="flex gap-1 px-4 pt-3 pb-2 border-b border-neutral-800">
+        {(["today", "week", "month", "all"] as Period[]).map((p) => (
+          <button
+            key={p}
+            onClick={() => setPeriod(p)}
+            className={`px-3 py-1 rounded text-xs font-mono transition-colors ${period === p ? "bg-indigo-600 text-white" : "bg-neutral-800 text-neutral-400 hover:text-neutral-200"}`}
+          >{PERIOD_LABELS[p]}</button>
+        ))}
+      </div>
+
       <main className={`max-w-3xl mx-auto px-4 py-6 space-y-6 transition-opacity duration-150 ${loading ? "opacity-40 pointer-events-none" : "opacity-100"}`}>
 
         {/* MVP card */}
@@ -73,7 +92,7 @@ export default function TeamPage() {
           </Link>
         ) : (
           <div className="bg-slate-900 rounded-lg p-4 text-center text-slate-500 text-sm">
-            아직 데이터가 없어요. CLI 설치 후 세션을 종료하면 데이터가 수집됩니다.
+            {hasData ? "해당 기간에 활동 데이터가 없어요." : "아직 데이터가 없어요. CLI 설치 후 세션을 종료하면 데이터가 수집됩니다."}
           </div>
         )}
 
