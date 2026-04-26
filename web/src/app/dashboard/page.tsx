@@ -17,7 +17,7 @@ interface DashboardData {
   user: { name: string; lastSyncedAt: string | null };
   summary: { totalTokens: number; inputTokens: number; outputTokens: number; totalCost: number; oneShotRate: number; cacheHitRate: number; sessionsCount: number; totalEdits: number; cacheRead: number };
   platformAvg: { userCount: number; dailyCost: number; cacheSavingUsd: number };
-  daily: Array<{ date: string; totalTokens: number; totalCost: number; cacheRead: number; cacheWrite: number }>;
+  daily: Array<{ date: string; totalTokens: number; totalCost: number; cacheRead: number; cacheWrite: number; sessionsCount: number }>;
   models: Record<string, { tokens: number; cost: number }>;
   suggestions: Suggestion[];
 }
@@ -46,14 +46,24 @@ function chartDayLabel(period: Period, totalDays: number) {
 }
 
 // Recharts custom tooltip
-function ChartTooltip({ active, payload, label }: { active?: boolean; payload?: { value: number }[]; label?: string }) {
+function ChartTooltip({ active, payload, label }: {
+  active?: boolean;
+  payload?: Array<{ value: number; payload: { tokensM: number; cacheHitPct: number | null; costPerSession: number | null } }>;
+  label?: string;
+}) {
   if (!active || !payload?.length) return null;
-  const val = payload[0].value;
-  const display = val >= 1000 ? `${(val / 1000).toFixed(1)}B tok` : `${val}M tok`;
+  const { tokensM, cacheHitPct, costPerSession } = payload[0].payload;
+  const tokDisplay = tokensM >= 1000 ? `${(tokensM / 1000).toFixed(1)}B tok` : `${tokensM}M tok`;
   return (
-    <div className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-xs shadow-lg">
-      <p className="text-slate-400 mb-1">{label}</p>
-      <p className="text-indigo-300 font-semibold">{display}</p>
+    <div className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-xs shadow-lg space-y-1">
+      <p className="text-slate-400">{label}</p>
+      <p className="text-indigo-300 font-semibold">{tokDisplay}</p>
+      {cacheHitPct !== null && (
+        <p className="text-slate-300">Cache hit <span className="text-emerald-400 font-medium">{cacheHitPct}%</span></p>
+      )}
+      {costPerSession !== null && (
+        <p className="text-slate-300">세션당 비용 <span className="text-amber-400 font-medium">${costPerSession.toFixed(3)}</span></p>
+      )}
     </div>
   );
 }
@@ -132,11 +142,17 @@ export default function DashboardPage() {
   }
 
   // Chart: include cache tokens, unit = M
-  const chartData = data.daily.map((d) => ({
-    date: d.date.slice(5),
-    tokensM: Math.round(((d.totalTokens ?? 0) + (d.cacheRead ?? 0) + (d.cacheWrite ?? 0)) / 1_000_000),
-    cost: d.totalCost ?? 0,
-  }));
+  const chartData = data.daily.map((d) => {
+    const cr = d.cacheRead ?? 0;
+    const cw = d.cacheWrite ?? 0;
+    const sc = d.sessionsCount ?? 0;
+    return {
+      date: d.date.slice(5),
+      tokensM: Math.round(((d.totalTokens ?? 0) + cr + cw) / 1_000_000),
+      cacheHitPct: cr + cw > 0 ? Math.round((cr / (cr + cw)) * 100) : null,
+      costPerSession: sc > 0 ? (d.totalCost ?? 0) / sc : null,
+    };
+  });
 
   const totalTokens = data.summary.totalTokens;
   const { cacheHitRate, sessionsCount, cacheRead } = data.summary;
