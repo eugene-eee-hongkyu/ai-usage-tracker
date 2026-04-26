@@ -6,8 +6,8 @@
 
 ---
 
-## 마지막 실행: 2026-04-26 07:31
-## 마지막 업데이트: 2026-04-26 07:31
+## 마지막 실행: 2026-04-26 09:31
+## 마지막 업데이트: 2026-04-26 09:31
 ## 현재 모드: bypassPermissions
 
 ### 현재 집중
@@ -16,9 +16,9 @@
 
 ### 이어서 할 것
 
-1. 팀원에게 `https://ai-usage-tracker-web-psi.vercel.app` 공유 및 초대
-2. B-1 §3 Hold 플래그: Windows 환경 친구 1명 확보 — SessionEnd hook 발화 검증
-3. 프로덕션 사용 중 발견되는 UX 버그 수집 및 수정
+1. Vercel 환경변수 `ALLOWED_EMAIL_DOMAINS` 프로덕션 업데이트 (수동)
+2. 팀원에게 `https://ai-usage-tracker-web-psi.vercel.app` 공유 및 초대, 팀랭킹 화면 검증
+3. B-1 §3 Hold 플래그: Windows 환경 친구 1명 확보 — SessionEnd hook 발화 검증
 
 ### 막힌 것
 
