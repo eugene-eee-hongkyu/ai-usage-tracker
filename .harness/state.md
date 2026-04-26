@@ -6,20 +6,19 @@
 
 ---
 
-## 마지막 실행: 2026-04-26 16:58
-## 마지막 업데이트: 2026-04-26 16:58
+## 마지막 실행: 2026-04-26 17:17
+## 마지막 업데이트: 2026-04-26 17:17
 ## 현재 모드: bypassPermissions
 
 ### 현재 집중
 
-- codeburn migration 진행 중 (run: docs/runs/2026-04-26-codeburn-migration_run.md)
-- 현재 run: docs/runs/2026-04-26-codeburn-migration_run.md — codeburn migration
+- codeburn migration 코드 배포 완료 → run 완료 기준 검증 대기
 
 ### 이어서 할 것
 
-1. codeburn migration 구현 시작 — 1단계: DB 스키마 교체 (`lib/db/schema.ts`)
-2. 2단계: Supabase 마이그레이션 SQL 작성 → 사용자가 실행
-3. 이후 API → UI → CLI 순서로 16단계 진행
+1. `npx github:eugene-eee-hongkyu/ai-usage-tracker sync` 실행 → 대시보드 activities/projects/topSessions 표시 확인 (run 완료 기준 #2)
+2. 팀원 초대 및 팀랭킹 화면 검증
+3. Windows SessionEnd hook 발화 검증 (Hold)
 
 ### 막힌 것
 
@@ -27,8 +26,7 @@
 
 ### 사람 판단 필요
 
-- Supabase SQL 에디터에서 마이그레이션 SQL 실행 (기존 테이블 DROP + user_snapshots CREATE)
-- Vercel 환경변수 `ALLOWED_EMAIL_DOMAINS` 업데이트 필요 (`iskra.world,primuslabs.world,z21labs.xyz`)
+- 팀원 초대 (Vercel/서비스 접근 권한, 초대 이메일 목록 결정)
 
 ### 진행 상황
 
@@ -64,8 +62,9 @@
 - [x] CLI sync 명령 오류 수정 (`program.parse(process.argv)`)
 - [x] 차트 툴팁에 cache hit%, 세션당 비용 추가 (Vercel 배포 완료)
 - [x] codeburn migration kickoff (docs/runs/2026-04-26-codeburn-migration_run.md)
-- [ ] codeburn migration 구현 (16단계 — run 파일 참조)
-- [ ] Supabase 마이그레이션 SQL 실행 (사람)
-- [ ] Vercel 환경변수 `ALLOWED_EMAIL_DOMAINS` 프로덕션 업데이트
+- [x] codeburn migration 16단계 구현 완료 (커밋 6846510, Vercel 배포)
+- [x] Supabase 마이그레이션 SQL 실행 (DROP old tables + CREATE user_snapshots)
+- [x] Vercel 환경변수 `ALLOWED_EMAIL_DOMAINS` 프로덕션 업데이트
+- [ ] CLI sync 실행 → 대시보드 데이터 확인 (run 완료 기준 검증)
 - [ ] 팀원 초대 및 팀랭킹 화면 검증
 - [ ] Windows SessionEnd hook 발화 검증 (Hold 플래그)
