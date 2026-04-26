@@ -4,6 +4,13 @@
 
 ---
 
+## Session 2026-04-26 19:50 — 대시보드 UX 변경 커밋·푸시
+
+### 작업 요약
+- `f985fa6` 커밋·푸시 — Period 버튼 고정 너비·Daily Activity 세로 목록·Tabs/Overview 너비 정렬 (dashboard + team)
+
+---
+
 ## Session 2026-04-26 19:43 — codeburn migration 완료 검증 + 대시보드 UX 개선
 
 ### 작업 요약
