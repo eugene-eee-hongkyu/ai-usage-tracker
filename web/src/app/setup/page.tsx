@@ -108,9 +108,8 @@ export default function SetupPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
   const [steps, setSteps] = useState<Step[]>([
-    { label: "Node 18+ 확인", done: false },
-    { label: "keytar 설치", done: false },
     { label: "hook 등록", done: false },
+    { label: "첫 데이터 수신", done: false },
   ]);
   const [copied, setCopied] = useState(false);
 
@@ -125,7 +124,10 @@ export default function SetupPage() {
       try {
         const res = await fetch("/api/setup/status");
         const data = await res.json();
-        if (data.steps) setSteps(data.steps);
+        if (data.steps) setSteps([
+          { label: "hook 등록", done: !!data.steps.hook_registered },
+          { label: "첫 데이터 수신", done: !!data.steps.first_session },
+        ]);
       } catch {
         // ignore
       }

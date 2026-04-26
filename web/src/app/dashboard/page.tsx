@@ -76,6 +76,7 @@ export default function DashboardPage() {
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState(false);
+  const [syncCopied, setSyncCopied] = useState(false);
 
   useEffect(() => {
     if (status === "unauthenticated") router.push("/login");
@@ -135,18 +136,23 @@ export default function DashboardPage() {
   }
 
   if (!data.summary) {
+    const syncCmd = `npx github:${process.env.NEXT_PUBLIC_GITHUB_ORG ?? "eugene-eee-hongkyu"}/ai-usage-tracker sync`;
     return (
       <div className="min-h-screen">
         <Nav />
-        <main className="max-w-xl mx-auto px-4 py-20 text-center space-y-6">
-          <div className="text-4xl animate-pulse">⏳</div>
+        <main className="max-w-md mx-auto px-4 py-20 text-center space-y-6">
+          <div className="text-4xl">⏳</div>
           <h1 className="text-2xl font-bold text-slate-100">동기화가 필요합니다</h1>
-          <p className="text-slate-400">
-            터미널에서 아래 명령어를 실행해주세요.
-          </p>
-          <code className="block bg-slate-900 rounded px-4 py-3 text-indigo-300 text-sm">
-            npx github:eugene-eee-hongkyu/ai-usage-tracker sync
-          </code>
+          <p className="text-slate-400">터미널에서 아래 명령어를 실행해주세요.</p>
+          <div className="flex items-center gap-2 bg-slate-900 rounded-lg px-4 py-3 text-left">
+            <code className="flex-1 text-sm text-indigo-300 font-mono break-all">{syncCmd}</code>
+            <button
+              onClick={() => { navigator.clipboard.writeText(syncCmd); setSyncCopied(true); setTimeout(() => setSyncCopied(false), 2000); }}
+              className="shrink-0 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white text-xs rounded-md transition-colors font-medium"
+            >
+              {syncCopied ? "✓ 복사됨" : "복사"}
+            </button>
+          </div>
         </main>
       </div>
     );
