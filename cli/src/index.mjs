@@ -1099,20 +1099,20 @@ async function runReset() {
 // src/sync.ts
 import { spawn as spawn2 } from "child_process";
 var SERVER_URL2 = process.env.USAGE_TRACKER_URL ?? "https://ai-usage-tracker-web-psi.vercel.app";
-function spawnCodeburn() {
+var PERIODS = ["today", "week", "month", "all"];
+function spawnCodeburn(period) {
   return new Promise((resolve, reject) => {
     const chunks = [];
-    const proc = spawn2("codeburn", ["report", "--format", "json", "--provider", "claude", "--period", "all"], {
+    const proc = spawn2("codeburn", ["report", "--format", "json", "--provider", "claude", "--period", period], {
       stdio: ["ignore", "pipe", "pipe"],
       shell: false
     });
     proc.stdout.on("data", (d) => chunks.push(d));
     proc.on("close", (code) => {
       if (code !== 0)
-        return reject(new Error(`codeburn exited ${code}`));
+        return reject(new Error(`codeburn exited ${code} (period=${period})`));
       try {
-        const raw = Buffer.concat(chunks).toString("utf8").trim();
-        resolve(JSON.parse(raw));
+        resolve(JSON.parse(Buffer.concat(chunks).toString("utf8").trim()));
       } catch (e) {
         reject(e);
       }
@@ -1120,7 +1120,7 @@ function spawnCodeburn() {
     proc.on("error", reject);
     setTimeout(() => {
       proc.kill();
-      reject(new Error("codeburn timeout"));
+      reject(new Error(`codeburn timeout (period=${period})`));
     }, 120000);
   });
 }
@@ -1131,25 +1131,22 @@ async function runSync(_days) {
     process.exit(1);
   }
   console.log("codeburn 데이터 수집 중...");
-  let report;
   try {
-    report = await spawnCodeburn();
+    const results = await Promise.all(PERIODS.map((p) => spawnCodeburn(p)));
+    const report = Object.fromEntries(PERIODS.map((p, i) => [p, results[i]]));
+    const resp = await fetch(`${SERVER_URL2}/api/ingest`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-api-key": apiKey },
+      body: JSON.stringify(report)
+    });
+    if (resp.ok) {
+      console.log("✅ 데이터 전송 완료");
+    } else {
+      console.error(`❌ 전송 실패: ${resp.status}`);
+      process.exit(1);
+    }
   } catch (err) {
     console.error("codeburn 실행 실패:", err.message);
-    process.exit(1);
-  }
-  const resp = await fetch(`${SERVER_URL2}/api/ingest`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-api-key": apiKey
-    },
-    body: JSON.stringify(report)
-  });
-  if (resp.ok) {
-    console.log("✅ 데이터 전송 완료");
-  } else {
-    console.error(`❌ 전송 실패: ${resp.status}`);
     process.exit(1);
   }
 }

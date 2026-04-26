@@ -8,8 +8,8 @@ interface CodeburnActivity {
   category?: string;
   sessions?: number;
   turns?: number;
-  cost: number;
-  oneShotRate: number | null; // 0-100 scale
+  cost?: number;
+  oneShotRate?: number | null;
 }
 
 interface CodeburnOverview {
@@ -24,21 +24,30 @@ interface CodeburnOverview {
   cacheHitPct?: number;
 }
 
-interface CodeburnReport {
+interface CodeburnPeriodReport {
   overview?: CodeburnOverview;
-  summary?: CodeburnOverview; // legacy
+  summary?: CodeburnOverview;
   activities?: CodeburnActivity[];
-  daily?: Array<{ date: string; cost: number; sessions: number }>;
-  projects?: Array<{ name: string; cost: number; sessions?: number; calls?: number; path?: string; avgCost?: number }>;
-  topSessions?: Array<{ sessionId?: string; id?: string; date: string; project: string; cost: number; calls?: number; turns?: number }>;
+}
+
+function getBaseReport(body: unknown): CodeburnPeriodReport {
+  if (typeof body !== "object" || body === null) return {};
+  const b = body as Record<string, unknown>;
+  // Multi-period format: { today: {...}, week: {...}, month: {...}, all: {...} }
+  if ("all" in b || "today" in b) {
+    return (b.all ?? Object.values(b)[0] ?? {}) as CodeburnPeriodReport;
+  }
+  return body as CodeburnPeriodReport;
 }
 
 function computeOverallOneShot(activities: CodeburnActivity[]): number {
   const filtered = activities.filter((a) => a.oneShotRate != null);
   const totalWeight = filtered.reduce((s, a) => s + (a.turns ?? a.sessions ?? 1), 0);
   if (totalWeight === 0) return 0;
-  // normalize from 0-100 to 0-1
-  const weighted = filtered.reduce((s, a) => s + ((a.oneShotRate! / 100) * (a.turns ?? a.sessions ?? 1)), 0);
+  const weighted = filtered.reduce(
+    (s, a) => s + ((a.oneShotRate! / 100) * (a.turns ?? a.sessions ?? 1)),
+    0
+  );
   return weighted / totalWeight;
 }
 
@@ -54,18 +63,17 @@ export async function POST(req: NextRequest) {
 
   if (!user[0]) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
 
-  const body: CodeburnReport = await req.json();
+  const body = await req.json();
+  const base = getBaseReport(body);
+  const ov = base.overview ?? base.summary ?? {};
+  const activities = base.activities ?? [];
 
-  const overview = body.overview ?? body.summary ?? {};
-  const activities = body.activities ?? [];
-
-  const totalCost = overview.cost ?? overview.totalCost ?? 0;
-  const sessionsCount = overview.sessions ?? overview.totalSessions ?? 0;
-  const callsCount = overview.calls ?? overview.callsCount ?? 0;
-  // cacheHitPercent is 0-100; legacy cacheHitPct may be 0-1 or 0-100
-  const rawCacheHit = overview.cacheHitPercent ?? overview.cacheHitPct ?? 0;
+  const totalCost = ov.cost ?? ov.totalCost ?? 0;
+  const sessionsCount = ov.sessions ?? ov.totalSessions ?? 0;
+  const callsCount = ov.calls ?? ov.callsCount ?? 0;
+  const rawCacheHit = ov.cacheHitPercent ?? ov.cacheHitPct ?? 0;
   const cacheHitPct = rawCacheHit > 1 ? rawCacheHit : rawCacheHit * 100;
-  const overallOneShot = computeOverallOneShot(activities); // 0-1 decimal
+  const overallOneShot = computeOverallOneShot(activities);
 
   await db
     .insert(userSnapshots)
