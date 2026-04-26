@@ -1,4 +1,7 @@
-#!/usr/bin/env node
+import { createRequire } from "node:module";
+var __require = /* @__PURE__ */ createRequire(import.meta.url);
+
+// src/init.ts
 import { execSync, spawn } from "child_process";
 import * as fs from "fs";
 import * as http from "http";
@@ -6,16 +9,12 @@ import * as os from "os";
 import * as path from "path";
 import * as readline from "readline";
 import { fileURLToPath } from "url";
-
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-
-const SERVER_URL = process.env.USAGE_TRACKER_URL ?? "https://ai-usage-tracker-web-psi.vercel.app";
-const KEYTAR_SERVICE = "primus-usage-tracker";
-const KEYTAR_ACCOUNT = "api-key";
-const CLAUDE_SETTINGS_PATH = path.join(os.homedir(), ".claude", "settings.json");
-const STABLE_DIR = path.join(os.homedir(), ".primus-usage-tracker");
-const CLI_PORT = 9988;
-
+var __dirname2 = path.dirname(fileURLToPath(import.meta.url));
+var SERVER_URL = process.env.USAGE_TRACKER_URL ?? "https://ai-usage-tracker-web-psi.vercel.app";
+var KEYTAR_SERVICE = "primus-usage-tracker";
+var KEYTAR_ACCOUNT = "api-key";
+var CLAUDE_SETTINGS_PATH = path.join(os.homedir(), ".claude", "settings.json");
+var CLI_PORT = 9988;
 async function getKeytar() {
   try {
     const kt = await import("keytar");
@@ -24,78 +23,70 @@ async function getKeytar() {
     return null;
   }
 }
-
-export async function saveApiKey(apiKey) {
-  // Always save to fallback file so standalone scripts can read it without keytar
-  const fallbackPath = path.join(os.homedir(), ".primus-usage-key");
-  fs.writeFileSync(fallbackPath, apiKey, { mode: 0o600 });
-  // Also try keytar for better security
+async function saveApiKey(apiKey) {
   const keytar = await getKeytar();
   if (keytar) {
     await keytar.setPassword(KEYTAR_SERVICE, KEYTAR_ACCOUNT, apiKey);
+    return;
   }
+  const fallbackPath = path.join(os.homedir(), ".primus-usage-key");
+  fs.writeFileSync(fallbackPath, apiKey, { mode: 384 });
 }
-
-export async function loadApiKey() {
-  if (process.env.USAGE_TRACKER_API_KEY) return process.env.USAGE_TRACKER_API_KEY;
+async function loadApiKey() {
   const keytar = await getKeytar();
   if (keytar) {
     const key = await keytar.getPassword(KEYTAR_SERVICE, KEYTAR_ACCOUNT);
-    if (key) return key;
+    if (key)
+      return key;
   }
   const fallbackPath = path.join(os.homedir(), ".primus-usage-key");
-  if (fs.existsSync(fallbackPath)) return fs.readFileSync(fallbackPath, "utf8").trim();
+  if (fs.existsSync(fallbackPath)) {
+    return fs.readFileSync(fallbackPath, "utf8").trim();
+  }
   return null;
 }
-
-export async function deleteApiKey() {
+async function deleteApiKey() {
   const keytar = await getKeytar();
-  if (keytar) await keytar.deletePassword(KEYTAR_SERVICE, KEYTAR_ACCOUNT);
+  if (keytar) {
+    await keytar.deletePassword(KEYTAR_SERVICE, KEYTAR_ACCOUNT);
+  }
   const fallbackPath = path.join(os.homedir(), ".primus-usage-key");
-  if (fs.existsSync(fallbackPath)) fs.unlinkSync(fallbackPath);
+  if (fs.existsSync(fallbackPath))
+    fs.unlinkSync(fallbackPath);
 }
-
 function openBrowser(url) {
   try {
     const platform = process.platform;
-    if (platform === "darwin") execSync(`open "${url}"`);
-    else if (platform === "win32") execSync(`start "" "${url}"`);
-    else execSync(`xdg-open "${url}"`);
-  } catch {
-    // ignore
-  }
+    if (platform === "darwin")
+      execSync(`open "${url}"`);
+    else if (platform === "win32")
+      execSync(`start "" "${url}"`);
+    else
+      execSync(`xdg-open "${url}"`);
+  } catch {}
 }
-
 function getApiKeyViaLocalServer() {
   return new Promise((resolve, reject) => {
-    let timeoutId;
-
     const server = http.createServer((req, res) => {
       const url = new URL(req.url ?? "/", `http://127.0.0.1:${CLI_PORT}`);
       const apiKey = url.searchParams.get("apiKey");
-
-      res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+      res.writeHead(200, { "Content-Type": "text/html" });
       if (apiKey) {
-        res.end(
-          "<html><head><meta charset='utf-8'></head>" +
-          "<body style='font-family:sans-serif;padding:2em'>" +
-          "<h2>✅ 인증 완료</h2><p>이 창을 닫아도 됩니다.</p></body></html>"
-        );
-        clearTimeout(timeoutId);
+        res.end("<html><body style='font-family:sans-serif;padding:2em'>" + "<h2>✅ 인증 완료</h2><p>이 창을 닫아도 됩니다.</p></body></html>");
         server.close();
         resolve(apiKey);
       } else {
-        res.end("<html><head><meta charset='utf-8'></head><body><h2>대기 중...</h2></body></html>");
+        res.end("<html><body><h2>대기 중...</h2></body></html>");
       }
     });
-
     server.listen(CLI_PORT, "127.0.0.1", () => {
       const authUrl = `${SERVER_URL}/api/cli-auth?port=${CLI_PORT}`;
-      console.log("\n브라우저에서 GitHub 계정으로 로그인하세요...");
-      console.log(`URL: ${authUrl}\n`);
+      console.log(`
+브라우저에서 GitHub 계정으로 로그인하세요...`);
+      console.log(`URL: ${authUrl}
+`);
       openBrowser(authUrl);
     });
-
     server.on("error", (err) => {
       if (err.code === "EADDRINUSE") {
         reject(new Error(`포트 ${CLI_PORT}가 이미 사용 중입니다. 잠시 후 다시 시도하세요.`));
@@ -103,24 +94,12 @@ function getApiKeyViaLocalServer() {
         reject(err);
       }
     });
-
-    timeoutId = setTimeout(() => {
+    setTimeout(() => {
       server.close();
       reject(new Error("인증 시간 초과 (5분)"));
-    }, 5 * 60 * 1000);
+    }, 300000);
   });
 }
-
-function installSubmitScript() {
-  // Copy submit.mjs to a stable path so the hook survives npx cache rotation
-  const srcSubmit = path.join(__dirname, "submit.mjs");
-  fs.mkdirSync(STABLE_DIR, { recursive: true });
-  const stableSubmit = path.join(STABLE_DIR, "submit.mjs");
-  fs.copyFileSync(srcSubmit, stableSubmit);
-  fs.chmodSync(stableSubmit, 0o755);
-  return stableSubmit;
-}
-
 function mergeHook(submitPath) {
   let settings = {};
   if (fs.existsSync(CLAUDE_SETTINGS_PATH)) {
@@ -130,23 +109,17 @@ function mergeHook(submitPath) {
       settings = {};
     }
   }
-
   const hooks = settings.hooks ?? {};
   const sessionEndHooks = hooks.SessionEnd ?? [];
-
   const hookCommand = `node "${submitPath}"`;
-  const alreadyRegistered = sessionEndHooks.some((group) =>
-    group.hooks?.some((h) => h.command === hookCommand)
-  );
-
+  const alreadyRegistered = sessionEndHooks.some((group) => group.hooks?.some((h) => h.command === hookCommand));
   if (!alreadyRegistered) {
     sessionEndHooks.push({
       matcher: ".*",
-      hooks: [{ type: "command", command: hookCommand }],
+      hooks: [{ type: "command", command: hookCommand }]
     });
     hooks.SessionEnd = sessionEndHooks;
     settings.hooks = hooks;
-
     fs.mkdirSync(path.dirname(CLAUDE_SETTINGS_PATH), { recursive: true });
     fs.writeFileSync(CLAUDE_SETTINGS_PATH, JSON.stringify(settings, null, 2));
     console.log("✅ SessionEnd hook 등록 완료");
@@ -154,39 +127,70 @@ function mergeHook(submitPath) {
     console.log("✅ SessionEnd hook 이미 등록되어 있음");
   }
 }
-
 function runBackfill(apiKey) {
-  const syncScript = path.join(STABLE_DIR, "sync.mjs");
-  if (!fs.existsSync(syncScript)) {
-    // Copy sync.mjs to stable dir as well
-    const srcSync = path.join(__dirname, "sync.mjs");
-    if (fs.existsSync(srcSync)) fs.copyFileSync(srcSync, syncScript);
-  }
-  if (!fs.existsSync(syncScript)) return;
-
-  const child = spawn(process.execPath, [syncScript], {
+  const syncScript = path.join(__dirname2, "sync.mjs");
+  const syncTs = path.join(__dirname2, "sync.js");
+  const scriptPath = fs.existsSync(syncScript) ? syncScript : fs.existsSync(syncTs) ? syncTs : null;
+  if (!scriptPath)
+    return;
+  const child = spawn(process.execPath, [scriptPath], {
     detached: true,
     stdio: "ignore",
     env: {
       ...process.env,
       USAGE_TRACKER_API_KEY: apiKey,
       USAGE_TRACKER_URL: SERVER_URL,
-      USAGE_TRACKER_DAYS: "90",
-    },
+      USAGE_TRACKER_DAYS: "90"
+    }
   });
   child.unref();
-  console.log("📦 과거 데이터 백그라운드 수집 시작 (최대 90일)");
+  console.log("\uD83D\uDCE6 과거 데이터 백그라운드 수집 시작 (최대 90일)");
 }
-
-export async function runInit() {
-  console.log("🚀 Primus Usage Tracker 설치 시작\n");
-
+function checkCodeburn() {
+  try {
+    execSync("which codeburn", { stdio: "ignore" });
+    return true;
+  } catch {
+    return false;
+  }
+}
+async function installCodeburn() {
+  console.log("\uD83D\uDCE6 codeburn 설치 중...");
+  try {
+    execSync("npm install -g codeburn", { stdio: "inherit" });
+    return true;
+  } catch {
+    return false;
+  }
+}
+async function runInit() {
+  console.log(`\uD83D\uDE80 Usage Tracker 설치 시작
+`);
+  if (!checkCodeburn()) {
+    console.log("⚠️  codeburn이 설치되어 있지 않습니다.");
+    const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+    const answer = await new Promise((res) => rl.question("지금 설치할까요? (Y/n) ", res));
+    rl.close();
+    if (answer.toLowerCase() !== "n") {
+      const ok = await installCodeburn();
+      if (!ok) {
+        console.error("❌ codeburn 설치 실패. 수동으로 설치하세요: npm install -g codeburn");
+        process.exit(1);
+      }
+      console.log(`✅ codeburn 설치 완료
+`);
+    } else {
+      console.log("⚠️  codeburn 없이는 사용량을 수집할 수 없습니다.");
+      console.log("   나중에: npm install -g codeburn");
+    }
+  } else {
+    console.log(`✅ codeburn 확인됨
+`);
+  }
   const existingKey = await loadApiKey();
   if (existingKey) {
     const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
-    const answer = await new Promise((res) =>
-      rl.question("이미 설치되어 있습니다. 재설치할까요? (y/N) ", res)
-    );
+    const answer = await new Promise((res) => rl.question("이미 설치되어 있습니다. 재설치할까요? (y/N) ", res));
     rl.close();
     if (answer.toLowerCase() !== "y") {
       console.log("설치 취소됨.");
@@ -194,7 +198,6 @@ export async function runInit() {
     }
     await deleteApiKey();
   }
-
   let apiKey;
   try {
     apiKey = await getApiKeyViaLocalServer();
@@ -202,16 +205,19 @@ export async function runInit() {
     console.error("❌ 인증 실패:", err.message);
     process.exit(1);
   }
-
   await saveApiKey(apiKey);
-  console.log("🔑 API 키 저장 완료");
-
-  const submitPath = installSubmitScript();
+  console.log("\uD83D\uDD11 API 키 저장 완료");
+  const submitPath = path.join(__dirname2, "submit.mjs");
   mergeHook(submitPath);
   runBackfill(apiKey);
-
-  console.log("\n✨ 설치 완료!");
+  console.log(`
+✨ 설치 완료!`);
   console.log("   Claude Code 세션을 종료하면 자동으로 사용량이 수집됩니다.");
-  console.log(`   대시보드: ${SERVER_URL}/dashboard\n`);
-  process.exit(0);
+  console.log(`   대시보드: ${SERVER_URL}/dashboard
+`);
 }
+export {
+  runInit,
+  loadApiKey,
+  deleteApiKey
+};

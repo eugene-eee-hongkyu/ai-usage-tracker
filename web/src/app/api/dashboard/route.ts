@@ -1,34 +1,46 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import { db, sessions, dailyAgg, users } from "@/lib/db";
-import { eq, gte, and, asc } from "drizzle-orm";
-import { generateSuggestions } from "@/lib/rules";
+import { db, userSnapshots, users } from "@/lib/db";
+import { eq } from "drizzle-orm";
 
 type Period = "today" | "week" | "month" | "all";
 
-function sinceDate(period: Period): Date {
+function sinceDate(period: Period): string {
   const now = new Date();
-  if (period === "today") return new Date(now.toDateString());
+  if (period === "today") {
+    return now.toISOString().slice(0, 10);
+  }
   if (period === "week") {
     const d = new Date(now);
     d.setDate(d.getDate() - 6);
-    return d;
+    return d.toISOString().slice(0, 10);
   }
   if (period === "month") {
     const d = new Date(now);
     d.setDate(d.getDate() - 29);
-    return d;
+    return d.toISOString().slice(0, 10);
   }
-  return new Date("2000-01-01");
+  return "2000-01-01";
 }
 
-// Local YYYY-MM-DD string (avoids UTC shift when comparing daily_agg.date strings)
-function localDateStr(d: Date): string {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
+interface DailyRow { date: string; cost: number; sessions: number; calls?: number }
+interface Activity { name: string; sessions: number; cost: number; oneShotRate: number | null }
+interface Project { name: string; cost: number; sessions: number; avgCost: number }
+interface TopSession { id: string; date: string; project: string; cost: number; turns: number }
+
+interface RawJson {
+  summary?: {
+    totalCost?: number;
+    totalSessions?: number;
+    callsCount?: number;
+    cacheHitPct?: number;
+    avgTurns?: number;
+  };
+  daily?: DailyRow[];
+  activities?: Activity[];
+  projects?: Project[];
+  topSessions?: TopSession[];
 }
 
 export async function GET(req: NextRequest) {
@@ -46,108 +58,54 @@ export async function GET(req: NextRequest) {
     .limit(1);
   if (!user[0]) return NextResponse.json({ error: "not found" }, { status: 404 });
 
-  const userId = user[0].id;
-
-  // daily chart — use same period as summary
-  const chartSince = sinceDate(period);
-  const dailyRows = await db
+  const snap = await db
     .select()
-    .from(dailyAgg)
-    .where(and(eq(dailyAgg.userId, userId), gte(dailyAgg.date, localDateStr(chartSince))))
-    .orderBy(asc(dailyAgg.date));
+    .from(userSnapshots)
+    .where(eq(userSnapshots.userId, user[0].id))
+    .limit(1);
 
-  // aggregate for period
-  const periodSessions = await db
-    .select()
-    .from(sessions)
-    .where(and(eq(sessions.userId, userId), gte(sessions.startedAt, since)));
-
-  const totalTokens = periodSessions.reduce(
-    (s, r) => s + r.inputTokens + r.outputTokens + r.cacheRead + r.cacheWrite,
-    0
-  );
-  const inputTokens = periodSessions.reduce((s, r) => s + r.inputTokens, 0);
-  const outputTokens = periodSessions.reduce((s, r) => s + r.outputTokens, 0);
-  const totalCost = periodSessions.reduce((s, r) => s + r.costUsd, 0);
-  const cacheRead = periodSessions.reduce((s, r) => s + r.cacheRead, 0);
-  const cacheWrite = periodSessions.reduce((s, r) => s + r.cacheWrite, 0);
-  const oneShotEdits = periodSessions.reduce((s, r) => s + r.oneShotEdits, 0);
-  const totalEdits = periodSessions.reduce((s, r) => s + r.totalEdits, 0);
-  const oneShotRate = totalEdits > 0 ? Math.round((oneShotEdits / totalEdits) * 100) : 0;
-  const cacheHitRate =
-    cacheRead + cacheWrite > 0
-      ? Math.round((cacheRead / (cacheRead + cacheWrite)) * 100)
-      : 0;
-
-  // model breakdown
-  const modelMap: Record<string, { tokens: number; cost: number }> = {};
-  for (const s of periodSessions) {
-    const key = s.model.toLowerCase().includes("opus")
-      ? "Opus"
-      : s.model.toLowerCase().includes("haiku")
-      ? "Haiku"
-      : "Sonnet";
-    if (!modelMap[key]) modelMap[key] = { tokens: 0, cost: 0 };
-    modelMap[key].tokens += s.inputTokens + s.outputTokens + s.cacheRead + s.cacheWrite;
-    modelMap[key].cost += s.costUsd;
+  if (!snap[0]) {
+    return NextResponse.json({
+      user: { name: user[0].name, email: user[0].email, avatarUrl: user[0].avatarUrl, lastSyncedAt: user[0].lastSyncedAt },
+      summary: null,
+      daily: [],
+      activities: [],
+      projects: [],
+      topSessions: [],
+    });
   }
 
-  // project breakdown
-  const projectMap: Record<string, { tokens: number; cost: number; oneShotEdits: number; totalEdits: number }> = {};
-  for (const s of periodSessions) {
-    if (!projectMap[s.project]) projectMap[s.project] = { tokens: 0, cost: 0, oneShotEdits: 0, totalEdits: 0 };
-    projectMap[s.project].tokens += s.inputTokens + s.outputTokens;
-    projectMap[s.project].cost += s.costUsd;
-    projectMap[s.project].oneShotEdits += s.oneShotEdits;
-    projectMap[s.project].totalEdits += s.totalEdits;
-  }
+  const raw = snap[0].rawJson as RawJson;
+  const allDaily: DailyRow[] = raw.daily ?? [];
+  const activities: Activity[] = (raw.activities ?? []).filter((a) => a.oneShotRate !== null);
+  const projects: Project[] = raw.projects ?? [];
+  const topSessions: TopSession[] = raw.topSessions ?? [];
+  const summary = raw.summary ?? {};
 
-  const suggestions = generateSuggestions({
-    totalTokens,
-    totalCost,
-    sessionsCount: periodSessions.length,
-    oneShotEdits,
-    totalEdits,
-    cacheRead,
-    cacheWrite,
-    opusTokens: modelMap["Opus"]?.tokens ?? 0,
-    sonnetTokens: modelMap["Sonnet"]?.tokens ?? 0,
-    haikuTokens: modelMap["Haiku"]?.tokens ?? 0,
-    avgRetries: 0,
-    activeHours: 0,
-  });
+  const filteredDaily = period === "all"
+    ? allDaily
+    : allDaily.filter((d) => d.date >= since);
 
-  // Platform averages for comparison.
-  // Real-time aggregation — fine for ≤100 users.
-  // For scale (1k+ users), move to a pre-aggregated daily table updated by cron.
-  const allPeriodSessions = await db
-    .select({ userId: sessions.userId, costUsd: sessions.costUsd, cacheRead: sessions.cacheRead, startedAt: sessions.startedAt })
-    .from(sessions)
-    .where(gte(sessions.startedAt, since));
-
-  const pMap: Record<number, { cost: number; days: Set<string>; cacheRead: number }> = {};
-  for (const s of allPeriodSessions) {
-    if (!pMap[s.userId]) pMap[s.userId] = { cost: 0, days: new Set(), cacheRead: 0 };
-    pMap[s.userId].cost += s.costUsd;
-    pMap[s.userId].days.add(new Date(s.startedAt).toISOString().slice(0, 10));
-    pMap[s.userId].cacheRead += s.cacheRead;
-  }
-  const pEntries = Object.values(pMap);
-  const platformUserCount = pEntries.length;
-  const platformAvgDailyCost = platformUserCount > 0
-    ? pEntries.reduce((sum, u) => sum + u.cost / Math.max(u.days.size, 1), 0) / platformUserCount
-    : 0;
-  const platformAvgCacheSaving = platformUserCount > 0
-    ? pEntries.reduce((sum, u) => sum + (u.cacheRead / 1_000_000) * 2.70, 0) / platformUserCount
-    : 0;
+  const periodCost = filteredDaily.reduce((s, d) => s + (d.cost ?? 0), 0);
+  const periodSessions = filteredDaily.reduce((s, d) => s + (d.sessions ?? 0), 0);
+  const activeDays = filteredDaily.filter((d) => d.cost > 0).length;
 
   return NextResponse.json({
     user: { name: user[0].name, email: user[0].email, avatarUrl: user[0].avatarUrl, lastSyncedAt: user[0].lastSyncedAt },
-    summary: { totalTokens, inputTokens, outputTokens, totalCost, oneShotRate, cacheHitRate, sessionsCount: periodSessions.length, totalEdits, cacheRead },
-    platformAvg: { userCount: platformUserCount, dailyCost: platformAvgDailyCost, cacheSavingUsd: platformAvgCacheSaving },
-    daily: dailyRows,
-    models: modelMap,
-    projects: projectMap,
-    suggestions,
+    summary: {
+      totalCost: periodCost,
+      sessionsCount: periodSessions,
+      activeDays,
+      // all-time metrics from snapshot
+      cacheHitPct: snap[0].cacheHitPct,
+      overallOneShot: snap[0].overallOneShot,
+      avgTurns: summary.avgTurns ?? 0,
+      allTimeCost: snap[0].totalCost,
+      allTimeSessions: snap[0].sessionsCount,
+    },
+    daily: filteredDaily,
+    activities,
+    projects,
+    topSessions,
   });
 }

@@ -162,8 +162,49 @@ function runBackfill(apiKey: string) {
   console.log("📦 과거 데이터 백그라운드 수집 시작 (최대 90일)");
 }
 
+function checkCodeburn(): boolean {
+  try {
+    execSync("which codeburn", { stdio: "ignore" });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function installCodeburn(): Promise<boolean> {
+  console.log("📦 codeburn 설치 중...");
+  try {
+    execSync("npm install -g codeburn", { stdio: "inherit" });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export async function runInit() {
-  console.log("🚀 Primus Usage Tracker 설치 시작\n");
+  console.log("🚀 Usage Tracker 설치 시작\n");
+
+  if (!checkCodeburn()) {
+    console.log("⚠️  codeburn이 설치되어 있지 않습니다.");
+    const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+    const answer = await new Promise<string>((res) =>
+      rl.question("지금 설치할까요? (Y/n) ", res)
+    );
+    rl.close();
+    if (answer.toLowerCase() !== "n") {
+      const ok = await installCodeburn();
+      if (!ok) {
+        console.error("❌ codeburn 설치 실패. 수동으로 설치하세요: npm install -g codeburn");
+        process.exit(1);
+      }
+      console.log("✅ codeburn 설치 완료\n");
+    } else {
+      console.log("⚠️  codeburn 없이는 사용량을 수집할 수 없습니다.");
+      console.log("   나중에: npm install -g codeburn");
+    }
+  } else {
+    console.log("✅ codeburn 확인됨\n");
+  }
 
   const existingKey = await loadApiKey();
   if (existingKey) {

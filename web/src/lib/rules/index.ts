@@ -1,101 +1,13 @@
-export interface SessionStats {
-  totalTokens: number;
-  totalCost: number;
-  sessionsCount: number;
-  oneShotEdits: number;
-  totalEdits: number;
-  cacheRead: number;
-  cacheWrite: number;
-  opusTokens: number;
-  sonnetTokens: number;
-  haikuTokens: number;
-  avgRetries: number; // average tool retries per session
-  activeHours: number; // distinct hours with activity in last 5h windows
-}
-
-export interface Suggestion {
-  type:
-    | "cache_hit"
-    | "opus_heavy"
-    | "high_retry"
-    | "low_utilization"
-    | "mcp_unused";
-  title: string;
-  detail: string;
-  estimatedSavingUsd?: number;
-  confidence: "low" | "medium" | "high";
-}
-
-export function generateSuggestions(stats: SessionStats): Suggestion[] {
-  const suggestions: Suggestion[] = [];
-
-  // Rule 1: Cache hit rate (confidence: low — indirect signal)
-  const totalCacheable = stats.cacheRead + stats.cacheWrite;
-  const cacheHitRate =
-    totalCacheable > 0 ? stats.cacheRead / totalCacheable : 0;
-  if (cacheHitRate < 0.5 && stats.sessionsCount >= 3) {
-    const saving = stats.totalCost * 0.15;
-    suggestions.push({
-      type: "cache_hit",
-      title: `Cache hit ${Math.round(cacheHitRate * 100)}% — CLAUDE.md 다이어트 권장`,
-      detail: `CLAUDE.md를 5KB 이하로 줄이면 캐시 적중률이 올라갑니다. 예상 절감 $${saving.toFixed(2)}/월`,
-      estimatedSavingUsd: saving,
-      confidence: "low",
-    });
-  }
-
-  // Rule 2: Opus heavy (confidence: high — direct cost signal)
-  if (stats.totalTokens > 0) {
-    const opusRatio = stats.opusTokens / stats.totalTokens;
-    if (opusRatio > 0.3) {
-      const saving = stats.totalCost * opusRatio * 0.7;
-      suggestions.push({
-        type: "opus_heavy",
-        title: `Opus 비중 ${Math.round(opusRatio * 100)}% — Sonnet 전환 권장`,
-        detail: `대부분 작업은 Sonnet으로 충분합니다. 예상 절감 $${saving.toFixed(2)}/월`,
-        estimatedSavingUsd: saving,
-        confidence: "high",
-      });
-    }
-  }
-
-  // Rule 3: High retry rate (confidence: low — proxy metric)
-  if (stats.avgRetries > 2.5 && stats.sessionsCount >= 3) {
-    suggestions.push({
-      type: "high_retry",
-      title: `평균 retry ${stats.avgRetries.toFixed(1)}회 — 프롬프트 명확도 개선 권장`,
-      detail: `재시도가 많으면 컨텍스트 설명이 부족한 경우가 많습니다.`,
-      confidence: "low",
-    });
-  }
-
-  // Rule 4: 5h window utilization — only fire when activeHours is actually tracked
-  const utilization5h =
-    stats.sessionsCount > 0 ? stats.activeHours / (stats.sessionsCount * 5) : 0;
-  if (stats.activeHours > 0 && utilization5h < 0.3 && stats.sessionsCount >= 5) {
-    suggestions.push({
-      type: "low_utilization",
-      title: `5h 활용률 ${Math.round(utilization5h * 100)}% — 세션 집중도 개선 권장`,
-      detail: `Claude Code 세션을 더 집중적으로 사용하면 요금제 효율이 올라갑니다.`,
-      confidence: "high",
-    });
-  }
-
-  return suggestions.slice(0, 5);
-}
-
-// efficiency score = cache hit% × 100 / cost-per-session
+// efficiencyScore = overallOneShot × cacheHitPct / (totalCost / sessionsCount)
 export function computeEfficiencyScore(
-  cacheRead: number,
-  cacheWrite: number,
+  overallOneShot: number,
+  cacheHitPct: number,
   totalCost: number,
   sessionsCount: number
 ): number {
   if (sessionsCount === 0 || totalCost === 0) return 0;
-  const totalCacheable = cacheRead + cacheWrite;
-  const cacheHitPct = totalCacheable > 0 ? (cacheRead / totalCacheable) * 100 : 0;
   const costPerSession = totalCost / sessionsCount;
-  return Math.round((cacheHitPct * 100) / costPerSession);
+  return Math.round((overallOneShot * cacheHitPct) / costPerSession);
 }
 
 export function generateMvpBlurb(

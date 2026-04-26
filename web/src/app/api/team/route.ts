@@ -1,79 +1,64 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import { db, sessions, users } from "@/lib/db";
-import { gte } from "drizzle-orm";
+import { db, userSnapshots, users } from "@/lib/db";
 import { computeEfficiencyScore, generateMvpBlurb } from "@/lib/rules";
 
-type Period = "today" | "week" | "month" | "all";
-
-function sinceDate(period: Period): Date {
-  const now = new Date();
-  if (period === "today") return new Date(now.toDateString());
-  if (period === "week") { const d = new Date(now); d.setDate(d.getDate() - 6); return d; }
-  if (period === "month") { const d = new Date(now); d.setDate(d.getDate() - 29); return d; }
-  return new Date("2000-01-01");
-}
-
 export async function GET(req: NextRequest) {
+  void req;
   const session = await getServerSession(authOptions);
   if (!session?.user?.email)
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
 
-  const period = (req.nextUrl.searchParams.get("period") ?? "week") as Period;
-  const since = sinceDate(period);
-
   const allUsers = await db.select().from(users);
-  const allSessions = await db
-    .select()
-    .from(sessions)
-    .where(gte(sessions.startedAt, since));
+  const allSnaps = await db.select().from(userSnapshots);
 
-  const memberStats = allUsers.map((u) => {
-    const userSessions = allSessions.filter((s) => s.userId === u.id);
-    const totalTokens = userSessions.reduce((acc, s) => acc + s.inputTokens + s.outputTokens, 0);
-    const totalCost = userSessions.reduce((acc, s) => acc + s.costUsd, 0);
-    const cacheRead = userSessions.reduce((acc, s) => acc + s.cacheRead, 0);
-    const cacheWrite = userSessions.reduce((acc, s) => acc + s.cacheWrite, 0);
-    const sessionsCount = userSessions.length;
-    const totalCacheable = cacheRead + cacheWrite;
-    const cacheHitPct = totalCacheable > 0 ? (cacheRead / totalCacheable) * 100 : 0;
-    const costPerSession = sessionsCount > 0 ? totalCost / sessionsCount : 0;
-    const efficiencyScore = computeEfficiencyScore(cacheRead, cacheWrite, totalCost, sessionsCount);
-    const topProject = Object.entries(
-      userSessions.reduce((acc, s) => {
-        acc[s.project] = (acc[s.project] ?? 0) + s.inputTokens + s.outputTokens;
-        return acc;
-      }, {} as Record<string, number>)
-    ).sort(([, a], [, b]) => b - a)[0]?.[0] ?? "unknown";
+  const snapMap = new Map(allSnaps.map((s) => [s.userId, s]));
 
-    return { userId: u.id, name: u.name, avatarUrl: u.avatarUrl, totalTokens, totalCost, cacheHitPct, costPerSession, efficiencyScore, topProject, sessionsCount };
-  });
+  const memberStats = allUsers
+    .map((u) => {
+      const snap = snapMap.get(u.id);
+      if (!snap) return null;
 
-  const byTokens = [...memberStats].sort((a, b) => b.totalTokens - a.totalTokens);
+      const totalCost = snap.totalCost;
+      const sessionsCount = snap.sessionsCount;
+      const cacheHitPct = snap.cacheHitPct;
+      const overallOneShot = snap.overallOneShot;
+      const efficiencyScore = computeEfficiencyScore(overallOneShot, cacheHitPct, totalCost, sessionsCount);
+
+      const raw = snap.rawJson as { projects?: Array<{ name: string; cost: number; sessions: number }> };
+      const topProject = (raw.projects ?? []).sort((a, b) => b.cost - a.cost)[0]?.name ?? "unknown";
+
+      return {
+        userId: u.id,
+        name: u.name,
+        avatarUrl: u.avatarUrl,
+        totalCost,
+        sessionsCount,
+        cacheHitPct,
+        overallOneShot,
+        efficiencyScore,
+        topProject,
+      };
+    })
+    .filter((m): m is NonNullable<typeof m> => m !== null);
+
+  const byOneShotRate = [...memberStats].sort((a, b) => b.overallOneShot - a.overallOneShot);
   const byEfficiency = [...memberStats].sort((a, b) => b.efficiencyScore - a.efficiencyScore);
-  const mvpCandidate = [...memberStats].sort((a, b) => b.efficiencyScore - a.efficiencyScore)[0];
+  const bySessions = [...memberStats].sort((a, b) => b.sessionsCount - a.sessionsCount);
 
+  const mvpCandidate = byEfficiency[0] ?? null;
   const mvp = mvpCandidate
     ? {
         ...mvpCandidate,
-        blurb: generateMvpBlurb(mvpCandidate.name, mvpCandidate.topProject, mvpCandidate.cacheHitPct, mvpCandidate.costPerSession),
+        blurb: generateMvpBlurb(
+          mvpCandidate.name,
+          mvpCandidate.topProject,
+          mvpCandidate.cacheHitPct,
+          mvpCandidate.sessionsCount > 0 ? mvpCandidate.totalCost / mvpCandidate.sessionsCount : 0
+        ),
       }
     : null;
 
-  // project leaderboard
-  const projectStats: Record<string, Array<{ userId: number; name: string; tokens: number }>> = {};
-  for (const s of allSessions) {
-    if (!projectStats[s.project]) projectStats[s.project] = [];
-    const u = allUsers.find((u) => u.id === s.userId);
-    if (!u) continue;
-    const existing = projectStats[s.project].find((p) => p.userId === s.userId);
-    if (existing) existing.tokens += s.inputTokens + s.outputTokens;
-    else projectStats[s.project].push({ userId: s.userId, name: u.name, tokens: s.inputTokens + s.outputTokens });
-  }
-  for (const k of Object.keys(projectStats)) {
-    projectStats[k].sort((a, b) => b.tokens - a.tokens);
-  }
-
-  return NextResponse.json({ mvp, byTokens, byEfficiency, projects: projectStats });
+  return NextResponse.json({ mvp, byOneShotRate, byEfficiency, bySessions });
 }

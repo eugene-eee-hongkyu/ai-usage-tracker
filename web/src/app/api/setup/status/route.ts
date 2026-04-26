@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import { db, users, sessions } from "@/lib/db";
-import { eq, count } from "drizzle-orm";
+import { db, users, userSnapshots } from "@/lib/db";
+import { eq } from "drizzle-orm";
 
 export async function GET() {
   const session = await getServerSession(authOptions);
@@ -15,25 +15,26 @@ export async function GET() {
     .where(eq(users.email, session.user.email))
     .limit(1);
 
-  if (!user[0]) return NextResponse.json({ ready: false, steps: [] });
+  if (!user[0]) return NextResponse.json({ ready: false, steps: {} });
 
-  const [sessionCount] = await db
-    .select({ value: count() })
-    .from(sessions)
-    .where(eq(sessions.userId, user[0].id));
+  const snap = await db
+    .select({ sessionsCount: userSnapshots.sessionsCount })
+    .from(userSnapshots)
+    .where(eq(userSnapshots.userId, user[0].id))
+    .limit(1);
 
-  const sessionsCount = sessionCount?.value ?? 0;
-  const hasSessions = sessionsCount > 0;
+  const sessionsCount = snap[0]?.sessionsCount ?? 0;
   const hasSynced = !!user[0].lastSyncedAt;
+  const hasData = sessionsCount > 0;
 
   return NextResponse.json({
-    ready: hasSessions,
+    ready: hasData,
     lastSyncedAt: user[0].lastSyncedAt ?? null,
     sessionsCount,
     steps: {
       cli_installed: hasSynced,
       hook_registered: hasSynced,
-      first_session: hasSessions,
+      first_session: hasData,
     },
   });
 }
