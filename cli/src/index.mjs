@@ -31,5 +31,5 @@ program
 if (!process.argv[2] || process.argv[2] === "init") {
   program.parse(["node", "ai-usage-tracker", "init", ...process.argv.slice(3)]);
 } else {
-  program.parse();
+  program.parse(process.argv);
 }
