@@ -3,9 +3,6 @@
 import { useEffect, useState } from "react";
 import { useSession, signOut } from "next-auth/react";
 import { useRouter } from "next/navigation";
-import {
-  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
-} from "recharts";
 import { Nav } from "@/components/nav";
 import { CacheHitModal, OneShotRateModal, CostPerSessionModal, CallsPerSessionModal } from "@/components/metric-modal";
 import Link from "next/link";
@@ -86,21 +83,6 @@ function TipBtn({ label, onClick }: { label: string; onClick: () => void }) {
   );
 }
 
-function ChartTooltip({ active, payload, label }: {
-  active?: boolean;
-  payload?: Array<{ payload: { cost: number; sessions: number } }>;
-  label?: string;
-}) {
-  if (!active || !payload?.length) return null;
-  const { cost, sessions } = payload[0].payload;
-  return (
-    <div className="bg-neutral-900 border border-neutral-700 rounded px-2.5 py-1.5 text-xs font-mono shadow-lg space-y-0.5">
-      <p className="text-neutral-400">{label}</p>
-      <p className="text-yellow-400">${cost.toFixed(3)}</p>
-      {sessions > 0 && <p className="text-neutral-500">{sessions}s</p>}
-    </div>
-  );
-}
 
 export default function DashboardPage() {
   const { data: session, status } = useSession();
@@ -210,24 +192,28 @@ export default function DashboardPage() {
       <Nav />
 
       {/* Period Tabs */}
-      <div className="flex gap-1 px-4 pt-3 pb-2 border-b border-neutral-800">
-        {(["today", "week", "month", "all"] as Period[]).map((p) => (
-          <button
-            key={p}
-            onClick={() => setPeriod(p)}
-            className={`px-3 py-1 rounded text-xs font-mono transition-colors ${period === p ? "bg-indigo-600 text-white" : "bg-neutral-800 text-neutral-400 hover:text-neutral-200"}`}
-          >{PERIOD_LABELS[p]}</button>
-        ))}
+      <div className="border-b border-neutral-800">
+        <div className="max-w-6xl mx-auto px-4 pt-3 pb-2 flex gap-1">
+          {(["today", "week", "month", "all"] as Period[]).map((p) => (
+            <button
+              key={p}
+              onClick={() => setPeriod(p)}
+              className={`w-16 text-center py-1 rounded text-xs font-mono transition-colors ${period === p ? "bg-indigo-600 text-white" : "bg-neutral-800 text-neutral-400 hover:text-neutral-200"}`}
+            >{PERIOD_LABELS[p]}</button>
+          ))}
+        </div>
       </div>
 
       {/* Overview Bar */}
-      <div className="px-4 py-2.5 flex flex-wrap gap-x-5 gap-y-1 text-sm font-mono bg-neutral-900 border-b border-neutral-800">
-        <span><span className="text-yellow-400 font-bold">${ov.cost.toFixed(2)}</span><span className="text-neutral-500 ml-1 text-xs">cost</span></span>
-        <span><span className="text-blue-400 font-bold">{ov.calls.toLocaleString()}</span><span className="text-neutral-500 ml-1 text-xs">calls</span></span>
-        <span><span className="text-cyan-400 font-bold">{ov.sessions}</span><span className="text-neutral-500 ml-1 text-xs">sessions</span></span>
-        <span><span className="text-emerald-400 font-bold">{ov.cacheHitPct.toFixed(1)}%</span><span className="text-neutral-500 ml-1 text-xs">cache hit</span></span>
-        <span><span className="text-violet-400 font-bold">{Math.round(ov.oneShotRate * 100)}%</span><span className="text-neutral-500 ml-1 text-xs">1-shot</span></span>
-        <span className="text-neutral-600 text-xs self-center ml-auto">활성 {ov.activeDays}일</span>
+      <div className="bg-neutral-900 border-b border-neutral-800">
+        <div className="max-w-6xl mx-auto px-4 py-2.5 flex flex-wrap gap-x-5 gap-y-1 text-sm font-mono">
+          <span><span className="text-yellow-400 font-bold">${ov.cost.toFixed(2)}</span><span className="text-neutral-500 ml-1 text-xs">cost</span></span>
+          <span><span className="text-blue-400 font-bold">{ov.calls.toLocaleString()}</span><span className="text-neutral-500 ml-1 text-xs">calls</span></span>
+          <span><span className="text-cyan-400 font-bold">{ov.sessions}</span><span className="text-neutral-500 ml-1 text-xs">sessions</span></span>
+          <span><span className="text-emerald-400 font-bold">{ov.cacheHitPct.toFixed(1)}%</span><span className="text-neutral-500 ml-1 text-xs">cache hit</span></span>
+          <span><span className="text-violet-400 font-bold">{Math.round(ov.oneShotRate * 100)}%</span><span className="text-neutral-500 ml-1 text-xs">1-shot</span></span>
+          <span className="text-neutral-600 text-xs self-center ml-auto">활성 {ov.activeDays}일</span>
+        </div>
       </div>
 
       <main className="px-4 py-4 space-y-4 max-w-6xl mx-auto">
@@ -244,14 +230,21 @@ export default function DashboardPage() {
               {chartData.length === 0 ? (
                 <div className="h-32 flex items-center justify-center text-neutral-600 text-xs font-mono">no data</div>
               ) : (
-                <ResponsiveContainer width="100%" height={130}>
-                  <BarChart data={chartData} margin={{ top: 4, right: 0, left: -24, bottom: 0 }}>
-                    <XAxis dataKey="date" tick={{ fill: "#525252", fontSize: 10, fontFamily: "monospace" }} axisLine={false} tickLine={false} interval="preserveStartEnd" />
-                    <YAxis hide />
-                    <Tooltip content={<ChartTooltip />} cursor={{ fill: "rgba(99,102,241,0.08)" }} />
-                    <Bar dataKey="cost" fill="#6366f1" radius={[2, 2, 0, 0]} maxBarSize={32} />
-                  </BarChart>
-                </ResponsiveContainer>
+                <div className="space-y-1 max-h-52 overflow-y-auto">
+                  {(() => {
+                    const maxCost = Math.max(...chartData.map((d) => d.cost), 0.01);
+                    return chartData.map((d) => (
+                      <div key={d.date} className="flex items-center gap-1.5 text-xs font-mono">
+                        <span className="w-10 text-neutral-500 shrink-0">{d.date}</span>
+                        <div className="w-20 h-1.5 bg-neutral-800 rounded overflow-hidden shrink-0">
+                          <div className="h-full bg-cyan-500 rounded" style={{ width: `${(d.cost / maxCost) * 100}%` }} />
+                        </div>
+                        <span className="text-yellow-400 flex-1">{fmt$(d.cost)}</span>
+                        {d.sessions > 0 && <span className="text-neutral-600 w-6 text-right">{d.sessions}s</span>}
+                      </div>
+                    ));
+                  })()}
+                </div>
               )}
             </div>
           </div>

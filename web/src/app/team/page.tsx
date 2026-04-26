@@ -66,14 +66,16 @@ export default function TeamPage() {
       <Nav />
 
       {/* Period Tabs */}
-      <div className="flex gap-1 px-4 pt-3 pb-2 border-b border-neutral-800">
-        {(["today", "week", "month", "all"] as Period[]).map((p) => (
-          <button
-            key={p}
-            onClick={() => setPeriod(p)}
-            className={`px-3 py-1 rounded text-xs font-mono transition-colors ${period === p ? "bg-indigo-600 text-white" : "bg-neutral-800 text-neutral-400 hover:text-neutral-200"}`}
-          >{PERIOD_LABELS[p]}</button>
-        ))}
+      <div className="border-b border-neutral-800">
+        <div className="max-w-3xl mx-auto px-4 pt-3 pb-2 flex gap-1">
+          {(["today", "week", "month", "all"] as Period[]).map((p) => (
+            <button
+              key={p}
+              onClick={() => setPeriod(p)}
+              className={`w-16 text-center py-1 rounded text-xs font-mono transition-colors ${period === p ? "bg-indigo-600 text-white" : "bg-neutral-800 text-neutral-400 hover:text-neutral-200"}`}
+            >{PERIOD_LABELS[p]}</button>
+          ))}
+        </div>
       </div>
 
       <main className={`max-w-3xl mx-auto px-4 py-6 space-y-6 transition-opacity duration-150 ${loading ? "opacity-40 pointer-events-none" : "opacity-100"}`}>
