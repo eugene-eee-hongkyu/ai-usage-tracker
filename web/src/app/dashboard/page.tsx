@@ -45,6 +45,8 @@ interface TopSession {
 }
 
 interface DailyRow { date: string; cost: number; sessions: number }
+interface Model { name: string; cost: number; calls: number; cacheHitPct: number }
+interface NameCalls { name: string; calls: number }
 
 interface DashboardData {
   user: { name: string; lastSyncedAt: string | null };
@@ -53,6 +55,10 @@ interface DashboardData {
   activities: Activity[];
   projects: Project[];
   topSessions: TopSession[];
+  models: Model[];
+  tools: NameCalls[];
+  shellCommands: NameCalls[];
+  mcpServers: NameCalls[];
 }
 
 const PERIOD_LABELS: Record<Period, string> = {
@@ -320,7 +326,11 @@ export default function DashboardPage() {
             <div className="px-3 py-2 border-b border-neutral-800">
               <span className="text-xs font-mono font-bold text-fuchsia-400 uppercase tracking-wider">Efficiency</span>
             </div>
-            <div className="p-3 space-y-3 font-mono">
+            <div className="p-3 font-mono">
+              <div className="flex text-xs text-neutral-600 mb-1.5">
+                <span className="flex-1">metric</span>
+                <span>value</span>
+              </div>
               {[
                 {
                   label: "Cache hit",
@@ -343,9 +353,9 @@ export default function DashboardPage() {
                   color: "text-blue-400",
                 },
               ].map(({ label, value, color }) => (
-                <div key={label} className="flex items-center justify-between">
-                  <span className="text-xs text-neutral-500">{label}</span>
-                  <span className={`text-sm font-bold ${color}`}>{value}</span>
+                <div key={label} className="flex items-center justify-between text-xs py-0.5">
+                  <span className="text-neutral-400">{label}</span>
+                  <span className={`font-bold ${color}`}>{value}</span>
                 </div>
               ))}
             </div>
@@ -382,6 +392,126 @@ export default function DashboardPage() {
                 {data.activities.length === 0 && (
                   <p className="text-neutral-600 text-xs font-mono">no data</p>
                 )}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Row 4: By Model + MCP Servers */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+
+          {/* By Model */}
+          <div className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-pink-500 rounded">
+            <div className="px-3 py-2 border-b border-neutral-800">
+              <span className="text-xs font-mono font-bold text-pink-400 uppercase tracking-wider">By Model</span>
+            </div>
+            <div className="p-3">
+              <div className="flex text-xs text-neutral-600 font-mono mb-1.5">
+                <span className="flex-1">model</span>
+                <span className="w-16 text-right">cost</span>
+                <span className="w-14 text-right">cache</span>
+                <span className="w-14 text-right">calls</span>
+              </div>
+              <div className="space-y-1">
+                {(data.models ?? []).map((m) => {
+                  const maxCost = Math.max(...(data.models ?? []).map((x) => x.cost), 0.01);
+                  const barOpacity = 0.25 + (m.cost / maxCost) * 0.75;
+                  return (
+                    <div key={m.name} className="flex items-center gap-1.5 text-xs font-mono">
+                      <div className="w-1.5 h-3.5 rounded-sm shrink-0 bg-pink-500" style={{ opacity: barOpacity }} />
+                      <span className="flex-1 text-neutral-300 truncate">{m.name}</span>
+                      <span className="w-16 text-yellow-400 text-right">{fmt$(m.cost)}</span>
+                      <span className="w-14 text-emerald-400 text-right">{m.cacheHitPct.toFixed(1)}%</span>
+                      <span className="w-14 text-neutral-500 text-right">{m.calls.toLocaleString()}</span>
+                    </div>
+                  );
+                })}
+                {(data.models ?? []).length === 0 && <p className="text-neutral-600 text-xs font-mono">no data</p>}
+              </div>
+            </div>
+          </div>
+
+          {/* MCP Servers */}
+          <div className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-cyan-500 rounded">
+            <div className="px-3 py-2 border-b border-neutral-800">
+              <span className="text-xs font-mono font-bold text-cyan-400 uppercase tracking-wider">MCP Servers</span>
+            </div>
+            <div className="p-3">
+              <div className="flex text-xs text-neutral-600 font-mono mb-1.5">
+                <span className="flex-1">server</span>
+                <span className="w-16 text-right">calls</span>
+              </div>
+              <div className="space-y-1">
+                {(data.mcpServers ?? []).map((m) => {
+                  const maxCalls = Math.max(...(data.mcpServers ?? []).map((x) => x.calls), 0.01);
+                  const barOpacity = 0.25 + (m.calls / maxCalls) * 0.75;
+                  return (
+                    <div key={m.name} className="flex items-center gap-1.5 text-xs font-mono">
+                      <div className="w-1.5 h-3.5 rounded-sm shrink-0 bg-cyan-500" style={{ opacity: barOpacity }} />
+                      <span className="flex-1 text-neutral-300 truncate">{m.name}</span>
+                      <span className="w-16 text-blue-400 text-right">{m.calls.toLocaleString()}</span>
+                    </div>
+                  );
+                })}
+                {(data.mcpServers ?? []).length === 0 && <p className="text-neutral-600 text-xs font-mono">no data</p>}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Row 5: Core Tools + Shell Commands */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+
+          {/* Core Tools */}
+          <div className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-teal-500 rounded">
+            <div className="px-3 py-2 border-b border-neutral-800">
+              <span className="text-xs font-mono font-bold text-teal-400 uppercase tracking-wider">Core Tools</span>
+            </div>
+            <div className="p-3">
+              <div className="flex text-xs text-neutral-600 font-mono mb-1.5">
+                <span className="flex-1">tool</span>
+                <span className="w-16 text-right">calls</span>
+              </div>
+              <div className="space-y-1">
+                {(data.tools ?? []).slice(0, 10).map((t) => {
+                  const maxCalls = Math.max(...(data.tools ?? []).map((x) => x.calls), 0.01);
+                  const barOpacity = 0.25 + (t.calls / maxCalls) * 0.75;
+                  return (
+                    <div key={t.name} className="flex items-center gap-1.5 text-xs font-mono">
+                      <div className="w-1.5 h-3.5 rounded-sm shrink-0 bg-teal-500" style={{ opacity: barOpacity }} />
+                      <span className="flex-1 text-neutral-300 truncate">{t.name}</span>
+                      <span className="w-16 text-blue-400 text-right">{t.calls.toLocaleString()}</span>
+                    </div>
+                  );
+                })}
+                {(data.tools ?? []).length === 0 && <p className="text-neutral-600 text-xs font-mono">no data</p>}
+              </div>
+            </div>
+          </div>
+
+          {/* Shell Commands */}
+          <div className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-orange-500 rounded">
+            <div className="px-3 py-2 border-b border-neutral-800">
+              <span className="text-xs font-mono font-bold text-orange-400 uppercase tracking-wider">Shell Commands</span>
+            </div>
+            <div className="p-3">
+              <div className="flex text-xs text-neutral-600 font-mono mb-1.5">
+                <span className="flex-1">command</span>
+                <span className="w-16 text-right">calls</span>
+              </div>
+              <div className="space-y-1">
+                {(data.shellCommands ?? []).slice(0, 10).map((s) => {
+                  const maxCalls = Math.max(...(data.shellCommands ?? []).map((x) => x.calls), 0.01);
+                  const barOpacity = 0.25 + (s.calls / maxCalls) * 0.75;
+                  return (
+                    <div key={s.name} className="flex items-center gap-1.5 text-xs font-mono">
+                      <div className="w-1.5 h-3.5 rounded-sm shrink-0 bg-orange-500" style={{ opacity: barOpacity }} />
+                      <span className="flex-1 text-neutral-300 truncate">{s.name}</span>
+                      <span className="w-16 text-blue-400 text-right">{s.calls.toLocaleString()}</span>
+                    </div>
+                  );
+                })}
+                {(data.shellCommands ?? []).length === 0 && <p className="text-neutral-600 text-xs font-mono">no data</p>}
               </div>
             </div>
           </div>

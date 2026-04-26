@@ -44,6 +44,16 @@ interface RawTopSession {
   turns?: number;
 }
 
+interface RawModel {
+  name?: string;
+  cost?: number;
+  calls?: number;
+  inputTokens?: number;
+  cacheReadTokens?: number;
+}
+
+interface RawNameCalls { name?: string; calls?: number }
+
 interface RawPeriodData {
   overview?: RawOverview;
   summary?: RawOverview;
@@ -51,6 +61,10 @@ interface RawPeriodData {
   activities?: RawActivity[];
   projects?: RawProject[];
   topSessions?: RawTopSession[];
+  models?: RawModel[];
+  tools?: RawNameCalls[];
+  shellCommands?: RawNameCalls[];
+  mcpServers?: RawNameCalls[];
 }
 
 function getPeriodData(raw: unknown, period: string): RawPeriodData {
@@ -149,6 +163,16 @@ export async function GET(req: NextRequest) {
       : null,
   }));
 
+  const models = (d.models ?? []).map((m) => {
+    const input = m.inputTokens ?? 0;
+    const cacheRead = m.cacheReadTokens ?? 0;
+    const cacheHit = input + cacheRead > 0 ? (cacheRead / (input + cacheRead)) * 100 : 0;
+    return { name: m.name ?? "", cost: m.cost ?? 0, calls: m.calls ?? 0, cacheHitPct: cacheHit };
+  });
+
+  const toNameCalls = (arr: RawNameCalls[]) =>
+    arr.map((x) => ({ name: x.name ?? "", calls: x.calls ?? 0 }));
+
   return NextResponse.json({
     user: { name: user[0].name, lastSyncedAt: user[0].lastSyncedAt },
     overview: { cost, sessions, calls, cacheHitPct, oneShotRate, activeDays },
@@ -156,5 +180,9 @@ export async function GET(req: NextRequest) {
     activities,
     projects,
     topSessions,
+    models,
+    tools: toNameCalls(d.tools ?? []),
+    shellCommands: toNameCalls(d.shellCommands ?? []),
+    mcpServers: toNameCalls(d.mcpServers ?? []),
   });
 }
