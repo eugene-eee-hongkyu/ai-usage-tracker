@@ -17,15 +17,15 @@ export function Nav() {
   ];
 
   return (
-    <header className="border-b border-slate-800 px-4 py-3 flex items-center justify-between">
-      <div className="flex items-center gap-6">
-        <span className="font-bold text-slate-200">Primus Usage</span>
-        <nav className="flex gap-4">
+    <header className="border-b border-slate-800 px-4 py-3 flex items-center justify-between gap-2">
+      <div className="flex items-center gap-3 min-w-0">
+        <span className="font-bold text-slate-200 shrink-0 hidden sm:block">Primus Usage</span>
+        <nav className="flex gap-1 sm:gap-3">
           {tabs.map((t) => (
             <Link
               key={t.href}
               href={t.href}
-              className={`text-sm px-3 py-1 rounded transition-colors ${
+              className={`text-sm px-2 sm:px-3 py-1 rounded transition-colors whitespace-nowrap ${
                 path.startsWith(t.href)
                   ? "bg-slate-700 text-slate-100"
                   : "text-slate-400 hover:text-slate-200"
@@ -36,15 +36,15 @@ export function Nav() {
           ))}
         </nav>
       </div>
-      <div className="relative">
+      <div className="relative shrink-0">
         <button
           onClick={() => setOpen(!open)}
-          className="text-sm text-slate-400 hover:text-slate-200 flex items-center gap-1"
+          className="text-sm text-slate-400 hover:text-slate-200 flex items-center gap-1 whitespace-nowrap"
         >
           {session?.user?.name?.split(" ")[0]} ▾
         </button>
         {open && (
-          <div className="absolute right-0 top-8 bg-slate-800 border border-slate-700 rounded shadow-lg z-50">
+          <div className="absolute right-0 top-8 bg-slate-800 border border-slate-700 rounded shadow-lg z-50 whitespace-nowrap">
             <button
               onClick={() => signOut({ callbackUrl: "/login" })}
               className="block px-4 py-2 text-sm text-slate-300 hover:bg-slate-700 w-full text-left"
