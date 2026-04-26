@@ -31,5 +31,5 @@ program
 if (process.argv[2] === "init" || process.argv.length <= 2) {
   program.parse(["node", "usage-tracker", "init", ...process.argv.slice(3)]);
 } else {
-  program.parse();
+  program.parse(process.argv);
 }
