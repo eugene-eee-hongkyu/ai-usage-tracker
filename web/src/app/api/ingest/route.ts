@@ -57,7 +57,17 @@ export async function POST(req: NextRequest) {
           startedAt: new Date(s.startedAt),
           endedAt: new Date(s.endedAt),
         })
-        .onConflictDoNothing()
+        .onConflictDoUpdate({
+          target: [sessions.userId, sessions.sessionIdHash],
+          set: {
+            inputTokens: sql`excluded.input_tokens`,
+            outputTokens: sql`excluded.output_tokens`,
+            cacheRead: sql`excluded.cache_read`,
+            cacheWrite: sql`excluded.cache_write`,
+            costUsd: sql`excluded.cost_usd`,
+            endedAt: sql`excluded.ended_at`,
+          },
+        })
         .returning({ id: sessions.id });
       if (rows.length > 0) inserted++;
     } catch {
