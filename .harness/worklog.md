@@ -4,29 +4,20 @@
 
 ---
 
-세션 요약이 버그 원인을 찾는 탐색 작업 중에 끊긴 것으로 보입니다. 제공된 정보를 바탕으로 worklog를 작성합니다.
-
----
-
-## Session 2026-04-26 15:30 — 버그 원인 파악을 위한 프로젝트/로그 탐색
+## Session 2026-04-26 15:49 — 오늘 데이터 0 버그 수정 (ingest + CLI sync)
 
 ### 작업 요약
-- `ai-usage-tracker` 프로젝트 디렉토리 구조 확인
-- Python 소스 파일 목록 탐색 및 스케줄러/수집 관련 코드 파일 식별
-- `docker-compose.yml`, `.env` 등 환경 설정 파일 확인
-- Docker 컨테이너 목록 및 collector 컨테이너 로그 조회 시도
-- systemd 서비스 상태 및 저널 로그 조회 시도
-- 버그 원인 특정에는 이르지 못하고 세션 종료
-
-### 실패한 시도
-- collector 컨테이너 로그 조회 실패 (컨테이너 이름 불일치로 여러 이름 패턴 시도)
-- `journalctl` / `systemctl` 로그에서 유의미한 정보 확보 실패
-- 세션 중 버그 원인을 끝내 특정하지 못함
+- **버그 원인 분석**: `ccusage daily`로 오늘(04-26) 데이터가 있음에도 대시보드 "오늘" 탭이 0을 표시
+  - 원인: SessionEnd hook 첫 발화 시 JSONL race condition → 0토큰으로 삽입 → `onConflictDoNothing`이 이후 정확한 데이터 업데이트 차단
+- **`api/ingest/route.ts` 수정**: `.onConflictDoNothing()` → `.onConflictDoUpdate({ target: [userId, sessionIdHash], set: { inputTokens, outputTokens, cacheRead, cacheWrite, costUsd, endedAt } })` — hook 발화마다 최신값으로 갱신
+- **CLI `sync` 오류 수정**: `program.parse()` (인수 없음) → `program.parse(process.argv)` — 번들 환경에서 commander가 process.argv를 자동 감지 실패
+- CLI 번들 재빌드(`bun build --target node`) 후 커밋·푸시
+- 사용자 확인: 수정 후 오늘 데이터 정상 표시
 
 ### 다음 액션
-- 실제 컨테이너/서비스 이름을 정확히 확인 후 로그 재조회
-- `collector/main.py` 또는 핵심 수집 로직 코드를 직접 열어 로직 검토
-- 에러 재현 조건 정리 후 버그 원인 분석 재시도
+1. Vercel 환경변수 `ALLOWED_EMAIL_DOMAINS` 프로덕션 업데이트 (수동)
+2. 팀원에게 프로덕션 URL 공유 및 초대
+3. Windows SessionEnd hook 발화 검증
 
 
 ## Session 2026-04-26 09:31 — 세션 마무리 커밋 및 푸시

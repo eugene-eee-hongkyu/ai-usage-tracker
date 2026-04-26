@@ -6,8 +6,8 @@
 
 ---
 
-## 마지막 실행: 2026-04-26 15:30
-## 마지막 업데이트: 2026-04-26 09:31
+## 마지막 실행: 2026-04-26 15:49
+## 마지막 업데이트: 2026-04-26 15:49
 ## 현재 모드: bypassPermissions
 
 ### 현재 집중
@@ -60,6 +60,8 @@
 - [x] worklog.md, state.md 갱신 후 git commit & push
 - [x] 5h utilization 기능 — "안 한다"로 확정 (백로그 미등록)
 - [x] `ALLOWED_EMAIL_DOMAIN` 허용 도메인 확정: `iskra.world,primuslabs.world,z21labs.xyz`
+- [x] ingest `onConflictDoUpdate` 수정 — 오늘 데이터 0 버그 해결
+- [x] CLI sync 명령 오류 수정 (`program.parse(process.argv)`)
 - [ ] Vercel 환경변수 `ALLOWED_EMAIL_DOMAINS` 프로덕션 업데이트
 - [ ] 팀원 초대 및 팀랭킹 화면 검증
 - [ ] Windows SessionEnd hook 발화 검증 (Hold 플래그)
