@@ -116,9 +116,10 @@ export async function GET(req: NextRequest) {
   const rawCacheHit = ov.cacheHitPercent ?? ov.cacheHitPct ?? 0;
   const cacheHitPct = rawCacheHit > 1 ? rawCacheHit : rawCacheHit * 100;
 
-  const rawActivities = (d.activities ?? []).filter((a) => a.oneShotRate != null);
-  const totalTurns = rawActivities.reduce((s, a) => s + (a.turns ?? a.sessions ?? 1), 0);
-  const weightedOneShot = rawActivities.reduce(
+  const allActivities = d.activities ?? [];
+  const activitiesWithRate = allActivities.filter((a) => a.oneShotRate != null);
+  const totalTurns = activitiesWithRate.reduce((s, a) => s + (a.turns ?? a.sessions ?? 1), 0);
+  const weightedOneShot = activitiesWithRate.reduce(
     (s, a) => s + ((a.oneShotRate! / 100) * (a.turns ?? a.sessions ?? 1)),
     0
   );
@@ -154,9 +155,9 @@ export async function GET(req: NextRequest) {
     calls: s.calls ?? s.turns ?? 0,
   }));
 
-  const activities = rawActivities.map((a) => ({
+  const activities = allActivities.map((a) => ({
     name: a.name ?? a.category ?? "Unknown",
-    sessions: a.sessions ?? a.turns ?? 0,
+    turns: a.turns ?? a.sessions ?? 0,
     cost: a.cost ?? 0,
     oneShotRate: a.oneShotRate != null
       ? (a.oneShotRate > 1 ? a.oneShotRate / 100 : a.oneShotRate)

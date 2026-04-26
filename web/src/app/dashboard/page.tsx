@@ -23,7 +23,7 @@ interface Overview {
 
 interface Activity {
   name: string;
-  sessions: number;
+  turns: number;
   cost: number;
   oneShotRate: number | null;
 }
@@ -388,28 +388,33 @@ export default function DashboardPage() {
               <span className="text-xs font-mono font-bold text-violet-400 uppercase tracking-wider">By Activity</span>
             </div>
             <div className="p-3">
-              <div className="flex text-xs text-neutral-600 font-mono mb-1.5">
-                <span className="w-24">activity</span>
-                <span className="flex-1 ml-2">1-shot</span>
-                <span className="w-10 text-right">%</span>
-                <span className="w-14 text-right">turns</span>
+              <div className="flex text-xs text-neutral-600 font-mono mb-1.5 pr-1">
+                <span className="w-16 shrink-0" />
+                <span className="flex-1">activity</span>
+                <span className="w-16 text-right">cost</span>
+                <span className="w-12 text-right">turns</span>
+                <span className="w-14 text-right">1-shot</span>
               </div>
-              <div className="space-y-1.5">
-                {data.activities.map((a) => {
-                  const pct = a.oneShotRate != null ? Math.round(a.oneShotRate * 100) : null;
-                  return (
-                    <div key={a.name} className="flex items-center gap-2 text-xs font-mono">
-                      <span className="w-24 text-neutral-300 truncate">{a.name}</span>
-                      <div className="flex-1 bg-neutral-800 rounded h-1.5 overflow-hidden">
-                        <div className="bg-violet-500 h-full rounded" style={{ width: `${pct ?? 0}%` }} />
+              <div className="space-y-1">
+                {(() => {
+                  const maxCost = Math.max(...data.activities.map((a) => a.cost), 0.01);
+                  return data.activities.map((a) => {
+                    const pct = a.oneShotRate != null ? Math.round(a.oneShotRate * 100) : null;
+                    return (
+                      <div key={a.name} className="flex items-center gap-1.5 text-xs font-mono">
+                        <div className="w-16 h-1.5 bg-neutral-800 rounded overflow-hidden shrink-0">
+                          <div className="h-full bg-violet-500 rounded" style={{ width: `${(a.cost / maxCost) * 100}%` }} />
+                        </div>
+                        <span className="flex-1 text-neutral-300 truncate">{a.name}</span>
+                        <span className="w-16 text-yellow-400 text-right">{fmt$(a.cost)}</span>
+                        <span className="w-12 text-neutral-500 text-right">{a.turns}</span>
+                        <span className={`w-14 text-right font-bold ${pct == null ? "text-neutral-600" : pct >= 70 ? "text-emerald-400" : pct >= 40 ? "text-yellow-400" : "text-neutral-500"}`}>
+                          {pct != null ? `${pct}%` : "—"}
+                        </span>
                       </div>
-                      <span className={`w-10 text-right font-bold ${pct == null ? "text-neutral-600" : pct >= 70 ? "text-emerald-400" : pct >= 40 ? "text-yellow-400" : "text-neutral-500"}`}>
-                        {pct != null ? `${pct}%` : "—"}
-                      </span>
-                      <span className="w-14 text-neutral-500 text-right">{a.sessions}</span>
-                    </div>
-                  );
-                })}
+                    );
+                  });
+                })()}
                 {data.activities.length === 0 && (
                   <p className="text-neutral-600 text-xs font-mono">no data</p>
                 )}
