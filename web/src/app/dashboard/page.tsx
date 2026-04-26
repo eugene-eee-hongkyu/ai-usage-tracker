@@ -7,6 +7,7 @@ import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
 } from "recharts";
 import { Nav } from "@/components/nav";
+import { CacheHitModal } from "@/components/metric-modal";
 import Link from "next/link";
 
 type Period = "today" | "week" | "month" | "all";
@@ -100,6 +101,7 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState(false);
   const [syncCopied, setSyncCopied] = useState(false);
+  const [showCacheModal, setShowCacheModal] = useState(false);
 
   useEffect(() => {
     if (status === "unauthenticated") router.push("/login");
@@ -259,11 +261,12 @@ export default function DashboardPage() {
               </div>
               <div className="space-y-1">
                 {data.projects.slice(0, 8).map((p) => {
-                  const barOpacity = 0.25 + (p.cost / maxProjectCost) * 0.75;
                   const displayPath = formatPath(p.path || p.name);
                   return (
                     <div key={p.name} className="flex items-center gap-1.5 text-xs font-mono">
-                      <div className="w-1.5 h-3.5 rounded-sm shrink-0 bg-yellow-500" style={{ opacity: barOpacity }} />
+                      <div className="w-16 h-1.5 bg-neutral-800 rounded overflow-hidden shrink-0">
+                        <div className="h-full bg-yellow-500 rounded" style={{ width: `${(p.cost / maxProjectCost) * 100}%` }} />
+                      </div>
                       <span className="flex-1 text-neutral-300 truncate" title={displayPath}>{displayPath}</span>
                       <span className="w-16 text-yellow-400 text-right">{fmt$(p.cost)}</span>
                       <span className="w-14 text-neutral-500 text-right">{fmt$(p.avgCost)}</span>
@@ -294,15 +297,14 @@ export default function DashboardPage() {
             </div>
             <div className="space-y-1">
               {data.topSessions.slice(0, 5).map((s, i) => {
-                const barOpacity = 0.2 + (s.cost / maxSessionCost) * 0.8;
                 const displayPath = formatPath(s.projectPath || s.project);
                 return (
                   <div key={s.id || i} className="flex items-center gap-2 text-xs font-mono">
                     <span className="w-5 text-neutral-600">{i + 1}.</span>
                     <span className="w-20 text-neutral-500 shrink-0">{s.date}</span>
                     <div className="flex-1 flex items-center gap-2 min-w-0">
-                      <div className="w-10 h-1.5 bg-neutral-800 rounded overflow-hidden shrink-0">
-                        <div className="h-full bg-red-500 rounded" style={{ opacity: barOpacity, width: "100%" }} />
+                      <div className="w-16 h-1.5 bg-neutral-800 rounded overflow-hidden shrink-0">
+                        <div className="h-full bg-red-500 rounded" style={{ width: `${(s.cost / maxSessionCost) * 100}%` }} />
                       </div>
                       <span className="text-neutral-300 truncate" title={displayPath}>{displayPath}</span>
                     </div>
@@ -336,6 +338,12 @@ export default function DashboardPage() {
                   label: "Cache hit",
                   value: `${ov.cacheHitPct.toFixed(1)}%`,
                   color: ov.cacheHitPct >= 80 ? "text-emerald-400" : ov.cacheHitPct >= 50 ? "text-yellow-400" : "text-red-400",
+                  extra: (
+                    <button
+                      onClick={() => setShowCacheModal(true)}
+                      className="text-neutral-600 hover:text-indigo-400 text-xs font-mono underline underline-offset-2 transition-colors"
+                    >늘리는 법</button>
+                  ),
                 },
                 {
                   label: "One-shot rate",
@@ -352,9 +360,12 @@ export default function DashboardPage() {
                   value: ov.sessions > 0 ? Math.round(ov.calls / ov.sessions).toString() : "0",
                   color: "text-blue-400",
                 },
-              ].map(({ label, value, color }) => (
+              ].map(({ label, value, color, extra = null }) => (
                 <div key={label} className="flex items-center justify-between text-xs py-0.5">
-                  <span className="text-neutral-400">{label}</span>
+                  <span className="flex items-center gap-1.5 text-neutral-400">
+                    {label}
+                    {extra}
+                  </span>
                   <span className={`font-bold ${color}`}>{value}</span>
                 </div>
               ))}
@@ -415,10 +426,11 @@ export default function DashboardPage() {
               <div className="space-y-1">
                 {(data.models ?? []).map((m) => {
                   const maxCost = Math.max(...(data.models ?? []).map((x) => x.cost), 0.01);
-                  const barOpacity = 0.25 + (m.cost / maxCost) * 0.75;
                   return (
                     <div key={m.name} className="flex items-center gap-1.5 text-xs font-mono">
-                      <div className="w-1.5 h-3.5 rounded-sm shrink-0 bg-pink-500" style={{ opacity: barOpacity }} />
+                      <div className="w-16 h-1.5 bg-neutral-800 rounded overflow-hidden shrink-0">
+                        <div className="h-full bg-pink-500 rounded" style={{ width: `${(m.cost / maxCost) * 100}%` }} />
+                      </div>
                       <span className="flex-1 text-neutral-300 truncate">{m.name}</span>
                       <span className="w-16 text-yellow-400 text-right">{fmt$(m.cost)}</span>
                       <span className="w-14 text-emerald-400 text-right">{m.cacheHitPct.toFixed(1)}%</span>
@@ -444,10 +456,11 @@ export default function DashboardPage() {
               <div className="space-y-1">
                 {(data.mcpServers ?? []).map((m) => {
                   const maxCalls = Math.max(...(data.mcpServers ?? []).map((x) => x.calls), 0.01);
-                  const barOpacity = 0.25 + (m.calls / maxCalls) * 0.75;
                   return (
                     <div key={m.name} className="flex items-center gap-1.5 text-xs font-mono">
-                      <div className="w-1.5 h-3.5 rounded-sm shrink-0 bg-cyan-500" style={{ opacity: barOpacity }} />
+                      <div className="w-16 h-1.5 bg-neutral-800 rounded overflow-hidden shrink-0">
+                        <div className="h-full bg-cyan-500 rounded" style={{ width: `${(m.calls / maxCalls) * 100}%` }} />
+                      </div>
                       <span className="flex-1 text-neutral-300 truncate">{m.name}</span>
                       <span className="w-16 text-blue-400 text-right">{m.calls.toLocaleString()}</span>
                     </div>
@@ -475,10 +488,11 @@ export default function DashboardPage() {
               <div className="space-y-1">
                 {(data.tools ?? []).slice(0, 10).map((t) => {
                   const maxCalls = Math.max(...(data.tools ?? []).map((x) => x.calls), 0.01);
-                  const barOpacity = 0.25 + (t.calls / maxCalls) * 0.75;
                   return (
                     <div key={t.name} className="flex items-center gap-1.5 text-xs font-mono">
-                      <div className="w-1.5 h-3.5 rounded-sm shrink-0 bg-teal-500" style={{ opacity: barOpacity }} />
+                      <div className="w-16 h-1.5 bg-neutral-800 rounded overflow-hidden shrink-0">
+                        <div className="h-full bg-teal-500 rounded" style={{ width: `${(t.calls / maxCalls) * 100}%` }} />
+                      </div>
                       <span className="flex-1 text-neutral-300 truncate">{t.name}</span>
                       <span className="w-16 text-blue-400 text-right">{t.calls.toLocaleString()}</span>
                     </div>
@@ -502,10 +516,11 @@ export default function DashboardPage() {
               <div className="space-y-1">
                 {(data.shellCommands ?? []).slice(0, 10).map((s) => {
                   const maxCalls = Math.max(...(data.shellCommands ?? []).map((x) => x.calls), 0.01);
-                  const barOpacity = 0.25 + (s.calls / maxCalls) * 0.75;
                   return (
                     <div key={s.name} className="flex items-center gap-1.5 text-xs font-mono">
-                      <div className="w-1.5 h-3.5 rounded-sm shrink-0 bg-orange-500" style={{ opacity: barOpacity }} />
+                      <div className="w-16 h-1.5 bg-neutral-800 rounded overflow-hidden shrink-0">
+                        <div className="h-full bg-orange-500 rounded" style={{ width: `${(s.calls / maxCalls) * 100}%` }} />
+                      </div>
                       <span className="flex-1 text-neutral-300 truncate">{s.name}</span>
                       <span className="w-16 text-blue-400 text-right">{s.calls.toLocaleString()}</span>
                     </div>
@@ -518,6 +533,10 @@ export default function DashboardPage() {
         </div>
 
       </main>
+
+      {showCacheModal && (
+        <CacheHitModal value={ov.cacheHitPct} onClose={() => setShowCacheModal(false)} />
+      )}
     </div>
   );
 }
