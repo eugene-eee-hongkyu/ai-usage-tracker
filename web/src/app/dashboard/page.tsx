@@ -96,11 +96,11 @@ export default function DashboardPage() {
   }, [session, period]);
 
   useEffect(() => {
-    if (!session || !data || data.user.lastSyncedAt) return;
+    if (!session || !data || data.summary) return;
     const timer = setInterval(() => {
       fetch(`/api/dashboard?period=${period}`)
         .then((r) => r.json())
-        .then((d) => { if (d.user?.lastSyncedAt) setData(d); });
+        .then((d) => { if (d.summary) setData(d); });
     }, 4000);
     return () => clearInterval(timer);
   }, [session, data, period]);
@@ -129,22 +129,24 @@ export default function DashboardPage() {
     </div>
   );
 
-  const neverSynced = !data.user.lastSyncedAt || !data.summary;
-  if (neverSynced) {
+  if (!data.user.lastSyncedAt) {
+    router.push("/setup");
+    return null;
+  }
+
+  if (!data.summary) {
     return (
       <div className="min-h-screen">
         <Nav />
         <main className="max-w-xl mx-auto px-4 py-20 text-center space-y-6">
           <div className="text-4xl animate-pulse">⏳</div>
-          <h1 className="text-2xl font-bold text-slate-100">데이터 수집 중...</h1>
+          <h1 className="text-2xl font-bold text-slate-100">동기화가 필요합니다</h1>
           <p className="text-slate-400">
-            CLI가 과거 사용량을 백그라운드에서 수집하고 있습니다.<br />
-            잠시 후 자동으로 대시보드가 표시됩니다.
+            터미널에서 아래 명령어를 실행해주세요.
           </p>
-          <p className="text-xs text-slate-600">
-            CLI가 아직 설치되지 않았다면 →{" "}
-            <Link href="/setup" className="underline hover:text-slate-400">CLI 설치하기</Link>
-          </p>
+          <code className="block bg-slate-900 rounded px-4 py-3 text-indigo-300 text-sm">
+            npx github:eugene-eee-hongkyu/ai-usage-tracker sync
+          </code>
         </main>
       </div>
     );
