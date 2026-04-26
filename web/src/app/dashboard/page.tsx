@@ -377,12 +377,10 @@ export default function DashboardPage() {
                   btn: <TipBtn label="설명" onClick={() => setShowCallsModal(true)} />,
                 },
               ].map(({ label, value, color, btn }) => (
-                <div key={label} className="flex items-center justify-between text-xs py-0.5">
-                  <span className="flex items-center gap-1.5 text-neutral-400">
-                    {label}
-                    {btn}
-                  </span>
-                  <span className={`font-bold ${color}`}>{value}</span>
+                <div key={label} className="flex items-center text-xs py-0.5 gap-2">
+                  <span className="text-neutral-400 w-28 shrink-0">{label}</span>
+                  <span className="w-20 shrink-0">{btn}</span>
+                  <span className={`font-bold ${color} ml-auto`}>{value}</span>
                 </div>
               ))}
             </div>
