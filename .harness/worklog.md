@@ -4,13 +4,18 @@
 
 ---
 
-## Session 2026-04-27 06:28 — lastSyncedAt 날짜/시간 표시 기능 추가 시작
+## Session 2026-04-27 06:47 — 대시보드 UX 개선 (마지막 수신·Efficiency 배지·등급 한글화)
 
 ### 작업 요약
-- API 응답의 `lastSyncedAt` 필드 포맷 확인 시도
+- **마지막 수신 시각 표시**: Overview Bar 우측에 `lastSyncedAt` → `MM-DD HH:mm` 포맷 표시
+- **Efficiency 버튼 컬럼 정렬**: metric `w-28`, 버튼 `w-20` 고정 컬럼 분리
+- **Efficiency 종합 등급 배지**: 섹션 헤더 우측에 탁월/양호/보통/개선 필요/경고 배지 (composite score)
+- **지표별 개별 등급 배지 추가**: 각 행 오른쪽에 소형 배지 (cache hit / one-shot / cost / calls 각각)
+- **모달 등급표 전면 한글화**: S/A/B/C/D → 탁월/양호/보통/개선 필요/경고, 현재 등급 행 색상 강조
 
 ### 다음 액션
-- 실제 `lastSyncedAt` 포맷 확인 후 UI 표시 구현
+1. 팀원 초대 (이메일 목록 확정 → Vercel/서비스 초대)
+2. Windows SessionEnd hook 발화 검증
 
 
 ## Session 2026-04-26 21:50 — Daily Activity 스크롤 제거 및 커밋

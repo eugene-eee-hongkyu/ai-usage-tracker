@@ -6,19 +6,18 @@
 
 ---
 
-## 마지막 실행: 2026-04-27 06:28
-## 마지막 업데이트: 2026-04-27 06:28
+## 마지막 실행: 2026-04-27 06:47
+## 마지막 업데이트: 2026-04-27 06:47
 ## 현재 모드: bypassPermissions
 
 ### 현재 집중
 
-- lastSyncedAt 날짜/시간 표시 기능 추가 중
+- 대시보드 UX 개선 완료. 팀원 초대 대기.
 
 ### 이어서 할 것
 
-1. API 응답 `lastSyncedAt` 실제 포맷 확인 후 UI 표시 구현
-2. 팀원 초대 (이메일 목록 확정 → Vercel/서비스 초대)
-3. Windows SessionEnd hook 발화 검증 (Windows 테스터 필요)
+1. 팀원 초대 (이메일 목록 확정 → Vercel/서비스 초대)
+2. Windows SessionEnd hook 발화 검증 (Windows 테스터 필요)
 
 ### 막힌 것
 
@@ -84,7 +83,10 @@
 - [x] By Activity 전체 항목 표시 + cost/turns/1-shot 컬럼 재설계
 - [x] codeburn migration run 완료 기준 3개 사용자 직접 검증 완료
 - [x] 대시보드 UX: Period 버튼 고정 너비, Daily Activity 세로 목록, Tabs/Overview 너비 정렬
-- [x] Daily Activity 목록 스크롤 제거 (max-h-52 overflow-y-auto 삭제 → 전체 표시)
-- [ ] lastSyncedAt 날짜/시간 UI 표시 구현 (API 포맷 확인 후 진행)
+- [x] Daily Activity 목록 스크롤 제거 (전체 표시)
+- [x] Overview Bar 마지막 수신 시각 표시 (MM-DD HH:mm)
+- [x] Efficiency 버튼 컬럼 정렬 (w-28 / w-20 고정)
+- [x] Efficiency 종합 등급 배지 (탁월/양호/보통/개선 필요/경고)
+- [x] Efficiency 지표별 개별 등급 배지 + 모달 등급표 한글화
 - [ ] 팀원 초대 및 팀랭킹 화면 검증
 - [ ] Windows SessionEnd hook 발화 검증 (Hold 플래그)
