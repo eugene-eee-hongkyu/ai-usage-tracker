@@ -2,7 +2,16 @@
 
 import { useEffect } from "react";
 
-type GradeRow = { grade: string; range: string; label: string };
+type GradeLevel = "탁월" | "양호" | "보통" | "개선 필요" | "경고";
+type GradeRow = { grade: GradeLevel; range: string; label: string };
+
+const GRADE_ROW_COLORS: Record<GradeLevel, { bg: string; gradeText: string; contentText: string }> = {
+  "탁월":    { bg: "bg-emerald-950/60", gradeText: "text-emerald-300", contentText: "text-emerald-200" },
+  "양호":    { bg: "bg-green-950/60",   gradeText: "text-green-300",   contentText: "text-green-200" },
+  "보통":    { bg: "bg-yellow-950/60",  gradeText: "text-yellow-300",  contentText: "text-yellow-200" },
+  "개선 필요": { bg: "bg-orange-950/60", gradeText: "text-orange-300", contentText: "text-orange-200" },
+  "경고":    { bg: "bg-red-950/60",     gradeText: "text-red-300",     contentText: "text-red-200" },
+};
 
 function ModalShell({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
   useEffect(() => {
@@ -44,27 +53,28 @@ function Section({ title, children }: { title: string; children: React.ReactNode
   );
 }
 
-function GradeTable({ rows, currentGrade }: { rows: GradeRow[]; currentGrade: string }) {
+function GradeTable({ rows, currentGrade }: { rows: GradeRow[]; currentGrade: GradeLevel }) {
   return (
     <table className="w-full text-xs border-collapse">
       <thead>
         <tr className="text-slate-600">
-          <th className="text-left py-1.5 w-10 font-normal">등급</th>
-          <th className="text-left py-1.5 w-24 font-normal">범위</th>
-          <th className="text-left py-1.5 font-normal">상태</th>
+          <th className="text-left py-1.5 w-20 font-normal">등급</th>
+          <th className="text-left py-1.5 w-28 font-normal">범위</th>
+          <th className="text-left py-1.5 font-normal">설명</th>
         </tr>
       </thead>
       <tbody>
         {rows.map((row) => {
           const cur = row.grade === currentGrade;
+          const style = GRADE_ROW_COLORS[row.grade];
           return (
-            <tr key={row.grade} className={cur ? "bg-indigo-950/60" : ""}>
-              <td className={`py-1.5 pl-2 rounded-l font-bold ${cur ? "text-indigo-300" : "text-slate-500"}`}>
+            <tr key={row.grade} className={cur ? style.bg : ""}>
+              <td className={`py-1.5 pl-2 rounded-l font-bold ${cur ? style.gradeText : "text-slate-500"}`}>
                 {row.grade}
               </td>
-              <td className={`py-1.5 ${cur ? "text-indigo-200" : "text-slate-400"}`}>{row.range}</td>
-              <td className={`py-1.5 pr-2 rounded-r ${cur ? "text-indigo-200 font-medium" : "text-slate-500"}`}>
-                {row.label}{cur && <span className="ml-1.5 text-indigo-400">← 현재</span>}
+              <td className={`py-1.5 ${cur ? style.contentText : "text-slate-400"}`}>{row.range}</td>
+              <td className={`py-1.5 pr-2 rounded-r ${cur ? `${style.contentText} font-medium` : "text-slate-500"}`}>
+                {row.label}{cur && <span className={`ml-1.5 ${style.gradeText}`}>← 현재</span>}
               </td>
             </tr>
           );
@@ -97,36 +107,36 @@ function Ref({ href, children }: { href: string; children: React.ReactNode }) {
   );
 }
 
-function cacheHitGrade(v: number) {
-  if (v >= 96) return "S";
-  if (v >= 90) return "A";
-  if (v >= 80) return "B";
-  if (v >= 60) return "C";
-  return "D";
+function cacheHitGrade(v: number): GradeLevel {
+  if (v >= 96) return "탁월";
+  if (v >= 90) return "양호";
+  if (v >= 80) return "보통";
+  if (v >= 60) return "개선 필요";
+  return "경고";
 }
 
-function oneShotGrade(v: number) {
-  if (v >= 90) return "S";
-  if (v >= 80) return "A";
-  if (v >= 70) return "B";
-  if (v >= 60) return "C";
-  return "D";
+function oneShotGrade(v: number): GradeLevel {
+  if (v >= 90) return "탁월";
+  if (v >= 80) return "양호";
+  if (v >= 70) return "보통";
+  if (v >= 60) return "개선 필요";
+  return "경고";
 }
 
-function costPerSessionGrade(v: number) {
-  if (v < 10) return "S";
-  if (v < 25) return "A";
-  if (v < 50) return "B";
-  if (v < 100) return "C";
-  return "D";
+function costPerSessionGrade(v: number): GradeLevel {
+  if (v < 10) return "탁월";
+  if (v < 25) return "양호";
+  if (v < 50) return "보통";
+  if (v < 100) return "개선 필요";
+  return "경고";
 }
 
-function callsPerSessionGrade(v: number) {
-  if (v >= 30 && v <= 60) return "S";
-  if ((v >= 20 && v < 30) || (v > 60 && v <= 80)) return "A";
-  if ((v >= 10 && v < 20) || (v > 80 && v <= 120)) return "B";
-  if ((v >= 5 && v < 10) || (v > 120 && v <= 200)) return "C";
-  return "D";
+function callsPerSessionGrade(v: number): GradeLevel {
+  if (v >= 30 && v <= 60) return "탁월";
+  if ((v >= 20 && v < 30) || (v > 60 && v <= 80)) return "양호";
+  if ((v >= 10 && v < 20) || (v > 80 && v <= 120)) return "보통";
+  if ((v >= 5 && v < 10) || (v > 120 && v <= 200)) return "개선 필요";
+  return "경고";
 }
 
 export function CacheHitModal({ value, onClose }: { value: number; onClose: () => void }) {
@@ -186,11 +196,11 @@ export function CacheHitModal({ value, onClose }: { value: number; onClose: () =
       <Section title="등급">
         <GradeTable
           rows={[
-            { grade: "S", range: "96%+", label: "Claude Code 본사 내부 기준" },
-            { grade: "A", range: "90~95%", label: "좋음" },
-            { grade: "B", range: "80~90%", label: "보통" },
-            { grade: "C", range: "60~80%", label: "개선 필요 — CLAUDE.md 비대 의심" },
-            { grade: "D", range: "60% 미만", label: "본사 기준 사고(SEV) 수준" },
+            { grade: "탁월",    range: "96%+",     label: "Claude Code 본사 내부 기준" },
+            { grade: "양호",    range: "90~95%",   label: "좋은 상태" },
+            { grade: "보통",    range: "80~89%",   label: "일반적인 수준" },
+            { grade: "개선 필요", range: "60~79%", label: "CLAUDE.md 비대 의심" },
+            { grade: "경고",    range: "60% 미만", label: "본사 기준 사고(SEV) 수준" },
           ]}
           currentGrade={grade}
         />
@@ -264,11 +274,11 @@ export function OneShotRateModal({ value, onClose }: { value: number; onClose: (
       <Section title="등급">
         <GradeTable
           rows={[
-            { grade: "S", range: "90%+", label: "명확한 지시 + 좋은 컨텍스트. 본보기 패턴" },
-            { grade: "A", range: "80~90%", label: "좋음" },
-            { grade: "B", range: "70~80%", label: "보통. 지시 명확도 점검 필요" },
-            { grade: "C", range: "60~70%", label: "자주 retry 발생. 컨텍스트 부족 가능성" },
-            { grade: "D", range: "60% 미만", label: "비효율 패턴. 토큰 낭비가 큼" },
+            { grade: "탁월",    range: "90%+",     label: "명확한 지시 + 좋은 컨텍스트. 본보기 패턴" },
+            { grade: "양호",    range: "80~89%",   label: "좋은 상태" },
+            { grade: "보통",    range: "70~79%",   label: "지시 명확도 점검 필요" },
+            { grade: "개선 필요", range: "60~69%", label: "자주 retry 발생. 컨텍스트 부족 가능성" },
+            { grade: "경고",    range: "60% 미만", label: "비효율 패턴. 토큰 낭비가 큼" },
           ]}
           currentGrade={grade}
         />
@@ -347,11 +357,11 @@ export function CostPerSessionModal({
       <Section title="등급 (Sonnet 기준)">
         <GradeTable
           rows={[
-            { grade: "S", range: "$10 미만", label: "짧은 작업 단위로 잘 분리됨. 본보기 패턴" },
-            { grade: "A", range: "$10~25", label: "적당한 규모 작업. 정상" },
-            { grade: "B", range: "$25~50", label: "큰 작업 또는 한 세션에 여러 작업 섞임" },
-            { grade: "C", range: "$50~100", label: "세션이 너무 큼. 분리 필요" },
-            { grade: "D", range: "$100+", label: "auto-compact 트리거되는 거대 세션. 비효율" },
+            { grade: "탁월",    range: "$10 미만",  label: "짧은 작업 단위로 잘 분리됨. 본보기 패턴" },
+            { grade: "양호",    range: "$10~25",    label: "적당한 규모 작업. 정상" },
+            { grade: "보통",    range: "$25~50",    label: "큰 작업 또는 여러 작업 혼재" },
+            { grade: "개선 필요", range: "$50~100", label: "세션이 너무 큼. 분리 필요" },
+            { grade: "경고",    range: "$100+",     label: "auto-compact 트리거되는 거대 세션. 비효율" },
           ]}
           currentGrade={grade}
         />
@@ -456,11 +466,11 @@ export function CallsPerSessionModal({
       <Section title="등급">
         <GradeTable
           rows={[
-            { grade: "S", range: "30~60", label: "세션이 한 작업 단위에 정확히 매칭. 이상적" },
-            { grade: "A", range: "20~30 또는 60~80", label: "좋음. 약간 짧거나 약간 김" },
-            { grade: "B", range: "10~20 또는 80~120", label: "보통. 짧으면 활용 부족, 길면 분리 검토" },
-            { grade: "C", range: "5~10 또는 120~200", label: "너무 짧거나 너무 김. one-shot rate 같이 점검" },
-            { grade: "D", range: "5 미만 또는 200+", label: "비정상. 활용 부족 또는 retry 루프 의심" },
+            { grade: "탁월",    range: "30~60",           label: "세션이 한 작업 단위에 정확히 매칭. 이상적" },
+            { grade: "양호",    range: "20~30 또는 60~80", label: "약간 짧거나 약간 김" },
+            { grade: "보통",    range: "10~20 또는 80~120", label: "짧으면 활용 부족, 길면 분리 검토" },
+            { grade: "개선 필요", range: "5~10 또는 120~200", label: "너무 짧거나 너무 김. one-shot rate 같이 점검" },
+            { grade: "경고",    range: "5 미만 또는 200+", label: "비정상. 활용 부족 또는 retry 루프 의심" },
           ]}
           currentGrade={grade}
         />
