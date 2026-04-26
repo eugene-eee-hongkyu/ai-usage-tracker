@@ -24,23 +24,45 @@ function sinceDate(period: Period): string {
   return "2000-01-01";
 }
 
-interface DailyRow { date: string; cost: number; sessions: number; calls?: number }
+interface DailyRow { date: string; cost: number; sessions: number }
 interface Activity { name: string; sessions: number; cost: number; oneShotRate: number | null }
 interface Project { name: string; cost: number; sessions: number; avgCost: number }
 interface TopSession { id: string; date: string; project: string; cost: number; turns: number }
 
+interface RawActivity {
+  name?: string;
+  category?: string;
+  sessions?: number;
+  turns?: number;
+  cost?: number;
+  oneShotRate?: number | null;
+}
+
+interface RawProject {
+  name?: string;
+  cost?: number;
+  sessions?: number;
+  calls?: number;
+  avgCost?: number;
+}
+
+interface RawTopSession {
+  id?: string;
+  sessionId?: string;
+  date?: string;
+  project?: string;
+  cost?: number;
+  turns?: number;
+  calls?: number;
+}
+
 interface RawJson {
-  summary?: {
-    totalCost?: number;
-    totalSessions?: number;
-    callsCount?: number;
-    cacheHitPct?: number;
-    avgTurns?: number;
-  };
+  overview?: { avgTurns?: number };
+  summary?: { avgTurns?: number };
   daily?: DailyRow[];
-  activities?: Activity[];
-  projects?: Project[];
-  topSessions?: TopSession[];
+  activities?: RawActivity[];
+  projects?: RawProject[];
+  topSessions?: RawTopSession[];
 }
 
 export async function GET(req: NextRequest) {
@@ -77,21 +99,39 @@ export async function GET(req: NextRequest) {
 
   const raw = snap[0].rawJson as RawJson;
   const allDaily: DailyRow[] = raw.daily ?? [];
-  const activities: Activity[] = (raw.activities ?? []).filter((a) => a.oneShotRate !== null);
-  const projects: Project[] = (raw.projects ?? []).map((p) => ({
-    name: p.name ?? "",
-    cost: p.cost ?? 0,
-    sessions: p.sessions ?? 0,
-    avgCost: p.avgCost ?? 0,
-  }));
+
+  const activities: Activity[] = (raw.activities ?? [])
+    .filter((a) => a.oneShotRate != null)
+    .map((a) => ({
+      name: a.name ?? a.category ?? "Unknown",
+      sessions: a.sessions ?? a.turns ?? 0,
+      cost: a.cost ?? 0,
+      // normalize 0-100 → 0-1 if value > 1
+      oneShotRate: a.oneShotRate != null
+        ? (a.oneShotRate > 1 ? a.oneShotRate / 100 : a.oneShotRate)
+        : null,
+    }));
+
+  const projects: Project[] = (raw.projects ?? []).map((p) => {
+    const cost = p.cost ?? 0;
+    const sessions = p.sessions ?? p.calls ?? 0;
+    return {
+      name: p.name ?? "",
+      cost,
+      sessions,
+      avgCost: p.avgCost ?? (sessions > 0 ? cost / sessions : 0),
+    };
+  });
+
   const topSessions: TopSession[] = (raw.topSessions ?? []).map((s) => ({
-    id: s.id ?? "",
+    id: s.id ?? s.sessionId ?? "",
     date: s.date ?? "",
     project: s.project ?? "",
     cost: s.cost ?? 0,
-    turns: s.turns ?? 0,
+    turns: s.turns ?? s.calls ?? 0,
   }));
-  const summary = raw.summary ?? {};
+
+  const overview = raw.overview ?? raw.summary ?? {};
 
   const filteredDaily = period === "all"
     ? allDaily
@@ -107,10 +147,9 @@ export async function GET(req: NextRequest) {
       totalCost: periodCost,
       sessionsCount: periodSessions,
       activeDays,
-      // all-time metrics from snapshot
       cacheHitPct: snap[0].cacheHitPct,
       overallOneShot: snap[0].overallOneShot,
-      avgTurns: summary.avgTurns ?? 0,
+      avgTurns: overview.avgTurns ?? 0,
       allTimeCost: snap[0].totalCost,
       allTimeSessions: snap[0].sessionsCount,
     },
