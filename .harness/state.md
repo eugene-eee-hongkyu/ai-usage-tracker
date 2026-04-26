@@ -6,19 +6,19 @@
 
 ---
 
-## 마지막 실행: 2026-04-26 17:17
-## 마지막 업데이트: 2026-04-26 17:17
+## 마지막 실행: 2026-04-26 18:08
+## 마지막 업데이트: 2026-04-26 18:08
 ## 현재 모드: bypassPermissions
 
 ### 현재 집중
 
-- codeburn migration 코드 배포 완료 → run 완료 기준 검증 대기
+- codeburn migration run 완료 기준 검증 대기 (npx sync 구버전 캐시 문제 수정 완료, 재실행 필요)
 
 ### 이어서 할 것
 
-1. `npx github:eugene-eee-hongkyu/ai-usage-tracker sync` 실행 → 대시보드 activities/projects/topSessions 표시 확인 (run 완료 기준 #2)
-2. 팀원 초대 및 팀랭킹 화면 검증
-3. Windows SessionEnd hook 발화 검증 (Hold)
+1. `npm cache clean --force` 후 `npx github:eugene-eee-hongkyu/ai-usage-tracker sync` 재실행 → "codeburn 데이터 수집 중..." 확인 후 대시보드 데이터 표시 검증 (run 완료 기준 #2)
+2. `npx github:eugene-eee-hongkyu/ai-usage-tracker init` 실행 → codeburn 설치 확인 + hook 등록 정상 완료 확인 (run 완료 기준 #1)
+3. 팀랭킹 `/api/team` efficiencyScore 필드 확인 (run 완료 기준 #3)
 
 ### 막힌 것
 
@@ -27,6 +27,10 @@
 ### 사람 판단 필요
 
 - 팀원 초대 (Vercel/서비스 접근 권한, 초대 이메일 목록 결정)
+
+### 백로그 요약
+- 대기 중: 2개
+- 최근 추가: 2026-04-26 — 팀원 초대
 
 ### 진행 상황
 
@@ -65,6 +69,13 @@
 - [x] codeburn migration 16단계 구현 완료 (커밋 6846510, Vercel 배포)
 - [x] Supabase 마이그레이션 SQL 실행 (DROP old tables + CREATE user_snapshots)
 - [x] Vercel 환경변수 `ALLOWED_EMAIL_DOMAINS` 프로덕션 업데이트
-- [ ] CLI sync 실행 → 대시보드 데이터 확인 (run 완료 기준 검증)
+- [x] 파비콘 적용 (docs/favicon/ 커밋, web/public/ 복사, layout.tsx metadata)
+- [x] 대시보드 클라이언트 에러 수정 (fetchError 핸들링, neverSynced 조건, 신규→setup 리다이렉트)
+- [x] Setup 체크 단계 2개로 정리 (hook 등록 + 첫 데이터 수신), API steps 버그 수정
+- [x] Nav 로그아웃 두 줄 버그 수정 + 모바일 반응형 grid 적용
+- [x] npx 구버전 캐시 원인 수정 (루트 package.json bin → cli/src/index.mjs, v0.2.0)
+- [ ] CLI sync 재실행 → 대시보드 데이터 확인 (run 완료 기준 #2)
+- [ ] npx init → codeburn 설치 + hook 등록 확인 (run 완료 기준 #1)
+- [ ] 팀랭킹 efficiencyScore 검증 (run 완료 기준 #3)
 - [ ] 팀원 초대 및 팀랭킹 화면 검증
 - [ ] Windows SessionEnd hook 발화 검증 (Hold 플래그)

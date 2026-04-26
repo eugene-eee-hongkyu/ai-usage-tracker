@@ -4,6 +4,36 @@
 
 ---
 
+## Session 2026-04-26 18:08 — 파비콘 적용, 대시보드 버그 수정, npx 구버전 캐시 문제 해결
+
+### 작업 요약
+- **파비콘 적용**: `docs/favicon/` 커밋, `web/public/` 복사, `layout.tsx` metadata icons 설정
+- **대시보드 클라이언트 에러 수정**: API 500 → `data.user` undefined crash
+  - `fetchError` state 추가, 에러 시 "다시 시도" 버튼 표시
+  - `neverSynced` 조건: `!lastSyncedAt || !summary` — summary null일 때 crash 방지
+  - 신규 사용자(`!lastSyncedAt`) → `/setup` 자동 리다이렉트
+  - 기존 사용자 snapshot 없음(`!summary`) → sync 명령어 + 복사 버튼 화면
+- **Setup 페이지 체크 단계 2개로 정리**: Node 18+/keytar 제거, hook 등록 + 첫 데이터 수신 유지. API steps 객체→배열 변환 버그 수정
+- **Nav 버그 수정**: 로그아웃 드롭다운 두 줄 → `whitespace-nowrap` 추가
+- **모바일 반응형**: 효율지표 `grid-cols-2 sm:grid-cols-4`, 팀랭킹 `grid-cols-1 sm:grid-cols-3`, 멤버 프로필 `grid-cols-2 sm:grid-cols-4`, Nav 브랜드명 모바일 숨김
+- **"동기화 필요" 화면 개선**: Nav → 미니멀 헤더(로그아웃만), 복사 버튼 추가
+- **npx 구버전 캐시 원인 분석 및 수정**:
+  - 루트 `package.json` bin이 `./cli/bin/cli.mjs` (ccusage 기반 구버전) 가리키던 것 발견
+  - `./cli/src/index.mjs` (codeburn 기반 신버전)로 수정
+  - 루트 버전 0.1.0 → 0.2.0 bump (캐시 무효화)
+  - Supabase 0값 스냅샷 삭제 (구버전 sync가 summary 없는 포맷으로 저장했던 것)
+
+### 실패한 시도
+- `npx --force github:... sync` 재실행 → 여전히 구버전 실행 (루트 package.json bin이 원인이었으나 그 이전에 시도)
+- `npm cache clean --force` 안내했으나 실제 원인은 루트 bin 항목이었음
+
+### 다음 액션
+1. `npm cache clean --force` 후 `npx github:eugene-eee-hongkyu/ai-usage-tracker sync` 재실행 → "codeburn 데이터 수집 중..." 메시지 확인 후 대시보드 데이터 표시 검증 (run 완료 기준 #2)
+2. `npx github:eugene-eee-hongkyu/ai-usage-tracker init` 실행 → codeburn 설치 확인 + hook 등록 정상 완료 확인 (run 완료 기준 #1)
+3. 팀랭킹 `/api/team` efficiencyScore 필드 확인 (run 완료 기준 #3)
+
+---
+
 ## Session 2026-04-26 17:17 — codeburn migration 16단계 전체 구현 완료
 
 ### 작업 요약
