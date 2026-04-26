@@ -4,6 +4,30 @@
 
 ---
 
+## Session 2026-04-26 19:35 — 대시보드 UX 개선 (바 그래프·tip 모달·팀랭킹 period·By Activity 전체)
+
+### 작업 요약
+- **비율 기반 가로 바로 전환**: By Project, Top Sessions, By Model, MCP Servers, Core Tools, Shell Commands 6개 섹션 — opacity dot(`w-1.5 h-3.5`) → `w-16 h-1.5` 비율 fill bar
+- **Efficiency tip 모달 전체 추가**:
+  - Cache hit `[늘리는 법]` → `CacheHitModal` (기존 연결)
+  - One-shot rate `[늘리는 법]` → `OneShotRateModal` 신규 작성
+  - Cost/session `[줄이는 법]` → `CostPerSessionModal` 개선
+  - Calls/session `[설명]` → `CallsPerSessionModal` 신규 작성 (양면성 솔직 명시)
+  - 버튼 스타일: 회색 언더라인 → `TipBtn` indigo pill (`bg-indigo-600 text-white`)
+- **팀랭킹 period 필터 추가**: 오늘/이번주/이번달/전체 탭 — team page + team API
+  - API: `?period=` 파라미터, `all`은 mirror 컬럼 사용, 나머지는 rawJson에서 기간별 추출
+  - 해당 기간 세션 0인 멤버 랭킹 제외
+- **By Activity 전체 항목 표시**: `oneShotRate != null` 필터 제거 → 10개 모두 표시
+  - 컬럼 재설계: `[cost bar] | activity | cost | turns | 1-shot%`
+  - `sessions` → `turns` 필드명 정정
+
+### 다음 액션
+1. multi-period re-sync 실행 → period별 데이터 표시 검증 (run 완료 기준 #2)
+2. `npx github:eugene-eee-hongkyu/ai-usage-tracker init` 실행 → codeburn 설치 + hook 등록 확인 (run 완료 기준 #1)
+3. 팀원 초대 및 팀랭킹 화면 검증
+
+---
+
 ## Session 2026-04-26 19:06 — 대시보드 codeburn 스키마 완전 정합 + 기간별 데이터 + UI 전면 재설계
 
 ### 작업 요약

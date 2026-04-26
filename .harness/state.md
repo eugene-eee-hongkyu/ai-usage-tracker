@@ -6,8 +6,8 @@
 
 ---
 
-## 마지막 실행: 2026-04-26 19:06
-## 마지막 업데이트: 2026-04-26 19:06
+## 마지막 실행: 2026-04-26 19:35
+## 마지막 업데이트: 2026-04-26 19:35
 ## 현재 모드: bypassPermissions
 
 ### 현재 집중
@@ -16,9 +16,9 @@
 
 ### 이어서 할 것
 
-1. `npm cache clean --force` + `npx github:eugene-eee-hongkyu/ai-usage-tracker sync` 재실행 → DB에 `{ today, week, month, all }` 구조 저장 확인, period 탭별 다른 데이터 표시 검증
-2. Vercel 재배포 후 대시보드 전체 UI 확인 (codeburn 스타일, By Model/MCP/Tools/Shell 섹션)
-3. 팀랭킹 `/api/team` efficiencyScore 필드 확인 (run 완료 기준 #3)
+1. `npm cache clean --force` + `npx github:eugene-eee-hongkyu/ai-usage-tracker sync` 재실행 → period별 데이터 표시 검증 (run 완료 기준 #2)
+2. `npx github:eugene-eee-hongkyu/ai-usage-tracker init` 실행 → codeburn 설치 + hook 등록 확인 (run 완료 기준 #1)
+3. 팀원 초대 및 팀랭킹 화면 검증
 
 ### 막힌 것
 
@@ -78,6 +78,10 @@
 - [x] multi-period sync 구현 (codeburn 4회 병렬 호출, today/week/month/all 중첩 저장)
 - [x] 대시보드 UI codeburn 스타일 전면 재설계 (neutral-950, font-mono, 컬러 border)
 - [x] By Model / MCP Servers / Core Tools / Shell Commands 섹션 추가
+- [x] 대시보드 섹션 비율 기반 가로 바 교체 (opacity dot → proportional bar, 6개 섹션)
+- [x] Efficiency 4개 지표 tip 모달 + indigo pill 버튼 (cache hit/one-shot/cost/calls)
+- [x] 팀랭킹 period 필터 추가 (오늘/이번주/이번달/전체)
+- [x] By Activity 전체 항목 표시 + cost/turns/1-shot 컬럼 재설계
 - [ ] multi-period re-sync 실행 → period별 데이터 표시 검증 (run 완료 기준 #2)
 - [ ] npx init → codeburn 설치 + hook 등록 확인 (run 완료 기준 #1)
 - [ ] 팀랭킹 efficiencyScore 검증 (run 완료 기준 #3)
