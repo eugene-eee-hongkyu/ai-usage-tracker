@@ -6,13 +6,13 @@
 
 ---
 
-## 마지막 실행: 2026-04-27 17:38
-## 마지막 업데이트: 2026-04-27 17:38
+## 마지막 실행: 2026-04-27 17:58
+## 마지막 업데이트: 2026-04-27 17:58
 ## 현재 모드: bypassPermissions
 
 ### 현재 집중
 
-- 팀 페이지 레이아웃 개편 및 버그 수정 완료. Vercel ADMIN_EMAIL 설정 + 팀원 초대 남음.
+- 팀 페이지 차트/툴팁 개선 완료. Vercel ADMIN_EMAIL 설정 + 팀원 초대 남음.
 
 ### 이어서 할 것
 
@@ -133,6 +133,9 @@
 - [x] 중복 이름 버그 수정 (name__userId 복합 키, memberLabel() 함수)
 - [x] Top Sessions 프로젝트 RTL ellipsis + hover 툴팁
 - [x] README.md 실제 코드베이스 기준 업데이트
+- [x] By Member 차트 stackId 제거 (각 멤버 독립 렌더링)
+- [x] By Member 툴팁 커스텀 컴포넌트 (비용 내림차순 정렬)
+- [x] Efficiency 테이블 GradeCell native title (등급명 호버 표시)
 - [ ] Vercel ADMIN_EMAIL env var 설정
 - [ ] 재설치 (`rm -rf ~/.primus-usage-tracker` → `npx init`)
 - [ ] 팀원 초대 및 팀 화면 검증

@@ -4,6 +4,20 @@
 
 ---
 
+## Session 2026-04-27 17:58 — By Member 차트 스택 제거 + 툴팁 개선
+
+### 작업 요약
+- **By Member 차트 `stackId` 제거**: 멤버별 영역이 스택 누적되던 것을 각자 0 기준선부터 독립적으로 그리도록 수정 (`stackId="1"` 삭제)
+- **Team Total 차트 원인 분석**: "Team Total이 oreo 차트와 똑같아 보인다"는 현상이 oreo가 스택 맨 위에 올라가 그 top edge = 팀 전체 합계가 되는 Recharts stacking 동작 때문임을 확인. 데이터 자체는 정상
+- **By Member 툴팁 커스텀 컴포넌트**: `formatter` → `MemberTooltip` 커스텀 컴포넌트로 교체. 호버 시점 값 기준 내림차순 정렬하여 많이 쓴 사람이 위에 표시
+- **Efficiency 테이블 native title**: `GradeCell` `<td>`에 `title={grade}` 추가. 각 지표 셀 호버 시 "탁월"/"양호"/"보통"/"부족"/"경고" 네이티브 툴팁 표시
+
+### 다음 액션
+- Vercel ADMIN_EMAIL env var 설정
+- 팀원 초대 및 팀 화면 검증
+
+---
+
 ## Session 2026-04-27 17:32 — 팀 페이지 레이아웃 개편 + 버그 수정
 
 ### 작업 요약
