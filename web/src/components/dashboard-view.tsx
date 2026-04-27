@@ -267,12 +267,15 @@ function TipBtn({ label, onClick, variant = "action" }: { label: string; onClick
   );
 }
 
+interface TeamMember { userId: string; name: string }
+
 export function DashboardView({ targetUserId }: { targetUserId?: string }) {
   const viewOnly = !!targetUserId;
   const { data: session, status } = useSession();
   const router = useRouter();
   const [period, setPeriod] = useState<Period>("week");
   const [data, setData] = useState<DashboardData | null>(null);
+  const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState(false);
   const [syncCopied, setSyncCopied] = useState(false);
@@ -301,6 +304,20 @@ export function DashboardView({ targetUserId }: { targetUserId?: string }) {
   useEffect(() => {
     if (status === "unauthenticated") router.push("/login");
   }, [status, router]);
+
+  useEffect(() => {
+    if (!viewOnly || !session) return;
+    fetch("/api/team")
+      .then((r) => r.json())
+      .then((d) => {
+        const list: TeamMember[] = (d.byEfficiency ?? []).map((m: { userId: string; name: string }) => ({
+          userId: m.userId,
+          name: m.name,
+        }));
+        setTeamMembers(list);
+      })
+      .catch(() => {});
+  }, [viewOnly, session]);
 
   useEffect(() => {
     if (!session) return;
@@ -426,10 +443,16 @@ export function DashboardView({ targetUserId }: { targetUserId?: string }) {
               className={`w-16 text-center py-1 rounded text-xs font-mono transition-colors ${period === p ? "bg-indigo-600 text-white" : "bg-neutral-800 text-neutral-400 hover:text-neutral-200"}`}
             >{PERIOD_LABELS[p]}</button>
           ))}
-          {viewOnly && (
-            <Link href={`/team/${targetUserId}`} className="ml-auto text-xs font-mono text-neutral-500 hover:text-neutral-300 self-center">
-              ← 프로필로
-            </Link>
+          {viewOnly && teamMembers.length > 0 && (
+            <select
+              value={targetUserId}
+              onChange={(e) => router.push(`/team/${e.target.value}/dashboard`)}
+              className="ml-auto text-xs font-mono bg-neutral-800 text-neutral-300 border border-neutral-700 rounded px-2 py-1 self-center hover:border-neutral-500 focus:outline-none focus:border-indigo-500 cursor-pointer"
+            >
+              {teamMembers.map((m) => (
+                <option key={m.userId} value={m.userId}>{m.name}</option>
+              ))}
+            </select>
           )}
         </div>
       </div>
