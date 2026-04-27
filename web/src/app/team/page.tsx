@@ -6,8 +6,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Nav } from "@/components/nav";
 import {
-  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
-  AreaChart, Area, CartesianGrid,
+  AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
 } from "recharts";
 
 type Period = "today" | "week" | "month" | "all";
@@ -25,6 +24,11 @@ const GRADE_STYLES: Record<GradeLevel, string> = {
   "경고": "bg-red-500/15 text-red-400 border border-red-500/40",
 };
 
+const MEMBER_COLORS = [
+  "#4f46e5", "#10b981", "#f59e0b", "#ef4444",
+  "#8b5cf6", "#06b6d4", "#f97316", "#ec4899",
+];
+
 interface MemberStat {
   userId: number;
   name: string;
@@ -38,6 +42,14 @@ interface MemberStat {
   topProject: string;
   callsCount: number;
   outputInputRatio: number;
+  prevCostPerSession: number | null;
+}
+
+interface TeamActivity {
+  name: string;
+  totalCost: number;
+  totalTurns: number;
+  memberCount: number;
 }
 
 interface TeamData {
@@ -51,6 +63,9 @@ interface TeamData {
     avgOneShotRate: number;
   };
   daily: Array<{ date: string; cost: number }>;
+  teamActivities: TeamActivity[];
+  dailyByMember: Array<Record<string, number | string>>;
+  memberNames: string[];
 }
 
 function SyncBadge({ lastSyncedAt }: { lastSyncedAt: string | null }) {
@@ -67,6 +82,16 @@ function GradePill({ grade }: { grade: GradeLevel }) {
       {grade}
     </span>
   );
+}
+
+function TrendBadge({ current, prev }: { current: number; prev: number | null }) {
+  if (prev === null || prev === 0) return <span className="text-neutral-700 text-[10px] font-mono w-10 text-right block">—</span>;
+  const delta = (current - prev) / prev;
+  if (Math.abs(delta) < 0.05) return <span className="text-neutral-500 text-[10px] font-mono w-10 text-right block">→</span>;
+  if (delta < 0) {
+    return <span className="text-emerald-400 text-[10px] font-mono w-10 text-right block">↓{Math.abs(Math.round(delta * 100))}%</span>;
+  }
+  return <span className="text-red-400 text-[10px] font-mono w-10 text-right block">↑{Math.round(delta * 100)}%</span>;
 }
 
 function cacheHitGrade(v: number): GradeLevel {
@@ -117,7 +142,7 @@ export default function TeamPage() {
   }, [session, period]);
 
   if (!data) return (
-    <div className="min-h-screen">
+    <div className="min-h-screen bg-neutral-950">
       <Nav />
       <div className="flex items-center justify-center h-64">
         <div className="animate-pulse text-neutral-500 text-sm font-mono">로딩 중...</div>
@@ -128,14 +153,16 @@ export default function TeamPage() {
   const members = data.byEfficiency;
   const sum = data.teamSummary;
   const byCost = [...members].sort((a, b) => b.totalCost - a.totalCost);
+  const maxCost = Math.max(...byCost.map((m) => m.totalCost), 0.01);
+  const maxActivity = Math.max(...(data.teamActivities ?? []).map((a) => a.totalTurns), 0.01);
 
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen bg-neutral-950 text-neutral-100">
       <Nav />
 
       {/* Period Tabs */}
       <div className="border-b border-neutral-800">
-        <div className="max-w-5xl mx-auto px-4 pt-3 pb-2 flex gap-1">
+        <div className="max-w-6xl mx-auto px-4 pt-3 pb-2 flex gap-1">
           {(["today", "week", "month", "all"] as Period[]).map((p) => (
             <button
               key={p}
@@ -148,7 +175,7 @@ export default function TeamPage() {
 
       {/* Team Summary Bar */}
       <div className="bg-neutral-900 border-b border-neutral-800">
-        <div className="max-w-5xl mx-auto px-4 py-2.5 flex flex-wrap gap-x-5 gap-y-1 text-sm font-mono">
+        <div className="max-w-6xl mx-auto px-4 py-2.5 flex flex-wrap gap-x-5 gap-y-1 text-sm font-mono">
           <span><span className="text-yellow-400 font-bold">${sum.totalCost.toFixed(2)}</span><span className="text-neutral-500 ml-1 text-xs">총비용</span></span>
           <span><span className="text-blue-400 font-bold">{sum.totalSessions.toLocaleString()}</span><span className="text-neutral-500 ml-1 text-xs">세션</span></span>
           <span><span className="text-cyan-400 font-bold">{sum.activeMemberCount}</span><span className="text-neutral-500 ml-1 text-xs">명 활성</span></span>
@@ -157,18 +184,20 @@ export default function TeamPage() {
         </div>
       </div>
 
-      <main className={`max-w-5xl mx-auto px-4 py-6 space-y-8 transition-opacity duration-150 ${loading ? "opacity-40 pointer-events-none" : "opacity-100"}`}>
+      <main className={`max-w-6xl mx-auto px-4 py-4 space-y-4 transition-opacity duration-150 ${loading ? "opacity-40 pointer-events-none" : "opacity-100"}`}>
 
         {members.length === 0 ? (
-          <div className="bg-neutral-900 rounded-lg p-8 text-center text-neutral-500 text-sm font-mono">
+          <div className="bg-neutral-900 border border-neutral-800 rounded-lg p-8 text-center text-neutral-500 text-sm font-mono">
             해당 기간에 활동 데이터가 없어요.
           </div>
         ) : (
           <>
             {/* Efficiency Table */}
-            <section>
-              <h2 className="text-xs font-mono text-neutral-500 uppercase tracking-wider mb-3">효율</h2>
-              <div className="overflow-x-auto">
+            <div className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-fuchsia-500 rounded">
+              <div className="px-3 py-2 border-b border-neutral-800">
+                <span className="text-xs font-mono font-bold text-fuchsia-400 uppercase tracking-wider">Efficiency</span>
+              </div>
+              <div className="p-3 overflow-x-auto">
                 <table className="w-full text-xs font-mono border-collapse">
                   <thead>
                     <tr className="border-b border-neutral-800">
@@ -176,6 +205,7 @@ export default function TeamPage() {
                       <th className="text-right text-neutral-500 pb-2 px-3 font-normal">cache hit</th>
                       <th className="text-right text-neutral-500 pb-2 px-3 font-normal">1-shot</th>
                       <th className="text-right text-neutral-500 pb-2 px-3 font-normal">$/session</th>
+                      <th className="text-right text-neutral-500 pb-2 px-2 font-normal text-[10px]">vs prev</th>
                       <th className="text-right text-neutral-500 pb-2 px-3 font-normal">$/call</th>
                       <th className="text-right text-neutral-500 pb-2 px-3 font-normal">out/in</th>
                       <th className="text-right text-neutral-500 pb-2 pl-3 font-normal">종합</th>
@@ -188,7 +218,7 @@ export default function TeamPage() {
                       const costPerCall = calls > 0 ? m.totalCost / calls : 0;
                       const grade = overallGrade(m.cacheHitPct, m.overallOneShot, costPerSession);
                       return (
-                        <tr key={m.userId} className="border-b border-neutral-800/50 hover:bg-neutral-900/60 transition-colors">
+                        <tr key={m.userId} className="border-b border-neutral-800/50 hover:bg-neutral-800/30 transition-colors">
                           <td className="py-2.5 pr-4">
                             <Link href={`/team/${m.userId}`} className="flex items-center gap-2 hover:text-neutral-200 text-neutral-300">
                               <span>{m.name}</span>
@@ -207,6 +237,9 @@ export default function TeamPage() {
                             <span className="text-neutral-300 mr-1.5">${costPerSession.toFixed(2)}</span>
                             <GradePill grade={costGrade(costPerSession)} />
                           </td>
+                          <td className="py-2.5 px-2 text-right whitespace-nowrap">
+                            <TrendBadge current={costPerSession} prev={m.prevCostPerSession} />
+                          </td>
                           <td className="py-2.5 px-3 text-right whitespace-nowrap">
                             <span className="text-neutral-300 mr-1.5">${costPerCall.toFixed(3)}</span>
                             <GradePill grade={costPerCallGrade(costPerCall)} />
@@ -224,67 +257,95 @@ export default function TeamPage() {
                   </tbody>
                 </table>
               </div>
-            </section>
+            </div>
 
-            {/* Usage Bar Chart */}
-            <section>
-              <h2 className="text-xs font-mono text-neutral-500 uppercase tracking-wider mb-3">사용량</h2>
-              <div className="bg-neutral-900 rounded-lg p-4">
-                <ResponsiveContainer width="100%" height={Math.max(160, byCost.length * 40)}>
-                  <BarChart
-                    layout="vertical"
-                    data={byCost.map((m) => ({
-                      name: m.name,
-                      cost: parseFloat(m.totalCost.toFixed(2)),
-                      세션: m.sessionsCount,
-                    }))}
-                    margin={{ top: 0, right: 64, left: 0, bottom: 0 }}
-                  >
-                    <XAxis
-                      type="number"
-                      tick={{ fill: "#525252", fontSize: 10, fontFamily: "monospace" }}
-                      axisLine={false} tickLine={false}
-                      tickFormatter={(v) => `$${v}`}
-                    />
-                    <YAxis
-                      type="category" dataKey="name"
-                      tick={{ fill: "#a3a3a3", fontSize: 11, fontFamily: "monospace" }}
-                      axisLine={false} tickLine={false} width={90}
-                    />
-                    <Tooltip
-                      contentStyle={{ background: "#171717", border: "1px solid #404040", borderRadius: 6, fontSize: 11, fontFamily: "monospace" }}
-                      labelStyle={{ color: "#e5e5e5" }}
-                      formatter={(v, name) =>
-                        name === "cost" ? [`$${Number(v).toFixed(2)}`, "비용"] : [v, "세션"]
-                      }
-                    />
-                    <Bar
-                      dataKey="cost" fill="#4f46e5" radius={[0, 3, 3, 0]}
-                      label={{ position: "right", fill: "#fbbf24", fontSize: 10, fontFamily: "monospace", formatter: (v: unknown) => `$${Number(v).toFixed(0)}` }}
-                    />
-                  </BarChart>
-                </ResponsiveContainer>
+            {/* Row 2: Usage + Activities */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+
+              {/* Usage */}
+              <div className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-yellow-500 rounded">
+                <div className="px-3 py-2 border-b border-neutral-800">
+                  <span className="text-xs font-mono font-bold text-yellow-400 uppercase tracking-wider">Usage</span>
+                </div>
+                <div className="p-3 space-y-2">
+                  {byCost.map((m) => (
+                    <div key={m.userId} className="flex items-center gap-2 text-xs font-mono">
+                      <span className="w-20 text-neutral-300 truncate shrink-0">{m.name}</span>
+                      <div className="flex-1 h-1.5 bg-neutral-800 rounded overflow-hidden">
+                        <div
+                          className="h-full bg-yellow-500 rounded"
+                          style={{ width: `${(m.totalCost / maxCost) * 100}%` }}
+                        />
+                      </div>
+                      <span className="text-yellow-400 w-16 text-right shrink-0">${m.totalCost.toFixed(0)}</span>
+                      <span className="text-neutral-600 w-12 text-right shrink-0">{m.sessionsCount}s</span>
+                    </div>
+                  ))}
+                </div>
               </div>
-            </section>
 
-            {/* Daily Trend */}
-            {data.daily.length > 1 && (
-              <section>
-                <h2 className="text-xs font-mono text-neutral-500 uppercase tracking-wider mb-3">일별 비용 추이</h2>
-                <div className="bg-neutral-900 rounded-lg p-4">
-                  <ResponsiveContainer width="100%" height={160}>
+              {/* Team Activities */}
+              <div className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-violet-500 rounded">
+                <div className="px-3 py-2 border-b border-neutral-800">
+                  <span className="text-xs font-mono font-bold text-violet-400 uppercase tracking-wider">Team Activities</span>
+                </div>
+                <div className="p-3">
+                  {(data.teamActivities ?? []).length === 0 ? (
+                    <p className="text-neutral-600 text-xs font-mono">no data</p>
+                  ) : (
+                    <div className="space-y-1.5">
+                      <div className="flex text-[10px] text-neutral-600 font-mono mb-1">
+                        <span className="w-16 shrink-0" />
+                        <span className="flex-1">activity</span>
+                        <span className="w-14 text-right">turns</span>
+                        <span className="w-10 text-right">m</span>
+                      </div>
+                      {(data.teamActivities ?? []).map((a) => (
+                        <div key={a.name} className="flex items-center gap-1.5 text-xs font-mono">
+                          <div className="w-16 h-1.5 bg-neutral-800 rounded overflow-hidden shrink-0">
+                            <div className="h-full bg-violet-500 rounded" style={{ width: `${(a.totalTurns / maxActivity) * 100}%` }} />
+                          </div>
+                          <span className="flex-1 text-neutral-300 truncate">{a.name}</span>
+                          <span className="w-14 text-neutral-400 text-right">{a.totalTurns.toLocaleString()}</span>
+                          <span className="w-10 text-neutral-600 text-right">{a.memberCount}명</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Daily Trend — Stacked Area */}
+            {(data.dailyByMember ?? []).length > 1 && (
+              <div className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-cyan-500 rounded">
+                <div className="px-3 py-2 border-b border-neutral-800 flex items-center justify-between">
+                  <span className="text-xs font-mono font-bold text-cyan-400 uppercase tracking-wider">Daily Cost Trend</span>
+                  <div className="flex gap-3">
+                    {(data.memberNames ?? []).map((name, i) => (
+                      <span key={name} className="flex items-center gap-1 text-[10px] font-mono text-neutral-400">
+                        <span className="w-2 h-2 rounded-full inline-block" style={{ background: MEMBER_COLORS[i % MEMBER_COLORS.length] }} />
+                        {name}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+                <div className="p-3">
+                  <ResponsiveContainer width="100%" height={180}>
                     <AreaChart
-                      data={data.daily.map((d) => ({
-                        date: fmtDate(d.date),
-                        cost: parseFloat(d.cost.toFixed(2)),
+                      data={(data.dailyByMember ?? []).map((row) => ({
+                        ...row,
+                        date: fmtDate(String(row.date)),
                       }))}
                       margin={{ top: 4, right: 8, left: 0, bottom: 0 }}
                     >
                       <defs>
-                        <linearGradient id="costGrad" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="#4f46e5" stopOpacity={0.3} />
-                          <stop offset="95%" stopColor="#4f46e5" stopOpacity={0} />
-                        </linearGradient>
+                        {(data.memberNames ?? []).map((name, i) => (
+                          <linearGradient key={name} id={`grad-${i}`} x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="5%" stopColor={MEMBER_COLORS[i % MEMBER_COLORS.length]} stopOpacity={0.4} />
+                            <stop offset="95%" stopColor={MEMBER_COLORS[i % MEMBER_COLORS.length]} stopOpacity={0.05} />
+                          </linearGradient>
+                        ))}
                       </defs>
                       <CartesianGrid strokeDasharray="3 3" stroke="#262626" />
                       <XAxis
@@ -301,13 +362,24 @@ export default function TeamPage() {
                       />
                       <Tooltip
                         contentStyle={{ background: "#171717", border: "1px solid #404040", borderRadius: 6, fontSize: 11, fontFamily: "monospace" }}
-                        formatter={(v) => [`$${Number(v).toFixed(2)}`, "팀 비용"]}
+                        formatter={(v, name) => [`$${Number(v).toFixed(2)}`, name]}
                       />
-                      <Area type="monotone" dataKey="cost" stroke="#4f46e5" strokeWidth={2} fill="url(#costGrad)" dot={false} />
+                      {(data.memberNames ?? []).map((name, i) => (
+                        <Area
+                          key={name}
+                          type="monotone"
+                          dataKey={name}
+                          stackId="1"
+                          stroke={MEMBER_COLORS[i % MEMBER_COLORS.length]}
+                          strokeWidth={1.5}
+                          fill={`url(#grad-${i})`}
+                          dot={false}
+                        />
+                      ))}
                     </AreaChart>
                   </ResponsiveContainer>
                 </div>
-              </section>
+              </div>
             )}
           </>
         )}
