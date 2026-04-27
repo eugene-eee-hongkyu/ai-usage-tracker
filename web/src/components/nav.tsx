@@ -12,7 +12,7 @@ export function Nav() {
 
   const tabs = [
     { href: "/dashboard", label: "개인" },
-    { href: "/team", label: "팀랭킹" },
+    { href: "/team", label: "팀" },
     { href: "/setup-status", label: "셋업" },
   ];
 

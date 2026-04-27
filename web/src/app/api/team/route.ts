@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { db, userSnapshots, users } from "@/lib/db";
-import { computeEfficiencyScore, generateMvpBlurb } from "@/lib/rules";
+import { computeEfficiencyScore } from "@/lib/rules";
 
 type Period = "today" | "week" | "month" | "all";
 
@@ -36,6 +36,7 @@ interface RawPeriodData {
   summary?: RawOverview;
   activities?: RawActivity[];
   projects?: RawProject[];
+  daily?: Array<{ date: string; cost: number; sessions?: number }>;
 }
 
 function getPeriodData(raw: unknown, period: string): RawPeriodData {
@@ -127,6 +128,8 @@ export async function GET(req: NextRequest) {
         overallOneShot,
         efficiencyScore,
         topProject,
+        callsCount,
+        outputInputRatio,
       };
     })
     .filter((m): m is NonNullable<typeof m> => m !== null);
@@ -135,18 +138,30 @@ export async function GET(req: NextRequest) {
   const byEfficiency = [...memberStats].sort((a, b) => b.efficiencyScore - a.efficiencyScore);
   const bySessions = [...memberStats].sort((a, b) => b.sessionsCount - a.sessionsCount);
 
-  const mvpCandidate = byEfficiency[0] ?? null;
-  const mvp = mvpCandidate
-    ? {
-        ...mvpCandidate,
-        blurb: generateMvpBlurb(
-          mvpCandidate.name,
-          mvpCandidate.topProject,
-          mvpCandidate.cacheHitPct,
-          mvpCandidate.sessionsCount > 0 ? mvpCandidate.totalCost / mvpCandidate.sessionsCount : 0
-        ),
-      }
-    : null;
+  const teamSummary = {
+    totalCost: memberStats.reduce((s, m) => s + m.totalCost, 0),
+    totalSessions: memberStats.reduce((s, m) => s + m.sessionsCount, 0),
+    activeMemberCount: memberStats.length,
+    avgCacheHitPct: memberStats.length > 0
+      ? memberStats.reduce((s, m) => s + m.cacheHitPct, 0) / memberStats.length
+      : 0,
+    avgOneShotRate: memberStats.length > 0
+      ? memberStats.reduce((s, m) => s + m.overallOneShot, 0) / memberStats.length
+      : 0,
+  };
 
-  return NextResponse.json({ mvp, byOneShotRate, byEfficiency, bySessions });
+  const dailyMap = new Map<string, number>();
+  for (const u of allUsers) {
+    const snap = snapMap.get(u.id);
+    if (!snap) continue;
+    const d = getPeriodData(snap.rawJson, period);
+    for (const row of d.daily ?? []) {
+      dailyMap.set(row.date, (dailyMap.get(row.date) ?? 0) + row.cost);
+    }
+  }
+  const daily = [...dailyMap.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([date, cost]) => ({ date, cost }));
+
+  return NextResponse.json({ byOneShotRate, byEfficiency, bySessions, teamSummary, daily });
 }
