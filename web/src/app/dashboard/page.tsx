@@ -483,7 +483,7 @@ export default function DashboardPage() {
           <div className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-yellow-500 rounded">
             <div className="px-3 py-2 border-b border-neutral-800 flex items-center justify-between">
               <span className="text-xs font-mono font-bold text-yellow-400 uppercase tracking-wider">By Project</span>
-              {data.projects.length > 0 && <span className="text-[10px] font-mono text-neutral-600">({data.projects.length})</span>}
+              {data.projects.length > 6 && <span className="text-[10px] font-mono text-neutral-600">({data.projects.length})</span>}
             </div>
             <div className="p-3">
               <div className="flex text-xs text-neutral-600 font-mono mb-1.5 pr-1">
@@ -523,7 +523,7 @@ export default function DashboardPage() {
           <div className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-violet-500 rounded">
             <div className="px-3 py-2 border-b border-neutral-800 flex items-center justify-between">
               <span className="text-xs font-mono font-bold text-violet-400 uppercase tracking-wider">By Activity</span>
-              {data.activities.length > 0 && <span className="text-[10px] font-mono text-neutral-600">({data.activities.length})</span>}
+              {data.activities.length > 6 && <span className="text-[10px] font-mono text-neutral-600">({data.activities.length})</span>}
             </div>
             <div className="p-3">
               <div className="flex text-xs text-neutral-600 font-mono mb-1.5 pr-1">
@@ -647,7 +647,7 @@ export default function DashboardPage() {
           <div className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-teal-500 rounded">
             <div className="px-3 py-2 border-b border-neutral-800 flex items-center justify-between">
               <span className="text-xs font-mono font-bold text-teal-400 uppercase tracking-wider">Core Tools</span>
-              {(data.tools ?? []).length > 0 && <span className="text-[10px] font-mono text-neutral-600">({(data.tools ?? []).length})</span>}
+              {(data.tools ?? []).length > 6 && <span className="text-[10px] font-mono text-neutral-600">({(data.tools ?? []).length})</span>}
             </div>
             <div className="p-3">
               <div className="flex text-xs text-neutral-600 font-mono mb-1.5">
@@ -681,7 +681,7 @@ export default function DashboardPage() {
           <div className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-orange-500 rounded">
             <div className="px-3 py-2 border-b border-neutral-800 flex items-center justify-between">
               <span className="text-xs font-mono font-bold text-orange-400 uppercase tracking-wider">Shell Commands</span>
-              {(data.shellCommands ?? []).length > 0 && <span className="text-[10px] font-mono text-neutral-600">({(data.shellCommands ?? []).length})</span>}
+              {(data.shellCommands ?? []).length > 6 && <span className="text-[10px] font-mono text-neutral-600">({(data.shellCommands ?? []).length})</span>}
             </div>
             <div className="p-3">
               <div className="flex text-xs text-neutral-600 font-mono mb-1.5">
@@ -719,7 +719,7 @@ export default function DashboardPage() {
           <div className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-cyan-500 rounded">
             <div className="px-3 py-2 border-b border-neutral-800 flex items-center justify-between">
               <span className="text-xs font-mono font-bold text-cyan-400 uppercase tracking-wider">MCP Servers</span>
-              {(data.mcpServers ?? []).length > 0 && <span className="text-[10px] font-mono text-neutral-600">({(data.mcpServers ?? []).length})</span>}
+              {(data.mcpServers ?? []).length > 6 && <span className="text-[10px] font-mono text-neutral-600">({(data.mcpServers ?? []).length})</span>}
             </div>
             <div className="p-3">
               <div className="flex text-xs text-neutral-600 font-mono mb-1.5">
