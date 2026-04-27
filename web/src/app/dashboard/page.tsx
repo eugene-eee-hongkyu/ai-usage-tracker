@@ -396,6 +396,8 @@ export default function DashboardPage() {
                     value: `${ov.cacheHitPct.toFixed(1)}%`,
                     color: "text-emerald-400",
                     grade: cacheHitGrade(ov.cacheHitPct),
+                    gradeRows: CACHE_ROWS,
+                    gradeTitle: "Cache hit",
                     onDesc: () => setShowCacheModal(true),
                     onAct: () => setShowCacheMethodsModal(true),
                     actLabel: "늘리는법",
@@ -405,6 +407,8 @@ export default function DashboardPage() {
                     value: `${Math.round(ov.oneShotRate * 100)}%`,
                     color: "text-violet-400",
                     grade: oneShotGrade(Math.round(ov.oneShotRate * 100)),
+                    gradeRows: ONESHOT_ROWS,
+                    gradeTitle: "One-shot rate",
                     onDesc: () => setShowOneShotModal(true),
                     onAct: () => setShowOneShotMethodsModal(true),
                     actLabel: "늘리는법",
@@ -414,6 +418,8 @@ export default function DashboardPage() {
                     value: ov.sessions > 0 ? fmt$(costPerSession) : "$0.00",
                     color: "text-yellow-400",
                     grade: costGrade(costPerSession),
+                    gradeRows: COST_ROWS,
+                    gradeTitle: "Cost / session",
                     onDesc: () => setShowCostModal(true),
                     onAct: () => setShowCostMethodsModal(true),
                     actLabel: "줄이는법",
@@ -423,11 +429,13 @@ export default function DashboardPage() {
                     value: callsPerSession.toString(),
                     color: "text-blue-400",
                     grade: callsGrade(callsPerSession),
+                    gradeRows: CALLS_ROWS,
+                    gradeTitle: "Calls / session",
                     onDesc: () => setShowCallsModal(true),
                     onAct: () => setShowCallsMethodsModal(true),
                     actLabel: "최적화",
                   },
-                ].map(({ label, value, color, grade, onDesc, onAct, actLabel }) => (
+                ].map(({ label, value, color, grade, gradeRows, gradeTitle, onDesc, onAct, actLabel }) => (
                   <div key={label} className="flex items-center text-xs py-0.5 gap-2">
                     <span className="text-neutral-400 w-28 shrink-0">{label}</span>
                     <span className="flex gap-1 shrink-0 w-24">
@@ -436,7 +444,14 @@ export default function DashboardPage() {
                     </span>
                     <div className="ml-auto flex items-center gap-2">
                       <span className={`font-bold ${color}`}>{value}</span>
-                      <span className={`text-[10px] font-mono font-bold px-1.5 py-0.5 rounded border w-14 text-center ${GRADE_STYLES[grade]}`}>{grade}</span>
+                      <div className="relative group/mbadge">
+                        <span className={`text-[10px] font-mono font-bold px-1.5 py-0.5 rounded border w-14 text-center block cursor-default ${GRADE_STYLES[grade]}`}>{grade}</span>
+                        {grade !== "양호" && (
+                          <div className="absolute right-0 top-full mt-1 z-50 opacity-0 invisible group-hover/mbadge:opacity-100 group-hover/mbadge:visible transition-all duration-100 bg-slate-900 border border-slate-700 rounded-lg shadow-2xl p-3 w-44">
+                            <MiniGradeTable title={gradeTitle} rows={gradeRows} current={grade} />
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </div>
                 ));
@@ -445,7 +460,7 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* Row 2: By Project + Top Sessions */}
+        {/* Row 2: By Project + By Activity */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
 
           {/* By Project */}
@@ -485,48 +500,6 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          {/* Top Sessions */}
-          <div className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-red-500 rounded">
-            <div className="px-3 py-2 border-b border-neutral-800">
-              <span className="text-xs font-mono font-bold text-red-400 uppercase tracking-wider">Top Sessions</span>
-            </div>
-            <div className="p-3">
-              <div className="flex text-xs text-neutral-600 font-mono mb-1.5">
-                <span className="w-5">#</span>
-                <span className="w-20">date</span>
-                <span className="flex-1">project</span>
-                <span className="w-16 text-right">cost</span>
-                <span className="w-16 text-right">calls</span>
-              </div>
-              <div className="space-y-1">
-                {data.topSessions.slice(0, 5).map((s, i) => {
-                  const displayPath = formatPath(s.projectPath || s.project);
-                  return (
-                    <div key={s.id || i} className="flex items-center gap-2 text-xs font-mono">
-                      <span className="w-5 text-neutral-600">{i + 1}.</span>
-                      <span className="w-20 text-neutral-500 shrink-0">{s.date}</span>
-                      <div className="flex-1 flex items-center gap-2 min-w-0">
-                        <div className="w-16 h-1.5 bg-neutral-800 rounded overflow-hidden shrink-0">
-                          <div className="h-full bg-red-500 rounded" style={{ width: `${(s.cost / maxSessionCost) * 100}%` }} />
-                        </div>
-                        <span className="text-neutral-300 truncate" title={displayPath}>{displayPath}</span>
-                      </div>
-                      <span className="w-16 text-yellow-400 text-right shrink-0">{fmt$(s.cost)}</span>
-                      <span className="w-16 text-neutral-500 text-right shrink-0">{s.calls.toLocaleString()}</span>
-                    </div>
-                  );
-                })}
-                {data.topSessions.length === 0 && (
-                  <p className="text-neutral-600 text-xs font-mono">no data</p>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Row 3: By Activity + By Model */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-
           {/* By Activity */}
           <div className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-violet-500 rounded">
             <div className="px-3 py-2 border-b border-neutral-800">
@@ -561,6 +534,48 @@ export default function DashboardPage() {
                   });
                 })()}
                 {data.activities.length === 0 && (
+                  <p className="text-neutral-600 text-xs font-mono">no data</p>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Row 3: Top Sessions + By Model */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+
+          {/* Top Sessions */}
+          <div className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-red-500 rounded">
+            <div className="px-3 py-2 border-b border-neutral-800">
+              <span className="text-xs font-mono font-bold text-red-400 uppercase tracking-wider">Top Sessions</span>
+            </div>
+            <div className="p-3">
+              <div className="flex text-xs text-neutral-600 font-mono mb-1.5">
+                <span className="w-5">#</span>
+                <span className="w-20">date</span>
+                <span className="flex-1">project</span>
+                <span className="w-16 text-right">cost</span>
+                <span className="w-16 text-right">calls</span>
+              </div>
+              <div className="space-y-1">
+                {data.topSessions.slice(0, 5).map((s, i) => {
+                  const displayPath = formatPath(s.projectPath || s.project);
+                  return (
+                    <div key={s.id || i} className="flex items-center gap-2 text-xs font-mono">
+                      <span className="w-5 text-neutral-600">{i + 1}.</span>
+                      <span className="w-20 text-neutral-500 shrink-0">{s.date}</span>
+                      <div className="flex-1 flex items-center gap-2 min-w-0">
+                        <div className="w-16 h-1.5 bg-neutral-800 rounded overflow-hidden shrink-0">
+                          <div className="h-full bg-red-500 rounded" style={{ width: `${(s.cost / maxSessionCost) * 100}%` }} />
+                        </div>
+                        <span className="text-neutral-300 truncate" title={displayPath}>{displayPath}</span>
+                      </div>
+                      <span className="w-16 text-yellow-400 text-right shrink-0">{fmt$(s.cost)}</span>
+                      <span className="w-16 text-neutral-500 text-right shrink-0">{s.calls.toLocaleString()}</span>
+                    </div>
+                  );
+                })}
+                {data.topSessions.length === 0 && (
                   <p className="text-neutral-600 text-xs font-mono">no data</p>
                 )}
               </div>
