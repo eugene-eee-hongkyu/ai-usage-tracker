@@ -552,7 +552,11 @@ export default function DashboardPage() {
           <div className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-yellow-500 rounded">
             <div className="px-3 py-2 border-b border-neutral-800 flex items-center justify-between">
               <span className="text-xs font-mono font-bold text-yellow-400 uppercase tracking-wider">By Project</span>
-              {data.projects.length > 6 && <span className="text-[10px] font-mono text-neutral-600">({data.projects.length})</span>}
+              {data.projects.length > 15 && (
+                <span className="flex items-center gap-1 text-[10px] font-mono bg-yellow-900/40 text-yellow-300 border border-yellow-700/60 rounded px-1.5 py-0.5">
+                  ↕ scroll · {data.projects.length}
+                </span>
+              )}
             </div>
             <div className="p-3">
               <div className="flex text-xs text-neutral-600 font-mono mb-1.5 pr-1">
@@ -561,8 +565,8 @@ export default function DashboardPage() {
                 <span className="w-14 text-right">avg/s</span>
                 <span className="w-6 text-right">s</span>
               </div>
-              <div className="relative">
-                <div className={`space-y-1${data.projects.length > 6 ? " pb-4" : ""}`}>
+              <div className={data.projects.length > 15 ? "overflow-y-auto max-h-[300px] pr-1" : ""}>
+                <div className="space-y-1">
                   {data.projects.map((p) => {
                     const displayPath = formatPath(p.path || p.name);
                     return (
@@ -581,9 +585,6 @@ export default function DashboardPage() {
                     <p className="text-neutral-600 text-xs font-mono">no data</p>
                   )}
                 </div>
-                {data.projects.length > 6 && (
-                  <div className="absolute bottom-0 left-0 right-0 h-8 bg-gradient-to-t from-neutral-900 to-transparent pointer-events-none" />
-                )}
               </div>
             </div>
           </div>
@@ -592,7 +593,11 @@ export default function DashboardPage() {
           <div className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-violet-500 rounded">
             <div className="px-3 py-2 border-b border-neutral-800 flex items-center justify-between">
               <span className="text-xs font-mono font-bold text-violet-400 uppercase tracking-wider">By Activity</span>
-              {data.activities.length > 6 && <span className="text-[10px] font-mono text-neutral-600">({data.activities.length})</span>}
+              {data.activities.length > 15 && (
+                <span className="flex items-center gap-1 text-[10px] font-mono bg-violet-900/40 text-violet-300 border border-violet-700/60 rounded px-1.5 py-0.5">
+                  ↕ scroll · {data.activities.length}
+                </span>
+              )}
             </div>
             <div className="p-3">
               <div className="flex text-xs text-neutral-600 font-mono mb-1.5 pr-1">
@@ -602,8 +607,8 @@ export default function DashboardPage() {
                 <span className="w-12 text-right">turns</span>
                 <span className="w-14 text-right">1-shot</span>
               </div>
-              <div className="relative">
-                <div className={`space-y-1${data.activities.length > 6 ? " pb-4" : ""}`}>
+              <div className={data.activities.length > 15 ? "overflow-y-auto max-h-[300px] pr-1" : ""}>
+                <div className="space-y-1">
                   {(() => {
                     const maxCost = Math.max(...data.activities.map((a) => a.cost), 0.01);
                     return data.activities.map((a) => {
@@ -627,9 +632,6 @@ export default function DashboardPage() {
                     <p className="text-neutral-600 text-xs font-mono">no data</p>
                   )}
                 </div>
-                {data.activities.length > 6 && (
-                  <div className="absolute bottom-0 left-0 right-0 h-8 bg-gradient-to-t from-neutral-900 to-transparent pointer-events-none" />
-                )}
               </div>
             </div>
           </div>
@@ -716,15 +718,19 @@ export default function DashboardPage() {
           <div className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-teal-500 rounded">
             <div className="px-3 py-2 border-b border-neutral-800 flex items-center justify-between">
               <span className="text-xs font-mono font-bold text-teal-400 uppercase tracking-wider">Core Tools</span>
-              {(data.tools ?? []).length > 6 && <span className="text-[10px] font-mono text-neutral-600">({(data.tools ?? []).length})</span>}
+              {(data.tools ?? []).length > 15 && (
+                <span className="flex items-center gap-1 text-[10px] font-mono bg-teal-900/40 text-teal-300 border border-teal-700/60 rounded px-1.5 py-0.5">
+                  ↕ scroll · {(data.tools ?? []).length}
+                </span>
+              )}
             </div>
             <div className="p-3">
               <div className="flex text-xs text-neutral-600 font-mono mb-1.5">
                 <span className="flex-1">tool</span>
                 <span className="w-16 text-right">calls</span>
               </div>
-              <div className="relative">
-                <div className={`space-y-1${(data.tools ?? []).length > 6 ? " pb-4" : ""}`}>
+              <div className={(data.tools ?? []).length > 15 ? "overflow-y-auto max-h-[300px] pr-1" : ""}>
+                <div className="space-y-1">
                   {(data.tools ?? []).map((t) => {
                     const maxCalls = Math.max(...(data.tools ?? []).map((x) => x.calls), 0.01);
                     return (
@@ -739,9 +745,6 @@ export default function DashboardPage() {
                   })}
                   {(data.tools ?? []).length === 0 && <p className="text-neutral-600 text-xs font-mono">no data</p>}
                 </div>
-                {(data.tools ?? []).length > 6 && (
-                  <div className="absolute bottom-0 left-0 right-0 h-8 bg-gradient-to-t from-neutral-900 to-transparent pointer-events-none" />
-                )}
               </div>
             </div>
           </div>
@@ -750,15 +753,19 @@ export default function DashboardPage() {
           <div className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-orange-500 rounded">
             <div className="px-3 py-2 border-b border-neutral-800 flex items-center justify-between">
               <span className="text-xs font-mono font-bold text-orange-400 uppercase tracking-wider">Shell Commands</span>
-              {(data.shellCommands ?? []).length > 6 && <span className="text-[10px] font-mono text-neutral-600">({(data.shellCommands ?? []).length})</span>}
+              {(data.shellCommands ?? []).length > 15 && (
+                <span className="flex items-center gap-1 text-[10px] font-mono bg-orange-900/40 text-orange-300 border border-orange-700/60 rounded px-1.5 py-0.5">
+                  ↕ scroll · {(data.shellCommands ?? []).length}
+                </span>
+              )}
             </div>
             <div className="p-3">
               <div className="flex text-xs text-neutral-600 font-mono mb-1.5">
                 <span className="flex-1">command</span>
                 <span className="w-16 text-right">calls</span>
               </div>
-              <div className="relative">
-                <div className={`space-y-1${(data.shellCommands ?? []).length > 6 ? " pb-4" : ""}`}>
+              <div className={(data.shellCommands ?? []).length > 15 ? "overflow-y-auto max-h-[300px] pr-1" : ""}>
+                <div className="space-y-1">
                   {(data.shellCommands ?? []).map((s) => {
                     const maxCalls = Math.max(...(data.shellCommands ?? []).map((x) => x.calls), 0.01);
                     return (
@@ -773,9 +780,6 @@ export default function DashboardPage() {
                   })}
                   {(data.shellCommands ?? []).length === 0 && <p className="text-neutral-600 text-xs font-mono">no data</p>}
                 </div>
-                {(data.shellCommands ?? []).length > 6 && (
-                  <div className="absolute bottom-0 left-0 right-0 h-8 bg-gradient-to-t from-neutral-900 to-transparent pointer-events-none" />
-                )}
               </div>
             </div>
           </div>
@@ -788,15 +792,19 @@ export default function DashboardPage() {
           <div className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-cyan-500 rounded">
             <div className="px-3 py-2 border-b border-neutral-800 flex items-center justify-between">
               <span className="text-xs font-mono font-bold text-cyan-400 uppercase tracking-wider">MCP Servers</span>
-              {(data.mcpServers ?? []).length > 6 && <span className="text-[10px] font-mono text-neutral-600">({(data.mcpServers ?? []).length})</span>}
+              {(data.mcpServers ?? []).length > 15 && (
+                <span className="flex items-center gap-1 text-[10px] font-mono bg-cyan-900/40 text-cyan-300 border border-cyan-700/60 rounded px-1.5 py-0.5">
+                  ↕ scroll · {(data.mcpServers ?? []).length}
+                </span>
+              )}
             </div>
             <div className="p-3">
               <div className="flex text-xs text-neutral-600 font-mono mb-1.5">
                 <span className="flex-1">server</span>
                 <span className="w-16 text-right">calls</span>
               </div>
-              <div className="relative">
-                <div className={`space-y-1${(data.mcpServers ?? []).length > 6 ? " pb-4" : ""}`}>
+              <div className={(data.mcpServers ?? []).length > 15 ? "overflow-y-auto max-h-[300px] pr-1" : ""}>
+                <div className="space-y-1">
                   {(data.mcpServers ?? []).map((m) => {
                     const maxCalls = Math.max(...(data.mcpServers ?? []).map((x) => x.calls), 0.01);
                     return (
@@ -811,9 +819,6 @@ export default function DashboardPage() {
                   })}
                   {(data.mcpServers ?? []).length === 0 && <p className="text-neutral-600 text-xs font-mono">no data</p>}
                 </div>
-                {(data.mcpServers ?? []).length > 6 && (
-                  <div className="absolute bottom-0 left-0 right-0 h-8 bg-gradient-to-t from-neutral-900 to-transparent pointer-events-none" />
-                )}
               </div>
             </div>
           </div>
