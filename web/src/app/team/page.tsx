@@ -24,6 +24,14 @@ const GRADE_STYLES: Record<GradeLevel, string> = {
   "경고": "bg-red-500/15 text-red-400 border border-red-500/40",
 };
 
+const GRADE_VALUE_COLOR: Record<GradeLevel, string> = {
+  "탁월": "text-emerald-400",
+  "양호": "text-green-400",
+  "보통": "text-yellow-400",
+  "부족": "text-orange-400",
+  "경고": "text-red-400",
+};
+
 const MEMBER_COLORS = [
   "#4f46e5", "#10b981", "#f59e0b", "#ef4444",
   "#8b5cf6", "#06b6d4", "#f97316", "#ec4899",
@@ -169,7 +177,7 @@ export default function TeamPage() {
           <span><span className="text-blue-400 font-bold">{sum.totalSessions.toLocaleString()}</span><span className="text-neutral-500 ml-1 text-xs">세션</span></span>
           <span><span className="text-cyan-400 font-bold">{sum.activeMemberCount}</span><span className="text-neutral-500 ml-1 text-xs">명 활성</span></span>
           <span><span className="text-emerald-400 font-bold">{sum.avgCacheHitPct.toFixed(1)}%</span><span className="text-neutral-500 ml-1 text-xs">평균 cache hit</span></span>
-          <span><span className="text-violet-400 font-bold">{Math.round(sum.avgOneShotRate * 100)}%</span><span className="text-neutral-500 ml-1 text-xs">평균 1-shot</span></span>
+          <span><span className="text-pink-400 font-bold">{Math.round(sum.avgOneShotRate * 100)}%</span><span className="text-neutral-500 ml-1 text-xs">평균 1-shot</span></span>
         </div>
       </div>
 
@@ -213,25 +221,20 @@ export default function TeamPage() {
                               <SyncBadge lastSyncedAt={m.lastSyncedAt} />
                             </Link>
                           </td>
-                          <td className="py-2.5 px-3 text-right whitespace-nowrap">
-                            <span className="text-neutral-300 mr-1.5">{m.cacheHitPct.toFixed(1)}%</span>
-                            <GradePill grade={cacheHitGrade(m.cacheHitPct)} />
+                          <td className="py-2.5 px-3 text-right whitespace-nowrap tabular-nums">
+                            <span className={`font-bold ${GRADE_VALUE_COLOR[cacheHitGrade(m.cacheHitPct)]}`}>{m.cacheHitPct.toFixed(1)}%</span>
                           </td>
-                          <td className="py-2.5 px-3 text-right whitespace-nowrap">
-                            <span className="text-neutral-300 mr-1.5">{Math.round(m.overallOneShot * 100)}%</span>
-                            <GradePill grade={oneShotGrade(m.overallOneShot * 100)} />
+                          <td className="py-2.5 px-3 text-right whitespace-nowrap tabular-nums">
+                            <span className={`font-bold ${GRADE_VALUE_COLOR[oneShotGrade(m.overallOneShot * 100)]}`}>{Math.round(m.overallOneShot * 100)}%</span>
                           </td>
-                          <td className="py-2.5 px-3 text-right whitespace-nowrap">
-                            <span className="text-neutral-300 mr-1.5">${costPerSession.toFixed(2)}</span>
-                            <GradePill grade={costGrade(costPerSession)} />
+                          <td className="py-2.5 px-3 text-right whitespace-nowrap tabular-nums">
+                            <span className={`font-bold ${GRADE_VALUE_COLOR[costGrade(costPerSession)]}`}>${costPerSession.toFixed(2)}</span>
                           </td>
-                          <td className="py-2.5 px-3 text-right whitespace-nowrap">
-                            <span className="text-neutral-300 mr-1.5">${costPerCall.toFixed(3)}</span>
-                            <GradePill grade={costPerCallGrade(costPerCall)} />
+                          <td className="py-2.5 px-3 text-right whitespace-nowrap tabular-nums">
+                            <span className={`font-bold ${GRADE_VALUE_COLOR[costPerCallGrade(costPerCall)]}`}>${costPerCall.toFixed(3)}</span>
                           </td>
-                          <td className="py-2.5 px-3 text-right whitespace-nowrap">
-                            <span className="text-neutral-300 mr-1.5">{m.outputInputRatio.toFixed(1)}×</span>
-                            <GradePill grade={outputInputGrade(m.outputInputRatio)} />
+                          <td className="py-2.5 px-3 text-right whitespace-nowrap tabular-nums">
+                            <span className={`font-bold ${GRADE_VALUE_COLOR[outputInputGrade(m.outputInputRatio)]}`}>{m.outputInputRatio.toFixed(1)}×</span>
                           </td>
                           <td className="py-2.5 pl-3 text-right">
                             <GradePill grade={grade} />
@@ -252,27 +255,32 @@ export default function TeamPage() {
                 <div className="px-3 py-2 border-b border-neutral-800">
                   <span className="text-xs font-mono font-bold text-yellow-400 uppercase tracking-wider">Usage</span>
                 </div>
-                <div className="p-3 space-y-2">
-                  {byCost.map((m) => (
-                    <div key={m.userId} className="flex items-center gap-2 text-xs font-mono">
-                      <span className="w-20 text-neutral-300 truncate shrink-0">{m.name}</span>
-                      <div className="flex-1 h-1.5 bg-neutral-800 rounded overflow-hidden">
-                        <div
-                          className="h-full bg-yellow-500 rounded"
-                          style={{ width: `${(m.totalCost / maxCost) * 100}%` }}
-                        />
+                <div className="p-3">
+                  <div className="flex text-xs text-neutral-600 font-mono mb-1.5">
+                    <span className="w-16 shrink-0" />
+                    <span className="flex-1">member</span>
+                    <span className="w-16 text-right">cost</span>
+                    <span className="w-12 text-right">s</span>
+                  </div>
+                  <div className="space-y-1">
+                    {byCost.map((m) => (
+                      <div key={m.userId} className="flex items-center gap-1.5 text-xs font-mono">
+                        <div className="w-16 h-1.5 bg-neutral-800 rounded overflow-hidden shrink-0">
+                          <div className="h-full bg-yellow-500 rounded" style={{ width: `${(m.totalCost / maxCost) * 100}%` }} />
+                        </div>
+                        <span className="flex-1 text-neutral-300 truncate">{m.name}</span>
+                        <span className="w-16 text-yellow-400 text-right tabular-nums">${m.totalCost.toFixed(2)}</span>
+                        <span className="w-12 text-neutral-600 text-right tabular-nums">{m.sessionsCount}s</span>
                       </div>
-                      <span className="text-yellow-400 w-16 text-right shrink-0">${m.totalCost.toFixed(0)}</span>
-                      <span className="text-neutral-600 w-12 text-right shrink-0">{m.sessionsCount}s</span>
-                    </div>
-                  ))}
+                    ))}
+                  </div>
                 </div>
               </div>
 
               {/* Team Activities */}
-              <div className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-violet-500 rounded">
+              <div className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-pink-500 rounded">
                 <div className="px-3 py-2 border-b border-neutral-800">
-                  <span className="text-xs font-mono font-bold text-violet-400 uppercase tracking-wider">Team Activities</span>
+                  <span className="text-xs font-mono font-bold text-pink-400 uppercase tracking-wider">Team Activities</span>
                 </div>
                 <div className="p-3">
                   {(data.teamActivities ?? []).length === 0 ? (
@@ -288,7 +296,7 @@ export default function TeamPage() {
                       {(data.teamActivities ?? []).map((a) => (
                         <div key={a.name} className="flex items-center gap-1.5 text-xs font-mono">
                           <div className="w-16 h-1.5 bg-neutral-800 rounded overflow-hidden shrink-0">
-                            <div className="h-full bg-violet-500 rounded" style={{ width: `${(a.totalTurns / maxActivity) * 100}%` }} />
+                            <div className="h-full bg-pink-500 rounded" style={{ width: `${(a.totalTurns / maxActivity) * 100}%` }} />
                           </div>
                           <span className="flex-1 text-neutral-300 truncate">{a.name}</span>
                           <span className="w-14 text-neutral-400 text-right">{a.totalTurns.toLocaleString()}</span>
