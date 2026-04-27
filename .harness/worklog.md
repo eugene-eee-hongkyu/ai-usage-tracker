@@ -4,6 +4,28 @@
 
 ---
 
+## Session 2026-04-27 16:44 — 팀 대시보드 시각 시스템 정비 + 버그 수정
+
+### 작업 요약
+- **팀 페이지 시각 개선 (API + 프론트)**:
+  - API: `prevCostPerSession`, `teamActivities`, `dailyByMember`, `memberNames` 필드 추가
+  - 프론트: 카드 시스템(border-l-2 accent), 멤버별 stacked area, 팀 활동 분포, 사용량 막대 세션 수 라벨
+  - vs prev 컬럼 추가 후 데이터 부재로 즉시 제거
+- **팀 API cache hit 100% 버그 수정**: non-"all" 기간에서 `ov.cacheHitPercent` 직접 사용 → 토큰 기반 계산으로 교체 (dashboard API, all 케이스와 동일하게)
+- **dead code 정리**: `collectors/claude-code.ts` (ccusage spawn, import 없음) 삭제, `metric-modal.tsx` 텍스트에서 ccusage 제거
+- **팀 페이지 시각 시스템 개인 대시보드와 정합**:
+  - `GRADE_VALUE_COLOR` 상수 추가 (grade → tailwind text 색 매핑)
+  - Efficiency table: 메트릭별 GradePill 제거 → grade 색 value 텍스트, 종합만 pill 유지, `tabular-nums`
+  - Usage: bar 앞으로(BY PROJECT 패턴), 컬럼 헤더 추가, gap-1.5/space-y-1, 비용 소수점 2자리
+  - Team Activities: violet → pink (개인 BY ACTIVITY violet 중복 방지)
+
+### 다음 액션
+- Vercel ADMIN_EMAIL env var 설정
+- 팀원 초대 및 팀 화면 검증
+- Windows SessionEnd hook 발화 검증
+
+---
+
 ## Session 2026-04-27 16:08 — Windows CLI 호환성 수정 + Vercel 빌드 에러
 
 ### 작업 요약

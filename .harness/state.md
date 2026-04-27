@@ -6,19 +6,19 @@
 
 ---
 
-## 마지막 실행: 2026-04-27 16:08
-## 마지막 업데이트: 2026-04-27 16:08
+## 마지막 실행: 2026-04-27 16:44
+## 마지막 업데이트: 2026-04-27 16:44
 ## 현재 모드: bypassPermissions
 
 ### 현재 집중
 
-- 팀 대시보드 재설계 + Windows 호환성 수정 완료. Vercel ADMIN_EMAIL 설정 + 팀원 초대 남음.
+- 팀 대시보드 시각 시스템 개인 대시보드와 정합 완료. Vercel ADMIN_EMAIL 설정 + 팀원 초대 남음.
 
 ### 이어서 할 것
 
 1. Vercel 환경변수 `ADMIN_EMAIL` 설정 (프로덕션 관리자 버튼 활성화)
-2. Windows 사용자 `npx github:eugene-eee-hongkyu/ai-usage-tracker init` 재실행 → step 2 해결 확인
-3. 팀원 초대 및 팀 화면 검증
+2. 팀원 초대 및 팀 화면 검증
+3. Windows SessionEnd hook 발화 검증
 
 ### 막힌 것
 
@@ -122,6 +122,10 @@
 - [x] members API `callsCount`, `outputInputRatio`, `teamSummary`, `daily` 필드 추가
 - [x] `ADMIN_EMAIL` import → `isAdmin()` 함수로 교체 (기존 TS 오류 수정)
 - [x] Windows CLI 호환성: sync.ts shell:false→shell:true, init.ts where vs which 분기
+- [x] 팀 API prevCostPerSession/teamActivities/dailyByMember/memberNames 추가, 시각 개선
+- [x] 팀 API cache hit 100% 버그 수정 (토큰 기반 계산 전 기간 통일)
+- [x] dead code 정리: collectors/claude-code.ts 삭제, ccusage 텍스트 제거
+- [x] 팀 페이지 시각 시스템 개인 대시보드 정합 (GRADE_VALUE_COLOR, Usage 레이아웃, Activities pink)
 - [ ] Vercel ADMIN_EMAIL env var 설정
 - [ ] 재설치 (`rm -rf ~/.primus-usage-tracker` → `npx init`)
 - [ ] 팀원 초대 및 팀 화면 검증
