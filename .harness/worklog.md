@@ -4,6 +4,26 @@
 
 ---
 
+## Session 2026-04-27 08:42 — Efficiency UX 개선 및 대시보드 카드 순서 재배치
+
+### 작업 요약
+- **"개선 필요" → "부족" 전면 교체**: GradeLevel 타입, GRADE_STYLES, 모든 grade 함수, modal 등급표 전부
+- **Efficiency 종합 배지 hover 툴팁**: 4개 지표(Cache hit / One-shot / Cost / Calls) 등급 기준표를 2×2 그리드로 표시, 현재 등급 하이라이트
+- **메트릭 버튼 재구성**: 기존 버튼 → 회색 "설명" 버튼(전체 모달), 보통/부족/경고 등급일 때만 인디고 액션 버튼(늘리는법/줄이는법/최적화) 추가 → 방법 섹션만 팝업
+- **modal `methodsOnly` prop 추가**: 4개 modal 컴포넌트에 `methodsOnly?: boolean` 추가, true면 방법 섹션만 렌더링
+- **대시보드 카드 순서 재배치**:
+  - Row 1: Daily Activity + Efficiency (핵심 요약)
+  - Row 2: By Project + Top Sessions (비용 상세)
+  - Row 3: By Activity + By Model (사용 패턴)
+  - Row 4: MCP Servers + Core Tools (도구 통계)
+  - Row 5: Shell Commands (반폭)
+
+### 다음 액션
+1. 팀원 초대 (이메일 목록 확정 → Vercel/서비스 초대)
+2. Windows SessionEnd hook 발화 검증 (Windows 테스터 필요)
+
+---
+
 ## Session 2026-04-27 06:47 — 대시보드 UX 개선 (마지막 수신·Efficiency 배지·등급 한글화)
 
 ### 작업 요약
