@@ -4,6 +4,23 @@
 
 ---
 
+## Session 2026-04-27 14:25 — 타임존 설정, 경로 표시 개선, 카드 스크롤 UX, Efficiency 지표 2개 추가
+
+### 작업 요약
+- **E2E 검증 완료**: 탭 닫기 13:38 → 대시보드 갱신 13:39 (self-detach PASS)
+- **타임존 기능 구현**: users 테이블 timezone 컬럼 추가 (Supabase migration), `/api/user/timezone` PATCH 라우트, Setup 페이지 타임존 선택 카드 (브라우저 자동 감지), 대시보드 마지막 수신 시각 timezone-aware 표시 + SGT/KST 배지 클릭으로 변경
+- **타임존 배지 버그 수정**: GMT+8 대신 SGT/KST 표시 (TZ_ABBR_MAP 추가, Intl이 GMT+N 반환 시 fallback), 드롭다운 방향 위→아래 수정
+- **경로 표시 개선**: By Project / Top Sessions에서 마지막 3 세그먼트만 표시, RTL ellipsis로 앞쪽 잘림
+- **카드 스크롤 UX**: 15개 이하 → 배지 없음/스크롤 없음, 15개 초과 → overflow-y-auto + 카드 색상 "↕ scroll · N" 배지. By Project/Activity/Core Tools/Shell Commands/MCP 전체 적용
+- **Efficiency 지표 2개 추가**: Cost/call (`$0.053`) + Output/Input ratio (`32.7×`). rawJson.tokens.output 기존 수집 확인 후 추가 수집 없이 계산. 모달(설명+방법) + 등급 배지 포함. composite grade hover에도 6개 모두 표시
+
+### 다음 액션
+- 재설치 (`rm -rf ~/.primus-usage-tracker` → `npx init`)
+- Vercel 배포 결과 확인 (팀 배지 렌더링, 타임존 배지 SGT/KST)
+- 팀원 초대 및 팀랭킹 화면 검증
+
+---
+
 ## Session 2026-04-27 13:34 — submit.mjs 탭 닫기 E2E 디버그 + self-detach 설치본 적용
 
 ### 작업 요약

@@ -6,19 +6,19 @@
 
 ---
 
-## 마지막 실행: 2026-04-27 13:34
-## 마지막 업데이트: 2026-04-27 13:34
+## 마지막 실행: 2026-04-27 14:25
+## 마지막 업데이트: 2026-04-27 14:25
 ## 현재 모드: bypassPermissions
 
 ### 현재 집중
 
-- submit.mjs 파이프라인 안정화 완료 (self-detach 적용), 탭 닫기 E2E 최종 확인 대기.
+- UI 개선 다수 완료 (타임존, 경로 표시, 스크롤 UX, Efficiency 6지표). 재설치 + 팀원 초대 남음.
 
 ### 이어서 할 것
 
-1. VS Code 탭 닫기 → 2분 대기 → 대시보드 갱신 확인 (self-detach E2E 최종 검증)
-2. `rm -rf ~/.primus-usage-tracker` → `npx github:eugene-eee-hongkyu/ai-usage-tracker init` 재설치 (모든 수정사항 반영)
-3. Vercel 배포 확인 (팀 배지 렌더링)
+1. 재설치 (`rm -rf ~/.primus-usage-tracker` → `npx github:eugene-eee-hongkyu/ai-usage-tracker init`)
+2. Vercel 배포 확인 (팀 배지 렌더링, 타임존 SGT/KST 배지)
+3. 팀원 초대 및 팀랭킹 화면 검증
 
 ### 막힌 것
 
@@ -26,11 +26,11 @@
 
 ### 사람 판단 필요
 
-- 팀원 초대 (Vercel/서비스 접근 권한, 초대 이메일 목록 결정)
+- 팀원 초대 (초대할 이메일 목록 결정)
 
 ### 백로그 요약
-- 대기 중: 3개
-- 최근 추가: 2026-04-27 — VS Code 탭 닫기 후 submit.mjs 파이프라인 재테스트
+- 대기 중: 2개
+- 최근 추가: 2026-04-26 — 팀원 초대
 
 ### 진행 상황
 
@@ -107,8 +107,12 @@
 - [x] Windows Task Scheduler XML `StartWhenAvailable` 추가 (꺼진 PC 켜지면 즉시 실행)
 - [x] submit.mjs API 키 폴백 파일(`~/.primus-usage-key`) 항상 저장하도록 수정
 - [x] submit.mjs self-detach 패턴 적용 (VS Code 종료 시 SIGKILL 대응)
-- [ ] VS Code 탭 닫기 → 대시보드 갱신 E2E 최종 검증 (self-detach 적용 후)
+- [x] VS Code 탭 닫기 → 대시보드 갱신 E2E 최종 검증 (13:38→13:39 PASS)
+- [x] 타임존 선택 기능 (Setup 카드 + 대시보드 배지 클릭 변경, SGT/KST 표시)
+- [x] 경로 표시 개선 (마지막 3 세그먼트 + RTL ellipsis)
+- [x] 카드 스크롤 UX (15개 초과 시만 scroll 배지 + overflow-y-auto)
+- [x] Efficiency 지표 6개로 확장 (Cost/call + Output/Input ratio 추가)
 - [ ] 재설치 (`rm -rf ~/.primus-usage-tracker` → `npx init`)
-- [ ] Vercel 배포 확인 (팀 배지 렌더링)
+- [ ] Vercel 배포 확인 (타임존 배지, 팀 배지 렌더링)
 - [ ] 팀원 초대 및 팀랭킹 화면 검증
 - [ ] Windows SessionEnd hook 발화 검증 (Hold 플래그)
