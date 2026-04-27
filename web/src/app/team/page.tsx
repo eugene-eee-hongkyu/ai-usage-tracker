@@ -282,7 +282,7 @@ export default function TeamPage() {
                           formatter={(v, key) => [`$${Number(v).toFixed(2)}`, memberLabel(String(key))]}
                         />
                         {(data.memberNames ?? []).map((key, i) => (
-                          <Area key={key} type="monotone" dataKey={key} stackId="1" stroke={MEMBER_COLORS[i % MEMBER_COLORS.length]} strokeWidth={1.5} fill={`url(#grad-${i})`} dot={false} />
+                          <Area key={key} type="monotone" dataKey={key} stroke={MEMBER_COLORS[i % MEMBER_COLORS.length]} strokeWidth={1.5} fill={`url(#grad-${i})`} dot={false} />
                         ))}
                       </AreaChart>
                     </ResponsiveContainer>
