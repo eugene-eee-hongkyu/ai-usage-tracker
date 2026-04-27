@@ -4,6 +4,23 @@
 
 ---
 
+## Session 2026-04-27 10:06 — CLI UX 버그 수정 (한글 깨짐·프로세스 미종료·동시 제출)
+
+### 작업 요약
+- **한글 깨짐 수정**: `getApiKeyViaLocalServer` 응답 HTML을 영어로 교체, Content-Type에 `charset=utf-8` 추가 (init.ts, init.mjs)
+- **init 후 프로세스 미종료 수정**: 브라우저 keep-alive 커넥션이 이벤트 루프를 붙잡는 문제. `runInit()` 마지막에 `process.exit(0)` 추가 (init.ts, init.mjs)
+- **번들 재빌드**: `bun build src/index.ts --outfile src/index.mjs --target node` — index.mjs가 구버전 번들이었음, 두 수정사항 모두 반영
+- **동시 세션 종료 문제 분석**: 4~5개 세션 동시 종료 시 submit.mjs 16개 codeburn 프로세스 + 4개 ingest 중복 POST 발생
+- **lock 파일 추가 (submit.mjs)**: `~/.primus-usage-tracker/submit.lock` — TTL 90초, `try/finally`로 에러 시에도 반드시 해제
+- **Q1 아키텍처 분석**: ingest가 `onConflictDoUpdate`로 단일 스냅샷 저장 → Claude Code 미실행 시 stale 데이터 그대로 유지됨. `lastSyncedAt`을 UI에 노출하면 "훅 미동작" 판단 가능
+
+### 다음 액션
+1. `rm -rf ~/.primus-usage-tracker` 후 `npx github:eugene-eee-hongkyu/ai-usage-tracker init` 재실행 (lock fix 반영된 submit.mjs 재배포)
+2. 팀원 초대 (이메일 목록 확정 → Vercel/서비스 초대)
+3. Windows SessionEnd hook 발화 검증
+
+---
+
 ## Session 2026-04-27 09:41 — SessionEnd hook 버그 수정
 
 ### 작업 요약

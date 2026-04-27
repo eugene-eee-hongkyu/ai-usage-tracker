@@ -6,17 +6,17 @@
 
 ---
 
-## 마지막 실행: 2026-04-27 09:41
-## 마지막 업데이트: 2026-04-27 09:41
+## 마지막 실행: 2026-04-27 10:06
+## 마지막 업데이트: 2026-04-27 10:06
 ## 현재 모드: bypassPermissions
 
 ### 현재 집중
 
-- SessionEnd hook 버그 수정 완료. 팀원 초대 대기.
+- CLI UX 버그 수정 완료 (한글 깨짐·미종료·동시 제출). 팀원 초대 대기.
 
 ### 이어서 할 것
 
-1. `npm cache clean --force` 후 `npx github:eugene-eee-hongkyu/ai-usage-tracker init` 재실행 (hook 경로 갱신)
+1. `rm -rf ~/.primus-usage-tracker` 후 `npx github:eugene-eee-hongkyu/ai-usage-tracker init` 재실행 (lock fix 반영)
 2. 팀원 초대 (이메일 목록 확정 → Vercel/서비스 초대)
 3. Windows SessionEnd hook 발화 검증 (Windows 테스터 필요)
 
@@ -97,6 +97,9 @@
 - [x] 카드 아이템 수 헤더 표시(7개↑) + 하단 페이드 그라디언트
 - [x] Efficiency 종합 배지 양호 시 hover 없음, Calls 최적화 팁 조건부 렌더링
 - [x] SessionEnd hook 경로 안정화 (~/.primus-usage-tracker/) + shell:true + 4-period 통일
-- [ ] `npx github:... init` 재실행으로 본인 hook 경로 갱신 (npm cache clean 선행)
+- [x] CLI init 한글 깨짐 수정 (영어 UI + charset=utf-8)
+- [x] CLI init 프로세스 미종료 수정 (process.exit(0))
+- [x] submit.mjs 동시 실행 방지 lock 파일 추가 (TTL 90s)
+- [ ] `rm -rf ~/.primus-usage-tracker` 후 `npx github:... init` 재실행 (lock fix 로컬 반영)
 - [ ] 팀원 초대 및 팀랭킹 화면 검증
 - [ ] Windows SessionEnd hook 발화 검증 (Hold 플래그)
