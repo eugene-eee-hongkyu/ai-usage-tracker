@@ -450,8 +450,14 @@ export default function TeamPage() {
                                 <span className="truncate max-w-[64px]">{s.userName}</span>
                               </span>
                             </td>
-                            <td className="py-1.5 pr-3 text-neutral-400 truncate max-w-[80px]">
-                              {s.project || "—"}
+                            <td className="py-1.5 pr-3">
+                              <div
+                                className="truncate max-w-[96px] text-neutral-400"
+                                style={{ direction: "rtl" }}
+                                title={s.project || undefined}
+                              >
+                                {s.project || "—"}
+                              </div>
                             </td>
                             <td className="py-1.5 pr-3 text-right text-neutral-500 tabular-nums">
                               {fmtDate(s.date)}
