@@ -10,7 +10,7 @@ function spawnCodeburn(period: string): Promise<unknown> {
     const chunks: Buffer[] = [];
     const proc = spawn("codeburn", ["report", "--format", "json", "--provider", "claude", "--period", period], {
       stdio: ["ignore", "pipe", "pipe"],
-      shell: false,
+      shell: true,
     });
     proc.stdout.on("data", (d: Buffer) => chunks.push(d));
     proc.on("close", (code: number) => {

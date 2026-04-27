@@ -46,7 +46,7 @@ function spawnCodeburn(period) {
     const chunks = [];
     const proc = spawn("codeburn", ["report", "--format", "json", "--provider", "claude", "--period", period], {
       stdio: ["ignore", "pipe", "pipe"],
-      shell: false
+      shell: true
     });
     proc.stdout.on("data", (d) => chunks.push(d));
     proc.on("close", (code) => {
