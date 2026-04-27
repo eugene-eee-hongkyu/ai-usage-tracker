@@ -459,27 +459,31 @@ export function CallsPerSessionModal({
           자연스럽게 적정 범위에 들어감.
         </p>
         <div className="space-y-2.5">
-          <Step n={1}>
-            <strong className="text-slate-300">너무 높다면 (100+ calls)</strong> — 세션이 너무 김.
-            cost per session 대책 그대로 적용 — 작업 단위 끊기, 컨텍스트 70% 넘으면 마무리,
-            한 세션 = 한 작업 원칙.
-          </Step>
-          <Step n={2}>
-            <strong className="text-slate-300">너무 낮다면 (10 미만 calls)</strong> — Claude를 충분히 활용 못 하고 있음.
-            &ldquo;이 부분 직접 작성해&rdquo; 대신 &ldquo;이 패턴으로 리팩토링해줘&rdquo;로 작업 위임 전환.
-          </Step>
-          <Step n={3}>
-            <strong className="text-slate-300">calls 적정인데 one-shot rate 낮다면</strong> — calls 수는 정상인데
-            retry 비율이 높은 것. one-shot rate 올리는 방법 적용 (충분한 컨텍스트 + 명확한 지시).
-          </Step>
-          <Step n={4}>
-            <strong className="text-slate-300">CLAUDE.md에 작업 패턴 박기</strong> — &ldquo;Read 먼저 후 Edit&rdquo;,
-            &ldquo;테스트 자동 실행&rdquo; 같은 룰을 CLAUDE.md에 명시. Claude가 같은 패턴 반복하면 calls 수가 안정됨.
-          </Step>
-          <Step n={5}>
-            <strong className="text-slate-300">세션 시작 시 작업 범위 선언</strong> — &ldquo;오늘은 X 기능만 구현. 끝나면 종료&rdquo;
-            식으로 시작하면 Claude가 그 범위 안에서 작업. 무한 늘어지는 거 방지.
-          </Step>
+          {((): React.ReactNode[] => {
+            const steps: React.ReactNode[] = [];
+            if (value >= 100) steps.push(
+              <><strong className="text-slate-300">너무 높다면 (100+ calls)</strong> — 세션이 너무 김.
+              cost per session 대책 그대로 적용 — 작업 단위 끊기, 컨텍스트 70% 넘으면 마무리,
+              한 세션 = 한 작업 원칙.</>
+            );
+            if (value < 10) steps.push(
+              <><strong className="text-slate-300">너무 낮다면 (10 미만 calls)</strong> — Claude를 충분히 활용 못 하고 있음.
+              &ldquo;이 부분 직접 작성해&rdquo; 대신 &ldquo;이 패턴으로 리팩토링해줘&rdquo;로 작업 위임 전환.</>
+            );
+            steps.push(
+              <><strong className="text-slate-300">calls 적정인데 one-shot rate 낮다면</strong> — calls 수는 정상인데
+              retry 비율이 높은 것. one-shot rate 올리는 방법 적용 (충분한 컨텍스트 + 명확한 지시).</>
+            );
+            steps.push(
+              <><strong className="text-slate-300">CLAUDE.md에 작업 패턴 박기</strong> — &ldquo;Read 먼저 후 Edit&rdquo;,
+              &ldquo;테스트 자동 실행&rdquo; 같은 룰을 CLAUDE.md에 명시. Claude가 같은 패턴 반복하면 calls 수가 안정됨.</>
+            );
+            steps.push(
+              <><strong className="text-slate-300">세션 시작 시 작업 범위 선언</strong> — &ldquo;오늘은 X 기능만 구현. 끝나면 종료&rdquo;
+              식으로 시작하면 Claude가 그 범위 안에서 작업. 무한 늘어지는 거 방지.</>
+            );
+            return steps.map((content, i) => <Step key={i} n={i + 1}>{content}</Step>);
+          })()}
         </div>
       </Section>
 
