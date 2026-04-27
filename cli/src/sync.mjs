@@ -38,17 +38,18 @@ async function loadApiKey() {
 
 // src/sync.ts
 var SERVER_URL2 = process.env.USAGE_TRACKER_URL ?? "https://ai-usage-tracker-web-psi.vercel.app";
-function spawnCodeburn() {
+var PERIODS = ["today", "week", "month", "all"];
+function spawnCodeburn(period) {
   return new Promise((resolve, reject) => {
     const chunks = [];
-    const proc = spawn("codeburn", ["report", "--format", "json", "--provider", "claude", "--period", "all"], {
+    const proc = spawn("codeburn", ["report", "--format", "json", "--provider", "claude", "--period", period], {
       stdio: ["ignore", "pipe", "pipe"],
       shell: false
     });
     proc.stdout.on("data", (d) => chunks.push(d));
     proc.on("close", (code) => {
       if (code !== 0)
-        return reject(new Error(`codeburn exited ${code}`));
+        return reject(new Error(`codeburn exited ${code} (period=${period})`));
       try {
         const raw = Buffer.concat(chunks).toString("utf8").trim();
         resolve(JSON.parse(raw));
@@ -59,7 +60,7 @@ function spawnCodeburn() {
     proc.on("error", reject);
     setTimeout(() => {
       proc.kill();
-      reject(new Error("codeburn timeout"));
+      reject(new Error(`codeburn timeout (period=${period})`));
     }, 120000);
   });
 }
@@ -72,7 +73,8 @@ async function runSync(_days) {
   console.log("codeburn 데이터 수집 중...");
   let report;
   try {
-    report = await spawnCodeburn();
+    const results = await Promise.all(PERIODS.map((p) => spawnCodeburn(p)));
+    report = Object.fromEntries(PERIODS.map((p, i) => [p, results[i]]));
   } catch (err) {
     console.error("codeburn 실행 실패:", err.message);
     process.exit(1);
@@ -95,8 +97,7 @@ async function runSync(_days) {
 var isMain = typeof process !== "undefined" && process.argv[1] && (process.argv[1].endsWith("sync.mjs") || process.argv[1].endsWith("sync.js"));
 if (isMain) {
   runSync().catch((err) => {
-    process.stderr.write(`[sync] error: ${err.message}
-`);
+    process.stderr.write(`[sync] error: ${err.message}\n`);
     process.exit(1);
   });
 }
