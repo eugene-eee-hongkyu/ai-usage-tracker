@@ -42,7 +42,6 @@ interface MemberStat {
   topProject: string;
   callsCount: number;
   outputInputRatio: number;
-  prevCostPerSession: number | null;
 }
 
 interface TeamActivity {
@@ -82,16 +81,6 @@ function GradePill({ grade }: { grade: GradeLevel }) {
       {grade}
     </span>
   );
-}
-
-function TrendBadge({ current, prev }: { current: number; prev: number | null }) {
-  if (prev === null || prev === 0) return <span className="text-neutral-700 text-[10px] font-mono w-10 text-right block">—</span>;
-  const delta = (current - prev) / prev;
-  if (Math.abs(delta) < 0.05) return <span className="text-neutral-500 text-[10px] font-mono w-10 text-right block">→</span>;
-  if (delta < 0) {
-    return <span className="text-emerald-400 text-[10px] font-mono w-10 text-right block">↓{Math.abs(Math.round(delta * 100))}%</span>;
-  }
-  return <span className="text-red-400 text-[10px] font-mono w-10 text-right block">↑{Math.round(delta * 100)}%</span>;
 }
 
 function cacheHitGrade(v: number): GradeLevel {
@@ -205,7 +194,6 @@ export default function TeamPage() {
                       <th className="text-right text-neutral-500 pb-2 px-3 font-normal">cache hit</th>
                       <th className="text-right text-neutral-500 pb-2 px-3 font-normal">1-shot</th>
                       <th className="text-right text-neutral-500 pb-2 px-3 font-normal">$/session</th>
-                      <th className="text-right text-neutral-500 pb-2 px-2 font-normal text-[10px]">vs prev</th>
                       <th className="text-right text-neutral-500 pb-2 px-3 font-normal">$/call</th>
                       <th className="text-right text-neutral-500 pb-2 px-3 font-normal">out/in</th>
                       <th className="text-right text-neutral-500 pb-2 pl-3 font-normal">종합</th>
@@ -236,9 +224,6 @@ export default function TeamPage() {
                           <td className="py-2.5 px-3 text-right whitespace-nowrap">
                             <span className="text-neutral-300 mr-1.5">${costPerSession.toFixed(2)}</span>
                             <GradePill grade={costGrade(costPerSession)} />
-                          </td>
-                          <td className="py-2.5 px-2 text-right whitespace-nowrap">
-                            <TrendBadge current={costPerSession} prev={m.prevCostPerSession} />
                           </td>
                           <td className="py-2.5 px-3 text-right whitespace-nowrap">
                             <span className="text-neutral-300 mr-1.5">${costPerCall.toFixed(3)}</span>
