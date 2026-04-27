@@ -482,8 +482,9 @@ export default function DashboardPage() {
 
           {/* By Project */}
           <div className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-yellow-500 rounded">
-            <div className="px-3 py-2 border-b border-neutral-800">
+            <div className="px-3 py-2 border-b border-neutral-800 flex items-center justify-between">
               <span className="text-xs font-mono font-bold text-yellow-400 uppercase tracking-wider">By Project</span>
+              {data.projects.length > 0 && <span className="text-[10px] font-mono text-neutral-600">({data.projects.length})</span>}
             </div>
             <div className="p-3">
               <div className="flex text-xs text-neutral-600 font-mono mb-1.5 pr-1">
@@ -492,23 +493,28 @@ export default function DashboardPage() {
                 <span className="w-14 text-right">avg/s</span>
                 <span className="w-6 text-right">s</span>
               </div>
-              <div className="space-y-1">
-                {data.projects.map((p) => {
-                  const displayPath = formatPath(p.path || p.name);
-                  return (
-                    <div key={p.name} className="flex items-center gap-1.5 text-xs font-mono">
-                      <div className="w-16 h-1.5 bg-neutral-800 rounded overflow-hidden shrink-0">
-                        <div className="h-full bg-yellow-500 rounded" style={{ width: `${(p.cost / maxProjectCost) * 100}%` }} />
+              <div className="relative">
+                <div className={`space-y-1${data.projects.length > 6 ? " pb-4" : ""}`}>
+                  {data.projects.map((p) => {
+                    const displayPath = formatPath(p.path || p.name);
+                    return (
+                      <div key={p.name} className="flex items-center gap-1.5 text-xs font-mono">
+                        <div className="w-16 h-1.5 bg-neutral-800 rounded overflow-hidden shrink-0">
+                          <div className="h-full bg-yellow-500 rounded" style={{ width: `${(p.cost / maxProjectCost) * 100}%` }} />
+                        </div>
+                        <span className="flex-1 text-neutral-300 truncate" title={displayPath}>{displayPath}</span>
+                        <span className="w-16 text-yellow-400 text-right">{fmt$(p.cost)}</span>
+                        <span className="w-14 text-neutral-500 text-right">{fmt$(p.avgCost)}</span>
+                        <span className="w-6 text-neutral-600 text-right">{p.sessions}</span>
                       </div>
-                      <span className="flex-1 text-neutral-300 truncate" title={displayPath}>{displayPath}</span>
-                      <span className="w-16 text-yellow-400 text-right">{fmt$(p.cost)}</span>
-                      <span className="w-14 text-neutral-500 text-right">{fmt$(p.avgCost)}</span>
-                      <span className="w-6 text-neutral-600 text-right">{p.sessions}</span>
-                    </div>
-                  );
-                })}
-                {data.projects.length === 0 && (
-                  <p className="text-neutral-600 text-xs font-mono">no data</p>
+                    );
+                  })}
+                  {data.projects.length === 0 && (
+                    <p className="text-neutral-600 text-xs font-mono">no data</p>
+                  )}
+                </div>
+                {data.projects.length > 6 && (
+                  <div className="absolute bottom-0 left-0 right-0 h-8 bg-gradient-to-t from-neutral-900 to-transparent pointer-events-none" />
                 )}
               </div>
             </div>
@@ -516,8 +522,9 @@ export default function DashboardPage() {
 
           {/* By Activity */}
           <div className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-violet-500 rounded">
-            <div className="px-3 py-2 border-b border-neutral-800">
+            <div className="px-3 py-2 border-b border-neutral-800 flex items-center justify-between">
               <span className="text-xs font-mono font-bold text-violet-400 uppercase tracking-wider">By Activity</span>
+              {data.activities.length > 0 && <span className="text-[10px] font-mono text-neutral-600">({data.activities.length})</span>}
             </div>
             <div className="p-3">
               <div className="flex text-xs text-neutral-600 font-mono mb-1.5 pr-1">
@@ -527,28 +534,33 @@ export default function DashboardPage() {
                 <span className="w-12 text-right">turns</span>
                 <span className="w-14 text-right">1-shot</span>
               </div>
-              <div className="space-y-1">
-                {(() => {
-                  const maxCost = Math.max(...data.activities.map((a) => a.cost), 0.01);
-                  return data.activities.map((a) => {
-                    const pct = a.oneShotRate != null ? Math.round(a.oneShotRate * 100) : null;
-                    return (
-                      <div key={a.name} className="flex items-center gap-1.5 text-xs font-mono">
-                        <div className="w-16 h-1.5 bg-neutral-800 rounded overflow-hidden shrink-0">
-                          <div className="h-full bg-violet-500 rounded" style={{ width: `${(a.cost / maxCost) * 100}%` }} />
+              <div className="relative">
+                <div className={`space-y-1${data.activities.length > 6 ? " pb-4" : ""}`}>
+                  {(() => {
+                    const maxCost = Math.max(...data.activities.map((a) => a.cost), 0.01);
+                    return data.activities.map((a) => {
+                      const pct = a.oneShotRate != null ? Math.round(a.oneShotRate * 100) : null;
+                      return (
+                        <div key={a.name} className="flex items-center gap-1.5 text-xs font-mono">
+                          <div className="w-16 h-1.5 bg-neutral-800 rounded overflow-hidden shrink-0">
+                            <div className="h-full bg-violet-500 rounded" style={{ width: `${(a.cost / maxCost) * 100}%` }} />
+                          </div>
+                          <span className="flex-1 text-neutral-300 truncate">{a.name}</span>
+                          <span className="w-16 text-yellow-400 text-right">{fmt$(a.cost)}</span>
+                          <span className="w-12 text-neutral-500 text-right">{a.turns}</span>
+                          <span className={`w-14 text-right font-bold ${pct == null ? "text-neutral-600" : pct >= 70 ? "text-emerald-400" : pct >= 40 ? "text-yellow-400" : "text-neutral-500"}`}>
+                            {pct != null ? `${pct}%` : "—"}
+                          </span>
                         </div>
-                        <span className="flex-1 text-neutral-300 truncate">{a.name}</span>
-                        <span className="w-16 text-yellow-400 text-right">{fmt$(a.cost)}</span>
-                        <span className="w-12 text-neutral-500 text-right">{a.turns}</span>
-                        <span className={`w-14 text-right font-bold ${pct == null ? "text-neutral-600" : pct >= 70 ? "text-emerald-400" : pct >= 40 ? "text-yellow-400" : "text-neutral-500"}`}>
-                          {pct != null ? `${pct}%` : "—"}
-                        </span>
-                      </div>
-                    );
-                  });
-                })()}
-                {data.activities.length === 0 && (
-                  <p className="text-neutral-600 text-xs font-mono">no data</p>
+                      );
+                    });
+                  })()}
+                  {data.activities.length === 0 && (
+                    <p className="text-neutral-600 text-xs font-mono">no data</p>
+                  )}
+                </div>
+                {data.activities.length > 6 && (
+                  <div className="absolute bottom-0 left-0 right-0 h-8 bg-gradient-to-t from-neutral-900 to-transparent pointer-events-none" />
                 )}
               </div>
             </div>
@@ -634,56 +646,68 @@ export default function DashboardPage() {
 
           {/* Core Tools */}
           <div className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-teal-500 rounded">
-            <div className="px-3 py-2 border-b border-neutral-800">
+            <div className="px-3 py-2 border-b border-neutral-800 flex items-center justify-between">
               <span className="text-xs font-mono font-bold text-teal-400 uppercase tracking-wider">Core Tools</span>
+              {(data.tools ?? []).length > 0 && <span className="text-[10px] font-mono text-neutral-600">({(data.tools ?? []).length})</span>}
             </div>
             <div className="p-3">
               <div className="flex text-xs text-neutral-600 font-mono mb-1.5">
                 <span className="flex-1">tool</span>
                 <span className="w-16 text-right">calls</span>
               </div>
-              <div className="space-y-1">
-                {(data.tools ?? []).map((t) => {
-                  const maxCalls = Math.max(...(data.tools ?? []).map((x) => x.calls), 0.01);
-                  return (
-                    <div key={t.name} className="flex items-center gap-1.5 text-xs font-mono">
-                      <div className="w-16 h-1.5 bg-neutral-800 rounded overflow-hidden shrink-0">
-                        <div className="h-full bg-teal-500 rounded" style={{ width: `${(t.calls / maxCalls) * 100}%` }} />
+              <div className="relative">
+                <div className={`space-y-1${(data.tools ?? []).length > 6 ? " pb-4" : ""}`}>
+                  {(data.tools ?? []).map((t) => {
+                    const maxCalls = Math.max(...(data.tools ?? []).map((x) => x.calls), 0.01);
+                    return (
+                      <div key={t.name} className="flex items-center gap-1.5 text-xs font-mono">
+                        <div className="w-16 h-1.5 bg-neutral-800 rounded overflow-hidden shrink-0">
+                          <div className="h-full bg-teal-500 rounded" style={{ width: `${(t.calls / maxCalls) * 100}%` }} />
+                        </div>
+                        <span className="flex-1 text-neutral-300 truncate">{t.name}</span>
+                        <span className="w-16 text-blue-400 text-right">{t.calls.toLocaleString()}</span>
                       </div>
-                      <span className="flex-1 text-neutral-300 truncate">{t.name}</span>
-                      <span className="w-16 text-blue-400 text-right">{t.calls.toLocaleString()}</span>
-                    </div>
-                  );
-                })}
-                {(data.tools ?? []).length === 0 && <p className="text-neutral-600 text-xs font-mono">no data</p>}
+                    );
+                  })}
+                  {(data.tools ?? []).length === 0 && <p className="text-neutral-600 text-xs font-mono">no data</p>}
+                </div>
+                {(data.tools ?? []).length > 6 && (
+                  <div className="absolute bottom-0 left-0 right-0 h-8 bg-gradient-to-t from-neutral-900 to-transparent pointer-events-none" />
+                )}
               </div>
             </div>
           </div>
 
           {/* Shell Commands */}
           <div className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-orange-500 rounded">
-            <div className="px-3 py-2 border-b border-neutral-800">
+            <div className="px-3 py-2 border-b border-neutral-800 flex items-center justify-between">
               <span className="text-xs font-mono font-bold text-orange-400 uppercase tracking-wider">Shell Commands</span>
+              {(data.shellCommands ?? []).length > 0 && <span className="text-[10px] font-mono text-neutral-600">({(data.shellCommands ?? []).length})</span>}
             </div>
             <div className="p-3">
               <div className="flex text-xs text-neutral-600 font-mono mb-1.5">
                 <span className="flex-1">command</span>
                 <span className="w-16 text-right">calls</span>
               </div>
-              <div className="space-y-1">
-                {(data.shellCommands ?? []).map((s) => {
-                  const maxCalls = Math.max(...(data.shellCommands ?? []).map((x) => x.calls), 0.01);
-                  return (
-                    <div key={s.name} className="flex items-center gap-1.5 text-xs font-mono">
-                      <div className="w-16 h-1.5 bg-neutral-800 rounded overflow-hidden shrink-0">
-                        <div className="h-full bg-orange-500 rounded" style={{ width: `${(s.calls / maxCalls) * 100}%` }} />
+              <div className="relative">
+                <div className={`space-y-1${(data.shellCommands ?? []).length > 6 ? " pb-4" : ""}`}>
+                  {(data.shellCommands ?? []).map((s) => {
+                    const maxCalls = Math.max(...(data.shellCommands ?? []).map((x) => x.calls), 0.01);
+                    return (
+                      <div key={s.name} className="flex items-center gap-1.5 text-xs font-mono">
+                        <div className="w-16 h-1.5 bg-neutral-800 rounded overflow-hidden shrink-0">
+                          <div className="h-full bg-orange-500 rounded" style={{ width: `${(s.calls / maxCalls) * 100}%` }} />
+                        </div>
+                        <span className="flex-1 text-neutral-300 truncate">{s.name}</span>
+                        <span className="w-16 text-blue-400 text-right">{s.calls.toLocaleString()}</span>
                       </div>
-                      <span className="flex-1 text-neutral-300 truncate">{s.name}</span>
-                      <span className="w-16 text-blue-400 text-right">{s.calls.toLocaleString()}</span>
-                    </div>
-                  );
-                })}
-                {(data.shellCommands ?? []).length === 0 && <p className="text-neutral-600 text-xs font-mono">no data</p>}
+                    );
+                  })}
+                  {(data.shellCommands ?? []).length === 0 && <p className="text-neutral-600 text-xs font-mono">no data</p>}
+                </div>
+                {(data.shellCommands ?? []).length > 6 && (
+                  <div className="absolute bottom-0 left-0 right-0 h-8 bg-gradient-to-t from-neutral-900 to-transparent pointer-events-none" />
+                )}
               </div>
             </div>
           </div>
@@ -694,28 +718,34 @@ export default function DashboardPage() {
 
           {/* MCP Servers */}
           <div className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-cyan-500 rounded">
-            <div className="px-3 py-2 border-b border-neutral-800">
+            <div className="px-3 py-2 border-b border-neutral-800 flex items-center justify-between">
               <span className="text-xs font-mono font-bold text-cyan-400 uppercase tracking-wider">MCP Servers</span>
+              {(data.mcpServers ?? []).length > 0 && <span className="text-[10px] font-mono text-neutral-600">({(data.mcpServers ?? []).length})</span>}
             </div>
             <div className="p-3">
               <div className="flex text-xs text-neutral-600 font-mono mb-1.5">
                 <span className="flex-1">server</span>
                 <span className="w-16 text-right">calls</span>
               </div>
-              <div className="space-y-1">
-                {(data.mcpServers ?? []).map((m) => {
-                  const maxCalls = Math.max(...(data.mcpServers ?? []).map((x) => x.calls), 0.01);
-                  return (
-                    <div key={m.name} className="flex items-center gap-1.5 text-xs font-mono">
-                      <div className="w-16 h-1.5 bg-neutral-800 rounded overflow-hidden shrink-0">
-                        <div className="h-full bg-cyan-500 rounded" style={{ width: `${(m.calls / maxCalls) * 100}%` }} />
+              <div className="relative">
+                <div className={`space-y-1${(data.mcpServers ?? []).length > 6 ? " pb-4" : ""}`}>
+                  {(data.mcpServers ?? []).map((m) => {
+                    const maxCalls = Math.max(...(data.mcpServers ?? []).map((x) => x.calls), 0.01);
+                    return (
+                      <div key={m.name} className="flex items-center gap-1.5 text-xs font-mono">
+                        <div className="w-16 h-1.5 bg-neutral-800 rounded overflow-hidden shrink-0">
+                          <div className="h-full bg-cyan-500 rounded" style={{ width: `${(m.calls / maxCalls) * 100}%` }} />
+                        </div>
+                        <span className="flex-1 text-neutral-300 truncate">{m.name}</span>
+                        <span className="w-16 text-blue-400 text-right">{m.calls.toLocaleString()}</span>
                       </div>
-                      <span className="flex-1 text-neutral-300 truncate">{m.name}</span>
-                      <span className="w-16 text-blue-400 text-right">{m.calls.toLocaleString()}</span>
-                    </div>
-                  );
-                })}
-                {(data.mcpServers ?? []).length === 0 && <p className="text-neutral-600 text-xs font-mono">no data</p>}
+                    );
+                  })}
+                  {(data.mcpServers ?? []).length === 0 && <p className="text-neutral-600 text-xs font-mono">no data</p>}
+                </div>
+                {(data.mcpServers ?? []).length > 6 && (
+                  <div className="absolute bottom-0 left-0 right-0 h-8 bg-gradient-to-t from-neutral-900 to-transparent pointer-events-none" />
+                )}
               </div>
             </div>
           </div>
