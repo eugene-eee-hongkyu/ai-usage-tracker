@@ -33,11 +33,11 @@ const GRADE_VALUE_COLOR: Record<GradeLevel, string> = {
 };
 
 const GRADE_CELL_BG: Record<GradeLevel, string> = {
-  "탁월": "bg-emerald-500/10",
-  "양호": "bg-green-500/8",
-  "보통": "",
-  "부족": "bg-orange-500/10",
-  "경고": "bg-red-500/12",
+  "탁월": "bg-emerald-500/25",
+  "양호": "bg-green-500/20",
+  "보통": "bg-slate-600/25",
+  "부족": "bg-amber-500/25",
+  "경고": "bg-red-500/30",
 };
 
 const MEMBER_COLORS = [
@@ -319,8 +319,41 @@ export default function TeamPage() {
               </div>
             )}
 
-            {/* Row 2: Efficiency + Top Sessions */}
+            {/* Row 2: Usage + Efficiency */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+
+              {/* Usage */}
+              <div className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-yellow-500 rounded">
+                <div className="px-3 py-2 border-b border-neutral-800">
+                  <span className="text-xs font-mono font-bold text-yellow-400 uppercase tracking-wider">Usage</span>
+                </div>
+                <div className="p-3">
+                  <div className="flex text-xs text-neutral-600 font-mono mb-1.5">
+                    <span className="w-16 shrink-0" />
+                    <span className="flex-1">member</span>
+                    <span className="w-16 text-right">cost</span>
+                    <span className="w-12 text-right">s</span>
+                  </div>
+                  <div className="space-y-1">
+                    {byCost.map((m, i) => (
+                      <div key={m.userId} className="flex items-center gap-1.5 text-xs font-mono">
+                        <div className="w-16 h-1.5 bg-neutral-800 rounded overflow-hidden shrink-0">
+                          <div
+                            className="h-full rounded"
+                            style={{
+                              width: `${(m.totalCost / maxCost) * 100}%`,
+                              background: MEMBER_COLORS[i % MEMBER_COLORS.length],
+                            }}
+                          />
+                        </div>
+                        <span className="flex-1 text-neutral-300 truncate">{m.name}</span>
+                        <span className="w-16 text-yellow-400 text-right tabular-nums">${m.totalCost.toFixed(2)}</span>
+                        <span className="w-12 text-neutral-600 text-right tabular-nums">{m.sessionsCount}s</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
 
               {/* Efficiency Table */}
               <div className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-fuchsia-500 rounded">
@@ -381,7 +414,12 @@ export default function TeamPage() {
                 </div>
               </div>
 
-              {/* Top Sessions */}
+            </div>
+
+            {/* Row 3: Top Sessions + Team Activities */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+
+              {/* Top Sessions (moved from Row 2) */}
               <div className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-red-500 rounded">
                 <div className="px-3 py-2 border-b border-neutral-800">
                   <span className="text-xs font-mono font-bold text-red-400 uppercase tracking-wider">Top Sessions</span>
@@ -429,43 +467,6 @@ export default function TeamPage() {
                       </tbody>
                     </table>
                   )}
-                </div>
-              </div>
-            </div>
-
-            {/* Row 3: Usage + Team Activities */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-
-              {/* Usage */}
-              <div className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-yellow-500 rounded">
-                <div className="px-3 py-2 border-b border-neutral-800">
-                  <span className="text-xs font-mono font-bold text-yellow-400 uppercase tracking-wider">Usage</span>
-                </div>
-                <div className="p-3">
-                  <div className="flex text-xs text-neutral-600 font-mono mb-1.5">
-                    <span className="w-16 shrink-0" />
-                    <span className="flex-1">member</span>
-                    <span className="w-16 text-right">cost</span>
-                    <span className="w-12 text-right">s</span>
-                  </div>
-                  <div className="space-y-1">
-                    {byCost.map((m, i) => (
-                      <div key={m.userId} className="flex items-center gap-1.5 text-xs font-mono">
-                        <div className="w-16 h-1.5 bg-neutral-800 rounded overflow-hidden shrink-0">
-                          <div
-                            className="h-full rounded"
-                            style={{
-                              width: `${(m.totalCost / maxCost) * 100}%`,
-                              background: MEMBER_COLORS[i % MEMBER_COLORS.length],
-                            }}
-                          />
-                        </div>
-                        <span className="flex-1 text-neutral-300 truncate">{m.name}</span>
-                        <span className="w-16 text-yellow-400 text-right tabular-nums">${m.totalCost.toFixed(2)}</span>
-                        <span className="w-12 text-neutral-600 text-right tabular-nums">{m.sessionsCount}s</span>
-                      </div>
-                    ))}
-                  </div>
                 </div>
               </div>
 
