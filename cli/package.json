@@ -7,7 +7,10 @@
     "usage-tracker": "./src/index.mjs"
   },
   "scripts": {
-    "build": "bun build src/index.ts --outfile src/index.mjs --target node",
+    "build:index": "bun build src/index.ts --outfile src/index.mjs --target node",
+    "build:sync": "bun build src/sync.ts --outfile src/sync.mjs --target node",
+    "build:init": "bun build src/init.ts --outfile src/init.mjs --target node",
+    "build": "bun run build:index && bun run build:sync && bun run build:init",
     "dev": "bun run src/index.ts"
   },
   "dependencies": {
