@@ -6,18 +6,18 @@
 
 ---
 
-## 마지막 실행: 2026-04-27 14:25
-## 마지막 업데이트: 2026-04-27 14:25
+## 마지막 실행: 2026-04-27 15:38
+## 마지막 업데이트: 2026-04-27 15:38
 ## 현재 모드: bypassPermissions
 
 ### 현재 집중
 
-- UI 개선 다수 완료 (타임존, 경로 표시, 스크롤 UX, Efficiency 6지표). 재설치 + 팀원 초대 남음.
+- 버그 수정 및 관리자 기능 완료. Vercel ADMIN_EMAIL 설정 + 팀원 초대 남음.
 
 ### 이어서 할 것
 
-1. 재설치 (`rm -rf ~/.primus-usage-tracker` → `npx github:eugene-eee-hongkyu/ai-usage-tracker init`)
-2. Vercel 배포 확인 (팀 배지 렌더링, 타임존 SGT/KST 배지)
+1. Vercel 환경변수 `ADMIN_EMAIL` 설정 (프로덕션 관리자 버튼 활성화)
+2. 재설치 (`rm -rf ~/.primus-usage-tracker` → `npx github:eugene-eee-hongkyu/ai-usage-tracker init`)
 3. 팀원 초대 및 팀랭킹 화면 검증
 
 ### 막힌 것
@@ -26,7 +26,7 @@
 
 ### 사람 판단 필요
 
-- 팀원 초대 (초대할 이메일 목록 결정)
+- Vercel 대시보드 `ADMIN_EMAIL` env var 직접 설정 필요
 
 ### 백로그 요약
 - 대기 중: 2개
@@ -112,7 +112,11 @@
 - [x] 경로 표시 개선 (마지막 3 세그먼트 + RTL ellipsis)
 - [x] 카드 스크롤 UX (15개 초과 시만 scroll 배지 + overflow-y-auto)
 - [x] Efficiency 지표 6개로 확장 (Cost/call + Output/Input ratio 추가)
+- [x] cache hit 100% 버그 수정 (>1 휴리스틱 제거, rawJson tokens 직접 계산)
+- [x] 효율 점수 재설계 (4지표: oneShotRate × cacheHit/100 × outputInputRatio / costPerCall)
+- [x] members API rawJson.all.daily 버그 수정 (히트맵 0 activities 해결)
+- [x] 관리자 대시보드 뷰어 (DashboardView 분리, /team/[userId]/dashboard, ADMIN_EMAIL 다중 지원)
+- [ ] Vercel ADMIN_EMAIL env var 설정
 - [ ] 재설치 (`rm -rf ~/.primus-usage-tracker` → `npx init`)
-- [ ] Vercel 배포 확인 (타임존 배지, 팀 배지 렌더링)
 - [ ] 팀원 초대 및 팀랭킹 화면 검증
 - [ ] Windows SessionEnd hook 발화 검증 (Hold 플래그)

@@ -4,6 +4,22 @@
 
 ---
 
+## Session 2026-04-27 15:38 — 팀랭킹 버그 수정 + 관리자 대시보드 기능
+
+### 작업 요약
+- **Cache hit 100% 버그 수정 (ingest/team/dashboard)**: `> 1` 정규화 휴리스틱 제거. `codeburn`이 0-100 퍼센트로 반환하는데 값이 1일 때 `1 > 1 = false`로 100배 뻥튀기되던 문제. 3곳(`ingest/route.ts`, `team/route.ts`, `dashboard/route.ts`) 일괄 수정
+- **Cache hit 계산 방식 통일**: team/member API에서 `snap.cacheHitPct`(DB 저장값) 대신 `rawJson.tokens`에서 직접 계산 (`tRead / (tRead + tWrite + tInput) × 100`). 재싱크 없이 즉시 정확한 값 반영
+- **효율 점수 재설계**: `oneShotRate × cacheHit / costPerSession` → `oneShotRate × (cacheHit/100) × outputInputRatio / costPerCall`. 6지표 중 4개 반영
+- **members API rawJson 구조 버그 수정**: `rawJson.daily` 대신 `rawJson.all.daily` 읽도록 수정. 활동 히트맵 "0 activities" 문제 해결
+- **관리자 전용 대시보드 뷰어**: `DashboardView` 컴포넌트로 분리, `/team/[userId]/dashboard` 페이지 신규. `lib/admin.ts` ADMIN_EMAIL 상수, members API에 `canViewFullDashboard` 플래그 추가 (서버사이드 체크)
+- **ADMIN_EMAIL 콤마 구분 다중 지원**: `ADMIN_EMAIL=a@x.com,b@x.com` 형식 파싱
+
+### 다음 액션
+- Vercel 환경변수 `ADMIN_EMAIL` 설정 (프로덕션 적용)
+- 재설치 (`rm -rf ~/.primus-usage-tracker` → `npx init`) 후 팀원 초대 및 랭킹 화면 검증
+
+---
+
 ## Session 2026-04-27 14:25 — 타임존 설정, 경로 표시 개선, 카드 스크롤 UX, Efficiency 지표 2개 추가
 
 ### 작업 요약
