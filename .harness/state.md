@@ -6,13 +6,13 @@
 
 ---
 
-## 마지막 실행: 2026-04-27 15:38
-## 마지막 업데이트: 2026-04-27 15:38
+## 마지막 실행: 2026-04-27 15:59
+## 마지막 업데이트: 2026-04-27 15:59
 ## 현재 모드: bypassPermissions
 
 ### 현재 집중
 
-- 버그 수정 및 관리자 기능 완료. Vercel ADMIN_EMAIL 설정 + 팀원 초대 남음.
+- 팀 대시보드 페이지 전면 재설계 완료. Vercel ADMIN_EMAIL 설정 + 팀원 초대 남음.
 
 ### 이어서 할 것
 
@@ -116,7 +116,12 @@
 - [x] 효율 점수 재설계 (4지표: oneShotRate × cacheHit/100 × outputInputRatio / costPerCall)
 - [x] members API rawJson.all.daily 버그 수정 (히트맵 0 activities 해결)
 - [x] 관리자 대시보드 뷰어 (DashboardView 분리, /team/[userId]/dashboard, ADMIN_EMAIL 다중 지원)
+- [x] 팀 페이지 전면 재설계 (팀요약 바·효율 표·사용량 바·일별 비용 Area 차트, 4섹션 구조)
+- [x] 어드민 팀원 전환 UI: "← 프로필로" 링크 → select 드롭다운으로 교체
+- [x] 팀 페이지 탭명 "팀랭킹" → "팀" 변경
+- [x] members API `callsCount`, `outputInputRatio`, `teamSummary`, `daily` 필드 추가
+- [x] `ADMIN_EMAIL` import → `isAdmin()` 함수로 교체 (기존 TS 오류 수정)
 - [ ] Vercel ADMIN_EMAIL env var 설정
 - [ ] 재설치 (`rm -rf ~/.primus-usage-tracker` → `npx init`)
-- [ ] 팀원 초대 및 팀랭킹 화면 검증
+- [ ] 팀원 초대 및 팀 화면 검증
 - [ ] Windows SessionEnd hook 발화 검증 (Hold 플래그)

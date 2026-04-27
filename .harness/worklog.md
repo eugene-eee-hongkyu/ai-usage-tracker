@@ -4,6 +4,20 @@
 
 ---
 
+## Session 2026-04-27 15:59 — 팀 대시보드 페이지 전면 재설계
+
+### 작업 요약
+- 어드민 화면의 "← 프로필로" 링크를 팀원 전환 드롭다운 select로 교체
+- 팀 페이지 이름 "팀랭킹" → "팀"으로 변경
+- MVP 카드·3개 랭킹 카드 제거 후 4섹션 구조로 재편
+  - 팀 요약 바 (총비용·세션·활성인원·평균 효율)
+  - 효율 표 (멤버별 cache hit / 1-shot / $/session 등 + 등급)
+  - 사용량 가로 막대 차트 (Recharts)
+  - 일별 비용 추이 Area 차트 (Recharts)
+- API에 `callsCount`, `outputInputRatio`, `teamSummary`, `daily` 필드 추가
+- 기존에 깨져있던 `ADMIN_EMAIL` import → `isAdmin()` 함수로 교체 (기존 TS 오류 수정)
+
+
 ## Session 2026-04-27 15:38 — 팀랭킹 버그 수정 + 관리자 대시보드 기능
 
 ### 작업 요약
