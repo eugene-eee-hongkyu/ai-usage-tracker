@@ -10,6 +10,18 @@ import { existsSync, readFileSync, writeFileSync, unlinkSync } from "fs";
 import { join } from "path";
 import { homedir } from "os";
 
+// Self-detach: SessionEnd hook 부모 프로세스는 VS Code 종료 시 SIGKILL될 수 있음.
+// _USAGE_TRACKER_DETACHED 없으면 자신을 detached 백그라운드로 재생성하고 즉시 종료.
+if (!process.env._USAGE_TRACKER_DETACHED) {
+  const child = spawn(process.execPath, [join(homedir(), ".primus-usage-tracker", "submit.mjs")], {
+    detached: true,
+    stdio: "ignore",
+    env: { ...process.env, _USAGE_TRACKER_DETACHED: "1" },
+  });
+  child.unref();
+  process.exit(0);
+}
+
 const SERVER_URL = process.env.USAGE_TRACKER_URL ?? "https://ai-usage-tracker-web-psi.vercel.app";
 const KEYTAR_SERVICE = "primus-usage-tracker";
 const KEYTAR_ACCOUNT = "api-key";
