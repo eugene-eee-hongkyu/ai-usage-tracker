@@ -629,7 +629,67 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* Row 4: MCP Servers + Core Tools */}
+        {/* Row 4: Core Tools + Shell Commands */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+
+          {/* Core Tools */}
+          <div className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-teal-500 rounded">
+            <div className="px-3 py-2 border-b border-neutral-800">
+              <span className="text-xs font-mono font-bold text-teal-400 uppercase tracking-wider">Core Tools</span>
+            </div>
+            <div className="p-3">
+              <div className="flex text-xs text-neutral-600 font-mono mb-1.5">
+                <span className="flex-1">tool</span>
+                <span className="w-16 text-right">calls</span>
+              </div>
+              <div className="space-y-1">
+                {(data.tools ?? []).map((t) => {
+                  const maxCalls = Math.max(...(data.tools ?? []).map((x) => x.calls), 0.01);
+                  return (
+                    <div key={t.name} className="flex items-center gap-1.5 text-xs font-mono">
+                      <div className="w-16 h-1.5 bg-neutral-800 rounded overflow-hidden shrink-0">
+                        <div className="h-full bg-teal-500 rounded" style={{ width: `${(t.calls / maxCalls) * 100}%` }} />
+                      </div>
+                      <span className="flex-1 text-neutral-300 truncate">{t.name}</span>
+                      <span className="w-16 text-blue-400 text-right">{t.calls.toLocaleString()}</span>
+                    </div>
+                  );
+                })}
+                {(data.tools ?? []).length === 0 && <p className="text-neutral-600 text-xs font-mono">no data</p>}
+              </div>
+            </div>
+          </div>
+
+          {/* Shell Commands */}
+          <div className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-orange-500 rounded">
+            <div className="px-3 py-2 border-b border-neutral-800">
+              <span className="text-xs font-mono font-bold text-orange-400 uppercase tracking-wider">Shell Commands</span>
+            </div>
+            <div className="p-3">
+              <div className="flex text-xs text-neutral-600 font-mono mb-1.5">
+                <span className="flex-1">command</span>
+                <span className="w-16 text-right">calls</span>
+              </div>
+              <div className="space-y-1">
+                {(data.shellCommands ?? []).map((s) => {
+                  const maxCalls = Math.max(...(data.shellCommands ?? []).map((x) => x.calls), 0.01);
+                  return (
+                    <div key={s.name} className="flex items-center gap-1.5 text-xs font-mono">
+                      <div className="w-16 h-1.5 bg-neutral-800 rounded overflow-hidden shrink-0">
+                        <div className="h-full bg-orange-500 rounded" style={{ width: `${(s.calls / maxCalls) * 100}%` }} />
+                      </div>
+                      <span className="flex-1 text-neutral-300 truncate">{s.name}</span>
+                      <span className="w-16 text-blue-400 text-right">{s.calls.toLocaleString()}</span>
+                    </div>
+                  );
+                })}
+                {(data.shellCommands ?? []).length === 0 && <p className="text-neutral-600 text-xs font-mono">no data</p>}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Row 5: MCP Servers (half width) */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
 
           {/* MCP Servers */}
@@ -656,66 +716,6 @@ export default function DashboardPage() {
                   );
                 })}
                 {(data.mcpServers ?? []).length === 0 && <p className="text-neutral-600 text-xs font-mono">no data</p>}
-              </div>
-            </div>
-          </div>
-
-          {/* Core Tools */}
-          <div className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-teal-500 rounded">
-            <div className="px-3 py-2 border-b border-neutral-800">
-              <span className="text-xs font-mono font-bold text-teal-400 uppercase tracking-wider">Core Tools</span>
-            </div>
-            <div className="p-3">
-              <div className="flex text-xs text-neutral-600 font-mono mb-1.5">
-                <span className="flex-1">tool</span>
-                <span className="w-16 text-right">calls</span>
-              </div>
-              <div className="space-y-1">
-                {(data.tools ?? []).slice(0, 10).map((t) => {
-                  const maxCalls = Math.max(...(data.tools ?? []).map((x) => x.calls), 0.01);
-                  return (
-                    <div key={t.name} className="flex items-center gap-1.5 text-xs font-mono">
-                      <div className="w-16 h-1.5 bg-neutral-800 rounded overflow-hidden shrink-0">
-                        <div className="h-full bg-teal-500 rounded" style={{ width: `${(t.calls / maxCalls) * 100}%` }} />
-                      </div>
-                      <span className="flex-1 text-neutral-300 truncate">{t.name}</span>
-                      <span className="w-16 text-blue-400 text-right">{t.calls.toLocaleString()}</span>
-                    </div>
-                  );
-                })}
-                {(data.tools ?? []).length === 0 && <p className="text-neutral-600 text-xs font-mono">no data</p>}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Row 5: Shell Commands (half width) */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-
-          {/* Shell Commands */}
-          <div className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-orange-500 rounded">
-            <div className="px-3 py-2 border-b border-neutral-800">
-              <span className="text-xs font-mono font-bold text-orange-400 uppercase tracking-wider">Shell Commands</span>
-            </div>
-            <div className="p-3">
-              <div className="flex text-xs text-neutral-600 font-mono mb-1.5">
-                <span className="flex-1">command</span>
-                <span className="w-16 text-right">calls</span>
-              </div>
-              <div className="space-y-1">
-                {(data.shellCommands ?? []).slice(0, 10).map((s) => {
-                  const maxCalls = Math.max(...(data.shellCommands ?? []).map((x) => x.calls), 0.01);
-                  return (
-                    <div key={s.name} className="flex items-center gap-1.5 text-xs font-mono">
-                      <div className="w-16 h-1.5 bg-neutral-800 rounded overflow-hidden shrink-0">
-                        <div className="h-full bg-orange-500 rounded" style={{ width: `${(s.calls / maxCalls) * 100}%` }} />
-                      </div>
-                      <span className="flex-1 text-neutral-300 truncate">{s.name}</span>
-                      <span className="w-16 text-blue-400 text-right">{s.calls.toLocaleString()}</span>
-                    </div>
-                  );
-                })}
-                {(data.shellCommands ?? []).length === 0 && <p className="text-neutral-600 text-xs font-mono">no data</p>}
               </div>
             </div>
           </div>
