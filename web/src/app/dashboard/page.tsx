@@ -64,11 +64,13 @@ const PERIOD_LABELS: Record<Period, string> = {
 
 function formatPath(path: string): string {
   if (!path) return "";
+  let p = path;
   if (path.startsWith("/")) {
     const m = path.match(/^\/(?:Users|home)\/[^/]+\/(.+)$/);
-    return m ? m[1] : path;
+    p = m ? m[1] : path;
   }
-  return path;
+  const parts = p.split("/").filter(Boolean);
+  return parts.slice(-3).join("/");
 }
 
 function fmt$(n: number) { return `$${n.toFixed(2)}`; }
@@ -568,7 +570,7 @@ export default function DashboardPage() {
                         <div className="w-16 h-1.5 bg-neutral-800 rounded overflow-hidden shrink-0">
                           <div className="h-full bg-yellow-500 rounded" style={{ width: `${(p.cost / maxProjectCost) * 100}%` }} />
                         </div>
-                        <span className="flex-1 text-neutral-300 truncate" title={displayPath}>{displayPath}</span>
+                        <span className="flex-1 text-neutral-300 overflow-hidden whitespace-nowrap" style={{ direction: "rtl", textOverflow: "ellipsis", textAlign: "left" }} title={p.path || p.name}>{displayPath}</span>
                         <span className="w-16 text-yellow-400 text-right">{fmt$(p.cost)}</span>
                         <span className="w-14 text-neutral-500 text-right">{fmt$(p.avgCost)}</span>
                         <span className="w-6 text-neutral-600 text-right">{p.sessions}</span>
@@ -660,7 +662,7 @@ export default function DashboardPage() {
                         <div className="w-16 h-1.5 bg-neutral-800 rounded overflow-hidden shrink-0">
                           <div className="h-full bg-red-500 rounded" style={{ width: `${(s.cost / maxSessionCost) * 100}%` }} />
                         </div>
-                        <span className="text-neutral-300 truncate" title={displayPath}>{displayPath}</span>
+                        <span className="text-neutral-300 overflow-hidden whitespace-nowrap" style={{ direction: "rtl", textOverflow: "ellipsis", textAlign: "left" }} title={s.projectPath || s.project}>{displayPath}</span>
                       </div>
                       <span className="w-16 text-yellow-400 text-right shrink-0">{fmt$(s.cost)}</span>
                       <span className="w-16 text-neutral-500 text-right shrink-0">{s.calls.toLocaleString()}</span>
