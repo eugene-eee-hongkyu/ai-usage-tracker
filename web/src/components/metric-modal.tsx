@@ -139,6 +139,22 @@ function callsPerSessionGrade(v: number): GradeLevel {
   return "경고";
 }
 
+function costPerCallGrade(v: number): GradeLevel {
+  if (v < 0.04) return "탁월";
+  if (v < 0.06) return "양호";
+  if (v < 0.10) return "보통";
+  if (v < 0.20) return "부족";
+  return "경고";
+}
+
+function outputInputGrade(v: number): GradeLevel {
+  if (v >= 30) return "탁월";
+  if (v >= 15) return "양호";
+  if (v >= 8) return "보통";
+  if (v >= 3) return "부족";
+  return "경고";
+}
+
 export function CacheHitModal({ value, onClose, methodsOnly = false }: { value: number; onClose: () => void; methodsOnly?: boolean }) {
   const grade = cacheHitGrade(value);
 
@@ -382,6 +398,158 @@ export function CostPerSessionModal({
             currentGrade={grade}
           />
           <p className="text-xs text-slate-600 mt-2">Opus는 약 5배로 환산.</p>
+        </Section>
+      )}
+    </ModalShell>
+  );
+}
+
+export function CostPerCallModal({
+  value,
+  totalCost,
+  totalCalls,
+  onClose,
+  methodsOnly = false,
+}: {
+  value: number;
+  totalCost: number;
+  totalCalls: number;
+  onClose: () => void;
+  methodsOnly?: boolean;
+}) {
+  const grade = costPerCallGrade(value);
+  return (
+    <ModalShell title={methodsOnly ? "Cost / call 줄이는 방법" : "Cost / call 상세"} onClose={onClose}>
+      {!methodsOnly && (
+        <Section title="Cost / call이란">
+          <p className="text-slate-400 leading-relaxed text-xs">
+            API 호출 한 번의 평균 비용. 사용자가 메시지를 보내거나 Claude가 도구를 실행할 때마다 한 번의 API
+            호출이 발생합니다.
+          </p>
+          <div className="bg-slate-800 rounded px-3 py-2 text-xs font-mono leading-relaxed">
+            <span className="text-slate-400">Cost / call = 총 비용 ÷ 총 호출 수</span>
+            <br />
+            <span className="text-slate-300">
+              ${totalCost.toFixed(2)} ÷ {totalCalls.toLocaleString()} ={" "}
+              <strong className="text-indigo-300">호출당 ${value.toFixed(3)}</strong>
+            </span>
+          </div>
+          <p className="text-slate-400 leading-relaxed text-xs">
+            Cache hit은 &ldquo;캐시를 잘 썼나&rdquo;를, Cost / session은 &ldquo;작업 단위가 적당한가&rdquo;를 보지만,
+            Cost / call은 <strong className="text-slate-300">&ldquo;모델 선택과 컨텍스트 크기&rdquo;</strong>의 직접 신호입니다.
+            같은 세션이라도 Opus를 쓰면 Sonnet 대비 5배, 컨텍스트가 크면 비례해서 올라갑니다.
+          </p>
+        </Section>
+      )}
+      <Section title="줄이는 방법">
+        <div className="space-y-2.5">
+          <Step n={1}>
+            <strong className="text-slate-300">Sonnet 위주 사용</strong> — Opus는 정말 어려운 설계·리팩토링·디버깅에만.
+            단순 파일 편집·검색·정보 조회는 Sonnet이 충분하고 비용은 1/5.
+          </Step>
+          <Step n={2}>
+            <strong className="text-slate-300">단순 작업은 Haiku로</strong> — 파일 목록 보기, 짧은 코드 조각 작성,
+            간단한 질문은 <Mono>/model haiku</Mono>로 전환. Sonnet 대비 1/4.
+          </Step>
+          <Step n={3}>
+            <strong className="text-slate-300">CLAUDE.md 다이어트</strong> — 매 호출마다 CLAUDE.md 전체가 전송됨.
+            5KB라면 호출당 5천 토큰 고정 비용. 핵심만 남기고 나머지는 별도 파일로 분리.
+          </Step>
+          <Step n={4}>
+            <strong className="text-slate-300">cache hit 유지</strong> — cache read는 일반 input의 1/10 가격.
+            cache hit가 높으면 같은 컨텍스트 크기에서도 cost / call이 낮아짐.
+          </Step>
+          <Step n={5}>
+            <strong className="text-slate-300">MCP 도구 정리</strong> — 등록된 MCP 도구가 많으면 도구 정의가
+            매 호출마다 전송됨. 자주 안 쓰는 MCP는 비활성화.
+          </Step>
+        </div>
+      </Section>
+      {!methodsOnly && (
+        <Section title="등급 (Sonnet 기준)">
+          <GradeTable
+            rows={[
+              { grade: "탁월", range: "$0.04 미만",  label: "cache 잘 활용 + 작은 모델" },
+              { grade: "양호", range: "$0.04~0.06",  label: "정상. Sonnet 위주" },
+              { grade: "보통", range: "$0.06~0.10",  label: "Opus 사용 또는 컨텍스트 큼" },
+              { grade: "부족", range: "$0.10~0.20",  label: "Opus 남용 또는 cache miss" },
+              { grade: "경고", range: "$0.20+",      label: "Opus + 큰 컨텍스트 + cache 깨짐" },
+            ]}
+            currentGrade={grade}
+          />
+          <p className="text-xs text-slate-600 mt-2">Opus는 약 5배로 환산. 팀원 비교 시 같은 모델 기준으로 볼 것.</p>
+        </Section>
+      )}
+    </ModalShell>
+  );
+}
+
+export function OutputInputRatioModal({
+  value,
+  onClose,
+  methodsOnly = false,
+}: {
+  value: number;
+  onClose: () => void;
+  methodsOnly?: boolean;
+}) {
+  const grade = outputInputGrade(value);
+  return (
+    <ModalShell title={methodsOnly ? "Output / Input ratio 올리는 방법" : "Output / Input ratio 상세"} onClose={onClose}>
+      {!methodsOnly && (
+        <Section title="Output / Input ratio란">
+          <p className="text-slate-400 leading-relaxed text-xs">
+            Claude에게 보낸 새 입력 1 토큰당 Claude가 생성한 출력이 몇 토큰인지를 나타냅니다.
+            높을수록 &ldquo;적은 지시로 많은 작업을 시킨 것&rdquo;.
+          </p>
+          <div className="bg-slate-800 rounded px-3 py-2 text-xs font-mono leading-relaxed">
+            <span className="text-slate-400">Output / Input = output 토큰 ÷ input 토큰</span>
+            <br />
+            <span className="text-slate-500 text-[10px]">※ input은 새로 보낸 토큰만. cache_read는 제외 (이미 1/10 가격으로 처리됨)</span>
+          </div>
+          <p className="text-slate-400 leading-relaxed text-xs">
+            낮은 ratio = 큰 컨텍스트를 새로 보내고 짧은 답을 받음 = cache를 안 쓰거나 단순 질의응답 패턴.{" "}
+            <strong className="text-slate-300">사내 멤버 비교에서 이 수치가 낮으면 AI 활용 방식 점검이 필요합니다.</strong>
+          </p>
+        </Section>
+      )}
+      <Section title="올리는 방법">
+        <div className="space-y-2.5">
+          <Step n={1}>
+            <strong className="text-slate-300">CLAUDE.md 안정화 → cache 활용</strong> — cache_read를 쓰면
+            input 토큰이 줄고 output은 그대로라 ratio가 올라감. cache hit와 직결.
+          </Step>
+          <Step n={2}>
+            <strong className="text-slate-300">작업 위임으로 사용</strong> — &ldquo;이 부분 어떻게 하지?&rdquo; 질문 대신
+            &ldquo;이 패턴으로 전체 리팩토링해줘&rdquo; 위임. 짧은 지시로 긴 코드를 받을수록 ratio ↑.
+          </Step>
+          <Step n={3}>
+            <strong className="text-slate-300">짧고 구체적인 지시</strong> — 긴 설명 대신 명확한 동사와 범위.
+            &ldquo;X 파일의 Y 함수를 Z 방식으로 수정해줘&rdquo;가 &ldquo;이거 좀 고쳐줘&rdquo;보다 output 품질과 양이 높음.
+          </Step>
+          <Step n={4}>
+            <strong className="text-slate-300">같은 세션 안에서 이어서 작업</strong> — 세션 끊으면 cache 날아감.
+            cache 살아있는 동안 연속 작업하면 input 토큰 최소화.
+          </Step>
+          <Step n={5}>
+            <strong className="text-slate-300">Claude를 검색기로 쓰지 않기</strong> — &ldquo;X가 뭐야?&rdquo; 같은
+            단순 질문은 ratio를 낮춤. 문서 검색은 MCP 도구로, Claude는 실제 작업에.
+          </Step>
+        </div>
+      </Section>
+      {!methodsOnly && (
+        <Section title="등급">
+          <GradeTable
+            rows={[
+              { grade: "탁월", range: "30× 이상",  label: "cache 잘 활용 + 짧은 지시 + 큰 출력" },
+              { grade: "양호", range: "15~30×",    label: "잘 쓰는 편" },
+              { grade: "보통", range: "8~15×",     label: "평범. 개선 여지 있음" },
+              { grade: "부족", range: "3~8×",      label: "큰 컨텍스트 매번 새로 보냄. cache 점검" },
+              { grade: "경고", range: "3× 미만",   label: "활용 미숙. 짧은 질문만 하는 패턴" },
+            ]}
+            currentGrade={grade}
+          />
+          <p className="text-xs text-slate-600 mt-2">임계값은 사내 멤버 데이터 축적 후 조정 예정.</p>
         </Section>
       )}
     </ModalShell>

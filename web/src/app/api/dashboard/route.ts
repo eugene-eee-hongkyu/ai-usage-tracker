@@ -14,7 +14,7 @@ interface RawOverview {
   totalCost?: number;
   totalSessions?: number;
   cacheHitPct?: number;
-  tokens?: { input?: number; cacheRead?: number; cacheWrite?: number };
+  tokens?: { input?: number; output?: number; cacheRead?: number; cacheWrite?: number };
 }
 
 interface RawActivity {
@@ -118,6 +118,9 @@ export async function GET(req: NextRequest) {
   const tRead = ov.tokens?.cacheRead ?? 0;
   const tWrite = ov.tokens?.cacheWrite ?? 0;
   const tInput = ov.tokens?.input ?? 0;
+  const tOutput = ov.tokens?.output ?? 0;
+  const costPerCall = calls > 0 ? cost / calls : 0;
+  const outputInputRatio = tInput > 0 ? tOutput / tInput : 0;
   const cacheHitPct = (tRead + tWrite + tInput) > 0
     ? (tRead / (tRead + tWrite + tInput)) * 100
     : (() => { const r = ov.cacheHitPercent ?? ov.cacheHitPct ?? 0; return r > 1 ? r : r * 100; })();
@@ -184,7 +187,7 @@ export async function GET(req: NextRequest) {
 
   return NextResponse.json({
     user: { name: user[0].name, lastSyncedAt: user[0].lastSyncedAt, timezone: user[0].timezone ?? null },
-    overview: { cost, sessions, calls, cacheHitPct, oneShotRate, activeDays },
+    overview: { cost, sessions, calls, cacheHitPct, oneShotRate, activeDays, costPerCall, outputInputRatio },
     daily,
     activities,
     projects,

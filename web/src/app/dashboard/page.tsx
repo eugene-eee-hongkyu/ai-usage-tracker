@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useSession, signOut } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { Nav } from "@/components/nav";
-import { CacheHitModal, OneShotRateModal, CostPerSessionModal, CallsPerSessionModal } from "@/components/metric-modal";
+import { CacheHitModal, OneShotRateModal, CostPerSessionModal, CallsPerSessionModal, CostPerCallModal, OutputInputRatioModal } from "@/components/metric-modal";
 
 type Period = "today" | "week" | "month" | "all";
 
@@ -15,6 +15,8 @@ interface Overview {
   cacheHitPct: number;
   oneShotRate: number;
   activeDays: number;
+  costPerCall: number;
+  outputInputRatio: number;
 }
 
 interface Activity {
@@ -120,6 +122,20 @@ const CALLS_ROWS: [GradeLevel, string, string][] = [
   ["부족", "5~10|120~200","너무 짧거나 너무 김"],
   ["경고", "<5|200+",    "활용 부족 또는 retry 루프"],
 ];
+const COST_CALL_ROWS: [GradeLevel, string, string][] = [
+  ["탁월", "<$0.04",    "cache 활용 + Sonnet/Haiku 위주"],
+  ["양호", "$0.04~0.06","정상 — Sonnet 기준"],
+  ["보통", "$0.06~0.10","Opus 사용 또는 컨텍스트 큼"],
+  ["부족", "$0.10~0.20","Opus 남용 또는 cache miss"],
+  ["경고", "$0.20+",    "Opus + 큰 컨텍스트 + cache 깨짐"],
+];
+const OUTPUT_INPUT_ROWS: [GradeLevel, string, string][] = [
+  ["탁월", "30×+",    "짧은 지시 + 큰 출력. cache 잘 활용"],
+  ["양호", "15~30×",  "잘 쓰는 편"],
+  ["보통", "8~15×",   "평범. 개선 여지 있음"],
+  ["부족", "3~8×",    "큰 컨텍스트 매번 새로 보냄"],
+  ["경고", "3× 미만", "활용 미숙"],
+];
 
 function MiniGradeTable({ title, rows, current }: { title: string; rows: [GradeLevel, string, string][]; current: GradeLevel }) {
   return (
@@ -166,6 +182,20 @@ function callsGrade(v: number): GradeLevel {
   if ((v >= 20 && v < 30) || (v > 60 && v <= 80)) return "양호";
   if ((v >= 10 && v < 20) || (v > 80 && v <= 120)) return "보통";
   if ((v >= 5 && v < 10) || (v > 120 && v <= 200)) return "부족";
+  return "경고";
+}
+function costPerCallGrade(v: number): GradeLevel {
+  if (v < 0.04) return "탁월";
+  if (v < 0.06) return "양호";
+  if (v < 0.10) return "보통";
+  if (v < 0.20) return "부족";
+  return "경고";
+}
+function outputInputGrade(v: number): GradeLevel {
+  if (v >= 30) return "탁월";
+  if (v >= 15) return "양호";
+  if (v >= 8) return "보통";
+  if (v >= 3) return "부족";
   return "경고";
 }
 function computeGrade(cacheHitPct: number, oneShotRate: number, costPerSession: number): GradeLevel {
@@ -253,6 +283,10 @@ export default function DashboardPage() {
   const [showOneShotMethodsModal, setShowOneShotMethodsModal] = useState(false);
   const [showCostMethodsModal, setShowCostMethodsModal] = useState(false);
   const [showCallsMethodsModal, setShowCallsMethodsModal] = useState(false);
+  const [showCostCallModal, setShowCostCallModal] = useState(false);
+  const [showCostCallMethodsModal, setShowCostCallMethodsModal] = useState(false);
+  const [showOutputInputModal, setShowOutputInputModal] = useState(false);
+  const [showOutputInputMethodsModal, setShowOutputInputMethodsModal] = useState(false);
   const [showTzPicker, setShowTzPicker] = useState(false);
   const [userTz, setUserTz] = useState<string>(() =>
     typeof window !== "undefined"
@@ -469,6 +503,8 @@ export default function DashboardPage() {
                           <MiniGradeTable title="One-shot rate" rows={ONESHOT_ROWS} current={oneShotGrade(Math.round(ov.oneShotRate * 100))} />
                           <MiniGradeTable title="Cost / session" rows={COST_ROWS} current={costGrade(costPs)} />
                           <MiniGradeTable title="Calls / session" rows={CALLS_ROWS} current={callsGrade(callsPs)} />
+                          <MiniGradeTable title="Cost / call" rows={COST_CALL_ROWS} current={costPerCallGrade(ov.costPerCall ?? 0)} />
+                          <MiniGradeTable title="Output / Input" rows={OUTPUT_INPUT_ROWS} current={outputInputGrade(ov.outputInputRatio ?? 0)} />
                         </div>
                       </div>
                     )}
@@ -530,6 +566,28 @@ export default function DashboardPage() {
                     onDesc: () => setShowCallsModal(true),
                     onAct: () => setShowCallsMethodsModal(true),
                     actLabel: "최적화",
+                  },
+                  {
+                    label: "Cost / call",
+                    value: ov.calls > 0 ? `$${(ov.costPerCall ?? 0).toFixed(3)}` : "$0.000",
+                    color: "text-orange-400",
+                    grade: costPerCallGrade(ov.costPerCall ?? 0),
+                    gradeRows: COST_CALL_ROWS,
+                    gradeTitle: "Cost / call",
+                    onDesc: () => setShowCostCallModal(true),
+                    onAct: () => setShowCostCallMethodsModal(true),
+                    actLabel: "줄이는법",
+                  },
+                  {
+                    label: "Output / Input",
+                    value: (ov.outputInputRatio ?? 0) > 0 ? `${(ov.outputInputRatio ?? 0).toFixed(1)}×` : "—",
+                    color: "text-cyan-400",
+                    grade: outputInputGrade(ov.outputInputRatio ?? 0),
+                    gradeRows: OUTPUT_INPUT_ROWS,
+                    gradeTitle: "Output / Input",
+                    onDesc: () => setShowOutputInputModal(true),
+                    onAct: () => setShowOutputInputMethodsModal(true),
+                    actLabel: "올리는법",
                   },
                 ].map(({ label, value, color, grade, gradeRows, gradeTitle, onDesc, onAct, actLabel }) => (
                   <div key={label} className="flex items-center text-xs py-0.5 gap-2">
@@ -880,6 +938,18 @@ export default function DashboardPage() {
           onClose={() => setShowCallsMethodsModal(false)}
           methodsOnly
         />
+      )}
+      {showCostCallModal && (
+        <CostPerCallModal value={ov.costPerCall ?? 0} totalCost={ov.cost} totalCalls={ov.calls} onClose={() => setShowCostCallModal(false)} />
+      )}
+      {showCostCallMethodsModal && (
+        <CostPerCallModal value={ov.costPerCall ?? 0} totalCost={ov.cost} totalCalls={ov.calls} onClose={() => setShowCostCallMethodsModal(false)} methodsOnly />
+      )}
+      {showOutputInputModal && (
+        <OutputInputRatioModal value={ov.outputInputRatio ?? 0} onClose={() => setShowOutputInputModal(false)} />
+      )}
+      {showOutputInputMethodsModal && (
+        <OutputInputRatioModal value={ov.outputInputRatio ?? 0} onClose={() => setShowOutputInputMethodsModal(false)} methodsOnly />
       )}
     </div>
   );
