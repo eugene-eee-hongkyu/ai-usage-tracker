@@ -4,6 +4,28 @@
 
 ---
 
+## Session 2026-04-27 18:49 — reading-guide 초안 생성·검증·적용
+
+### 작업 요약
+- **README.md 업데이트**: By Member 차트 설명 수정(stacked → 독립 렌더링), ADMIN_EMAIL 환경변수 추가
+- **`/reading-guide-init` 실행**: `docs/` 4개 파일 분류 후 `docs/reading-guide.md` 생성
+  - 포함: 03_A-2, 05_B-1 (설계 의도), codeburn-migration_run (실행 기록)
+  - 제외: favicon/README.md (how-to)
+  - `.gitignore`에 `docs/drift-report.md` 추가
+- **`/reading-guide-verify` 실행**: 검토 필요 4개, 일치 확인 7개, 검증 불가 3건 식별
+  - `docs/verify-report.md` 생성
+  - `docs/drift-report.md` 생성
+- **`/reading-guide-apply` 실행**: drift-report 3개 항목 모두 적용
+  - A-2 "읽어야 할 이유" 어긋난 UX 서술 수정 + ⚠ 경고 노트 추가
+  - B-1 ccusage→codeburn 원칙 중립화 + ⚠ 경고 노트 추가
+  - "문서에 없는 현재 기능" 섹션 추가 (어드민 뷰어·Google OAuth·타임존·일일 동기화)
+- **커밋**: `6b854c2` (reading-guide, verify-report, README, .gitignore)
+
+### 다음 액션
+- 없음 (신규 요청 대기)
+
+---
+
 ## Session 2026-04-27 18:04 — 프로덕션 배포 검증 완료
 
 ### 작업 요약

@@ -6,13 +6,13 @@
 
 ---
 
-## 마지막 실행: 2026-04-27 18:04
-## 마지막 업데이트: 2026-04-27 18:04
+## 마지막 실행: 2026-04-27 18:49
+## 마지막 업데이트: 2026-04-27 18:49
 ## 현재 모드: bypassPermissions
 
 ### 현재 집중
 
-- 모든 계획된 마일스톤 완료. Mac 3명 + Windows 1명 프로덕션 검증 완료.
+- 모든 계획된 마일스톤 완료. reading-guide 초기화·검증·적용까지 완료.
 
 ### 이어서 할 것
 
@@ -134,3 +134,5 @@
 - [x] 재설치 검증 (`rm -rf ~/.primus-usage-tracker` → `npx init`)
 - [x] 팀원 초대 및 팀 화면 검증 (Mac 3명 + Windows 1명)
 - [x] Windows SessionEnd hook 발화 검증
+- [x] README.md By Member 설명·ADMIN_EMAIL 환경변수 업데이트
+- [x] reading-guide.md 초기화·검증(verify)·적용(apply) 완료
