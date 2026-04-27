@@ -183,6 +183,12 @@ export default function TeamPage() {
   const maxActivity = Math.max(...(data.teamActivities ?? []).map((a) => a.totalTurns), 0.01);
   const memberColorMap = Object.fromEntries(members.map((m, i) => [m.name, MEMBER_COLORS[i % MEMBER_COLORS.length]]));
 
+  // Compute team total from dailyByMember — same source as By Member chart to stay in sync
+  const dailyTotal = (data.dailyByMember ?? []).map((row) => ({
+    date: String(row.date),
+    cost: (data.memberNames ?? []).reduce((s, key) => s + (Number(row[key]) || 0), 0),
+  }));
+
   // Grade counts for efficiency header
   const gradeCounts = members.reduce<Record<GradeLevel, number>>(
     (acc, m) => {
@@ -291,7 +297,7 @@ export default function TeamPage() {
                   <div className="p-3">
                     <ResponsiveContainer width="100%" height={160}>
                       <AreaChart
-                        data={(data.daily ?? []).map((row) => ({
+                        data={dailyTotal.map((row) => ({
                           date: fmtDate(row.date),
                           cost: row.cost,
                         }))}
