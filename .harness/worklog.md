@@ -4,6 +4,23 @@
 
 ---
 
+## Session 2026-04-27 09:41 — SessionEnd hook 버그 수정
+
+### 작업 요약
+- **버그 원인 확인**: SessionEnd hook이 `~/.npm/_npx/HASH/.../submit.mjs` 경로로 등록되어 있었음. npx 캐시 갱신/버전 변경 시 경로가 달라져 hook 무응답 발생
+- **submit.mjs PATH 문제 확인**: `spawn("codeburn", ..., { shell: false })` — Claude Code hook 실행 환경에서 PATH가 제한되면 codeburn 못 찾고 조용히 종료
+- **submit.mjs 단일 period 버그 확인**: `--period all` 하나만 전송하고 있었음 (sync.ts는 4개 병렬 전송 — 불일치)
+- **수정 1 (init.ts)**: init 시 `~/.primus-usage-tracker/submit.mjs`로 복사 후 해당 경로를 hook에 등록. 기존 submit.mjs hook 항목 자동 제거 후 새 경로로 교체
+- **수정 2 (submit.mjs)**: `shell: true`로 PATH 문제 해결. 4개 period 병렬 호출로 sync.ts와 통일
+- **적용 방법 안내**: `npm cache clean --force` 후 `npx github:... init` 재실행 (y로 재설치)
+
+### 다음 액션
+1. `npm cache clean --force` 후 `npx github:eugene-eee-hongkyu/ai-usage-tracker init` 재실행해서 hook 경로 갱신
+2. 팀원 초대 (이메일 목록 확정 → Vercel/서비스 초대)
+3. Windows SessionEnd hook 발화 검증 (Windows 테스터 필요)
+
+---
+
 ## Session 2026-04-27 09:21 — 대시보드 UX 세부 개선 (배지 hover·카드 순서·cache hit 공식)
 
 ### 작업 요약

@@ -6,18 +6,19 @@
 
 ---
 
-## 마지막 실행: 2026-04-27 09:21
-## 마지막 업데이트: 2026-04-27 09:21
+## 마지막 실행: 2026-04-27 09:41
+## 마지막 업데이트: 2026-04-27 09:41
 ## 현재 모드: bypassPermissions
 
 ### 현재 집중
 
-- 대시보드 UX 세부 개선 완료. 팀원 초대 대기.
+- SessionEnd hook 버그 수정 완료. 팀원 초대 대기.
 
 ### 이어서 할 것
 
-1. 팀원 초대 (이메일 목록 확정 → Vercel/서비스 초대)
-2. Windows SessionEnd hook 발화 검증 (Windows 테스터 필요)
+1. `npm cache clean --force` 후 `npx github:eugene-eee-hongkyu/ai-usage-tracker init` 재실행 (hook 경로 갱신)
+2. 팀원 초대 (이메일 목록 확정 → Vercel/서비스 초대)
+3. Windows SessionEnd hook 발화 검증 (Windows 테스터 필요)
 
 ### 막힌 것
 
@@ -90,10 +91,12 @@
 - [x] Efficiency 지표별 개별 등급 배지 + 모달 등급표 한글화
 - [x] "개선 필요" → "부족" 전면 교체 + 종합 배지 hover 툴팁 + 액션 버튼 분리
 - [x] 대시보드 카드 순서 재배치 (Daily Activity+Efficiency 상단 고정)
-- [x] 개별 메트릭 배지 hover 시 등급표+설명 표시 (양호 포함 전체)
+- [x] 개별 메트릭 배지 hover 시 등급표+설명 표시 (전 등급)
 - [x] Cache hit 표준 공식 적용 (cacheWrite 분모 포함, 95.x% 정확 표시)
 - [x] 카드 순서 2차 재배치 (By Activity↔Top Sessions 교환, Core Tools+Shell Commands 묶음, MCP 하단)
-- [x] 카드 아이템 수 헤더 표시 + 7개 이상 시 하단 페이드 그라디언트
+- [x] 카드 아이템 수 헤더 표시(7개↑) + 하단 페이드 그라디언트
 - [x] Efficiency 종합 배지 양호 시 hover 없음, Calls 최적화 팁 조건부 렌더링
+- [x] SessionEnd hook 경로 안정화 (~/.primus-usage-tracker/) + shell:true + 4-period 통일
+- [ ] `npx github:... init` 재실행으로 본인 hook 경로 갱신 (npm cache clean 선행)
 - [ ] 팀원 초대 및 팀랭킹 화면 검증
 - [ ] Windows SessionEnd hook 발화 검증 (Hold 플래그)
