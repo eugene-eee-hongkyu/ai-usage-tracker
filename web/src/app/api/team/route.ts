@@ -32,11 +32,22 @@ interface RawProject {
   cost?: number;
 }
 
+interface RawTopSession {
+  id?: string;
+  sessionId?: string;
+  date?: string;
+  project?: string;
+  cost?: number;
+  calls?: number;
+  turns?: number;
+}
+
 interface RawPeriodData {
   overview?: RawOverview;
   summary?: RawOverview;
   activities?: RawActivity[];
   projects?: RawProject[];
+  topSessions?: RawTopSession[];
   daily?: Array<{ date: string; cost: number; sessions?: number }>;
 }
 
@@ -87,6 +98,7 @@ export async function GET(req: NextRequest) {
   // Accumulators for team-level aggregations
   const activityAgg = new Map<string, { totalCost: number; totalTurns: number; members: Set<number> }>();
   const dailyMemberMap = new Map<string, Record<string, number>>();
+  const allTopSessions: Array<{ userId: number; userName: string; id: string; date: string; project: string; cost: number; calls: number }> = [];
 
   const memberStats = allUsers
     .map((u) => {
@@ -156,16 +168,29 @@ export async function GET(req: NextRequest) {
         entry.members.add(u.id);
       }
 
-      // Aggregate daily by member
+      // Aggregate daily by member — key by id to handle duplicate names
+      const memberKey = `${u.name}__${u.id}`;
       for (const day of d.daily ?? []) {
         if (!dailyMemberMap.has(day.date)) {
           dailyMemberMap.set(day.date, {});
         }
         const existing = dailyMemberMap.get(day.date)!;
-        existing[u.name] = (existing[u.name] ?? 0) + day.cost;
+        existing[memberKey] = (existing[memberKey] ?? 0) + day.cost;
       }
 
       const efficiencyScore = computeEfficiencyScore(overallOneShot, cacheHitPct, totalCost, sessionsCount, callsCount, outputInputRatio);
+
+      for (const s of d.topSessions ?? []) {
+        allTopSessions.push({
+          userId: u.id,
+          userName: u.name,
+          id: s.id ?? s.sessionId ?? "",
+          date: s.date ?? "",
+          project: s.project ?? "",
+          cost: s.cost ?? 0,
+          calls: s.calls ?? s.turns ?? 0,
+        });
+      }
 
       return {
         userId: u.id,
@@ -210,7 +235,8 @@ export async function GET(req: NextRequest) {
     .map(([date, cost]) => ({ date, cost }));
 
   // Team activities (top 10 by turns)
-  const memberNames = byEfficiency.map((m) => m.name);
+  // memberKeys are "name__userId" to handle duplicate display names
+  const memberNames = byEfficiency.map((m) => `${m.name}__${m.userId}`);
   const teamActivities = [...activityAgg.entries()]
     .map(([name, { totalCost, totalTurns, members }]) => ({
       name,
@@ -231,6 +257,10 @@ export async function GET(req: NextRequest) {
     return row;
   });
 
+  const topSessions = allTopSessions
+    .sort((a, b) => b.cost - a.cost)
+    .slice(0, 15);
+
   return NextResponse.json({
     byEfficiency,
     bySessions,
@@ -239,5 +269,6 @@ export async function GET(req: NextRequest) {
     teamActivities,
     dailyByMember,
     memberNames,
+    topSessions,
   });
 }

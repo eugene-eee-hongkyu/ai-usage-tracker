@@ -32,6 +32,14 @@ const GRADE_VALUE_COLOR: Record<GradeLevel, string> = {
   "경고": "text-red-400",
 };
 
+const GRADE_CELL_BG: Record<GradeLevel, string> = {
+  "탁월": "bg-emerald-500/10",
+  "양호": "bg-green-500/8",
+  "보통": "",
+  "부족": "bg-orange-500/10",
+  "경고": "bg-red-500/12",
+};
+
 const MEMBER_COLORS = [
   "#4f46e5", "#10b981", "#f59e0b", "#ef4444",
   "#8b5cf6", "#06b6d4", "#f97316", "#ec4899",
@@ -59,6 +67,16 @@ interface TeamActivity {
   memberCount: number;
 }
 
+interface TopSession {
+  userId: number;
+  userName: string;
+  id: string;
+  date: string;
+  project: string;
+  cost: number;
+  calls: number;
+}
+
 interface TeamData {
   byEfficiency: MemberStat[];
   bySessions: MemberStat[];
@@ -73,6 +91,7 @@ interface TeamData {
   teamActivities: TeamActivity[];
   dailyByMember: Array<Record<string, number | string>>;
   memberNames: string[];
+  topSessions: TopSession[];
 }
 
 function SyncBadge({ lastSyncedAt }: { lastSyncedAt: string | null }) {
@@ -100,9 +119,6 @@ function oneShotGrade(v: number): GradeLevel {
 function costGrade(v: number): GradeLevel {
   if (v < 10) return "탁월"; if (v < 25) return "양호"; if (v < 50) return "보통"; if (v < 100) return "부족"; return "경고";
 }
-function costPerCallGrade(v: number): GradeLevel {
-  if (v < 0.04) return "탁월"; if (v < 0.06) return "양호"; if (v < 0.10) return "보통"; if (v < 0.20) return "부족"; return "경고";
-}
 function outputInputGrade(v: number): GradeLevel {
   if (v >= 30) return "탁월"; if (v >= 15) return "양호"; if (v >= 8) return "보통"; if (v >= 3) return "부족"; return "경고";
 }
@@ -117,6 +133,19 @@ function overallGrade(cacheHitPct: number, oneShotRate: number, costPerSession: 
 function fmtDate(d: string): string {
   const m = d.match(/^\d{4}-(\d{2})-(\d{2})$/);
   return m ? `${parseInt(m[1])}/${parseInt(m[2])}` : d;
+}
+
+// memberNames are "name__userId" keys; strip the suffix for display
+function memberLabel(key: string): string {
+  return key.replace(/__\d+$/, "");
+}
+
+function GradeCell({ grade, children }: { grade: GradeLevel; children: React.ReactNode }) {
+  return (
+    <td className={`py-2.5 px-3 text-right whitespace-nowrap tabular-nums ${GRADE_CELL_BG[grade]}`}>
+      <span className={`font-bold ${GRADE_VALUE_COLOR[grade]}`}>{children}</span>
+    </td>
+  );
 }
 
 export default function TeamPage() {
@@ -152,6 +181,22 @@ export default function TeamPage() {
   const byCost = [...members].sort((a, b) => b.totalCost - a.totalCost);
   const maxCost = Math.max(...byCost.map((m) => m.totalCost), 0.01);
   const maxActivity = Math.max(...(data.teamActivities ?? []).map((a) => a.totalTurns), 0.01);
+  const memberColorMap = Object.fromEntries(members.map((m, i) => [m.name, MEMBER_COLORS[i % MEMBER_COLORS.length]]));
+
+  // Grade counts for efficiency header
+  const gradeCounts = members.reduce<Record<GradeLevel, number>>(
+    (acc, m) => {
+      const cps = m.sessionsCount > 0 ? m.totalCost / m.sessionsCount : 0;
+      const g = overallGrade(m.cacheHitPct, m.overallOneShot, cps);
+      acc[g] = (acc[g] ?? 0) + 1;
+      return acc;
+    },
+    { "탁월": 0, "양호": 0, "보통": 0, "부족": 0, "경고": 0 }
+  );
+  const gradeSummary = (["탁월", "양호", "보통", "부족", "경고"] as GradeLevel[])
+    .filter((g) => gradeCounts[g] > 0)
+    .map((g) => `${g} ${gradeCounts[g]}명`)
+    .join(" · ");
 
   return (
     <div className="min-h-screen bg-neutral-950 text-neutral-100">
@@ -189,65 +234,206 @@ export default function TeamPage() {
           </div>
         ) : (
           <>
-            {/* Efficiency Table */}
-            <div className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-fuchsia-500 rounded">
-              <div className="px-3 py-2 border-b border-neutral-800">
-                <span className="text-xs font-mono font-bold text-fuchsia-400 uppercase tracking-wider">Efficiency</span>
+            {/* Row 1: Daily Cost Trend — stacked (per-member) + total */}
+            {(data.dailyByMember ?? []).length > 1 && (
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+
+                {/* Stacked per-member */}
+                <div className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-cyan-500 rounded">
+                  <div className="px-3 py-2 border-b border-neutral-800 flex items-center justify-between">
+                    <span className="text-xs font-mono font-bold text-cyan-400 uppercase tracking-wider">By Member</span>
+                    <div className="flex flex-wrap gap-x-3 gap-y-1 justify-end">
+                      {(data.memberNames ?? []).map((key, i) => (
+                        <span key={key} className="flex items-center gap-1 text-[10px] font-mono text-neutral-400">
+                          <span className="w-2 h-2 rounded-full inline-block" style={{ background: MEMBER_COLORS[i % MEMBER_COLORS.length] }} />
+                          {memberLabel(key)}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="p-3">
+                    <ResponsiveContainer width="100%" height={160}>
+                      <AreaChart
+                        data={(data.dailyByMember ?? []).map((row) => ({
+                          ...row,
+                          date: fmtDate(String(row.date)),
+                        }))}
+                        margin={{ top: 4, right: 8, left: 0, bottom: 0 }}
+                      >
+                        <defs>
+                          {(data.memberNames ?? []).map((key, i) => (
+                            <linearGradient key={key} id={`grad-${i}`} x1="0" y1="0" x2="0" y2="1">
+                              <stop offset="5%" stopColor={MEMBER_COLORS[i % MEMBER_COLORS.length]} stopOpacity={0.4} />
+                              <stop offset="95%" stopColor={MEMBER_COLORS[i % MEMBER_COLORS.length]} stopOpacity={0.05} />
+                            </linearGradient>
+                          ))}
+                        </defs>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#262626" />
+                        <XAxis dataKey="date" tick={{ fill: "#525252", fontSize: 10, fontFamily: "monospace" }} axisLine={false} tickLine={false} interval="preserveStartEnd" />
+                        <YAxis tick={{ fill: "#525252", fontSize: 10, fontFamily: "monospace" }} axisLine={false} tickLine={false} tickFormatter={(v) => `$${v}`} width={40} />
+                        <Tooltip
+                          contentStyle={{ background: "#171717", border: "1px solid #404040", borderRadius: 6, fontSize: 11, fontFamily: "monospace" }}
+                          formatter={(v, key) => [`$${Number(v).toFixed(2)}`, memberLabel(String(key))]}
+                        />
+                        {(data.memberNames ?? []).map((key, i) => (
+                          <Area key={key} type="monotone" dataKey={key} stackId="1" stroke={MEMBER_COLORS[i % MEMBER_COLORS.length]} strokeWidth={1.5} fill={`url(#grad-${i})`} dot={false} />
+                        ))}
+                      </AreaChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+
+                {/* Total aggregated */}
+                <div className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-cyan-500 rounded">
+                  <div className="px-3 py-2 border-b border-neutral-800">
+                    <span className="text-xs font-mono font-bold text-cyan-400 uppercase tracking-wider">Team Total</span>
+                  </div>
+                  <div className="p-3">
+                    <ResponsiveContainer width="100%" height={160}>
+                      <AreaChart
+                        data={(data.daily ?? []).map((row) => ({
+                          date: fmtDate(row.date),
+                          cost: row.cost,
+                        }))}
+                        margin={{ top: 4, right: 8, left: 0, bottom: 0 }}
+                      >
+                        <defs>
+                          <linearGradient id="grad-total" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="5%" stopColor="#06b6d4" stopOpacity={0.35} />
+                            <stop offset="95%" stopColor="#06b6d4" stopOpacity={0.03} />
+                          </linearGradient>
+                        </defs>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#262626" />
+                        <XAxis dataKey="date" tick={{ fill: "#525252", fontSize: 10, fontFamily: "monospace" }} axisLine={false} tickLine={false} interval="preserveStartEnd" />
+                        <YAxis tick={{ fill: "#525252", fontSize: 10, fontFamily: "monospace" }} axisLine={false} tickLine={false} tickFormatter={(v) => `$${v}`} width={40} />
+                        <Tooltip
+                          contentStyle={{ background: "#171717", border: "1px solid #404040", borderRadius: 6, fontSize: 11, fontFamily: "monospace" }}
+                          formatter={(v) => [`$${Number(v).toFixed(2)}`, "팀 합산"]}
+                        />
+                        <Area type="monotone" dataKey="cost" stroke="#06b6d4" strokeWidth={2} fill="url(#grad-total)" dot={false} />
+                      </AreaChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+
               </div>
-              <div className="p-3 overflow-x-auto">
-                <table className="w-full text-xs font-mono border-collapse">
-                  <thead>
-                    <tr className="border-b border-neutral-800">
-                      <th className="text-left text-neutral-500 pb-2 pr-4 font-normal">멤버</th>
-                      <th className="text-right text-neutral-500 pb-2 px-3 font-normal">cache hit</th>
-                      <th className="text-right text-neutral-500 pb-2 px-3 font-normal">1-shot</th>
-                      <th className="text-right text-neutral-500 pb-2 px-3 font-normal">$/session</th>
-                      <th className="text-right text-neutral-500 pb-2 px-3 font-normal">$/call</th>
-                      <th className="text-right text-neutral-500 pb-2 px-3 font-normal">out/in</th>
-                      <th className="text-right text-neutral-500 pb-2 pl-3 font-normal">종합</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {members.map((m) => {
-                      const costPerSession = m.sessionsCount > 0 ? m.totalCost / m.sessionsCount : 0;
-                      const calls = m.callsCount > 0 ? m.callsCount : m.sessionsCount;
-                      const costPerCall = calls > 0 ? m.totalCost / calls : 0;
-                      const grade = overallGrade(m.cacheHitPct, m.overallOneShot, costPerSession);
-                      return (
-                        <tr key={m.userId} className="border-b border-neutral-800/50 hover:bg-neutral-800/30 transition-colors">
-                          <td className="py-2.5 pr-4">
-                            <Link href={`/team/${m.userId}`} className="flex items-center gap-2 hover:text-neutral-200 text-neutral-300">
-                              <span>{m.name}</span>
-                              <SyncBadge lastSyncedAt={m.lastSyncedAt} />
-                            </Link>
-                          </td>
-                          <td className="py-2.5 px-3 text-right whitespace-nowrap tabular-nums">
-                            <span className={`font-bold ${GRADE_VALUE_COLOR[cacheHitGrade(m.cacheHitPct)]}`}>{m.cacheHitPct.toFixed(1)}%</span>
-                          </td>
-                          <td className="py-2.5 px-3 text-right whitespace-nowrap tabular-nums">
-                            <span className={`font-bold ${GRADE_VALUE_COLOR[oneShotGrade(m.overallOneShot * 100)]}`}>{Math.round(m.overallOneShot * 100)}%</span>
-                          </td>
-                          <td className="py-2.5 px-3 text-right whitespace-nowrap tabular-nums">
-                            <span className={`font-bold ${GRADE_VALUE_COLOR[costGrade(costPerSession)]}`}>${costPerSession.toFixed(2)}</span>
-                          </td>
-                          <td className="py-2.5 px-3 text-right whitespace-nowrap tabular-nums">
-                            <span className={`font-bold ${GRADE_VALUE_COLOR[costPerCallGrade(costPerCall)]}`}>${costPerCall.toFixed(3)}</span>
-                          </td>
-                          <td className="py-2.5 px-3 text-right whitespace-nowrap tabular-nums">
-                            <span className={`font-bold ${GRADE_VALUE_COLOR[outputInputGrade(m.outputInputRatio)]}`}>{m.outputInputRatio.toFixed(1)}×</span>
-                          </td>
-                          <td className="py-2.5 pl-3 text-right">
-                            <GradePill grade={grade} />
-                          </td>
+            )}
+
+            {/* Row 2: Efficiency + Top Sessions */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+
+              {/* Efficiency Table */}
+              <div className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-fuchsia-500 rounded">
+                <div className="px-3 py-2 border-b border-neutral-800 flex items-center justify-between gap-2">
+                  <span className="text-xs font-mono font-bold text-fuchsia-400 uppercase tracking-wider">Efficiency</span>
+                  {gradeSummary && (
+                    <span className="text-[10px] font-mono text-neutral-500 shrink-0">{gradeSummary}</span>
+                  )}
+                </div>
+                <div className="p-3 overflow-x-auto">
+                  <table className="w-full text-xs font-mono border-collapse">
+                    <thead>
+                      <tr className="border-b border-neutral-800">
+                        <th className="text-left text-neutral-500 pb-2 pr-4 font-normal">멤버</th>
+                        <th className="text-right text-neutral-500 pb-2 px-3 font-normal">cache</th>
+                        <th className="text-right text-neutral-500 pb-2 px-3 font-normal">1-shot</th>
+                        <th className="text-right text-neutral-500 pb-2 px-3 font-normal">$/sess</th>
+                        <th className="text-right text-neutral-500 pb-2 px-3 font-normal">out/in</th>
+                        <th className="text-right text-neutral-500 pb-2 pl-3 font-normal">종합</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {members.map((m, i) => {
+                        const costPerSession = m.sessionsCount > 0 ? m.totalCost / m.sessionsCount : 0;
+                        const grade = overallGrade(m.cacheHitPct, m.overallOneShot, costPerSession);
+                        return (
+                          <tr key={m.userId} className="border-b border-neutral-800/50 hover:bg-neutral-800/30 transition-colors">
+                            <td className="py-2.5 pr-4">
+                              <Link href={`/team/${m.userId}`} className="flex items-center gap-2 hover:text-neutral-200 text-neutral-300">
+                                <span
+                                  className="w-2 h-2 rounded-full shrink-0"
+                                  style={{ background: MEMBER_COLORS[i % MEMBER_COLORS.length] }}
+                                />
+                                <span>{m.name}</span>
+                                <SyncBadge lastSyncedAt={m.lastSyncedAt} />
+                              </Link>
+                            </td>
+                            <GradeCell grade={cacheHitGrade(m.cacheHitPct)}>
+                              {m.cacheHitPct.toFixed(1)}%
+                            </GradeCell>
+                            <GradeCell grade={oneShotGrade(m.overallOneShot * 100)}>
+                              {Math.round(m.overallOneShot * 100)}%
+                            </GradeCell>
+                            <GradeCell grade={costGrade(costPerSession)}>
+                              ${costPerSession.toFixed(2)}
+                            </GradeCell>
+                            <GradeCell grade={outputInputGrade(m.outputInputRatio)}>
+                              {m.outputInputRatio.toFixed(1)}×
+                            </GradeCell>
+                            <td className="py-2.5 pl-3 text-right">
+                              <GradePill grade={grade} />
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Top Sessions */}
+              <div className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-red-500 rounded">
+                <div className="px-3 py-2 border-b border-neutral-800">
+                  <span className="text-xs font-mono font-bold text-red-400 uppercase tracking-wider">Top Sessions</span>
+                </div>
+                <div className="p-3 overflow-x-auto">
+                  {(data.topSessions ?? []).length === 0 ? (
+                    <p className="text-neutral-600 text-xs font-mono">no data</p>
+                  ) : (
+                    <table className="w-full text-xs font-mono border-collapse">
+                      <thead>
+                        <tr className="border-b border-neutral-800">
+                          <th className="text-left text-neutral-500 pb-2 pr-3 font-normal">멤버</th>
+                          <th className="text-left text-neutral-500 pb-2 pr-3 font-normal">프로젝트</th>
+                          <th className="text-right text-neutral-500 pb-2 pr-3 font-normal">date</th>
+                          <th className="text-right text-neutral-500 pb-2 pr-3 font-normal">calls</th>
+                          <th className="text-right text-neutral-500 pb-2 font-normal">cost</th>
                         </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
+                      </thead>
+                      <tbody>
+                        {(data.topSessions ?? []).map((s, i) => (
+                          <tr key={`${s.userId}-${s.id}-${i}`} className="border-b border-neutral-800/40 hover:bg-neutral-800/30 transition-colors">
+                            <td className="py-1.5 pr-3">
+                              <span className="flex items-center gap-1.5 text-neutral-300">
+                                <span
+                                  className="w-1.5 h-1.5 rounded-full shrink-0"
+                                  style={{ background: memberColorMap[s.userName] ?? "#6b7280" }}
+                                />
+                                <span className="truncate max-w-[64px]">{s.userName}</span>
+                              </span>
+                            </td>
+                            <td className="py-1.5 pr-3 text-neutral-400 truncate max-w-[80px]">
+                              {s.project || "—"}
+                            </td>
+                            <td className="py-1.5 pr-3 text-right text-neutral-500 tabular-nums">
+                              {fmtDate(s.date)}
+                            </td>
+                            <td className="py-1.5 pr-3 text-right text-neutral-500 tabular-nums">
+                              {s.calls}
+                            </td>
+                            <td className="py-1.5 text-right text-yellow-400 tabular-nums font-bold">
+                              ${s.cost.toFixed(2)}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  )}
+                </div>
               </div>
             </div>
 
-            {/* Row 2: Usage + Activities */}
+            {/* Row 3: Usage + Team Activities */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
 
               {/* Usage */}
@@ -263,10 +449,16 @@ export default function TeamPage() {
                     <span className="w-12 text-right">s</span>
                   </div>
                   <div className="space-y-1">
-                    {byCost.map((m) => (
+                    {byCost.map((m, i) => (
                       <div key={m.userId} className="flex items-center gap-1.5 text-xs font-mono">
                         <div className="w-16 h-1.5 bg-neutral-800 rounded overflow-hidden shrink-0">
-                          <div className="h-full bg-yellow-500 rounded" style={{ width: `${(m.totalCost / maxCost) * 100}%` }} />
+                          <div
+                            className="h-full rounded"
+                            style={{
+                              width: `${(m.totalCost / maxCost) * 100}%`,
+                              background: MEMBER_COLORS[i % MEMBER_COLORS.length],
+                            }}
+                          />
                         </div>
                         <span className="flex-1 text-neutral-300 truncate">{m.name}</span>
                         <span className="w-16 text-yellow-400 text-right tabular-nums">${m.totalCost.toFixed(2)}</span>
@@ -308,72 +500,6 @@ export default function TeamPage() {
                 </div>
               </div>
             </div>
-
-            {/* Daily Trend — Stacked Area */}
-            {(data.dailyByMember ?? []).length > 1 && (
-              <div className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-cyan-500 rounded">
-                <div className="px-3 py-2 border-b border-neutral-800 flex items-center justify-between">
-                  <span className="text-xs font-mono font-bold text-cyan-400 uppercase tracking-wider">Daily Cost Trend</span>
-                  <div className="flex gap-3">
-                    {(data.memberNames ?? []).map((name, i) => (
-                      <span key={name} className="flex items-center gap-1 text-[10px] font-mono text-neutral-400">
-                        <span className="w-2 h-2 rounded-full inline-block" style={{ background: MEMBER_COLORS[i % MEMBER_COLORS.length] }} />
-                        {name}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-                <div className="p-3">
-                  <ResponsiveContainer width="100%" height={180}>
-                    <AreaChart
-                      data={(data.dailyByMember ?? []).map((row) => ({
-                        ...row,
-                        date: fmtDate(String(row.date)),
-                      }))}
-                      margin={{ top: 4, right: 8, left: 0, bottom: 0 }}
-                    >
-                      <defs>
-                        {(data.memberNames ?? []).map((name, i) => (
-                          <linearGradient key={name} id={`grad-${i}`} x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="5%" stopColor={MEMBER_COLORS[i % MEMBER_COLORS.length]} stopOpacity={0.4} />
-                            <stop offset="95%" stopColor={MEMBER_COLORS[i % MEMBER_COLORS.length]} stopOpacity={0.05} />
-                          </linearGradient>
-                        ))}
-                      </defs>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#262626" />
-                      <XAxis
-                        dataKey="date"
-                        tick={{ fill: "#525252", fontSize: 10, fontFamily: "monospace" }}
-                        axisLine={false} tickLine={false}
-                        interval="preserveStartEnd"
-                      />
-                      <YAxis
-                        tick={{ fill: "#525252", fontSize: 10, fontFamily: "monospace" }}
-                        axisLine={false} tickLine={false}
-                        tickFormatter={(v) => `$${v}`}
-                        width={40}
-                      />
-                      <Tooltip
-                        contentStyle={{ background: "#171717", border: "1px solid #404040", borderRadius: 6, fontSize: 11, fontFamily: "monospace" }}
-                        formatter={(v, name) => [`$${Number(v).toFixed(2)}`, name]}
-                      />
-                      {(data.memberNames ?? []).map((name, i) => (
-                        <Area
-                          key={name}
-                          type="monotone"
-                          dataKey={name}
-                          stackId="1"
-                          stroke={MEMBER_COLORS[i % MEMBER_COLORS.length]}
-                          strokeWidth={1.5}
-                          fill={`url(#grad-${i})`}
-                          dot={false}
-                        />
-                      ))}
-                    </AreaChart>
-                  </ResponsiveContainer>
-                </div>
-              </div>
-            )}
           </>
         )}
       </main>
