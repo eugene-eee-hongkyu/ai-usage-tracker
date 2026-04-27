@@ -29,8 +29,8 @@ async function saveApiKey(apiKey: string) {
   const keytar = await getKeytar() as { setPassword: (s: string, a: string, p: string) => Promise<void> } | null;
   if (keytar) {
     await keytar.setPassword(KEYTAR_SERVICE, KEYTAR_ACCOUNT, apiKey);
-    return;
   }
+  // submit.mjs는 standalone 실행 시 keytar node_modules가 없으므로 항상 파일에도 저장
   const fallbackPath = path.join(os.homedir(), ".primus-usage-key");
   fs.writeFileSync(fallbackPath, apiKey, { mode: 0o600 });
 }
