@@ -14,6 +14,7 @@ interface RawOverview {
   totalCost?: number;
   totalSessions?: number;
   cacheHitPct?: number;
+  tokens?: { input?: number; cacheRead?: number; cacheWrite?: number };
 }
 
 interface RawActivity {
@@ -50,6 +51,7 @@ interface RawModel {
   calls?: number;
   inputTokens?: number;
   cacheReadTokens?: number;
+  cacheWriteTokens?: number;
 }
 
 interface RawNameCalls { name?: string; calls?: number }
@@ -113,8 +115,12 @@ export async function GET(req: NextRequest) {
   const cost = ov.cost ?? ov.totalCost ?? 0;
   const sessions = ov.sessions ?? ov.totalSessions ?? 0;
   const calls = ov.calls ?? 0;
-  const rawCacheHit = ov.cacheHitPercent ?? ov.cacheHitPct ?? 0;
-  const cacheHitPct = rawCacheHit > 1 ? rawCacheHit : rawCacheHit * 100;
+  const tRead = ov.tokens?.cacheRead ?? 0;
+  const tWrite = ov.tokens?.cacheWrite ?? 0;
+  const tInput = ov.tokens?.input ?? 0;
+  const cacheHitPct = (tRead + tWrite + tInput) > 0
+    ? (tRead / (tRead + tWrite + tInput)) * 100
+    : (() => { const r = ov.cacheHitPercent ?? ov.cacheHitPct ?? 0; return r > 1 ? r : r * 100; })();
 
   const allActivities = d.activities ?? [];
   const activitiesWithRate = allActivities.filter((a) => a.oneShotRate != null);
@@ -167,7 +173,9 @@ export async function GET(req: NextRequest) {
   const models = (d.models ?? []).map((m) => {
     const input = m.inputTokens ?? 0;
     const cacheRead = m.cacheReadTokens ?? 0;
-    const cacheHit = input + cacheRead > 0 ? (cacheRead / (input + cacheRead)) * 100 : 0;
+    const cacheWrite = m.cacheWriteTokens ?? 0;
+    const denom = input + cacheRead + cacheWrite;
+    const cacheHit = denom > 0 ? (cacheRead / denom) * 100 : 0;
     return { name: m.name ?? "", cost: m.cost ?? 0, calls: m.calls ?? 0, cacheHitPct: cacheHit };
   });
 
