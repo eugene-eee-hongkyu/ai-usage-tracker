@@ -6,6 +6,7 @@ import { useRouter, useParams } from "next/navigation";
 import { Nav } from "@/components/nav";
 import Link from "next/link";
 import { ActivityCalendar } from "react-activity-calendar";
+import { ADMIN_EMAIL } from "@/lib/admin";
 
 interface MemberData {
   user: { id: number; name: string; avatarUrl: string | null };
@@ -20,6 +21,7 @@ export default function MemberProfilePage() {
   const router = useRouter();
   const params = useParams();
   const userId = params.userId as string;
+  const isAdmin = session?.user?.email === ADMIN_EMAIL;
   const [data, setData] = useState<MemberData | null>(null);
 
   useEffect(() => {
@@ -110,6 +112,17 @@ export default function MemberProfilePage() {
                 <span className="text-slate-600 w-12 text-right text-xs">{p.sessions}회</span>
               </div>
             ))}
+          </div>
+        )}
+
+        {isAdmin && (
+          <div className="pt-2">
+            <Link
+              href={`/team/${userId}/dashboard`}
+              className="block w-full text-center py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-mono rounded-lg transition-colors"
+            >
+              자세히 보기 →
+            </Link>
           </div>
         )}
       </main>
