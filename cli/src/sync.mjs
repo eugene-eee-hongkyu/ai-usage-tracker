@@ -14,6 +14,8 @@ var SERVER_URL = process.env.USAGE_TRACKER_URL ?? "https://ai-usage-tracker-web-
 var KEYTAR_SERVICE = "primus-usage-tracker";
 var KEYTAR_ACCOUNT = "api-key";
 var CLAUDE_SETTINGS_PATH = path.join(os.homedir(), ".claude", "settings.json");
+var STABLE_DIR = path.join(os.homedir(), ".primus-usage-tracker");
+var STABLE_SUBMIT = path.join(STABLE_DIR, "submit.mjs");
 async function getKeytar() {
   try {
     const kt = await import("keytar");
@@ -51,8 +53,7 @@ function spawnCodeburn(period) {
       if (code !== 0)
         return reject(new Error(`codeburn exited ${code} (period=${period})`));
       try {
-        const raw = Buffer.concat(chunks).toString("utf8").trim();
-        resolve(JSON.parse(raw));
+        resolve(JSON.parse(Buffer.concat(chunks).toString("utf8").trim()));
       } catch (e) {
         reject(e);
       }
@@ -71,33 +72,30 @@ async function runSync(_days) {
     process.exit(1);
   }
   console.log("codeburn 데이터 수집 중...");
-  let report;
   try {
     const results = await Promise.all(PERIODS.map((p) => spawnCodeburn(p)));
-    report = Object.fromEntries(PERIODS.map((p, i) => [p, results[i]]));
+    const report = Object.fromEntries(PERIODS.map((p, i) => [p, results[i]]));
+    const resp = await fetch(`${SERVER_URL2}/api/ingest`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-api-key": apiKey },
+      body: JSON.stringify(report)
+    });
+    if (resp.ok) {
+      console.log("✅ 데이터 전송 완료");
+    } else {
+      console.error(`❌ 전송 실패: ${resp.status}`);
+      process.exit(1);
+    }
   } catch (err) {
     console.error("codeburn 실행 실패:", err.message);
-    process.exit(1);
-  }
-  const resp = await fetch(`${SERVER_URL2}/api/ingest`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-api-key": apiKey
-    },
-    body: JSON.stringify(report)
-  });
-  if (resp.ok) {
-    console.log("✅ 데이터 전송 완료");
-  } else {
-    console.error(`❌ 전송 실패: ${resp.status}`);
     process.exit(1);
   }
 }
 var isMain = typeof process !== "undefined" && process.argv[1] && (process.argv[1].endsWith("sync.mjs") || process.argv[1].endsWith("sync.js"));
 if (isMain) {
   runSync().catch((err) => {
-    process.stderr.write(`[sync] error: ${err.message}\n`);
+    process.stderr.write(`[sync] error: ${err.message}
+`);
     process.exit(1);
   });
 }

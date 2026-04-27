@@ -14,6 +14,8 @@ var SERVER_URL = process.env.USAGE_TRACKER_URL ?? "https://ai-usage-tracker-web-
 var KEYTAR_SERVICE = "primus-usage-tracker";
 var KEYTAR_ACCOUNT = "api-key";
 var CLAUDE_SETTINGS_PATH = path.join(os.homedir(), ".claude", "settings.json");
+var STABLE_DIR = path.join(os.homedir(), ".primus-usage-tracker");
+var STABLE_SUBMIT = path.join(STABLE_DIR, "submit.mjs");
 var CLI_PORT = 9988;
 async function getKeytar() {
   try {
@@ -72,7 +74,7 @@ function getApiKeyViaLocalServer() {
       const apiKey = url.searchParams.get("apiKey");
       res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
       if (apiKey) {
-        res.end("<html><body style='font-family:sans-serif;padding:2em'>" + "<h2>&#x2705; Authentication Complete</h2><p>You can close this window.</p></body></html>");
+        res.end("<html><body style='font-family:sans-serif;padding:2em'><h2>&#x2705; Authentication Complete</h2><p>You can close this window.</p></body></html>");
         server.close();
         resolve(apiKey);
       } else {
@@ -111,21 +113,16 @@ function mergeHook(submitPath) {
   }
   const hooks = settings.hooks ?? {};
   const sessionEndHooks = hooks.SessionEnd ?? [];
-  const hookCommand = `node "${submitPath}"`;
-  const alreadyRegistered = sessionEndHooks.some((group) => group.hooks?.some((h) => h.command === hookCommand));
-  if (!alreadyRegistered) {
-    sessionEndHooks.push({
-      matcher: ".*",
-      hooks: [{ type: "command", command: hookCommand }]
-    });
-    hooks.SessionEnd = sessionEndHooks;
-    settings.hooks = hooks;
-    fs.mkdirSync(path.dirname(CLAUDE_SETTINGS_PATH), { recursive: true });
-    fs.writeFileSync(CLAUDE_SETTINGS_PATH, JSON.stringify(settings, null, 2));
-    console.log("✅ SessionEnd hook 등록 완료");
-  } else {
-    console.log("✅ SessionEnd hook 이미 등록되어 있음");
-  }
+  const cleaned = sessionEndHooks.filter((group) => !group.hooks?.some((h) => h.command.includes("submit.mjs")));
+  cleaned.push({
+    matcher: ".*",
+    hooks: [{ type: "command", command: `node "${submitPath}"` }]
+  });
+  hooks.SessionEnd = cleaned;
+  settings.hooks = hooks;
+  fs.mkdirSync(path.dirname(CLAUDE_SETTINGS_PATH), { recursive: true });
+  fs.writeFileSync(CLAUDE_SETTINGS_PATH, JSON.stringify(settings, null, 2));
+  console.log("✅ SessionEnd hook 등록 완료");
 }
 function runBackfill(apiKey) {
   const syncScript = path.join(__dirname2, "sync.mjs");
@@ -207,8 +204,9 @@ async function runInit() {
   }
   await saveApiKey(apiKey);
   console.log("\uD83D\uDD11 API 키 저장 완료");
-  const submitPath = path.join(__dirname2, "submit.mjs");
-  mergeHook(submitPath);
+  fs.mkdirSync(STABLE_DIR, { recursive: true });
+  fs.copyFileSync(path.join(__dirname2, "submit.mjs"), STABLE_SUBMIT);
+  mergeHook(STABLE_SUBMIT);
   runBackfill(apiKey);
   console.log(`
 ✨ 설치 완료!`);
