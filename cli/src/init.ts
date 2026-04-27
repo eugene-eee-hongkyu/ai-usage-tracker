@@ -1,4 +1,4 @@
-import { execSync, spawn } from "child_process";
+import { execSync, spawn, spawnSync } from "child_process";
 import * as fs from "fs";
 import * as http from "http";
 import * as os from "os";
@@ -107,6 +107,75 @@ function getApiKeyViaLocalServer(): Promise<string> {
       reject(new Error("인증 시간 초과 (5분)"));
     }, 5 * 60 * 1000);
   });
+}
+
+function registerLaunchd(submitPath: string): void {
+  const label = "com.primus.usage-tracker.daily";
+  const plistDir = path.join(os.homedir(), "Library", "LaunchAgents");
+  const plistPath = path.join(plistDir, `${label}.plist`);
+
+  const plist = `<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>${label}</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>${process.execPath}</string>
+    <string>${submitPath}</string>
+  </array>
+  <key>StartCalendarInterval</key>
+  <dict>
+    <key>Hour</key>
+    <integer>9</integer>
+    <key>Minute</key>
+    <integer>0</integer>
+  </dict>
+  <key>StandardOutPath</key>
+  <string>${path.join(STABLE_DIR, "daily.log")}</string>
+  <key>StandardErrorPath</key>
+  <string>${path.join(STABLE_DIR, "daily-error.log")}</string>
+</dict>
+</plist>`;
+
+  try {
+    fs.mkdirSync(plistDir, { recursive: true });
+    try { execSync(`launchctl unload "${plistPath}"`, { stdio: "ignore" }); } catch {}
+    fs.writeFileSync(plistPath, plist);
+    execSync(`launchctl load "${plistPath}"`, { stdio: "ignore" });
+    console.log("✅ 일간 자동 동기화 등록 완료 (매일 오전 9시, launchd)");
+  } catch {
+    console.log("⚠️  일간 자동 동기화 등록 실패 (선택 사항, 수동으로 등록 가능)");
+  }
+}
+
+function registerWindowsTask(submitPath: string): void {
+  const taskName = "PrimusUsageTracker";
+  const wrapperPath = path.join(STABLE_DIR, "daily-sync.cmd");
+
+  // .cmd wrapper로 paths 내 공백/특수문자 처리
+  fs.writeFileSync(wrapperPath, `@echo off\r\n"${process.execPath}" "${submitPath}"\r\n`);
+
+  const result = spawnSync("schtasks", [
+    "/Create", "/TN", taskName,
+    "/TR", wrapperPath,
+    "/SC", "DAILY", "/ST", "09:00", "/F",
+  ], { stdio: "ignore" });
+
+  if (result.status === 0) {
+    console.log("✅ 일간 자동 동기화 등록 완료 (매일 오전 9시, Task Scheduler)");
+  } else {
+    console.log("⚠️  일간 자동 동기화 등록 실패 (선택 사항, 수동으로 등록 가능)");
+  }
+}
+
+function registerDailySchedule(submitPath: string): void {
+  if (process.platform === "darwin") {
+    registerLaunchd(submitPath);
+  } else if (process.platform === "win32") {
+    registerWindowsTask(submitPath);
+  }
 }
 
 function mergeHook(submitPath: string) {
@@ -233,10 +302,11 @@ export async function runInit() {
   fs.mkdirSync(STABLE_DIR, { recursive: true });
   fs.copyFileSync(path.join(__dirname, "submit.mjs"), STABLE_SUBMIT);
   mergeHook(STABLE_SUBMIT);
+  registerDailySchedule(STABLE_SUBMIT);
   runBackfill(apiKey);
 
   console.log("\n✨ 설치 완료!");
-  console.log("   Claude Code 세션을 종료하면 자동으로 사용량이 수집됩니다.");
+  console.log("   Claude Code 세션 종료 시 + 매일 오전 9시 자동으로 사용량이 수집됩니다.");
   console.log(`   대시보드: ${SERVER_URL}/dashboard\n`);
   process.exit(0);
 }
