@@ -22,6 +22,7 @@ interface RawActivity {
   category?: string;
   sessions?: number;
   turns?: number;
+  cost?: number;
   oneShotRate?: number | null;
 }
 
@@ -58,6 +59,19 @@ function computeOneShotRate(activities: RawActivity[]): number {
   return totalTurns > 0 ? weighted / totalTurns : 0;
 }
 
+function computePrevCostPerSession(
+  allDaily: Array<{ date: string; cost: number; sessions?: number }>,
+  period: Period
+): number | null {
+  if (period === "all") return null;
+  const n = period === "today" ? 1 : period === "week" ? 7 : 30;
+  const sorted = [...allDaily].sort((a, b) => b.date.localeCompare(a.date));
+  const prev = sorted.slice(n, n * 2);
+  const cost = prev.reduce((s, d) => s + d.cost, 0);
+  const sessions = prev.reduce((s, d) => s + (d.sessions ?? 0), 0);
+  return sessions > 0 ? cost / sessions : null;
+}
+
 export async function GET(req: NextRequest) {
   const session = await getServerSession(authOptions);
   if (!session?.user?.email)
@@ -69,6 +83,10 @@ export async function GET(req: NextRequest) {
   const allSnaps = await db.select().from(userSnapshots);
 
   const snapMap = new Map(allSnaps.map((s) => [s.userId, s]));
+
+  // Accumulators for team-level aggregations
+  const activityAgg = new Map<string, { totalCost: number; totalTurns: number; members: Set<number> }>();
+  const dailyMemberMap = new Map<string, Record<string, number>>();
 
   const memberStats = allUsers
     .map((u) => {
@@ -83,11 +101,13 @@ export async function GET(req: NextRequest) {
       let outputInputRatio: number;
       let topProject: string;
 
+      const d = getPeriodData(snap.rawJson, period);
+      const dAll = getPeriodData(snap.rawJson, "all");
+
       if (period === "all") {
         totalCost = snap.totalCost;
         sessionsCount = snap.sessionsCount;
         overallOneShot = snap.overallOneShot;
-        const d = getPeriodData(snap.rawJson, "all");
         const ov = d.overview ?? d.summary ?? {};
         callsCount = ov.calls ?? snap.callsCount;
         const tIn = ov.tokens?.input ?? 0;
@@ -100,7 +120,6 @@ export async function GET(req: NextRequest) {
         outputInputRatio = tIn > 0 ? tOut / tIn : 1;
         topProject = (d.projects ?? []).sort((a, b) => (b.cost ?? 0) - (a.cost ?? 0))[0]?.name ?? "unknown";
       } else {
-        const d = getPeriodData(snap.rawJson, period);
         const ov = d.overview ?? d.summary ?? {};
         totalCost = ov.cost ?? ov.totalCost ?? 0;
         sessionsCount = ov.sessions ?? ov.totalSessions ?? 0;
@@ -114,6 +133,33 @@ export async function GET(req: NextRequest) {
       }
 
       if (sessionsCount === 0) return null;
+
+      // Trend: prev period $/session from all-time daily data
+      const allDailyData = dAll.daily ?? [];
+      const prevCostPerSession = computePrevCostPerSession(allDailyData, period);
+
+      // Aggregate activities for team view
+      for (const a of d.activities ?? []) {
+        const name = a.name ?? a.category ?? "Unknown";
+        const cost = a.cost ?? 0;
+        const turns = a.turns ?? a.sessions ?? 0;
+        if (!activityAgg.has(name)) {
+          activityAgg.set(name, { totalCost: 0, totalTurns: 0, members: new Set() });
+        }
+        const entry = activityAgg.get(name)!;
+        entry.totalCost += cost;
+        entry.totalTurns += turns;
+        entry.members.add(u.id);
+      }
+
+      // Aggregate daily by member
+      for (const day of d.daily ?? []) {
+        if (!dailyMemberMap.has(day.date)) {
+          dailyMemberMap.set(day.date, {});
+        }
+        const existing = dailyMemberMap.get(day.date)!;
+        existing[u.name] = (existing[u.name] ?? 0) + day.cost;
+      }
 
       const efficiencyScore = computeEfficiencyScore(overallOneShot, cacheHitPct, totalCost, sessionsCount, callsCount, outputInputRatio);
 
@@ -130,11 +176,11 @@ export async function GET(req: NextRequest) {
         topProject,
         callsCount,
         outputInputRatio,
+        prevCostPerSession,
       };
     })
     .filter((m): m is NonNullable<typeof m> => m !== null);
 
-  const byOneShotRate = [...memberStats].sort((a, b) => b.overallOneShot - a.overallOneShot);
   const byEfficiency = [...memberStats].sort((a, b) => b.efficiencyScore - a.efficiencyScore);
   const bySessions = [...memberStats].sort((a, b) => b.sessionsCount - a.sessionsCount);
 
@@ -150,18 +196,44 @@ export async function GET(req: NextRequest) {
       : 0,
   };
 
+  // Team daily (sum across all members)
   const dailyMap = new Map<string, number>();
-  for (const u of allUsers) {
-    const snap = snapMap.get(u.id);
-    if (!snap) continue;
-    const d = getPeriodData(snap.rawJson, period);
-    for (const row of d.daily ?? []) {
-      dailyMap.set(row.date, (dailyMap.get(row.date) ?? 0) + row.cost);
-    }
+  for (const [date, memberCosts] of dailyMemberMap.entries()) {
+    dailyMap.set(date, Object.values(memberCosts).reduce((s, v) => s + v, 0));
   }
   const daily = [...dailyMap.entries()]
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([date, cost]) => ({ date, cost }));
 
-  return NextResponse.json({ byOneShotRate, byEfficiency, bySessions, teamSummary, daily });
+  // Team activities (top 10 by turns)
+  const memberNames = byEfficiency.map((m) => m.name);
+  const teamActivities = [...activityAgg.entries()]
+    .map(([name, { totalCost, totalTurns, members }]) => ({
+      name,
+      totalCost,
+      totalTurns,
+      memberCount: members.size,
+    }))
+    .sort((a, b) => b.totalTurns - a.totalTurns)
+    .slice(0, 10);
+
+  // Daily by member (for stacked area)
+  const allDates = [...dailyMemberMap.keys()].sort();
+  const dailyByMember = allDates.map((date) => {
+    const row: Record<string, number | string> = { date };
+    for (const name of memberNames) {
+      row[name] = dailyMemberMap.get(date)?.[name] ?? 0;
+    }
+    return row;
+  });
+
+  return NextResponse.json({
+    byEfficiency,
+    bySessions,
+    teamSummary,
+    daily,
+    teamActivities,
+    dailyByMember,
+    memberNames,
+  });
 }
