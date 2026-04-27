@@ -71,8 +71,7 @@ export async function POST(req: NextRequest) {
   const totalCost = ov.cost ?? ov.totalCost ?? 0;
   const sessionsCount = ov.sessions ?? ov.totalSessions ?? 0;
   const callsCount = ov.calls ?? ov.callsCount ?? 0;
-  const rawCacheHit = ov.cacheHitPercent ?? ov.cacheHitPct ?? 0;
-  const cacheHitPct = rawCacheHit > 1 ? rawCacheHit : rawCacheHit * 100;
+  const cacheHitPct = ov.cacheHitPercent ?? ov.cacheHitPct ?? 0;
   const overallOneShot = computeOverallOneShot(activities);
 
   await db

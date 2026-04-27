@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { db, userSnapshots, users } from "@/lib/db";
 import { eq } from "drizzle-orm";
+import { isAdmin } from "@/lib/admin";
 
 type Period = "today" | "week" | "month" | "all";
 
@@ -84,11 +85,22 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
 
   const period = (req.nextUrl.searchParams.get("period") ?? "week") as Period;
+  const requestedUserId = req.nextUrl.searchParams.get("userId");
+
+  let targetEmail = session.user.email!;
+  if (requestedUserId) {
+    if (!isAdmin(session.user.email!)) {
+      return NextResponse.json({ error: "forbidden" }, { status: 403 });
+    }
+    const targetUser = await db.select().from(users).where(eq(users.id, parseInt(requestedUserId))).limit(1);
+    if (!targetUser[0]) return NextResponse.json({ error: "not found" }, { status: 404 });
+    targetEmail = targetUser[0].email;
+  }
 
   const user = await db
     .select()
     .from(users)
-    .where(eq(users.email, session.user.email))
+    .where(eq(users.email, targetEmail))
     .limit(1);
   if (!user[0]) return NextResponse.json({ error: "not found" }, { status: 404 });
 
@@ -123,7 +135,7 @@ export async function GET(req: NextRequest) {
   const outputInputRatio = tInput > 0 ? tOutput / tInput : 0;
   const cacheHitPct = (tRead + tWrite + tInput) > 0
     ? (tRead / (tRead + tWrite + tInput)) * 100
-    : (() => { const r = ov.cacheHitPercent ?? ov.cacheHitPct ?? 0; return r > 1 ? r : r * 100; })();
+    : (ov.cacheHitPercent ?? ov.cacheHitPct ?? 0);
 
   const allActivities = d.activities ?? [];
   const activitiesWithRate = allActivities.filter((a) => a.oneShotRate != null);

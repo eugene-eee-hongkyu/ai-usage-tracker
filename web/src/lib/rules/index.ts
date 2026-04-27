@@ -1,13 +1,18 @@
-// efficiencyScore = overallOneShot × cacheHitPct / (totalCost / sessionsCount)
+// efficiencyScore = oneShotRate × (cacheHit/100) × outputInputRatio / costPerCall
 export function computeEfficiencyScore(
-  overallOneShot: number,
-  cacheHitPct: number,
+  overallOneShot: number,   // 0–1
+  cacheHitPct: number,      // 0–100
   totalCost: number,
-  sessionsCount: number
+  sessionsCount: number,
+  callsCount: number,
+  outputInputRatio: number  // tOutput / tInput
 ): number {
   if (sessionsCount === 0 || totalCost === 0) return 0;
-  const costPerSession = totalCost / sessionsCount;
-  return Math.round((overallOneShot * cacheHitPct) / costPerSession);
+  const denom = callsCount > 0 ? callsCount : sessionsCount;
+  const costPerCall = totalCost / denom;
+  if (costPerCall === 0) return 0;
+  const oiRatio = outputInputRatio > 0 ? outputInputRatio : 1;
+  return Math.round((overallOneShot * (cacheHitPct / 100) * oiRatio) / costPerCall);
 }
 
 export function generateMvpBlurb(

@@ -15,7 +15,13 @@ interface RawProject {
   avgCost?: number;
 }
 
+interface RawPeriodBlock {
+  daily?: DailyRow[];
+  projects?: RawProject[];
+}
+
 interface RawJson {
+  all?: RawPeriodBlock;
   daily?: DailyRow[];
   projects?: RawProject[];
 }
@@ -49,8 +55,9 @@ export async function GET(
   }
 
   const raw = snap[0].rawJson as RawJson;
-  const allDaily: DailyRow[] = raw.daily ?? [];
-  const projects: ProjectRow[] = (raw.projects ?? []).map((p) => {
+  const block = raw.all ?? raw;
+  const allDaily: DailyRow[] = block.daily ?? [];
+  const projects: ProjectRow[] = (block.projects ?? []).map((p) => {
     const cost = p.cost ?? 0;
     const sessions = p.sessions ?? p.calls ?? 0;
     return {

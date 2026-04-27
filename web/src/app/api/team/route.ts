@@ -14,6 +14,7 @@ interface RawOverview {
   totalCost?: number;
   totalSessions?: number;
   cacheHitPct?: number;
+  tokens?: { input?: number; output?: number; cacheRead?: number; cacheWrite?: number };
 }
 
 interface RawActivity {
@@ -77,6 +78,8 @@ export async function GET(req: NextRequest) {
       let sessionsCount: number;
       let cacheHitPct: number;
       let overallOneShot: number;
+      let callsCount: number;
+      let outputInputRatio: number;
       let topProject: string;
 
       if (period === "all") {
@@ -84,22 +87,30 @@ export async function GET(req: NextRequest) {
         sessionsCount = snap.sessionsCount;
         cacheHitPct = snap.cacheHitPct;
         overallOneShot = snap.overallOneShot;
-        const raw = snap.rawJson as { projects?: Array<{ name: string; cost: number }> };
-        topProject = (raw.projects ?? []).sort((a, b) => b.cost - a.cost)[0]?.name ?? "unknown";
+        const d = getPeriodData(snap.rawJson, "all");
+        const ov = d.overview ?? d.summary ?? {};
+        callsCount = ov.calls ?? snap.callsCount;
+        const tIn = ov.tokens?.input ?? 0;
+        const tOut = ov.tokens?.output ?? 0;
+        outputInputRatio = tIn > 0 ? tOut / tIn : 1;
+        topProject = (d.projects ?? []).sort((a, b) => (b.cost ?? 0) - (a.cost ?? 0))[0]?.name ?? "unknown";
       } else {
         const d = getPeriodData(snap.rawJson, period);
         const ov = d.overview ?? d.summary ?? {};
         totalCost = ov.cost ?? ov.totalCost ?? 0;
         sessionsCount = ov.sessions ?? ov.totalSessions ?? 0;
-        const rawCache = ov.cacheHitPercent ?? ov.cacheHitPct ?? 0;
-        cacheHitPct = rawCache > 1 ? rawCache : rawCache * 100;
+        cacheHitPct = ov.cacheHitPercent ?? ov.cacheHitPct ?? 0;
         overallOneShot = computeOneShotRate(d.activities ?? []);
+        callsCount = ov.calls ?? 0;
+        const tIn = ov.tokens?.input ?? 0;
+        const tOut = ov.tokens?.output ?? 0;
+        outputInputRatio = tIn > 0 ? tOut / tIn : 1;
         topProject = (d.projects ?? []).sort((a, b) => (b.cost ?? 0) - (a.cost ?? 0))[0]?.name ?? "unknown";
       }
 
       if (sessionsCount === 0) return null;
 
-      const efficiencyScore = computeEfficiencyScore(overallOneShot, cacheHitPct, totalCost, sessionsCount);
+      const efficiencyScore = computeEfficiencyScore(overallOneShot, cacheHitPct, totalCost, sessionsCount, callsCount, outputInputRatio);
 
       return {
         userId: u.id,
