@@ -123,11 +123,15 @@ export async function GET(req: NextRequest) {
         const ov = d.overview ?? d.summary ?? {};
         totalCost = ov.cost ?? ov.totalCost ?? 0;
         sessionsCount = ov.sessions ?? ov.totalSessions ?? 0;
-        cacheHitPct = ov.cacheHitPercent ?? ov.cacheHitPct ?? 0;
         overallOneShot = computeOneShotRate(d.activities ?? []);
         callsCount = ov.calls ?? 0;
         const tIn = ov.tokens?.input ?? 0;
         const tOut = ov.tokens?.output ?? 0;
+        const tRead = ov.tokens?.cacheRead ?? 0;
+        const tWrite = ov.tokens?.cacheWrite ?? 0;
+        cacheHitPct = (tRead + tWrite + tIn) > 0
+          ? (tRead / (tRead + tWrite + tIn)) * 100
+          : (ov.cacheHitPercent ?? ov.cacheHitPct ?? 0);
         outputInputRatio = tIn > 0 ? tOut / tIn : 1;
         topProject = (d.projects ?? []).sort((a, b) => (b.cost ?? 0) - (a.cost ?? 0))[0]?.name ?? "unknown";
       }
