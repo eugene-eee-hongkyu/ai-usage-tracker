@@ -230,7 +230,8 @@ function runBackfill(apiKey) {
 }
 function checkCodeburn() {
   try {
-    execSync("which codeburn", { stdio: "ignore" });
+    const cmd = process.platform === "win32" ? "where codeburn" : "which codeburn";
+    execSync(cmd, { stdio: "ignore" });
     return true;
   } catch {
     return false;
