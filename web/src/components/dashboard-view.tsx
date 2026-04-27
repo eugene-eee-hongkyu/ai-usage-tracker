@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 import { useSession, signOut } from "next-auth/react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
 import { Nav } from "@/components/nav";
 import { CacheHitModal, OneShotRateModal, CostPerSessionModal, CallsPerSessionModal, CostPerCallModal, OutputInputRatioModal } from "@/components/metric-modal";
 
