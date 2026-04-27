@@ -4,6 +4,24 @@
 
 ---
 
+## Session 2026-04-27 16:08 — Windows CLI 호환성 수정 + Vercel 빌드 에러
+
+### 작업 요약
+- **Vercel 빌드 에러 수정**: dashboard-view.tsx에서 사용하지 않는 `Link` import 제거 (ESLint no-unused-vars 빌드 실패)
+- **Windows CLI 호환성 수정** (backfill이 서버에 데이터 전송 못 하는 버그):
+  - 원인: `sync.ts` `spawnCodeburn()`이 `shell: false` 사용 → Windows에서 npm global 패키지가 `codeburn.cmd`로 설치되므로 `.cmd` 파일을 직접 실행 불가 → ENOENT → `catch` 블록에서 조용히 실패 → ingest 미호출 → `lastSyncedAt` null → step 2 두 항목 모두 미완
+  - `sync.ts`: `shell: false` → `shell: true`
+  - `init.ts`: `checkCodeburn()`에서 Windows는 `where codeburn`, Mac/Linux는 `which codeburn` 분기
+  - `bun run build:sync` + `bun run build:init` 재빌드 후 커밋·푸시
+- Mac 영향 없음 확인 (`shell: true`는 macOS에서 `/bin/sh -c`로 동일 동작)
+
+### 다음 액션
+- Windows 사용자가 `npx github:eugene-eee-hongkyu/ai-usage-tracker init` 재실행 → step 2 해결 여부 확인
+- Vercel `ADMIN_EMAIL` env var 설정
+- 팀원 초대 및 팀 화면 검증
+
+---
+
 ## Session 2026-04-27 15:59 — 팀 대시보드 페이지 전면 재설계
 
 ### 작업 요약

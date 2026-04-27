@@ -6,19 +6,19 @@
 
 ---
 
-## 마지막 실행: 2026-04-27 15:59
-## 마지막 업데이트: 2026-04-27 15:59
+## 마지막 실행: 2026-04-27 16:08
+## 마지막 업데이트: 2026-04-27 16:08
 ## 현재 모드: bypassPermissions
 
 ### 현재 집중
 
-- 팀 대시보드 페이지 전면 재설계 완료. Vercel ADMIN_EMAIL 설정 + 팀원 초대 남음.
+- 팀 대시보드 재설계 + Windows 호환성 수정 완료. Vercel ADMIN_EMAIL 설정 + 팀원 초대 남음.
 
 ### 이어서 할 것
 
 1. Vercel 환경변수 `ADMIN_EMAIL` 설정 (프로덕션 관리자 버튼 활성화)
-2. 재설치 (`rm -rf ~/.primus-usage-tracker` → `npx github:eugene-eee-hongkyu/ai-usage-tracker init`)
-3. 팀원 초대 및 팀랭킹 화면 검증
+2. Windows 사용자 `npx github:eugene-eee-hongkyu/ai-usage-tracker init` 재실행 → step 2 해결 확인
+3. 팀원 초대 및 팀 화면 검증
 
 ### 막힌 것
 
@@ -30,7 +30,7 @@
 
 ### 백로그 요약
 - 대기 중: 2개
-- 최근 추가: 2026-04-26 — 팀원 초대
+- 최근 추가: 2026-04-26 — Windows SessionEnd 훅 발화 검증
 
 ### 진행 상황
 
@@ -121,6 +121,7 @@
 - [x] 팀 페이지 탭명 "팀랭킹" → "팀" 변경
 - [x] members API `callsCount`, `outputInputRatio`, `teamSummary`, `daily` 필드 추가
 - [x] `ADMIN_EMAIL` import → `isAdmin()` 함수로 교체 (기존 TS 오류 수정)
+- [x] Windows CLI 호환성: sync.ts shell:false→shell:true, init.ts where vs which 분기
 - [ ] Vercel ADMIN_EMAIL env var 설정
 - [ ] 재설치 (`rm -rf ~/.primus-usage-tracker` → `npx init`)
 - [ ] 팀원 초대 및 팀 화면 검증
