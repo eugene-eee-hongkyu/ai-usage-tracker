@@ -384,15 +384,17 @@ export default function DashboardPage() {
                     <span className={`text-xs font-mono font-bold px-2 py-0.5 rounded border cursor-default ${GRADE_STYLES[grade]}`}>
                       {grade}
                     </span>
-                    <div className="absolute right-0 top-full mt-1 z-50 opacity-0 invisible group-hover/grade:opacity-100 group-hover/grade:visible transition-all duration-100 bg-slate-900 border border-slate-700 rounded-lg shadow-2xl p-3 w-[580px]">
-                      <p className="text-[10px] font-mono text-slate-500 mb-2.5 uppercase tracking-wider">등급 기준</p>
-                      <div className="grid grid-cols-2 gap-3">
-                        <MiniGradeTable title="Cache hit" rows={CACHE_ROWS} current={cacheHitGrade(ov.cacheHitPct)} />
-                        <MiniGradeTable title="One-shot rate" rows={ONESHOT_ROWS} current={oneShotGrade(Math.round(ov.oneShotRate * 100))} />
-                        <MiniGradeTable title="Cost / session" rows={COST_ROWS} current={costGrade(costPs)} />
-                        <MiniGradeTable title="Calls / session" rows={CALLS_ROWS} current={callsGrade(callsPs)} />
+                    {grade !== "양호" && (
+                      <div className="absolute right-0 top-full mt-1 z-50 opacity-0 invisible group-hover/grade:opacity-100 group-hover/grade:visible transition-all duration-100 bg-slate-900 border border-slate-700 rounded-lg shadow-2xl p-3 w-[580px]">
+                        <p className="text-[10px] font-mono text-slate-500 mb-2.5 uppercase tracking-wider">등급 기준</p>
+                        <div className="grid grid-cols-2 gap-3">
+                          <MiniGradeTable title="Cache hit" rows={CACHE_ROWS} current={cacheHitGrade(ov.cacheHitPct)} />
+                          <MiniGradeTable title="One-shot rate" rows={ONESHOT_ROWS} current={oneShotGrade(Math.round(ov.oneShotRate * 100))} />
+                          <MiniGradeTable title="Cost / session" rows={COST_ROWS} current={costGrade(costPs)} />
+                          <MiniGradeTable title="Calls / session" rows={CALLS_ROWS} current={callsGrade(callsPs)} />
+                        </div>
                       </div>
-                    </div>
+                    )}
                   </div>
                 );
               })()}
@@ -480,11 +482,8 @@ export default function DashboardPage() {
 
           {/* By Project */}
           <div className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-yellow-500 rounded">
-            <div className="px-3 py-2 border-b border-neutral-800 flex items-center justify-between">
+            <div className="px-3 py-2 border-b border-neutral-800">
               <span className="text-xs font-mono font-bold text-yellow-400 uppercase tracking-wider">By Project</span>
-              {data.projects.length > 8 && (
-                <Link href="/dashboard/detail" className="text-xs font-mono text-neutral-500 hover:text-neutral-300">+{data.projects.length - 8} more →</Link>
-              )}
             </div>
             <div className="p-3">
               <div className="flex text-xs text-neutral-600 font-mono mb-1.5 pr-1">
@@ -494,7 +493,7 @@ export default function DashboardPage() {
                 <span className="w-6 text-right">s</span>
               </div>
               <div className="space-y-1">
-                {data.projects.slice(0, 8).map((p) => {
+                {data.projects.map((p) => {
                   const displayPath = formatPath(p.path || p.name);
                   return (
                     <div key={p.name} className="flex items-center gap-1.5 text-xs font-mono">
