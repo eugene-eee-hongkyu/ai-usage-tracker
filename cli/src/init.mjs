@@ -145,19 +145,34 @@ function registerLaunchd(submitPath) {
 function registerWindowsTask(submitPath) {
   const taskName = "PrimusUsageTracker";
   const wrapperPath = path.join(STABLE_DIR, "daily-sync.cmd");
+  const xmlPath = path.join(STABLE_DIR, "task.xml");
   fs.writeFileSync(wrapperPath, `@echo off\r
 "${process.execPath}" "${submitPath}"\r
 `);
+  const xml = `<?xml version="1.0" encoding="UTF-16"?>
+<Task version="1.2" xmlns="http://schemas.microsoft.com/windows/2004/02/mit/task">
+  <Triggers>
+    <CalendarTrigger>
+      <StartBoundary>2000-01-01T09:00:00</StartBoundary>
+      <ScheduleByDay><DaysInterval>1</DaysInterval></ScheduleByDay>
+    </CalendarTrigger>
+  </Triggers>
+  <Settings>
+    <StartWhenAvailable>true</StartWhenAvailable>
+    <ExecutionTimeLimit>PT2H</ExecutionTimeLimit>
+    <MultipleInstancesPolicy>IgnoreNew</MultipleInstancesPolicy>
+  </Settings>
+  <Actions>
+    <Exec><Command>${wrapperPath}</Command></Exec>
+  </Actions>
+</Task>`;
+  fs.writeFileSync(xmlPath, Buffer.from("\uFEFF" + xml, "utf16le"));
   const result = spawnSync("schtasks", [
     "/Create",
     "/TN",
     taskName,
-    "/TR",
-    wrapperPath,
-    "/SC",
-    "DAILY",
-    "/ST",
-    "09:00",
+    "/XML",
+    xmlPath,
     "/F"
   ], { stdio: "ignore" });
   if (result.status === 0) {

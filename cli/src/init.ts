@@ -153,14 +153,34 @@ function registerLaunchd(submitPath: string): void {
 function registerWindowsTask(submitPath: string): void {
   const taskName = "PrimusUsageTracker";
   const wrapperPath = path.join(STABLE_DIR, "daily-sync.cmd");
+  const xmlPath = path.join(STABLE_DIR, "task.xml");
 
-  // .cmd wrapper로 paths 내 공백/특수문자 처리
   fs.writeFileSync(wrapperPath, `@echo off\r\n"${process.execPath}" "${submitPath}"\r\n`);
 
+  // XML 등록: StartWhenAvailable=true → 꺼져 있다가 켜지면 즉시 실행
+  const xml = `<?xml version="1.0" encoding="UTF-16"?>
+<Task version="1.2" xmlns="http://schemas.microsoft.com/windows/2004/02/mit/task">
+  <Triggers>
+    <CalendarTrigger>
+      <StartBoundary>2000-01-01T09:00:00</StartBoundary>
+      <ScheduleByDay><DaysInterval>1</DaysInterval></ScheduleByDay>
+    </CalendarTrigger>
+  </Triggers>
+  <Settings>
+    <StartWhenAvailable>true</StartWhenAvailable>
+    <ExecutionTimeLimit>PT2H</ExecutionTimeLimit>
+    <MultipleInstancesPolicy>IgnoreNew</MultipleInstancesPolicy>
+  </Settings>
+  <Actions>
+    <Exec><Command>${wrapperPath}</Command></Exec>
+  </Actions>
+</Task>`;
+
+  // Task Scheduler XML은 UTF-16LE로 저장해야 인식됨
+  fs.writeFileSync(xmlPath, Buffer.from("﻿" + xml, "utf16le"));
+
   const result = spawnSync("schtasks", [
-    "/Create", "/TN", taskName,
-    "/TR", wrapperPath,
-    "/SC", "DAILY", "/ST", "09:00", "/F",
+    "/Create", "/TN", taskName, "/XML", xmlPath, "/F",
   ], { stdio: "ignore" });
 
   if (result.status === 0) {
