@@ -159,10 +159,13 @@ export function CacheHitModal({ value, onClose, methodsOnly = false }: { value: 
             Cache hit = 캐시 읽기 ÷ (캐시 읽기 + 캐시 쓰기 + 새 입력)
           </div>
           <p className="text-slate-400 leading-relaxed text-xs">
-            현재 {value}%는 &ldquo;전체 입력의 {value}%를 1/10 가격으로 처리했다&rdquo;는 뜻.
+            현재 {value.toFixed(1)}%는 &ldquo;전체 입력의 {value.toFixed(1)}%를 1/10 가격으로 처리했다&rdquo;는 뜻.
             Claude Code 엔지니어가 말하길 정상 세션은 96% 정도 나오고, cache hit이 떨어지면 사고(SEV)로 본다고 합니다.{" "}
-            {value >= 90 && <strong className="text-slate-300">{value}%는 매우 좋은 상태입니다.</strong>}{" "}
+            {value >= 90 && <strong className="text-slate-300">{value.toFixed(1)}%는 매우 좋은 상태입니다.</strong>}{" "}
             <Ref href="https://www.claudecodecamp.com/p/how-prompt-caching-actually-works-in-claude-code">출처</Ref>
+          </p>
+          <p className="text-slate-600 text-[10px] leading-relaxed">
+            ※ ccusage·codeburn 같은 일부 도구는 캐시 쓰기를 분모에서 빼서 100%에 가까운 값을 표시하기도 합니다. 본 도구는 Anthropic 표준 공식 사용.
           </p>
         </Section>
       )}
