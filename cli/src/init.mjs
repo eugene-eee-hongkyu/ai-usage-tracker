@@ -29,7 +29,6 @@ async function saveApiKey(apiKey) {
   const keytar = await getKeytar();
   if (keytar) {
     await keytar.setPassword(KEYTAR_SERVICE, KEYTAR_ACCOUNT, apiKey);
-    return;
   }
   const fallbackPath = path.join(os.homedir(), ".primus-usage-key");
   fs.writeFileSync(fallbackPath, apiKey, { mode: 384 });
