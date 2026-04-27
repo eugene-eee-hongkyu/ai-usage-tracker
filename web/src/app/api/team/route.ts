@@ -85,13 +85,17 @@ export async function GET(req: NextRequest) {
       if (period === "all") {
         totalCost = snap.totalCost;
         sessionsCount = snap.sessionsCount;
-        cacheHitPct = snap.cacheHitPct;
         overallOneShot = snap.overallOneShot;
         const d = getPeriodData(snap.rawJson, "all");
         const ov = d.overview ?? d.summary ?? {};
         callsCount = ov.calls ?? snap.callsCount;
         const tIn = ov.tokens?.input ?? 0;
         const tOut = ov.tokens?.output ?? 0;
+        const tRead = ov.tokens?.cacheRead ?? 0;
+        const tWrite = ov.tokens?.cacheWrite ?? 0;
+        cacheHitPct = (tRead + tWrite + tIn) > 0
+          ? (tRead / (tRead + tWrite + tIn)) * 100
+          : snap.cacheHitPct;
         outputInputRatio = tIn > 0 ? tOut / tIn : 1;
         topProject = (d.projects ?? []).sort((a, b) => (b.cost ?? 0) - (a.cost ?? 0))[0]?.name ?? "unknown";
       } else {
