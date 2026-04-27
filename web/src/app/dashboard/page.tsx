@@ -46,7 +46,7 @@ interface Model { name: string; cost: number; calls: number; cacheHitPct: number
 interface NameCalls { name: string; calls: number }
 
 interface DashboardData {
-  user: { name: string; lastSyncedAt: string | null };
+  user: { name: string; lastSyncedAt: string | null; timezone: string | null };
   overview: Overview | null;
   daily: DailyRow[];
   activities: Activity[];
@@ -178,15 +178,43 @@ function computeGrade(cacheHitPct: number, oneShotRate: number, costPerSession: 
   return "경고";
 }
 
-function fmtSyncedAt(ts: string | null): string {
+function fmtSyncedAt(ts: string | null, tz: string): string {
   if (!ts) return "—";
   const d = new Date(ts);
-  const mm = String(d.getMonth() + 1).padStart(2, "0");
-  const dd = String(d.getDate()).padStart(2, "0");
-  const hh = String(d.getHours()).padStart(2, "0");
-  const min = String(d.getMinutes()).padStart(2, "0");
-  return `${mm}-${dd} ${hh}:${min}`;
+  const parts = new Intl.DateTimeFormat("en", {
+    timeZone: tz,
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).formatToParts(d);
+  const get = (t: string) => parts.find((p) => p.type === t)?.value ?? "00";
+  return `${get("month")}-${get("day")} ${get("hour")}:${get("minute")}`;
 }
+
+function tzAbbr(tz: string): string {
+  return (
+    new Intl.DateTimeFormat("en", { timeZone: tz, timeZoneName: "short" })
+      .formatToParts(new Date())
+      .find((p) => p.type === "timeZoneName")?.value ?? tz
+  );
+}
+
+const TIMEZONE_LIST: { label: string; value: string }[] = [
+  { label: "SGT — Singapore (UTC+8)", value: "Asia/Singapore" },
+  { label: "KST — Korea (UTC+9)", value: "Asia/Seoul" },
+  { label: "JST — Japan (UTC+9)", value: "Asia/Tokyo" },
+  { label: "HKT — Hong Kong (UTC+8)", value: "Asia/Hong_Kong" },
+  { label: "CST — China (UTC+8)", value: "Asia/Shanghai" },
+  { label: "IST — India (UTC+5:30)", value: "Asia/Kolkata" },
+  { label: "GMT/BST — UK", value: "Europe/London" },
+  { label: "CET — Central Europe", value: "Europe/Paris" },
+  { label: "EST/EDT — US Eastern", value: "America/New_York" },
+  { label: "CST/CDT — US Central", value: "America/Chicago" },
+  { label: "PST/PDT — US Pacific", value: "America/Los_Angeles" },
+  { label: "UTC", value: "UTC" },
+];
 
 function TipBtn({ label, onClick, variant = "action" }: { label: string; onClick: () => void; variant?: "explain" | "action" }) {
   return (
@@ -214,6 +242,12 @@ export default function DashboardPage() {
   const [showOneShotMethodsModal, setShowOneShotMethodsModal] = useState(false);
   const [showCostMethodsModal, setShowCostMethodsModal] = useState(false);
   const [showCallsMethodsModal, setShowCallsMethodsModal] = useState(false);
+  const [showTzPicker, setShowTzPicker] = useState(false);
+  const [userTz, setUserTz] = useState<string>(() =>
+    typeof window !== "undefined"
+      ? Intl.DateTimeFormat().resolvedOptions().timeZone
+      : "UTC"
+  );
 
   useEffect(() => {
     if (status === "unauthenticated") router.push("/login");
@@ -232,6 +266,20 @@ export default function DashboardPage() {
       })
       .catch(() => { setFetchError(true); setLoading(false); });
   }, [session, period]);
+
+  useEffect(() => {
+    if (data?.user?.timezone) setUserTz(data.user.timezone);
+  }, [data?.user?.timezone]);
+
+  const saveTz = async (tz: string) => {
+    setUserTz(tz);
+    setShowTzPicker(false);
+    await fetch("/api/user/timezone", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ timezone: tz }),
+    });
+  };
 
   useEffect(() => {
     if (!session || !data || data.overview) return;
@@ -332,7 +380,26 @@ export default function DashboardPage() {
           <span><span className="text-violet-400 font-bold">{Math.round(ov.oneShotRate * 100)}%</span><span className="text-neutral-500 ml-1 text-xs">1-shot</span></span>
           <span className="text-neutral-600 text-xs self-center ml-auto flex items-center gap-3">
             <span>활성 {ov.activeDays}일</span>
-            <span>마지막 수신 <span className="text-neutral-500">{fmtSyncedAt(data.user.lastSyncedAt)}</span></span>
+            <span className="relative">
+              마지막 수신{" "}
+              <span className="text-neutral-500">{fmtSyncedAt(data.user.lastSyncedAt, userTz)}</span>{" "}
+              <button
+                onClick={() => setShowTzPicker((v) => !v)}
+                className="text-neutral-600 hover:text-neutral-300 text-[10px] font-mono border border-neutral-700 hover:border-neutral-500 rounded px-1 py-0.5 transition-colors"
+                title="타임존 변경"
+              >{tzAbbr(userTz)}</button>
+              {showTzPicker && (
+                <div className="absolute right-0 bottom-6 z-50 bg-neutral-900 border border-neutral-700 rounded-lg shadow-xl w-64 py-1 text-left">
+                  {TIMEZONE_LIST.map((tz) => (
+                    <button
+                      key={tz.value}
+                      onClick={() => saveTz(tz.value)}
+                      className={`w-full text-left px-3 py-1.5 text-xs font-mono hover:bg-neutral-800 transition-colors ${userTz === tz.value ? "text-indigo-400" : "text-neutral-300"}`}
+                    >{tz.label}</button>
+                  ))}
+                </div>
+              )}
+            </span>
           </span>
         </div>
       </div>

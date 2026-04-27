@@ -4,6 +4,21 @@ import { useSession } from "next-auth/react";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
+const TIMEZONE_LIST: { label: string; value: string }[] = [
+  { label: "SGT — Singapore (UTC+8)", value: "Asia/Singapore" },
+  { label: "KST — Korea (UTC+9)", value: "Asia/Seoul" },
+  { label: "JST — Japan (UTC+9)", value: "Asia/Tokyo" },
+  { label: "HKT — Hong Kong (UTC+8)", value: "Asia/Hong_Kong" },
+  { label: "CST — China (UTC+8)", value: "Asia/Shanghai" },
+  { label: "IST — India (UTC+5:30)", value: "Asia/Kolkata" },
+  { label: "GMT/BST — UK", value: "Europe/London" },
+  { label: "CET — Central Europe", value: "Europe/Paris" },
+  { label: "EST/EDT — US Eastern", value: "America/New_York" },
+  { label: "CST/CDT — US Central", value: "America/Chicago" },
+  { label: "PST/PDT — US Pacific", value: "America/Los_Angeles" },
+  { label: "UTC", value: "UTC" },
+];
+
 type Step = { label: string; done: boolean };
 
 function NodeInstallGuide() {
@@ -112,10 +127,28 @@ export default function SetupPage() {
     { label: "첫 데이터 수신", done: false },
   ]);
   const [copied, setCopied] = useState(false);
+  const [timezone, setTimezone] = useState<string>("");
+  const [tzSaved, setTzSaved] = useState(false);
 
   useEffect(() => {
     if (status === "unauthenticated") router.push("/login");
   }, [status, router]);
+
+  useEffect(() => {
+    const detected = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    setTimezone(detected);
+  }, []);
+
+  const saveTz = async (tz: string) => {
+    setTimezone(tz);
+    setTzSaved(false);
+    await fetch("/api/user/timezone", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ timezone: tz }),
+    });
+    setTzSaved(true);
+  };
 
   useEffect(() => {
     if (!session) return;
@@ -161,6 +194,33 @@ export default function SetupPage() {
 
       {/* 사전 준비 — Node.js */}
       <NodeInstallGuide />
+
+      {/* 타임존 설정 */}
+      <div className="w-full max-w-md bg-slate-900 border border-slate-700 rounded-xl p-5 space-y-3">
+        <div>
+          <p className="text-xs text-slate-400 font-semibold tracking-wide uppercase">타임존 설정</p>
+          <p className="text-sm text-slate-400 mt-1">
+            대시보드 시간 표시에 사용됩니다. 자동으로 감지했습니다.
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <select
+            value={timezone}
+            onChange={(e) => saveTz(e.target.value)}
+            className="flex-1 bg-slate-800 border border-slate-600 text-slate-100 text-sm rounded-lg px-3 py-2 font-mono focus:outline-none focus:border-indigo-500"
+          >
+            {timezone && !TIMEZONE_LIST.find((t) => t.value === timezone) && (
+              <option value={timezone}>{timezone}</option>
+            )}
+            {TIMEZONE_LIST.map((t) => (
+              <option key={t.value} value={t.value}>{t.label}</option>
+            ))}
+          </select>
+          {tzSaved && (
+            <span className="text-green-400 text-xs font-mono shrink-0">✓ 저장됨</span>
+          )}
+        </div>
+      </div>
 
       {/* Step 1 — 핵심 액션 */}
       <div className="w-full max-w-md bg-indigo-950 border border-indigo-700 rounded-xl p-5 space-y-3">
