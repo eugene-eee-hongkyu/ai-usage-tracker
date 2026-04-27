@@ -4,6 +4,16 @@
 
 ---
 
+## Session 2026-04-27 20:50 — 세션 종료 워크로그 기록 및 커밋
+
+### 작업 요약
+- `.harness/worklog.md`, `state.md` 작성
+- git commit & push 완료
+- `snooze_attention` 훅 실행으로 세션 마무리 처리
+
+---
+
+
 ## Session 2026-04-27 18:49 — reading-guide 초안 생성·검증·적용
 
 ### 작업 요약

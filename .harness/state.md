@@ -6,8 +6,8 @@
 
 ---
 
-## 마지막 실행: 2026-04-27 18:49
-## 마지막 업데이트: 2026-04-27 18:49
+## 마지막 실행: 2026-04-27 20:50
+## 마지막 업데이트: 2026-04-27 20:50
 ## 현재 모드: bypassPermissions
 
 ### 현재 집중
@@ -16,7 +16,7 @@
 
 ### 이어서 할 것
 
-- 없음 (신규 요청 대기)
+1. 없음 (신규 요청 대기)
 
 ### 막힌 것
 
@@ -122,17 +122,4 @@
 - [x] 팀 페이지 시각 시스템 개인 대시보드 정합 (GRADE_VALUE_COLOR, Usage 레이아웃, Activities pink)
 - [x] 팀 페이지 레이아웃 재편: By Member+Team Total / Usage+Efficiency / Top Sessions+Team Activities
 - [x] Efficiency 테이블 셀 배경색 등급별 적용 (GRADE_CELL_BG, GradeCell 컴포넌트)
-- [x] Top Sessions 카드 추가 (15개, API 지원)
-- [x] Team Total 차트 버그 수정 (dailyByMember 프론트엔드 합산으로 By Member와 데이터 일치)
-- [x] 중복 이름 버그 수정 (name__userId 복합 키, memberLabel() 함수)
-- [x] Top Sessions 프로젝트 RTL ellipsis + hover 툴팁
-- [x] README.md 실제 코드베이스 기준 업데이트
-- [x] By Member 차트 stackId 제거 (각 멤버 독립 렌더링)
-- [x] By Member 툴팁 커스텀 컴포넌트 (비용 내림차순 정렬)
-- [x] Efficiency 테이블 GradeCell native title (등급명 호버 표시)
-- [x] Vercel ADMIN_EMAIL env var 설정
-- [x] 재설치 검증 (`rm -rf ~/.primus-usage-tracker` → `npx init`)
-- [x] 팀원 초대 및 팀 화면 검증 (Mac 3명 + Windows 1명)
-- [x] Windows SessionEnd hook 발화 검증
-- [x] README.md By Member 설명·ADMIN_EMAIL 환경변수 업데이트
-- [x] reading-guide.md 초기화·검증(verify)·적용(apply) 완료
+- [x] Top Sessions 카드 추가
