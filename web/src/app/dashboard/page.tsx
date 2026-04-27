@@ -74,41 +74,80 @@ function formatPath(path: string): string {
 
 function fmt$(n: number) { return `$${n.toFixed(2)}`; }
 
-type GradeLevel = "탁월" | "양호" | "보통" | "개선 필요" | "경고";
+type GradeLevel = "탁월" | "양호" | "보통" | "부족" | "경고";
 const GRADE_STYLES: Record<GradeLevel, string> = {
-  "탁월":    "bg-emerald-500/15 text-emerald-400 border-emerald-500/40",
-  "양호":    "bg-green-500/15 text-green-400 border-green-500/40",
-  "보통":    "bg-yellow-500/15 text-yellow-400 border-yellow-500/40",
-  "개선 필요": "bg-orange-500/15 text-orange-400 border-orange-500/40",
-  "경고":    "bg-red-500/15 text-red-400 border-red-500/40",
+  "탁월": "bg-emerald-500/15 text-emerald-400 border-emerald-500/40",
+  "양호": "bg-green-500/15 text-green-400 border-green-500/40",
+  "보통": "bg-yellow-500/15 text-yellow-400 border-yellow-500/40",
+  "부족": "bg-orange-500/15 text-orange-400 border-orange-500/40",
+  "경고": "bg-red-500/15 text-red-400 border-red-500/40",
 };
+
+const GRADE_TOOLTIP_CLS: Record<GradeLevel, string> = {
+  "탁월": "bg-emerald-950/60 text-emerald-300",
+  "양호": "bg-green-950/60 text-green-300",
+  "보통": "bg-yellow-950/60 text-yellow-300",
+  "부족": "bg-orange-950/60 text-orange-300",
+  "경고": "bg-red-950/60 text-red-300",
+};
+
+const CACHE_ROWS: [GradeLevel, string][] = [
+  ["탁월", "96%+"], ["양호", "90~95%"], ["보통", "80~89%"], ["부족", "60~79%"], ["경고", "<60%"],
+];
+const ONESHOT_ROWS: [GradeLevel, string][] = [
+  ["탁월", "90%+"], ["양호", "80~89%"], ["보통", "70~79%"], ["부족", "60~69%"], ["경고", "<60%"],
+];
+const COST_ROWS: [GradeLevel, string][] = [
+  ["탁월", "<$10"], ["양호", "$10~25"], ["보통", "$25~50"], ["부족", "$50~100"], ["경고", "$100+"],
+];
+const CALLS_ROWS: [GradeLevel, string][] = [
+  ["탁월", "30~60"], ["양호", "20~30|60~80"], ["보통", "10~20|80~120"], ["부족", "5~10|120~200"], ["경고", "<5|200+"],
+];
+
+function MiniGradeTable({ title, rows, current }: { title: string; rows: [GradeLevel, string][]; current: GradeLevel }) {
+  return (
+    <div>
+      <p className="text-[10px] font-mono text-slate-400 font-semibold mb-1">{title}</p>
+      {rows.map(([g, range]) => (
+        <div
+          key={g}
+          className={`flex items-center gap-1 px-1 py-0.5 rounded text-[10px] font-mono ${g === current ? GRADE_TOOLTIP_CLS[g] + " font-bold" : "text-slate-600"}`}
+        >
+          <span className="w-8 shrink-0">{g}</span>
+          <span className="text-[9px]">{range}</span>
+          {g === current && <span className="ml-auto text-[8px] shrink-0 opacity-60">← 현재</span>}
+        </div>
+      ))}
+    </div>
+  );
+}
 
 function cacheHitGrade(v: number): GradeLevel {
   if (v >= 96) return "탁월";
   if (v >= 90) return "양호";
   if (v >= 80) return "보통";
-  if (v >= 60) return "개선 필요";
+  if (v >= 60) return "부족";
   return "경고";
 }
 function oneShotGrade(v: number): GradeLevel {
   if (v >= 90) return "탁월";
   if (v >= 80) return "양호";
   if (v >= 70) return "보통";
-  if (v >= 60) return "개선 필요";
+  if (v >= 60) return "부족";
   return "경고";
 }
 function costGrade(v: number): GradeLevel {
   if (v < 10) return "탁월";
   if (v < 25) return "양호";
   if (v < 50) return "보통";
-  if (v < 100) return "개선 필요";
+  if (v < 100) return "부족";
   return "경고";
 }
 function callsGrade(v: number): GradeLevel {
   if (v >= 30 && v <= 60) return "탁월";
   if ((v >= 20 && v < 30) || (v > 60 && v <= 80)) return "양호";
   if ((v >= 10 && v < 20) || (v > 80 && v <= 120)) return "보통";
-  if ((v >= 5 && v < 10) || (v > 120 && v <= 200)) return "개선 필요";
+  if ((v >= 5 && v < 10) || (v > 120 && v <= 200)) return "부족";
   return "경고";
 }
 function computeGrade(cacheHitPct: number, oneShotRate: number, costPerSession: number): GradeLevel {
@@ -119,7 +158,7 @@ function computeGrade(cacheHitPct: number, oneShotRate: number, costPerSession: 
   if (composite >= 0.88) return "탁월";
   if (composite >= 0.72) return "양호";
   if (composite >= 0.52) return "보통";
-  if (composite >= 0.32) return "개선 필요";
+  if (composite >= 0.32) return "부족";
   return "경고";
 }
 
@@ -133,11 +172,11 @@ function fmtSyncedAt(ts: string | null): string {
   return `${mm}-${dd} ${hh}:${min}`;
 }
 
-function TipBtn({ label, onClick }: { label: string; onClick: () => void }) {
+function TipBtn({ label, onClick, variant = "action" }: { label: string; onClick: () => void; variant?: "explain" | "action" }) {
   return (
     <button
       onClick={onClick}
-      className="px-1.5 py-0.5 rounded text-[10px] font-mono font-semibold bg-indigo-600 text-white hover:bg-indigo-500 transition-colors leading-none"
+      className={`px-1.5 py-0.5 rounded text-[10px] font-mono font-semibold transition-colors leading-none ${variant === "explain" ? "bg-slate-700 text-slate-300 hover:bg-slate-600" : "bg-indigo-600 text-white hover:bg-indigo-500"}`}
     >{label}</button>
   );
 }
@@ -155,6 +194,10 @@ export default function DashboardPage() {
   const [showOneShotModal, setShowOneShotModal] = useState(false);
   const [showCostModal, setShowCostModal] = useState(false);
   const [showCallsModal, setShowCallsModal] = useState(false);
+  const [showCacheMethodsModal, setShowCacheMethodsModal] = useState(false);
+  const [showOneShotMethodsModal, setShowOneShotMethodsModal] = useState(false);
+  const [showCostMethodsModal, setShowCostMethodsModal] = useState(false);
+  const [showCallsMethodsModal, setShowCallsMethodsModal] = useState(false);
 
   useEffect(() => {
     if (status === "unauthenticated") router.push("/login");
@@ -280,7 +323,7 @@ export default function DashboardPage() {
 
       <main className="px-4 py-4 space-y-4 max-w-6xl mx-auto">
 
-        {/* Row 1: Daily Activity + By Project */}
+        {/* Row 1: Daily Activity + Efficiency */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
 
           {/* Daily Activity */}
@@ -310,6 +353,100 @@ export default function DashboardPage() {
               )}
             </div>
           </div>
+
+          {/* Efficiency Metrics */}
+          <div className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-fuchsia-500 rounded">
+            <div className="px-3 py-2 border-b border-neutral-800 flex items-center justify-between">
+              <span className="text-xs font-mono font-bold text-fuchsia-400 uppercase tracking-wider">Efficiency</span>
+              {(() => {
+                const grade = computeGrade(ov.cacheHitPct, ov.oneShotRate, ov.sessions > 0 ? ov.cost / ov.sessions : 0);
+                const costPs = ov.sessions > 0 ? ov.cost / ov.sessions : 0;
+                const callsPs = ov.sessions > 0 ? Math.round(ov.calls / ov.sessions) : 0;
+                return (
+                  <div className="relative group/grade">
+                    <span className={`text-xs font-mono font-bold px-2 py-0.5 rounded border cursor-default ${GRADE_STYLES[grade]}`}>
+                      {grade}
+                    </span>
+                    <div className="absolute right-0 top-full mt-1 z-50 opacity-0 invisible group-hover/grade:opacity-100 group-hover/grade:visible transition-all duration-100 bg-slate-900 border border-slate-700 rounded-lg shadow-2xl p-3 w-[420px]">
+                      <p className="text-[10px] font-mono text-slate-500 mb-2.5 uppercase tracking-wider">등급 기준</p>
+                      <div className="grid grid-cols-2 gap-3">
+                        <MiniGradeTable title="Cache hit" rows={CACHE_ROWS} current={cacheHitGrade(ov.cacheHitPct)} />
+                        <MiniGradeTable title="One-shot rate" rows={ONESHOT_ROWS} current={oneShotGrade(Math.round(ov.oneShotRate * 100))} />
+                        <MiniGradeTable title="Cost / session" rows={COST_ROWS} current={costGrade(costPs)} />
+                        <MiniGradeTable title="Calls / session" rows={CALLS_ROWS} current={callsGrade(callsPs)} />
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
+            </div>
+            <div className="p-3 font-mono">
+              <div className="flex text-xs text-neutral-600 mb-1.5">
+                <span className="flex-1">metric</span>
+                <span>value</span>
+              </div>
+              {(() => {
+                const costPerSession = ov.sessions > 0 ? ov.cost / ov.sessions : 0;
+                const callsPerSession = ov.sessions > 0 ? Math.round(ov.calls / ov.sessions) : 0;
+                const BAD: GradeLevel[] = ["보통", "부족", "경고"];
+                const isBad = (g: GradeLevel) => BAD.includes(g);
+                return [
+                  {
+                    label: "Cache hit",
+                    value: `${ov.cacheHitPct.toFixed(1)}%`,
+                    color: "text-emerald-400",
+                    grade: cacheHitGrade(ov.cacheHitPct),
+                    onDesc: () => setShowCacheModal(true),
+                    onAct: () => setShowCacheMethodsModal(true),
+                    actLabel: "늘리는법",
+                  },
+                  {
+                    label: "One-shot rate",
+                    value: `${Math.round(ov.oneShotRate * 100)}%`,
+                    color: "text-violet-400",
+                    grade: oneShotGrade(Math.round(ov.oneShotRate * 100)),
+                    onDesc: () => setShowOneShotModal(true),
+                    onAct: () => setShowOneShotMethodsModal(true),
+                    actLabel: "늘리는법",
+                  },
+                  {
+                    label: "Cost / session",
+                    value: ov.sessions > 0 ? fmt$(costPerSession) : "$0.00",
+                    color: "text-yellow-400",
+                    grade: costGrade(costPerSession),
+                    onDesc: () => setShowCostModal(true),
+                    onAct: () => setShowCostMethodsModal(true),
+                    actLabel: "줄이는법",
+                  },
+                  {
+                    label: "Calls / session",
+                    value: callsPerSession.toString(),
+                    color: "text-blue-400",
+                    grade: callsGrade(callsPerSession),
+                    onDesc: () => setShowCallsModal(true),
+                    onAct: () => setShowCallsMethodsModal(true),
+                    actLabel: "최적화",
+                  },
+                ].map(({ label, value, color, grade, onDesc, onAct, actLabel }) => (
+                  <div key={label} className="flex items-center text-xs py-0.5 gap-2">
+                    <span className="text-neutral-400 w-28 shrink-0">{label}</span>
+                    <span className="flex gap-1 shrink-0 w-24">
+                      <TipBtn label="설명" onClick={onDesc} variant="explain" />
+                      {isBad(grade) && <TipBtn label={actLabel} onClick={onAct} />}
+                    </span>
+                    <div className="ml-auto flex items-center gap-2">
+                      <span className={`font-bold ${color}`}>{value}</span>
+                      <span className={`text-[10px] font-mono font-bold px-1.5 py-0.5 rounded border w-14 text-center ${GRADE_STYLES[grade]}`}>{grade}</span>
+                    </div>
+                  </div>
+                ));
+              })()}
+            </div>
+          </div>
+        </div>
+
+        {/* Row 2: By Project + Top Sessions */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
 
           {/* By Project */}
           <div className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-yellow-500 rounded">
@@ -347,112 +484,48 @@ export default function DashboardPage() {
               </div>
             </div>
           </div>
-        </div>
 
-        {/* Row 2: Top Sessions (full width) */}
-        <div className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-red-500 rounded">
-          <div className="px-3 py-2 border-b border-neutral-800">
-            <span className="text-xs font-mono font-bold text-red-400 uppercase tracking-wider">Top Sessions</span>
-          </div>
-          <div className="p-3">
-            <div className="flex text-xs text-neutral-600 font-mono mb-1.5">
-              <span className="w-5">#</span>
-              <span className="w-20">date</span>
-              <span className="flex-1">project</span>
-              <span className="w-16 text-right">cost</span>
-              <span className="w-16 text-right">calls</span>
+          {/* Top Sessions */}
+          <div className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-red-500 rounded">
+            <div className="px-3 py-2 border-b border-neutral-800">
+              <span className="text-xs font-mono font-bold text-red-400 uppercase tracking-wider">Top Sessions</span>
             </div>
-            <div className="space-y-1">
-              {data.topSessions.slice(0, 5).map((s, i) => {
-                const displayPath = formatPath(s.projectPath || s.project);
-                return (
-                  <div key={s.id || i} className="flex items-center gap-2 text-xs font-mono">
-                    <span className="w-5 text-neutral-600">{i + 1}.</span>
-                    <span className="w-20 text-neutral-500 shrink-0">{s.date}</span>
-                    <div className="flex-1 flex items-center gap-2 min-w-0">
-                      <div className="w-16 h-1.5 bg-neutral-800 rounded overflow-hidden shrink-0">
-                        <div className="h-full bg-red-500 rounded" style={{ width: `${(s.cost / maxSessionCost) * 100}%` }} />
-                      </div>
-                      <span className="text-neutral-300 truncate" title={displayPath}>{displayPath}</span>
-                    </div>
-                    <span className="w-16 text-yellow-400 text-right shrink-0">{fmt$(s.cost)}</span>
-                    <span className="w-16 text-neutral-500 text-right shrink-0">{s.calls.toLocaleString()}</span>
-                  </div>
-                );
-              })}
-              {data.topSessions.length === 0 && (
-                <p className="text-neutral-600 text-xs font-mono">no data</p>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* Row 3: Efficiency Metrics + By Activity */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-
-          {/* Efficiency Metrics */}
-          <div className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-fuchsia-500 rounded">
-            <div className="px-3 py-2 border-b border-neutral-800 flex items-center justify-between">
-              <span className="text-xs font-mono font-bold text-fuchsia-400 uppercase tracking-wider">Efficiency</span>
-              {(() => {
-                const grade = computeGrade(ov.cacheHitPct, ov.oneShotRate, ov.sessions > 0 ? ov.cost / ov.sessions : 0);
-                return (
-                  <span className={`text-xs font-mono font-bold px-2 py-0.5 rounded border ${GRADE_STYLES[grade]}`}>
-                    {grade}
-                  </span>
-                );
-              })()}
-            </div>
-            <div className="p-3 font-mono">
-              <div className="flex text-xs text-neutral-600 mb-1.5">
-                <span className="flex-1">metric</span>
-                <span>value</span>
+            <div className="p-3">
+              <div className="flex text-xs text-neutral-600 font-mono mb-1.5">
+                <span className="w-5">#</span>
+                <span className="w-20">date</span>
+                <span className="flex-1">project</span>
+                <span className="w-16 text-right">cost</span>
+                <span className="w-16 text-right">calls</span>
               </div>
-              {(() => {
-                const costPerSession = ov.sessions > 0 ? ov.cost / ov.sessions : 0;
-                const callsPerSession = ov.sessions > 0 ? Math.round(ov.calls / ov.sessions) : 0;
-                return [
-                  {
-                    label: "Cache hit",
-                    value: `${ov.cacheHitPct.toFixed(1)}%`,
-                    color: "text-emerald-400",
-                    btn: <TipBtn label="늘리는 법" onClick={() => setShowCacheModal(true)} />,
-                    grade: cacheHitGrade(ov.cacheHitPct),
-                  },
-                  {
-                    label: "One-shot rate",
-                    value: `${Math.round(ov.oneShotRate * 100)}%`,
-                    color: "text-violet-400",
-                    btn: <TipBtn label="늘리는 법" onClick={() => setShowOneShotModal(true)} />,
-                    grade: oneShotGrade(Math.round(ov.oneShotRate * 100)),
-                  },
-                  {
-                    label: "Cost / session",
-                    value: ov.sessions > 0 ? fmt$(costPerSession) : "$0.00",
-                    color: "text-yellow-400",
-                    btn: <TipBtn label="줄이는 법" onClick={() => setShowCostModal(true)} />,
-                    grade: costGrade(costPerSession),
-                  },
-                  {
-                    label: "Calls / session",
-                    value: callsPerSession.toString(),
-                    color: "text-blue-400",
-                    btn: <TipBtn label="설명" onClick={() => setShowCallsModal(true)} />,
-                    grade: callsGrade(callsPerSession),
-                  },
-                ].map(({ label, value, color, btn, grade }) => (
-                  <div key={label} className="flex items-center text-xs py-0.5 gap-2">
-                    <span className="text-neutral-400 w-28 shrink-0">{label}</span>
-                    <span className="w-20 shrink-0">{btn}</span>
-                    <div className="ml-auto flex items-center gap-2">
-                      <span className={`font-bold ${color}`}>{value}</span>
-                      <span className={`text-[10px] font-mono font-bold px-1.5 py-0.5 rounded border w-16 text-center ${GRADE_STYLES[grade]}`}>{grade}</span>
+              <div className="space-y-1">
+                {data.topSessions.slice(0, 5).map((s, i) => {
+                  const displayPath = formatPath(s.projectPath || s.project);
+                  return (
+                    <div key={s.id || i} className="flex items-center gap-2 text-xs font-mono">
+                      <span className="w-5 text-neutral-600">{i + 1}.</span>
+                      <span className="w-20 text-neutral-500 shrink-0">{s.date}</span>
+                      <div className="flex-1 flex items-center gap-2 min-w-0">
+                        <div className="w-16 h-1.5 bg-neutral-800 rounded overflow-hidden shrink-0">
+                          <div className="h-full bg-red-500 rounded" style={{ width: `${(s.cost / maxSessionCost) * 100}%` }} />
+                        </div>
+                        <span className="text-neutral-300 truncate" title={displayPath}>{displayPath}</span>
+                      </div>
+                      <span className="w-16 text-yellow-400 text-right shrink-0">{fmt$(s.cost)}</span>
+                      <span className="w-16 text-neutral-500 text-right shrink-0">{s.calls.toLocaleString()}</span>
                     </div>
-                  </div>
-                ));
-              })()}
+                  );
+                })}
+                {data.topSessions.length === 0 && (
+                  <p className="text-neutral-600 text-xs font-mono">no data</p>
+                )}
+              </div>
             </div>
           </div>
+        </div>
+
+        {/* Row 3: By Activity + By Model */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
 
           {/* By Activity */}
           <div className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-violet-500 rounded">
@@ -493,10 +566,6 @@ export default function DashboardPage() {
               </div>
             </div>
           </div>
-        </div>
-
-        {/* Row 4: By Model + MCP Servers */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
 
           {/* By Model */}
           <div className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-pink-500 rounded">
@@ -529,6 +598,10 @@ export default function DashboardPage() {
               </div>
             </div>
           </div>
+        </div>
+
+        {/* Row 4: MCP Servers + Core Tools */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
 
           {/* MCP Servers */}
           <div className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-cyan-500 rounded">
@@ -557,10 +630,6 @@ export default function DashboardPage() {
               </div>
             </div>
           </div>
-        </div>
-
-        {/* Row 5: Core Tools + Shell Commands */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
 
           {/* Core Tools */}
           <div className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-teal-500 rounded">
@@ -589,6 +658,10 @@ export default function DashboardPage() {
               </div>
             </div>
           </div>
+        </div>
+
+        {/* Row 5: Shell Commands (half width) */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
 
           {/* Shell Commands */}
           <div className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-orange-500 rounded">
@@ -641,6 +714,30 @@ export default function DashboardPage() {
           callsTotal={ov.calls}
           sessionsCount={ov.sessions}
           onClose={() => setShowCallsModal(false)}
+        />
+      )}
+      {showCacheMethodsModal && (
+        <CacheHitModal value={ov.cacheHitPct} onClose={() => setShowCacheMethodsModal(false)} methodsOnly />
+      )}
+      {showOneShotMethodsModal && (
+        <OneShotRateModal value={Math.round(ov.oneShotRate * 100)} onClose={() => setShowOneShotMethodsModal(false)} methodsOnly />
+      )}
+      {showCostMethodsModal && (
+        <CostPerSessionModal
+          value={ov.sessions > 0 ? ov.cost / ov.sessions : 0}
+          sessionsCount={ov.sessions}
+          totalCost={ov.cost}
+          onClose={() => setShowCostMethodsModal(false)}
+          methodsOnly
+        />
+      )}
+      {showCallsMethodsModal && (
+        <CallsPerSessionModal
+          value={ov.sessions > 0 ? Math.round(ov.calls / ov.sessions) : 0}
+          callsTotal={ov.calls}
+          sessionsCount={ov.sessions}
+          onClose={() => setShowCallsMethodsModal(false)}
+          methodsOnly
         />
       )}
     </div>
