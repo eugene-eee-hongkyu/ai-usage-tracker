@@ -12,6 +12,8 @@ const SERVER_URL = process.env.USAGE_TRACKER_URL ?? "https://ai-usage-tracker-we
 const KEYTAR_SERVICE = "primus-usage-tracker";
 const KEYTAR_ACCOUNT = "api-key";
 const CLAUDE_SETTINGS_PATH = path.join(os.homedir(), ".claude", "settings.json");
+const STABLE_DIR = path.join(os.homedir(), ".primus-usage-tracker");
+const STABLE_SUBMIT = path.join(STABLE_DIR, "submit.mjs");
 const CLI_PORT = 9988;
 
 async function getKeytar() {
@@ -121,25 +123,21 @@ function mergeHook(submitPath: string) {
   const hooks = (settings.hooks as Record<string, HookEntry[]>) ?? {};
   const sessionEndHooks: HookEntry[] = (hooks.SessionEnd as HookEntry[]) ?? [];
 
-  const hookCommand = `node "${submitPath}"`;
-  const alreadyRegistered = sessionEndHooks.some((group) =>
-    group.hooks?.some((h) => h.command === hookCommand)
+  // 기존 usage-tracker hook 제거 (경로 변경 대응)
+  const cleaned = sessionEndHooks.filter(
+    (group) => !group.hooks?.some((h) => h.command.includes("submit.mjs"))
   );
 
-  if (!alreadyRegistered) {
-    sessionEndHooks.push({
-      matcher: ".*",
-      hooks: [{ type: "command", command: hookCommand }],
-    });
-    hooks.SessionEnd = sessionEndHooks;
-    settings.hooks = hooks;
+  cleaned.push({
+    matcher: ".*",
+    hooks: [{ type: "command", command: `node "${submitPath}"` }],
+  });
+  hooks.SessionEnd = cleaned;
+  settings.hooks = hooks;
 
-    fs.mkdirSync(path.dirname(CLAUDE_SETTINGS_PATH), { recursive: true });
-    fs.writeFileSync(CLAUDE_SETTINGS_PATH, JSON.stringify(settings, null, 2));
-    console.log("✅ SessionEnd hook 등록 완료");
-  } else {
-    console.log("✅ SessionEnd hook 이미 등록되어 있음");
-  }
+  fs.mkdirSync(path.dirname(CLAUDE_SETTINGS_PATH), { recursive: true });
+  fs.writeFileSync(CLAUDE_SETTINGS_PATH, JSON.stringify(settings, null, 2));
+  console.log("✅ SessionEnd hook 등록 완료");
 }
 
 function runBackfill(apiKey: string) {
@@ -231,8 +229,10 @@ export async function runInit() {
   await saveApiKey(apiKey);
   console.log("🔑 API 키 저장 완료");
 
-  const submitPath = path.join(__dirname, "submit.mjs");
-  mergeHook(submitPath);
+  // submit.mjs를 안정적인 경로에 복사 (npx 캐시 경로는 갱신 시 깨짐)
+  fs.mkdirSync(STABLE_DIR, { recursive: true });
+  fs.copyFileSync(path.join(__dirname, "submit.mjs"), STABLE_SUBMIT);
+  mergeHook(STABLE_SUBMIT);
   runBackfill(apiKey);
 
   console.log("\n✨ 설치 완료!");
