@@ -16,12 +16,21 @@ interface MemberStat {
   userId: number;
   name: string;
   avatarUrl: string | null;
+  lastSyncedAt: string | null;
   totalCost: number;
   sessionsCount: number;
   cacheHitPct: number;
   overallOneShot: number;
   efficiencyScore: number;
   topProject: string;
+}
+
+function SyncBadge({ lastSyncedAt }: { lastSyncedAt: string | null }) {
+  if (!lastSyncedAt) return <span className="text-xs text-red-400 font-mono">미수신</span>;
+  const days = Math.floor((Date.now() - new Date(lastSyncedAt).getTime()) / 86_400_000);
+  if (days >= 5) return <span className="text-xs text-red-400 font-mono" title="데이터 수신 없음 — 훅 점검 필요">⚠ {days}일 전</span>;
+  if (days >= 2) return <span className="text-xs text-yellow-500 font-mono" title="마지막 수신 시각">{days}일 전</span>;
+  return null;
 }
 
 interface TeamData {
@@ -108,6 +117,7 @@ export default function TeamPage() {
                 <Link key={m.userId} href={`/team/${m.userId}`} className="flex items-center gap-1 text-sm hover:bg-slate-800 px-1 rounded transition-colors">
                   <span className="text-slate-500 w-5">{i + 1}.</span>
                   <span className="text-slate-200 flex-1 truncate">{m.name}</span>
+                  <SyncBadge lastSyncedAt={m.lastSyncedAt} />
                   <span className="text-slate-300 font-medium text-xs">{Math.round(m.overallOneShot * 100)}%</span>
                 </Link>
               ))}
@@ -121,6 +131,7 @@ export default function TeamPage() {
                 <Link key={m.userId} href={`/team/${m.userId}`} className="flex items-center gap-1 text-sm hover:bg-slate-800 px-1 rounded transition-colors">
                   <span className="text-slate-500 w-5">{i + 1}.</span>
                   <span className="text-slate-200 flex-1 truncate">{m.name}</span>
+                  <SyncBadge lastSyncedAt={m.lastSyncedAt} />
                   <span className="text-slate-300 font-medium text-xs">{m.efficiencyScore}</span>
                 </Link>
               ))}
@@ -134,6 +145,7 @@ export default function TeamPage() {
                 <Link key={m.userId} href={`/team/${m.userId}`} className="flex items-center gap-1 text-sm hover:bg-slate-800 px-1 rounded transition-colors">
                   <span className="text-slate-500 w-5">{i + 1}.</span>
                   <span className="text-slate-200 flex-1 truncate">{m.name}</span>
+                  <SyncBadge lastSyncedAt={m.lastSyncedAt} />
                   <span className="text-slate-300 font-medium text-xs">{m.sessionsCount}회</span>
                 </Link>
               ))}

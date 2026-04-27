@@ -105,6 +105,7 @@ export async function GET(req: NextRequest) {
         userId: u.id,
         name: u.name,
         avatarUrl: u.avatarUrl,
+        lastSyncedAt: u.lastSyncedAt?.toISOString() ?? null,
         totalCost,
         sessionsCount,
         cacheHitPct,
