@@ -4,7 +4,7 @@ import { useEffect } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter, useParams } from "next/navigation";
 import { DashboardView } from "@/components/dashboard-view";
-import { ADMIN_EMAIL } from "@/lib/admin";
+import { isAdmin } from "@/lib/admin";
 
 export default function AdminMemberDashboardPage() {
   const { data: session, status } = useSession();
@@ -14,13 +14,13 @@ export default function AdminMemberDashboardPage() {
 
   useEffect(() => {
     if (status === "unauthenticated") { router.push("/login"); return; }
-    if (status === "authenticated" && session?.user?.email !== ADMIN_EMAIL) {
+    if (status === "authenticated" && !isAdmin(session?.user?.email ?? "")) {
       router.push(`/team/${userId}`);
     }
   }, [status, session, router, userId]);
 
   if (status === "loading") return null;
-  if (session?.user?.email !== ADMIN_EMAIL) return null;
+  if (!isAdmin(session?.user?.email ?? "")) return null;
 
   return <DashboardView targetUserId={userId} />;
 }
