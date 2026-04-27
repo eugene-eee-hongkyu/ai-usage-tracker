@@ -16,6 +16,7 @@ export const users = pgTable("users", {
   name: text("name").notNull(),
   avatarUrl: text("avatar_url"),
   apiKeyHash: text("api_key_hash"),
+  timezone: text("timezone"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   lastSyncedAt: timestamp("last_synced_at"),
 });

@@ -100,7 +100,7 @@ export async function GET(req: NextRequest) {
 
   if (!snap[0]) {
     return NextResponse.json({
-      user: { name: user[0].name, lastSyncedAt: user[0].lastSyncedAt },
+      user: { name: user[0].name, lastSyncedAt: user[0].lastSyncedAt, timezone: user[0].timezone ?? null },
       overview: null,
       daily: [],
       activities: [],
@@ -183,7 +183,7 @@ export async function GET(req: NextRequest) {
     arr.map((x) => ({ name: x.name ?? "", calls: x.calls ?? 0 }));
 
   return NextResponse.json({
-    user: { name: user[0].name, lastSyncedAt: user[0].lastSyncedAt },
+    user: { name: user[0].name, lastSyncedAt: user[0].lastSyncedAt, timezone: user[0].timezone ?? null },
     overview: { cost, sessions, calls, cacheHitPct, oneShotRate, activeDays },
     daily,
     activities,
