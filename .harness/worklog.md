@@ -4,6 +4,26 @@
 
 ---
 
+## Session 2026-04-27 10:47 — 버그 수정 및 빌드 자동화·팀 동기화 배지
+
+### 작업 요약
+- **sync.mjs 버그 재발**: `--period all` 단일 호출로 hardcoded 되어 있던 구버전 `sync.mjs`가 init 백필 시 DB를 단일 스냅샷으로 덮어씀 → 모든 기간이 전체 데이터로 표시되는 버그 재현
+- **sync.mjs 수정**: 4-period 병렬 호출로 수정 후 push
+- **빌드 자동화**: `cli/package.json`에 `build:sync`, `build:init` 스크립트 추가. `bun run build`로 `index.mjs`, `sync.mjs`, `init.mjs` 3개 동시 빌드 가능
+- **팀 동기화 배지**: 팀 랭킹 뷰에 `lastSyncedAt` 기반 경고 배지 구현
+  - 2~4일: 노란색 `N일 전`
+  - 5일 이상: 빨간색 `⚠ N일 전`
+  - 미수신: 빨간색 `미수신`
+  - 최근: 배지 없음
+- **lock TTL 검토**: 90s 유지 (codeburn 병렬 최대 60s + fetch, 타이트하지만 허용 범위)
+
+### 다음 액션
+1. Vercel 배포 확인 (팀 배지 렌더링)
+2. 팀원 초대 (이메일 목록 확정 → 서비스 초대)
+3. Windows SessionEnd hook 발화 검증
+
+---
+
 ## Session 2026-04-27 10:06 — CLI UX 버그 수정 (한글 깨짐·프로세스 미종료·동시 제출)
 
 ### 작업 요약

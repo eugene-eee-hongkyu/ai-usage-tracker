@@ -6,18 +6,18 @@
 
 ---
 
-## 마지막 실행: 2026-04-27 10:06
-## 마지막 업데이트: 2026-04-27 10:06
+## 마지막 실행: 2026-04-27 10:47
+## 마지막 업데이트: 2026-04-27 10:47
 ## 현재 모드: bypassPermissions
 
 ### 현재 집중
 
-- CLI UX 버그 수정 완료 (한글 깨짐·미종료·동시 제출). 팀원 초대 대기.
+- 버그 수정 및 안정화 완료. 팀원 초대 대기.
 
 ### 이어서 할 것
 
-1. `rm -rf ~/.primus-usage-tracker` 후 `npx github:eugene-eee-hongkyu/ai-usage-tracker init` 재실행 (lock fix 반영)
-2. 팀원 초대 (이메일 목록 확정 → Vercel/서비스 초대)
+1. Vercel 배포 확인 (팀 배지 렌더링)
+2. 팀원 초대 (이메일 목록 확정 → 서비스 초대)
 3. Windows SessionEnd hook 발화 검증 (Windows 테스터 필요)
 
 ### 막힌 것
@@ -100,6 +100,9 @@
 - [x] CLI init 한글 깨짐 수정 (영어 UI + charset=utf-8)
 - [x] CLI init 프로세스 미종료 수정 (process.exit(0))
 - [x] submit.mjs 동시 실행 방지 lock 파일 추가 (TTL 90s)
-- [ ] `rm -rf ~/.primus-usage-tracker` 후 `npx github:... init` 재실행 (lock fix 로컬 반영)
+- [x] sync.mjs multi-period 버그 재발 수정 (hardcoded --period all → 4-period 병렬)
+- [x] bun build 자동화 (build:index + build:sync + build:init 통합 스크립트)
+- [x] 팀 랭킹 lastSyncedAt 경고 배지 (2일↑ 노랑, 5일↑ 빨강, 미수신 빨강)
+- [ ] Vercel 배포 확인 (팀 배지 렌더링)
 - [ ] 팀원 초대 및 팀랭킹 화면 검증
 - [ ] Windows SessionEnd hook 발화 검증 (Hold 플래그)
