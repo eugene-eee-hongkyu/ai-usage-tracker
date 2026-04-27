@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { db, userSnapshots, users } from "@/lib/db";
 import { eq } from "drizzle-orm";
+import { isAdmin } from "@/lib/admin";
 
 interface DailyRow { date: string; cost: number; sessions: number }
 interface ProjectRow { name: string; cost: number; sessions: number; avgCost: number }
@@ -15,13 +16,23 @@ interface RawProject {
   avgCost?: number;
 }
 
+interface RawOverview {
+  cacheHitPercent?: number;
+  cacheHitPct?: number;
+  tokens?: { input?: number; output?: number; cacheRead?: number; cacheWrite?: number };
+}
+
 interface RawPeriodBlock {
+  overview?: RawOverview;
+  summary?: RawOverview;
   daily?: DailyRow[];
   projects?: RawProject[];
 }
 
 interface RawJson {
   all?: RawPeriodBlock;
+  overview?: RawOverview;
+  summary?: RawOverview;
   daily?: DailyRow[];
   projects?: RawProject[];
 }
@@ -55,7 +66,7 @@ export async function GET(
   }
 
   const raw = snap[0].rawJson as RawJson;
-  const block = raw.all ?? raw;
+  const block: RawPeriodBlock = raw.all ?? raw;
   const allDaily: DailyRow[] = block.daily ?? [];
   const projects: ProjectRow[] = (block.projects ?? []).map((p) => {
     const cost = p.cost ?? 0;
@@ -86,15 +97,24 @@ export async function GET(
     else break;
   }
 
+  const ov = block.overview ?? block.summary ?? {};
+  const tRead = ov.tokens?.cacheRead ?? 0;
+  const tWrite = ov.tokens?.cacheWrite ?? 0;
+  const tInput = ov.tokens?.input ?? 0;
+  const cacheHitPct = (tRead + tWrite + tInput) > 0
+    ? (tRead / (tRead + tWrite + tInput)) * 100
+    : (ov.cacheHitPercent ?? ov.cacheHitPct ?? snap[0].cacheHitPct ?? 0);
+
   return NextResponse.json({
     user: { id: user[0].id, name: user[0].name, avatarUrl: user[0].avatarUrl },
     summary: {
       totalCost: snap[0].totalCost,
       sessionsCount: snap[0].sessionsCount,
-      cacheHitPct: snap[0].cacheHitPct,
+      cacheHitPct,
     },
     daily: recentDaily.map((d) => ({ date: d.date, cost: d.cost, sessions: d.sessions })),
     streak,
     projects: projects.sort((a, b) => b.cost - a.cost).slice(0, 10),
+    canViewFullDashboard: isAdmin(session.user.email!),
   });
 }

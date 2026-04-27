@@ -6,14 +6,13 @@ import { useRouter, useParams } from "next/navigation";
 import { Nav } from "@/components/nav";
 import Link from "next/link";
 import { ActivityCalendar } from "react-activity-calendar";
-import { ADMIN_EMAIL } from "@/lib/admin";
-
 interface MemberData {
   user: { id: number; name: string; avatarUrl: string | null };
   summary: { totalCost: number; sessionsCount: number; cacheHitPct: number };
   daily: Array<{ date: string; cost: number; sessions: number }>;
   streak: number;
   projects: Array<{ name: string; cost: number; sessions: number; avgCost: number }>;
+  canViewFullDashboard: boolean;
 }
 
 export default function MemberProfilePage() {
@@ -21,7 +20,6 @@ export default function MemberProfilePage() {
   const router = useRouter();
   const params = useParams();
   const userId = params.userId as string;
-  const isAdmin = session?.user?.email === ADMIN_EMAIL;
   const [data, setData] = useState<MemberData | null>(null);
 
   useEffect(() => {
@@ -115,7 +113,7 @@ export default function MemberProfilePage() {
           </div>
         )}
 
-        {isAdmin && (
+        {data.canViewFullDashboard && (
           <div className="pt-2">
             <Link
               href={`/team/${userId}/dashboard`}
