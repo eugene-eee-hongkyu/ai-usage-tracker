@@ -4,6 +4,22 @@
 
 ---
 
+## Session 2026-04-27 13:34 — submit.mjs 탭 닫기 E2E 디버그 + self-detach 설치본 적용
+
+### 작업 요약
+- debug.log 추가로 SessionEnd hook 발화 재확인 (03:38:06Z 타임스탬프 기록 → 정상 발화 확인)
+- VS Code 탭 닫기 후 락 파일 잔류 확인 → 프로세스가 SIGKILL로 종료, finally 미실행으로 락 파일 남음
+- 설치된 `~/.primus-usage-tracker/submit.mjs`에도 self-detach 패턴 직접 적용 (재설치 없이 즉시 반영)
+- debug.log 제거, 스테일 락 파일 수동 제거
+- `node ~/.primus-usage-tracker/submit.mjs` 수동 실행 → 즉시 종료 확인 (detached 자식 프로세스 백그라운드 실행 정상)
+
+### 다음 액션
+1. VS Code 탭 닫기 → 2분 대기 → 대시보드 갱신 확인 (self-detach 설치 후 E2E 최종 검증)
+2. `rm -rf ~/.primus-usage-tracker` → `npx github:eugene-eee-hongkyu/ai-usage-tracker init` 재설치
+3. Vercel 배포 확인 (팀 배지 렌더링)
+
+---
+
 ## Session 2026-04-27 12:48 — submit.mjs 파이프라인 버그 진단 및 수정
 
 ### 작업 요약

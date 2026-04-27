@@ -6,18 +6,18 @@
 
 ---
 
-## 마지막 실행: 2026-04-27 12:48
-## 마지막 업데이트: 2026-04-27 12:48
+## 마지막 실행: 2026-04-27 13:34
+## 마지막 업데이트: 2026-04-27 13:34
 ## 현재 모드: bypassPermissions
 
 ### 현재 집중
 
-- submit.mjs 파이프라인 안정화 (self-detach, API 키 폴백) + 탭 닫기 재테스트 대기 중.
+- submit.mjs 파이프라인 안정화 완료 (self-detach 적용), 탭 닫기 E2E 최종 확인 대기.
 
 ### 이어서 할 것
 
-1. 탭 닫기(VS Code 종료) 후 SessionEnd hook → submit.mjs 정상 완료 재테스트
-2. 수동 실행 후 2분 뒤 대시보드 갱신 확인
+1. VS Code 탭 닫기 → 2분 대기 → 대시보드 갱신 확인 (self-detach E2E 최종 검증)
+2. `rm -rf ~/.primus-usage-tracker` → `npx github:eugene-eee-hongkyu/ai-usage-tracker init` 재설치 (모든 수정사항 반영)
 3. Vercel 배포 확인 (팀 배지 렌더링)
 
 ### 막힌 것
@@ -29,8 +29,8 @@
 - 팀원 초대 (Vercel/서비스 접근 권한, 초대 이메일 목록 결정)
 
 ### 백로그 요약
-- 대기 중: 2개
-- 최근 추가: 2026-04-26 — 팀원 초대
+- 대기 중: 3개
+- 최근 추가: 2026-04-27 — VS Code 탭 닫기 후 submit.mjs 파이프라인 재테스트
 
 ### 진행 상황
 
@@ -104,11 +104,11 @@
 - [x] bun build 자동화 (build:index + build:sync + build:init 통합 스크립트)
 - [x] 팀 랭킹 lastSyncedAt 경고 배지 (2일↑ 노랑, 5일↑ 빨강, 미수신 빨강)
 - [x] init 실행 시 일간 자동 동기화 등록 (Mac launchd / Windows Task Scheduler XML)
-- [x] Windows Task Scheduler XML `StartWhenAvailable` 추가
+- [x] Windows Task Scheduler XML `StartWhenAvailable` 추가 (꺼진 PC 켜지면 즉시 실행)
 - [x] submit.mjs API 키 폴백 파일(`~/.primus-usage-key`) 항상 저장하도록 수정
-- [x] SessionEnd hook 발화 확인 (debug.log)
-- [x] submit.mjs self-detach 패턴 적용 (VS Code 종료 시 SIGKILL 대응, 백그라운드 자식 프로세스 분리)
-- [ ] 탭 닫기(VS Code 종료) 후 SessionEnd hook → submit.mjs 정상 완료 재테스트
+- [x] submit.mjs self-detach 패턴 적용 (VS Code 종료 시 SIGKILL 대응)
+- [ ] VS Code 탭 닫기 → 대시보드 갱신 E2E 최종 검증 (self-detach 적용 후)
+- [ ] 재설치 (`rm -rf ~/.primus-usage-tracker` → `npx init`)
 - [ ] Vercel 배포 확인 (팀 배지 렌더링)
 - [ ] 팀원 초대 및 팀랭킹 화면 검증
 - [ ] Windows SessionEnd hook 발화 검증 (Hold 플래그)
