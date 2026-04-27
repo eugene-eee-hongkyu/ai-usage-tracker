@@ -181,7 +181,7 @@ export function CacheHitModal({ value, onClose, methodsOnly = false }: { value: 
             <Ref href="https://www.claudecodecamp.com/p/how-prompt-caching-actually-works-in-claude-code">출처</Ref>
           </p>
           <p className="text-slate-600 text-[10px] leading-relaxed">
-            ※ ccusage·codeburn 같은 일부 도구는 캐시 쓰기를 분모에서 빼서 100%에 가까운 값을 표시하기도 합니다. 본 도구는 Anthropic 표준 공식 사용.
+            ※ codeburn 등 일부 도구는 캐시 쓰기를 분모에서 빼서 100%에 가까운 값을 표시하기도 합니다. 본 도구는 Anthropic 표준 공식 사용.
           </p>
         </Section>
       )}
