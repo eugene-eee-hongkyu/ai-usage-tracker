@@ -6,19 +6,19 @@
 
 ---
 
-## 마지막 실행: 2026-04-27 10:47
-## 마지막 업데이트: 2026-04-27 10:47
+## 마지막 실행: 2026-04-27 12:48
+## 마지막 업데이트: 2026-04-27 12:48
 ## 현재 모드: bypassPermissions
 
 ### 현재 집중
 
-- 버그 수정 및 안정화 완료. 팀원 초대 대기.
+- submit.mjs 파이프라인 안정화 (self-detach, API 키 폴백) + 탭 닫기 재테스트 대기 중.
 
 ### 이어서 할 것
 
-1. Vercel 배포 확인 (팀 배지 렌더링)
-2. 팀원 초대 (이메일 목록 확정 → 서비스 초대)
-3. Windows SessionEnd hook 발화 검증 (Windows 테스터 필요)
+1. 탭 닫기(VS Code 종료) 후 SessionEnd hook → submit.mjs 정상 완료 재테스트
+2. 수동 실행 후 2분 뒤 대시보드 갱신 확인
+3. Vercel 배포 확인 (팀 배지 렌더링)
 
 ### 막힌 것
 
@@ -87,7 +87,7 @@
 - [x] Daily Activity 목록 스크롤 제거 (전체 표시)
 - [x] Overview Bar 마지막 수신 시각 표시 (MM-DD HH:mm)
 - [x] Efficiency 버튼 컬럼 정렬 (w-28 / w-20 고정)
-- [x] Efficiency 종합 등급 배지 (탁월/양호/보통/개선 필요/경고)
+- [x] Efficiency 종합 등급 배지 (탁월/양호/보통/부족/경고)
 - [x] Efficiency 지표별 개별 등급 배지 + 모달 등급표 한글화
 - [x] "개선 필요" → "부족" 전면 교체 + 종합 배지 hover 툴팁 + 액션 버튼 분리
 - [x] 대시보드 카드 순서 재배치 (Daily Activity+Efficiency 상단 고정)
@@ -103,6 +103,12 @@
 - [x] sync.mjs multi-period 버그 재발 수정 (hardcoded --period all → 4-period 병렬)
 - [x] bun build 자동화 (build:index + build:sync + build:init 통합 스크립트)
 - [x] 팀 랭킹 lastSyncedAt 경고 배지 (2일↑ 노랑, 5일↑ 빨강, 미수신 빨강)
+- [x] init 실행 시 일간 자동 동기화 등록 (Mac launchd / Windows Task Scheduler XML)
+- [x] Windows Task Scheduler XML `StartWhenAvailable` 추가
+- [x] submit.mjs API 키 폴백 파일(`~/.primus-usage-key`) 항상 저장하도록 수정
+- [x] SessionEnd hook 발화 확인 (debug.log)
+- [x] submit.mjs self-detach 패턴 적용 (VS Code 종료 시 SIGKILL 대응, 백그라운드 자식 프로세스 분리)
+- [ ] 탭 닫기(VS Code 종료) 후 SessionEnd hook → submit.mjs 정상 완료 재테스트
 - [ ] Vercel 배포 확인 (팀 배지 렌더링)
 - [ ] 팀원 초대 및 팀랭킹 화면 검증
 - [ ] Windows SessionEnd hook 발화 검증 (Hold 플래그)

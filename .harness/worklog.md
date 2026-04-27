@@ -4,6 +4,20 @@
 
 ---
 
+## Session 2026-04-27 12:48 — submit.mjs 파이프라인 버그 진단 및 수정
+
+### 작업 요약
+- `init` 실행 시 Mac(launchd) / Windows(Task Scheduler XML) 일간 자동 동기화 자동 등록 구현 → 빌드·커밋·푸시
+- Windows Task Scheduler XML에 `StartWhenAvailable` 추가 — PC 꺼진 상태에서 켜지면 즉시 실행되도록 변경
+- `submit.mjs` standalone 실행 시 keytar 로드 실패로 조용히 종료되던 API 키 미전달 버그 수정 → 폴백 파일(`~/.primus-usage-key`) 항상 저장하도록 변경, 현재 키 수동 기록 후 대시보드 갱신 확인
+- `SessionEnd` hook 발화 여부 확인 — debug.log 추가로 정상 발화 확인
+- VS Code 탭 닫기 시 SIGKILL로 hook 프로세스가 함께 종료되어 락 파일만 남는 문제 발견 → `submit.mjs` self-detach 패턴(백그라운드 자식 프로세스로 분리) 적용 → 커밋·푸시
+
+### 다음 액션
+- 수동 실행 후 2분 뒤 대시보드 갱신 확인
+- VS Code 탭 닫기 후 submit 정상 완료 재테스트
+
+
 ## Session 2026-04-27 10:47 — 버그 수정 및 빌드 자동화·팀 동기화 배지
 
 ### 작업 요약
