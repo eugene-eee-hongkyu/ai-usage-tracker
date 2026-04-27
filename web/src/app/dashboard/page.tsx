@@ -195,12 +195,21 @@ function fmtSyncedAt(ts: string | null, tz: string): string {
   return `${get("month")}-${get("day")} ${get("hour")}:${get("minute")}`;
 }
 
+const TZ_ABBR_MAP: Record<string, string> = {
+  "Asia/Singapore": "SGT",
+  "Asia/Seoul": "KST",
+  "Asia/Tokyo": "JST",
+  "Asia/Hong_Kong": "HKT",
+  "Asia/Shanghai": "CST",
+  "Asia/Kolkata": "IST",
+  "UTC": "UTC",
+};
+
 function tzAbbr(tz: string): string {
-  return (
-    new Intl.DateTimeFormat("en", { timeZone: tz, timeZoneName: "short" })
-      .formatToParts(new Date())
-      .find((p) => p.type === "timeZoneName")?.value ?? tz
-  );
+  const fromIntl = new Intl.DateTimeFormat("en", { timeZone: tz, timeZoneName: "short" })
+    .formatToParts(new Date())
+    .find((p) => p.type === "timeZoneName")?.value ?? tz;
+  return /^GMT[+-]/.test(fromIntl) ? (TZ_ABBR_MAP[tz] ?? fromIntl) : fromIntl;
 }
 
 const TIMEZONE_LIST: { label: string; value: string }[] = [
@@ -391,7 +400,7 @@ export default function DashboardPage() {
                 title="타임존 변경"
               >{tzAbbr(userTz)}</button>
               {showTzPicker && (
-                <div className="absolute right-0 bottom-6 z-50 bg-neutral-900 border border-neutral-700 rounded-lg shadow-xl w-64 py-1 text-left">
+                <div className="absolute right-0 top-full mt-1 z-50 bg-neutral-900 border border-neutral-700 rounded-lg shadow-xl w-64 py-1 text-left">
                   {TIMEZONE_LIST.map((tz) => (
                     <button
                       key={tz.value}
