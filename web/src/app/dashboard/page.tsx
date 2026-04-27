@@ -91,31 +91,48 @@ const GRADE_TOOLTIP_CLS: Record<GradeLevel, string> = {
   "경고": "bg-red-950/60 text-red-300",
 };
 
-const CACHE_ROWS: [GradeLevel, string][] = [
-  ["탁월", "96%+"], ["양호", "90~95%"], ["보통", "80~89%"], ["부족", "60~79%"], ["경고", "<60%"],
+const CACHE_ROWS: [GradeLevel, string, string][] = [
+  ["탁월", "96%+",    "Claude Code 본사 내부 기준"],
+  ["양호", "90~95%",  "좋은 상태"],
+  ["보통", "80~89%",  "일반적인 수준"],
+  ["부족", "60~79%",  "CLAUDE.md 비대 의심"],
+  ["경고", "<60%",    "본사 기준 사고(SEV) 수준"],
 ];
-const ONESHOT_ROWS: [GradeLevel, string][] = [
-  ["탁월", "90%+"], ["양호", "80~89%"], ["보통", "70~79%"], ["부족", "60~69%"], ["경고", "<60%"],
+const ONESHOT_ROWS: [GradeLevel, string, string][] = [
+  ["탁월", "90%+",    "명확한 지시 + 좋은 컨텍스트"],
+  ["양호", "80~89%",  "좋은 상태"],
+  ["보통", "70~79%",  "지시 명확도 점검 필요"],
+  ["부족", "60~69%",  "자주 retry 발생"],
+  ["경고", "<60%",    "비효율 패턴. 토큰 낭비"],
 ];
-const COST_ROWS: [GradeLevel, string][] = [
-  ["탁월", "<$10"], ["양호", "$10~25"], ["보통", "$25~50"], ["부족", "$50~100"], ["경고", "$100+"],
+const COST_ROWS: [GradeLevel, string, string][] = [
+  ["탁월", "<$10",    "작업 단위 잘 분리됨"],
+  ["양호", "$10~25",  "적당한 규모. 정상"],
+  ["보통", "$25~50",  "큰 작업 또는 혼재"],
+  ["부족", "$50~100", "세션이 너무 큼. 분리 필요"],
+  ["경고", "$100+",   "거대 세션. 비효율"],
 ];
-const CALLS_ROWS: [GradeLevel, string][] = [
-  ["탁월", "30~60"], ["양호", "20~30|60~80"], ["보통", "10~20|80~120"], ["부족", "5~10|120~200"], ["경고", "<5|200+"],
+const CALLS_ROWS: [GradeLevel, string, string][] = [
+  ["탁월", "30~60",      "한 작업 단위에 정확히 매칭"],
+  ["양호", "20~30|60~80","약간 짧거나 약간 김"],
+  ["보통", "10~20|80~120","활용 부족 또는 분리 검토"],
+  ["부족", "5~10|120~200","너무 짧거나 너무 김"],
+  ["경고", "<5|200+",    "활용 부족 또는 retry 루프"],
 ];
 
-function MiniGradeTable({ title, rows, current }: { title: string; rows: [GradeLevel, string][]; current: GradeLevel }) {
+function MiniGradeTable({ title, rows, current }: { title: string; rows: [GradeLevel, string, string][]; current: GradeLevel }) {
   return (
     <div>
       <p className="text-[10px] font-mono text-slate-400 font-semibold mb-1">{title}</p>
-      {rows.map(([g, range]) => (
+      {rows.map(([g, range, desc]) => (
         <div
           key={g}
-          className={`flex items-center gap-1 px-1 py-0.5 rounded text-[10px] font-mono ${g === current ? GRADE_TOOLTIP_CLS[g] + " font-bold" : "text-slate-600"}`}
+          className={`flex items-center gap-1.5 px-1 py-0.5 rounded text-[10px] font-mono ${g === current ? GRADE_TOOLTIP_CLS[g] + " font-bold" : "text-slate-600"}`}
         >
-          <span className="w-8 shrink-0">{g}</span>
-          <span className="text-[9px]">{range}</span>
-          {g === current && <span className="ml-auto text-[8px] shrink-0 opacity-60">← 현재</span>}
+          <span className="w-7 shrink-0">{g}</span>
+          <span className="w-20 shrink-0 text-[9px]">{range}</span>
+          <span className="text-[9px] opacity-70 truncate">{desc}</span>
+          {g === current && <span className="ml-auto text-[8px] shrink-0 opacity-50">←</span>}
         </div>
       ))}
     </div>
@@ -367,7 +384,7 @@ export default function DashboardPage() {
                     <span className={`text-xs font-mono font-bold px-2 py-0.5 rounded border cursor-default ${GRADE_STYLES[grade]}`}>
                       {grade}
                     </span>
-                    <div className="absolute right-0 top-full mt-1 z-50 opacity-0 invisible group-hover/grade:opacity-100 group-hover/grade:visible transition-all duration-100 bg-slate-900 border border-slate-700 rounded-lg shadow-2xl p-3 w-[420px]">
+                    <div className="absolute right-0 top-full mt-1 z-50 opacity-0 invisible group-hover/grade:opacity-100 group-hover/grade:visible transition-all duration-100 bg-slate-900 border border-slate-700 rounded-lg shadow-2xl p-3 w-[580px]">
                       <p className="text-[10px] font-mono text-slate-500 mb-2.5 uppercase tracking-wider">등급 기준</p>
                       <div className="grid grid-cols-2 gap-3">
                         <MiniGradeTable title="Cache hit" rows={CACHE_ROWS} current={cacheHitGrade(ov.cacheHitPct)} />
@@ -447,7 +464,7 @@ export default function DashboardPage() {
                       <div className="relative group/mbadge">
                         <span className={`text-[10px] font-mono font-bold px-1.5 py-0.5 rounded border w-14 text-center block cursor-default ${GRADE_STYLES[grade]}`}>{grade}</span>
                         {grade !== "양호" && (
-                          <div className="absolute right-0 top-full mt-1 z-50 opacity-0 invisible group-hover/mbadge:opacity-100 group-hover/mbadge:visible transition-all duration-100 bg-slate-900 border border-slate-700 rounded-lg shadow-2xl p-3 w-44">
+                          <div className="absolute right-0 top-full mt-1 z-50 opacity-0 invisible group-hover/mbadge:opacity-100 group-hover/mbadge:visible transition-all duration-100 bg-slate-900 border border-slate-700 rounded-lg shadow-2xl p-3 w-72">
                             <MiniGradeTable title={gradeTitle} rows={gradeRows} current={grade} />
                           </div>
                         )}
