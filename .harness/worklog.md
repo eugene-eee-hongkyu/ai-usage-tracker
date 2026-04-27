@@ -4,6 +4,34 @@
 
 ---
 
+## Session 2026-04-27 17:32 — 팀 페이지 레이아웃 개편 + 버그 수정
+
+### 작업 요약
+- **Efficiency 테이블 개선**:
+  - $/call 컬럼 제거 (5개 지표로 축소: cache / 1-shot / $/sess / out/in / 종합)
+  - 셀 배경색 히트맵 추가 (`GRADE_CELL_BG`: emerald/green/slate/amber/red 각 grade별)
+  - 멤버 좌측 컬러 점 추가 (MEMBER_COLORS와 동일 팔레트)
+  - 카드 헤더 등급 요약 ("탁월 N명 · 양호 N명 ...") 추가
+- **Top Sessions 카드 신규 추가** (반칸):
+  - 팀 API에 `topSessions` 필드 추가 — 멤버별 rawJson에서 세션 추출, cost 내림차순 top 15
+  - 컬럼: 멤버 컬러 점 · 멤버명 · 프로젝트 · 날짜 · calls · cost
+  - 프로젝트 셀: `direction: rtl`로 앞에 `...` 표시 (경로 끝 보임), `title` 호버 전체 경로
+- **팀 페이지 카드 순서 3회 재배치**:
+  - 최종: Daily Trend 행 → Usage/Efficiency → Top Sessions/Team Activities
+- **Daily Trend 분할**: 전체폭 1개 → 반칸 2개 (By Member stacked + Team Total)
+- **중복 이름 버그 수정**: `dailyMemberMap` 키를 `u.name` → `name__userId`로 변경. 동명이인 있을 때 차트에 4개 중복 표시되던 문제 해결
+- **Team Total 차트 데이터 버그 수정**: `data.daily`(API 합산) → 프론트엔드에서 `dailyByMember` 직접 합산. rawJson 포맷 차이로 API 합산이 일부 멤버 누락하던 문제 해결
+- **배경색 대비 개선**: opacity 10/8/12 → 25/20/25/25/30으로 상향, 보통에 slate 배경 추가
+- **셀 배경색 강화 2차**: bg opacity 재조정으로 5등급 시각적 구분 명확화
+- **README.md 업데이트**: 실제 DB 스키마(users + user_snapshots), 현재 UI 카드 목록, ingest 방식 반영
+
+### 다음 액션
+- Vercel ADMIN_EMAIL env var 설정
+- 팀원 초대 및 팀 화면 검증
+- Windows SessionEnd hook 발화 검증
+
+---
+
 ## Session 2026-04-27 16:44 — 팀 대시보드 시각 시스템 정비 + 버그 수정
 
 ### 작업 요약

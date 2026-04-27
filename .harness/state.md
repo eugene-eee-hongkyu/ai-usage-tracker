@@ -6,13 +6,13 @@
 
 ---
 
-## 마지막 실행: 2026-04-27 16:44
-## 마지막 업데이트: 2026-04-27 16:44
+## 마지막 실행: 2026-04-27 17:38
+## 마지막 업데이트: 2026-04-27 17:38
 ## 현재 모드: bypassPermissions
 
 ### 현재 집중
 
-- 팀 대시보드 시각 시스템 개인 대시보드와 정합 완료. Vercel ADMIN_EMAIL 설정 + 팀원 초대 남음.
+- 팀 페이지 레이아웃 개편 및 버그 수정 완료. Vercel ADMIN_EMAIL 설정 + 팀원 초대 남음.
 
 ### 이어서 할 것
 
@@ -126,6 +126,13 @@
 - [x] 팀 API cache hit 100% 버그 수정 (토큰 기반 계산 전 기간 통일)
 - [x] dead code 정리: collectors/claude-code.ts 삭제, ccusage 텍스트 제거
 - [x] 팀 페이지 시각 시스템 개인 대시보드 정합 (GRADE_VALUE_COLOR, Usage 레이아웃, Activities pink)
+- [x] 팀 페이지 레이아웃 재편: By Member+Team Total / Usage+Efficiency / Top Sessions+Team Activities
+- [x] Efficiency 테이블 셀 배경색 등급별 적용 (GRADE_CELL_BG, GradeCell 컴포넌트)
+- [x] Top Sessions 카드 추가 (15개, API 지원)
+- [x] Team Total 차트 버그 수정 (dailyByMember 프론트엔드 합산으로 By Member와 데이터 일치)
+- [x] 중복 이름 버그 수정 (name__userId 복합 키, memberLabel() 함수)
+- [x] Top Sessions 프로젝트 RTL ellipsis + hover 툴팁
+- [x] README.md 실제 코드베이스 기준 업데이트
 - [ ] Vercel ADMIN_EMAIL env var 설정
 - [ ] 재설치 (`rm -rf ~/.primus-usage-tracker` → `npx init`)
 - [ ] 팀원 초대 및 팀 화면 검증
