@@ -463,11 +463,9 @@ export default function DashboardPage() {
                       <span className={`font-bold ${color}`}>{value}</span>
                       <div className="relative group/mbadge">
                         <span className={`text-[10px] font-mono font-bold px-1.5 py-0.5 rounded border w-14 text-center block cursor-default ${GRADE_STYLES[grade]}`}>{grade}</span>
-                        {grade !== "양호" && (
-                          <div className="absolute right-0 top-full mt-1 z-50 opacity-0 invisible group-hover/mbadge:opacity-100 group-hover/mbadge:visible transition-all duration-100 bg-slate-900 border border-slate-700 rounded-lg shadow-2xl p-3 w-72">
-                            <MiniGradeTable title={gradeTitle} rows={gradeRows} current={grade} />
-                          </div>
-                        )}
+                        <div className="absolute right-0 top-full mt-1 z-50 opacity-0 invisible group-hover/mbadge:opacity-100 group-hover/mbadge:visible transition-all duration-100 bg-slate-900 border border-slate-700 rounded-lg shadow-2xl p-3 w-72">
+                          <MiniGradeTable title={gradeTitle} rows={gradeRows} current={grade} />
+                        </div>
                       </div>
                     </div>
                   </div>
