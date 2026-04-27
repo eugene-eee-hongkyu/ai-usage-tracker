@@ -6,7 +6,7 @@
  */
 
 import { spawn } from "child_process";
-import { existsSync, readFileSync } from "fs";
+import { existsSync, readFileSync, writeFileSync, unlinkSync } from "fs";
 import { join } from "path";
 import { homedir } from "os";
 
@@ -14,6 +14,10 @@ const SERVER_URL = process.env.USAGE_TRACKER_URL ?? "https://ai-usage-tracker-we
 const KEYTAR_SERVICE = "primus-usage-tracker";
 const KEYTAR_ACCOUNT = "api-key";
 const PERIODS = ["today", "week", "month", "all"];
+
+const STABLE_DIR = join(homedir(), ".primus-usage-tracker");
+const LOCK_FILE = join(STABLE_DIR, "submit.lock");
+const LOCK_TTL = 90_000; // 90s — covers codeburn 60s timeout + margin
 
 async function loadApiKey() {
   if (process.env.USAGE_TRACKER_API_KEY) return process.env.USAGE_TRACKER_API_KEY;
@@ -27,6 +31,19 @@ async function loadApiKey() {
   const fallbackPath = join(homedir(), ".primus-usage-key");
   if (existsSync(fallbackPath)) return readFileSync(fallbackPath, "utf8").trim();
   return null;
+}
+
+function acquireLock() {
+  if (existsSync(LOCK_FILE)) {
+    const lockAge = Date.now() - parseInt(readFileSync(LOCK_FILE, "utf8") || "0");
+    if (lockAge < LOCK_TTL) return false; // another instance is running
+  }
+  writeFileSync(LOCK_FILE, Date.now().toString());
+  return true;
+}
+
+function releaseLock() {
+  try { unlinkSync(LOCK_FILE); } catch {}
 }
 
 function spawnCodeburn(period) {
@@ -52,28 +69,34 @@ function spawnCodeburn(period) {
 }
 
 async function main() {
-  const apiKey = await loadApiKey();
-  if (!apiKey) process.exit(0);
-
-  let report;
-  try {
-    const results = await Promise.all(PERIODS.map((p) => spawnCodeburn(p)));
-    report = Object.fromEntries(PERIODS.map((p, i) => [p, results[i]]));
-  } catch {
-    process.exit(0);
-  }
+  if (!acquireLock()) process.exit(0);
 
   try {
-    const resp = await fetch(`${SERVER_URL}/api/ingest`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "x-api-key": apiKey },
-      body: JSON.stringify(report),
-    });
-    if (!resp.ok) {
-      process.stderr.write(`[usage-tracker] ingest failed: ${resp.status}\n`);
+    const apiKey = await loadApiKey();
+    if (!apiKey) return;
+
+    let report;
+    try {
+      const results = await Promise.all(PERIODS.map((p) => spawnCodeburn(p)));
+      report = Object.fromEntries(PERIODS.map((p, i) => [p, results[i]]));
+    } catch {
+      return;
     }
-  } catch {
-    // Network error — silent
+
+    try {
+      const resp = await fetch(`${SERVER_URL}/api/ingest`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-api-key": apiKey },
+        body: JSON.stringify(report),
+      });
+      if (!resp.ok) {
+        process.stderr.write(`[usage-tracker] ingest failed: ${resp.status}\n`);
+      }
+    } catch {
+      // Network error — silent
+    }
+  } finally {
+    releaseLock();
   }
 
   process.exit(0);
