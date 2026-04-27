@@ -142,9 +142,30 @@ function memberLabel(key: string): string {
 
 function GradeCell({ grade, children }: { grade: GradeLevel; children: React.ReactNode }) {
   return (
-    <td className={`py-2.5 px-3 text-right whitespace-nowrap tabular-nums ${GRADE_CELL_BG[grade]}`}>
+    <td title={grade} className={`py-2.5 px-3 text-right whitespace-nowrap tabular-nums ${GRADE_CELL_BG[grade]}`}>
       <span className={`font-bold ${GRADE_VALUE_COLOR[grade]}`}>{children}</span>
     </td>
+  );
+}
+
+interface MemberTooltipPayload {
+  dataKey: string;
+  value: number;
+  color: string;
+}
+
+function MemberTooltip({ active, payload, label }: { active?: boolean; payload?: MemberTooltipPayload[]; label?: string }) {
+  if (!active || !payload?.length) return null;
+  const sorted = [...payload].sort((a, b) => b.value - a.value);
+  return (
+    <div style={{ background: "#171717", border: "1px solid #404040", borderRadius: 6, fontSize: 11, fontFamily: "monospace", padding: "6px 10px" }}>
+      <div style={{ color: "#737373", marginBottom: 4 }}>{label}</div>
+      {sorted.map((p) => (
+        <div key={p.dataKey} style={{ color: p.color }}>
+          {memberLabel(p.dataKey)} : ${p.value.toFixed(2)}
+        </div>
+      ))}
+    </div>
   );
 }
 
@@ -277,10 +298,7 @@ export default function TeamPage() {
                         <CartesianGrid strokeDasharray="3 3" stroke="#262626" />
                         <XAxis dataKey="date" tick={{ fill: "#525252", fontSize: 10, fontFamily: "monospace" }} axisLine={false} tickLine={false} interval="preserveStartEnd" />
                         <YAxis tick={{ fill: "#525252", fontSize: 10, fontFamily: "monospace" }} axisLine={false} tickLine={false} tickFormatter={(v) => `$${v}`} width={40} />
-                        <Tooltip
-                          contentStyle={{ background: "#171717", border: "1px solid #404040", borderRadius: 6, fontSize: 11, fontFamily: "monospace" }}
-                          formatter={(v, key) => [`$${Number(v).toFixed(2)}`, memberLabel(String(key))]}
-                        />
+                        <Tooltip content={<MemberTooltip />} />
                         {(data.memberNames ?? []).map((key, i) => (
                           <Area key={key} type="monotone" dataKey={key} stroke={MEMBER_COLORS[i % MEMBER_COLORS.length]} strokeWidth={1.5} fill={`url(#grad-${i})`} dot={false} />
                         ))}
