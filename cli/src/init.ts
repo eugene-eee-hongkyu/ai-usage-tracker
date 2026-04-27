@@ -74,16 +74,16 @@ function getApiKeyViaLocalServer(): Promise<string> {
       const url = new URL(req.url ?? "/", `http://127.0.0.1:${CLI_PORT}`);
       const apiKey = url.searchParams.get("apiKey");
 
-      res.writeHead(200, { "Content-Type": "text/html" });
+      res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
       if (apiKey) {
         res.end(
           "<html><body style='font-family:sans-serif;padding:2em'>" +
-          "<h2>✅ 인증 완료</h2><p>이 창을 닫아도 됩니다.</p></body></html>"
+          "<h2>&#x2705; Authentication Complete</h2><p>You can close this window.</p></body></html>"
         );
         server.close();
         resolve(apiKey);
       } else {
-        res.end("<html><body><h2>대기 중...</h2></body></html>");
+        res.end("<html><body><h2>Waiting...</h2></body></html>");
       }
     });
 
@@ -238,4 +238,5 @@ export async function runInit() {
   console.log("\n✨ 설치 완료!");
   console.log("   Claude Code 세션을 종료하면 자동으로 사용량이 수집됩니다.");
   console.log(`   대시보드: ${SERVER_URL}/dashboard\n`);
+  process.exit(0);
 }
