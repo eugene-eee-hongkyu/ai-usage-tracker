@@ -5,7 +5,6 @@ import { useSession, signOut } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { Nav } from "@/components/nav";
 import { CacheHitModal, OneShotRateModal, CostPerSessionModal, CallsPerSessionModal } from "@/components/metric-modal";
-import Link from "next/link";
 
 type Period = "today" | "week" | "month" | "all";
 
