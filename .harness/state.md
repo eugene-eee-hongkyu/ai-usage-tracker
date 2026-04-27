@@ -6,19 +6,17 @@
 
 ---
 
-## 마지막 실행: 2026-04-27 17:58
-## 마지막 업데이트: 2026-04-27 17:58
+## 마지막 실행: 2026-04-27 18:04
+## 마지막 업데이트: 2026-04-27 18:04
 ## 현재 모드: bypassPermissions
 
 ### 현재 집중
 
-- 팀 페이지 차트/툴팁 개선 완료. Vercel ADMIN_EMAIL 설정 + 팀원 초대 남음.
+- 모든 계획된 마일스톤 완료. Mac 3명 + Windows 1명 프로덕션 검증 완료.
 
 ### 이어서 할 것
 
-1. Vercel 환경변수 `ADMIN_EMAIL` 설정 (프로덕션 관리자 버튼 활성화)
-2. 팀원 초대 및 팀 화면 검증
-3. Windows SessionEnd hook 발화 검증
+- 없음 (신규 요청 대기)
 
 ### 막힌 것
 
@@ -26,11 +24,7 @@
 
 ### 사람 판단 필요
 
-- Vercel 대시보드 `ADMIN_EMAIL` env var 직접 설정 필요
-
-### 백로그 요약
-- 대기 중: 2개
-- 최근 추가: 2026-04-26 — Windows SessionEnd 훅 발화 검증
+- 없음
 
 ### 진행 상황
 
@@ -136,7 +130,7 @@
 - [x] By Member 차트 stackId 제거 (각 멤버 독립 렌더링)
 - [x] By Member 툴팁 커스텀 컴포넌트 (비용 내림차순 정렬)
 - [x] Efficiency 테이블 GradeCell native title (등급명 호버 표시)
-- [ ] Vercel ADMIN_EMAIL env var 설정
-- [ ] 재설치 (`rm -rf ~/.primus-usage-tracker` → `npx init`)
-- [ ] 팀원 초대 및 팀 화면 검증
-- [ ] Windows SessionEnd hook 발화 검증 (Hold 플래그)
+- [x] Vercel ADMIN_EMAIL env var 설정
+- [x] 재설치 검증 (`rm -rf ~/.primus-usage-tracker` → `npx init`)
+- [x] 팀원 초대 및 팀 화면 검증 (Mac 3명 + Windows 1명)
+- [x] Windows SessionEnd hook 발화 검증
