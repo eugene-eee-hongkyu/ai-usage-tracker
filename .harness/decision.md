@@ -4,6 +4,32 @@
 
 ---
 
+## 2026-04-27: Cache hit 공식 — 표준 공식 (cacheWrite 분모 포함)
+
+- **선택**: `cacheRead ÷ (cacheRead + cacheWrite + input) × 100` (Anthropic 표준)
+- **대안 검토**:
+  - _옵션 A: codeburn 값 그대로_: 추가 계산 없음. 단 cacheWrite 제외로 99.99% → 100% 표시. 사용자가 "더 줄일 게 없다"고 오판
+  - _옵션 B: 표준 공식 재계산_: 선택. raw 토큰(`tokens.cacheRead/Write/input`)이 JSON에 있어 재계산 비용 없음. 95.66% 정확 표시
+  - _옵션 C: 두 값 모두 표시_: 정확 + 혼란 없음. UI 복잡도 증가
+- **선택 이유**: 도구의 핵심 가치는 신뢰할 수 있는 효율 가이드. 100% 표시는 사실 왜곡. raw 토큰이 이미 JSON에 있어 구현 비용 0
+- **영향 범위**: `web/src/app/api/dashboard/route.ts` (overview + per-model), `web/src/components/metric-modal.tsx` (모달 공식 주석)
+- **되돌리는 방법**: `route.ts`에서 `tRead/(tRead+tWrite+tInput)` → `ov.cacheHitPercent` 폴백 코드로 되돌리기
+
+---
+
+## 2026-04-27: 긴 카드 컨텐츠 처리 — 헤더 카운트 + 하단 페이드
+
+- **선택**: 헤더에 `(N)` 숫자 + 7개 이상 시 하단 페이드 그라디언트
+- **대안 검토**:
+  - _카드 내부 max-height + 스크롤_: 직관적. 단 페이지 스크롤과 카드 스크롤 이중 공존
+  - _"+N more" 링크 유지_: 기존 방식. 데이터 잘림 + detail 페이지 이동 필요
+  - _헤더 카운트 + 페이드_: 선택. 페이지 스크롤 단일 유지, JS 없이 CSS만으로 구현, 숫자로 총량 인지
+- **선택 이유**: 카드 내부 이중 스크롤 없이 UX 단순. 구현 간단 (절대 위치 div + Tailwind gradient)
+- **영향 범위**: `web/src/app/dashboard/page.tsx` By Project/Activity/Core Tools/Shell Commands/MCP Servers 카드
+- **되돌리는 방법**: `relative` wrapper 및 fade div 제거, 헤더 카운트 span 제거
+
+---
+
 ## 2026-04-26: multi-period sync 전략 — codeburn 4회 병렬 호출
 
 - **선택**: `sync.ts`에서 `--period today/week/month/all` 4번 병렬 호출, rawJson을 `{ today, week, month, all }` 중첩 구조로 저장

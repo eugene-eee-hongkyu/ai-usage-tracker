@@ -4,6 +4,29 @@
 
 ---
 
+## Session 2026-04-27 09:21 — 대시보드 UX 세부 개선 (배지 hover·카드 순서·cache hit 공식)
+
+### 작업 요약
+- **개별 메트릭 배지 hover 툴팁**: 캐시힛/원샷/코스트/콜 각 배지에 마우스 오버 시 해당 지표 등급표+설명 표시 (w-72)
+- **Efficiency 종합 배지**: "양호"일 때 hover 툴팁 없음, 나머지 등급만 표시
+- **Cache hit 표준 공식 적용**: codeburn의 변형 공식(`cacheRead÷(cacheRead+input)`) → Anthropic 표준(`cacheRead÷(cacheRead+cacheWrite+input)`). raw 토큰 없으면 폴백. per-model 동일 수정. 모달에 공식 차이 주석 추가
+- **대시보드 카드 순서 재배치**:
+  - Row 2: By Project + By Activity (유사 정보 묶음)
+  - Row 3: Top Sessions + By Model
+  - Row 4: Core Tools + Shell Commands (기본 도구 묶음)
+  - Row 5: MCP Servers (미설치자 고려해 하단)
+- **By Project / Core Tools / Shell Commands 전체 표시**: slice 제한 및 "+N more" 버튼 제거
+- **카드 헤더 아이템 수 표시**: By Project, By Activity, Core Tools, Shell Commands, MCP Servers에 `(N)` 추가
+- **하단 페이드 그라디언트**: 7개 이상 아이템 시 카드 하단에 `from-neutral-900` 페이드로 "더 있음" 암시
+- **Calls 최적화 팁 조건부 렌더링**: value≥100일 때만 "너무 높다면" 표시, value<10일 때만 "너무 낮다면" 표시. 자동 번호 부여
+- **배포 에러 수정**: "+N more" Link 제거 후 `import Link` 미삭제로 ESLint 빌드 실패 → import 제거
+
+### 다음 액션
+1. 팀원 초대 (이메일 목록 확정 → Vercel/서비스 초대)
+2. Windows SessionEnd hook 발화 검증 (Windows 테스터 필요)
+
+---
+
 ## Session 2026-04-27 08:42 — Efficiency UX 개선 및 대시보드 카드 순서 재배치
 
 ### 작업 요약
