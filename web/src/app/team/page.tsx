@@ -5,7 +5,6 @@ import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Nav } from "@/components/nav";
-import { isAdmin } from "@/lib/admin";
 import {
   AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
 } from "recharts";
@@ -81,6 +80,7 @@ interface TopSession {
 interface TeamData {
   byEfficiency: MemberStat[];
   bySessions: MemberStat[];
+  isAdminUser: boolean;
   teamSummary: {
     totalCost: number;
     totalSessions: number;
@@ -215,7 +215,7 @@ export default function TeamPage() {
     </div>
   );
 
-  const adminUser = isAdmin(session?.user?.email ?? "");
+  const adminUser = data.isAdminUser;
   const members = data.byEfficiency;
   const sum = data.teamSummary;
   const byCost = [...members].sort((a, b) => b.totalCost - a.totalCost);
