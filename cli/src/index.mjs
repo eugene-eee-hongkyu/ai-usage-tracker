@@ -1137,6 +1137,8 @@ async function runRepair() {
   }
   console.log(`✅ API 키 확인됨
 `);
+  const fallbackPath = path.join(os.homedir(), ".primus-usage-key");
+  fs.writeFileSync(fallbackPath, apiKey, { mode: 384 });
   fs.mkdirSync(STABLE_DIR, { recursive: true });
   fs.copyFileSync(path.join(__dirname2, "submit.mjs"), STABLE_SUBMIT);
   removeHook();
