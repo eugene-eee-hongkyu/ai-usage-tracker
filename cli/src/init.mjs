@@ -130,12 +130,13 @@ function registerLaunchd(submitPath) {
 </dict>
 </plist>`;
   try {
+    const uid = execSync("id -u", { encoding: "utf8" }).trim();
+    const gui = `gui/${uid}`;
     fs.mkdirSync(plistDir, { recursive: true });
-    try {
-      execSync(`launchctl unload "${plistPath}"`, { stdio: "ignore" });
-    } catch {}
+    try { execSync(`launchctl bootout ${gui} "${plistPath}"`, { stdio: "ignore" }); } catch {}
+    try { execSync(`launchctl bootout ${gui}/${label}`, { stdio: "ignore" }); } catch {}
     fs.writeFileSync(plistPath, plist);
-    execSync(`launchctl load "${plistPath}"`, { stdio: "ignore" });
+    execSync(`launchctl bootstrap ${gui} "${plistPath}"`, { stdio: "ignore" });
     console.log("✅ 일간 자동 동기화 등록 완료 (매일 오전 9시, launchd)");
   } catch {
     console.log("⚠️  일간 자동 동기화 등록 실패 (선택 사항, 수동으로 등록 가능)");
