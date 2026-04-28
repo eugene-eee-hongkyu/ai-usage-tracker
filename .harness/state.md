@@ -6,8 +6,8 @@
 
 ---
 
-## 마지막 실행: 2026-04-28 20:43
-## 마지막 업데이트: 2026-04-28 20:43
+## 마지막 실행: 2026-04-28 22:45
+## 마지막 업데이트: 2026-04-28 22:45
 ## 현재 모드: bypassPermissions
 
 ### 현재 집중
@@ -121,14 +121,4 @@
 - [x] 팀 API cache hit 100% 버그 수정 (토큰 기반 계산 전 기간 통일)
 - [x] dead code 정리: collectors/claude-code.ts 삭제, ccusage 텍스트 제거
 - [x] 팀 페이지 시각 시스템 개인 대시보드 정합 (GRADE_VALUE_COLOR, Usage 레이아웃, Activities pink)
-- [x] 팀 랭킹 개인 프로필 카드 + 어드민 팀원 상세 뷰 통합 (reading-guide 기반 검증)
-- [x] 어드민 전용 "팀원" 탭 추가 (nav.tsx, /member 페이지, localStorage 팀원 기억)
-- [x] launchctl bootstrap/bootout 수정 (macOS Sequoia deprecated load/unload 대응)
-- [x] repair 명령 추가 (hook·스케줄 재등록)
-- [x] launchd 스케줄 0/6/12/18시 4회로 확장 (최대 6시간 지연 보장)
-- [x] 팀 화면 Last Sync 테이블 추가 (어드민 전용, isAdmin 서버 사이드 이동)
-- [x] SessionStart/SessionEnd hook 제거 → launchd 4회/일 단독 수집 전환 (repair 명령 업데이트)
-- [x] launchd plist PATH 누락 수정 (EnvironmentVariables로 사용자 PATH 주입, commit 95ec4e1)
-- [x] repair API 키 fallback 파일 재작성 수정 (submit.mjs standalone keytar 없음 대응, commit 589ed52)
-- [x] kickstart 즉시 실행 검증 PASS (Vercel ingest 200 확인)
-- [ ] 06:00 launchd 자동 실행 검증 후 팀 배포
+- [x] 팀 랭킹 개인 프로필
