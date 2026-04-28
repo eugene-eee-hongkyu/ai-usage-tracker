@@ -868,7 +868,7 @@ var require_commander = __commonJS((exports, module) => {
 var import_commander = __toESM(require_commander(), 1);
 
 // src/init.ts
-import { execSync, spawn } from "child_process";
+import { execSync, spawn, spawnSync } from "child_process";
 import * as fs from "fs";
 import * as http from "http";
 import * as os from "os";
@@ -895,7 +895,6 @@ async function saveApiKey(apiKey) {
   const keytar = await getKeytar();
   if (keytar) {
     await keytar.setPassword(KEYTAR_SERVICE, KEYTAR_ACCOUNT, apiKey);
-    return;
   }
   const fallbackPath = path.join(os.homedir(), ".primus-usage-key");
   fs.writeFileSync(fallbackPath, apiKey, { mode: 384 });
@@ -968,6 +967,97 @@ function getApiKeyViaLocalServer() {
     }, 300000);
   });
 }
+function registerLaunchd(submitPath) {
+  const label = "com.primus.usage-tracker.daily";
+  const plistDir = path.join(os.homedir(), "Library", "LaunchAgents");
+  const plistPath = path.join(plistDir, `${label}.plist`);
+  const plist = `<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>${label}</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>${process.execPath}</string>
+    <string>${submitPath}</string>
+  </array>
+  <key>StartCalendarInterval</key>
+  <dict>
+    <key>Hour</key>
+    <integer>9</integer>
+    <key>Minute</key>
+    <integer>0</integer>
+  </dict>
+  <key>StandardOutPath</key>
+  <string>${path.join(STABLE_DIR, "daily.log")}</string>
+  <key>StandardErrorPath</key>
+  <string>${path.join(STABLE_DIR, "daily-error.log")}</string>
+</dict>
+</plist>`;
+  try {
+    const uid = execSync("id -u", { encoding: "utf8" }).trim();
+    const gui = `gui/${uid}`;
+    fs.mkdirSync(plistDir, { recursive: true });
+    try {
+      execSync(`launchctl bootout ${gui} "${plistPath}"`, { stdio: "ignore" });
+    } catch {}
+    try {
+      execSync(`launchctl bootout ${gui}/${label}`, { stdio: "ignore" });
+    } catch {}
+    fs.writeFileSync(plistPath, plist);
+    execSync(`launchctl bootstrap ${gui} "${plistPath}"`, { stdio: "ignore" });
+    console.log("✅ 일간 자동 동기화 등록 완료 (매일 오전 9시, launchd)");
+  } catch {
+    console.log("⚠️  일간 자동 동기화 등록 실패 (선택 사항, 수동으로 등록 가능)");
+  }
+}
+function registerWindowsTask(submitPath) {
+  const taskName = "PrimusUsageTracker";
+  const wrapperPath = path.join(STABLE_DIR, "daily-sync.cmd");
+  const xmlPath = path.join(STABLE_DIR, "task.xml");
+  fs.writeFileSync(wrapperPath, `@echo off\r
+"${process.execPath}" "${submitPath}"\r
+`);
+  const xml = `<?xml version="1.0" encoding="UTF-16"?>
+<Task version="1.2" xmlns="http://schemas.microsoft.com/windows/2004/02/mit/task">
+  <Triggers>
+    <CalendarTrigger>
+      <StartBoundary>2000-01-01T09:00:00</StartBoundary>
+      <ScheduleByDay><DaysInterval>1</DaysInterval></ScheduleByDay>
+    </CalendarTrigger>
+  </Triggers>
+  <Settings>
+    <StartWhenAvailable>true</StartWhenAvailable>
+    <ExecutionTimeLimit>PT2H</ExecutionTimeLimit>
+    <MultipleInstancesPolicy>IgnoreNew</MultipleInstancesPolicy>
+  </Settings>
+  <Actions>
+    <Exec><Command>${wrapperPath}</Command></Exec>
+  </Actions>
+</Task>`;
+  fs.writeFileSync(xmlPath, Buffer.from("\uFEFF" + xml, "utf16le"));
+  const result = spawnSync("schtasks", [
+    "/Create",
+    "/TN",
+    taskName,
+    "/XML",
+    xmlPath,
+    "/F"
+  ], { stdio: "ignore" });
+  if (result.status === 0) {
+    console.log("✅ 일간 자동 동기화 등록 완료 (매일 오전 9시, Task Scheduler)");
+  } else {
+    console.log("⚠️  일간 자동 동기화 등록 실패 (선택 사항, 수동으로 등록 가능)");
+  }
+}
+function registerDailySchedule(submitPath) {
+  if (process.platform === "darwin") {
+    registerLaunchd(submitPath);
+  } else if (process.platform === "win32") {
+    registerWindowsTask(submitPath);
+  }
+}
 function mergeHook(submitPath) {
   let settings = {};
   if (fs.existsSync(CLAUDE_SETTINGS_PATH)) {
@@ -1011,7 +1101,8 @@ function runBackfill(apiKey) {
 }
 function checkCodeburn() {
   try {
-    execSync("which codeburn", { stdio: "ignore" });
+    const cmd = process.platform === "win32" ? "where codeburn" : "which codeburn";
+    execSync(cmd, { stdio: "ignore" });
     return true;
   } catch {
     return false;
@@ -1025,6 +1116,28 @@ async function installCodeburn() {
   } catch {
     return false;
   }
+}
+async function runRepair() {
+  console.log(`\uD83D\uDD27 Usage Tracker 복구 시작
+`);
+  const apiKey = await loadApiKey();
+  if (!apiKey) {
+    console.error("❌ 설치된 API 키가 없습니다. 먼저 init을 실행하세요:");
+    console.error("   npx --yes github:eugene-eee-hongkyu/ai-usage-tracker init");
+    process.exit(1);
+  }
+  console.log(`✅ API 키 확인됨
+`);
+  fs.mkdirSync(STABLE_DIR, { recursive: true });
+  fs.copyFileSync(path.join(__dirname2, "submit.mjs"), STABLE_SUBMIT);
+  mergeHook(STABLE_SUBMIT);
+  registerDailySchedule(STABLE_SUBMIT);
+  console.log(`
+✨ 복구 완료!`);
+  console.log("   Claude Code 세션 종료 시 + 매일 오전 9시 자동으로 사용량이 수집됩니다.");
+  console.log(`   대시보드: ${SERVER_URL}/dashboard
+`);
+  process.exit(0);
 }
 async function runInit() {
   console.log(`\uD83D\uDE80 Usage Tracker 설치 시작
@@ -1073,10 +1186,11 @@ async function runInit() {
   fs.mkdirSync(STABLE_DIR, { recursive: true });
   fs.copyFileSync(path.join(__dirname2, "submit.mjs"), STABLE_SUBMIT);
   mergeHook(STABLE_SUBMIT);
+  registerDailySchedule(STABLE_SUBMIT);
   runBackfill(apiKey);
   console.log(`
 ✨ 설치 완료!`);
-  console.log("   Claude Code 세션을 종료하면 자동으로 사용량이 수집됩니다.");
+  console.log("   Claude Code 세션 종료 시 + 매일 오전 9시 자동으로 사용량이 수집됩니다.");
   console.log(`   대시보드: ${SERVER_URL}/dashboard
 `);
   process.exit(0);
@@ -1104,7 +1218,7 @@ function spawnCodeburn(period) {
     const chunks = [];
     const proc = spawn2("codeburn", ["report", "--format", "json", "--provider", "claude", "--period", period], {
       stdio: ["ignore", "pipe", "pipe"],
-      shell: false
+      shell: true
     });
     proc.stdout.on("data", (d) => chunks.push(d));
     proc.on("close", (code) => {
@@ -1162,6 +1276,7 @@ if (isMain) {
 var program = new import_commander.Command;
 program.name("usage-tracker").description("Primus Labs Claude Code usage tracker").version("0.1.0");
 program.command("init").description("인증 및 SessionEnd hook 등록").action(runInit);
+program.command("repair").description("API 키 유지하고 hook·스케줄만 재등록").action(runRepair);
 program.command("reset").description("API 키 재발급 및 재설정").action(runReset);
 program.command("sync").description("과거 데이터 수동 동기화").option("-d, --days <number>", "동기화할 일수", "90").action((opts) => runSync(parseInt(opts.days)));
 if (process.argv[2] === "init" || process.argv.length <= 2) {

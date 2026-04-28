@@ -272,6 +272,28 @@ async function installCodeburn(): Promise<boolean> {
   }
 }
 
+export async function runRepair() {
+  console.log("🔧 Usage Tracker 복구 시작\n");
+
+  const apiKey = await loadApiKey();
+  if (!apiKey) {
+    console.error("❌ 설치된 API 키가 없습니다. 먼저 init을 실행하세요:");
+    console.error("   npx --yes github:eugene-eee-hongkyu/ai-usage-tracker init");
+    process.exit(1);
+  }
+  console.log("✅ API 키 확인됨\n");
+
+  fs.mkdirSync(STABLE_DIR, { recursive: true });
+  fs.copyFileSync(path.join(__dirname, "submit.mjs"), STABLE_SUBMIT);
+  mergeHook(STABLE_SUBMIT);
+  registerDailySchedule(STABLE_SUBMIT);
+
+  console.log("\n✨ 복구 완료!");
+  console.log("   Claude Code 세션 종료 시 + 매일 오전 9시 자동으로 사용량이 수집됩니다.");
+  console.log(`   대시보드: ${SERVER_URL}/dashboard\n`);
+  process.exit(0);
+}
+
 export async function runInit() {
   console.log("🚀 Usage Tracker 설치 시작\n");
 

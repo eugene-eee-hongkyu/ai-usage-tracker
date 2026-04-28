@@ -133,8 +133,12 @@ function registerLaunchd(submitPath) {
     const uid = execSync("id -u", { encoding: "utf8" }).trim();
     const gui = `gui/${uid}`;
     fs.mkdirSync(plistDir, { recursive: true });
-    try { execSync(`launchctl bootout ${gui} "${plistPath}"`, { stdio: "ignore" }); } catch {}
-    try { execSync(`launchctl bootout ${gui}/${label}`, { stdio: "ignore" }); } catch {}
+    try {
+      execSync(`launchctl bootout ${gui} "${plistPath}"`, { stdio: "ignore" });
+    } catch {}
+    try {
+      execSync(`launchctl bootout ${gui}/${label}`, { stdio: "ignore" });
+    } catch {}
     fs.writeFileSync(plistPath, plist);
     execSync(`launchctl bootstrap ${gui} "${plistPath}"`, { stdio: "ignore" });
     console.log("✅ 일간 자동 동기화 등록 완료 (매일 오전 9시, launchd)");
@@ -247,6 +251,28 @@ async function installCodeburn() {
     return false;
   }
 }
+async function runRepair() {
+  console.log(`\uD83D\uDD27 Usage Tracker 복구 시작
+`);
+  const apiKey = await loadApiKey();
+  if (!apiKey) {
+    console.error("❌ 설치된 API 키가 없습니다. 먼저 init을 실행하세요:");
+    console.error("   npx --yes github:eugene-eee-hongkyu/ai-usage-tracker init");
+    process.exit(1);
+  }
+  console.log(`✅ API 키 확인됨
+`);
+  fs.mkdirSync(STABLE_DIR, { recursive: true });
+  fs.copyFileSync(path.join(__dirname2, "submit.mjs"), STABLE_SUBMIT);
+  mergeHook(STABLE_SUBMIT);
+  registerDailySchedule(STABLE_SUBMIT);
+  console.log(`
+✨ 복구 완료!`);
+  console.log("   Claude Code 세션 종료 시 + 매일 오전 9시 자동으로 사용량이 수집됩니다.");
+  console.log(`   대시보드: ${SERVER_URL}/dashboard
+`);
+  process.exit(0);
+}
 async function runInit() {
   console.log(`\uD83D\uDE80 Usage Tracker 설치 시작
 `);
@@ -304,6 +330,7 @@ async function runInit() {
   process.exit(0);
 }
 export {
+  runRepair,
   runInit,
   loadApiKey,
   deleteApiKey
