@@ -6,8 +6,8 @@
 
 ---
 
-## 마지막 실행: 2026-04-28 08:40
-## 마지막 업데이트: 2026-04-28 08:40
+## 마지막 실행: 2026-04-28 10:43
+## 마지막 업데이트: 2026-04-28 10:43
 ## 현재 모드: bypassPermissions
 
 ### 현재 집중
@@ -16,7 +16,7 @@
 
 ### 이어서 할 것
 
-- 없음
+1. 없음
 
 ### 막힌 것
 
@@ -123,4 +123,4 @@
 - [x] 팀 페이지 레이아웃 재편: By Member+Team Total / Usage+Efficiency / Top Sessions+Team Activities
 - [x] Efficiency 테이블 셀 배경색 등급별 적용 (GRADE_CELL_BG, GradeCell 컴포넌트)
 - [x] Top Sessions 카드 추가 (팀 페이지 Row 3)
-- [x] 어드민 전용 "팀원" 메뉴 추가 (팀~셋업 사이, localStorage 선택 기억, 자세히 보기 버튼 제거)
+- [x] 어드민 전용 "팀원"
