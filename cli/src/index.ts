@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { Command } from "commander";
-import { runInit } from "./init.js";
+import { runInit, runRepair } from "./init.js";
 import { runReset } from "./reset.js";
 import { runSync } from "./sync.js";
 
@@ -15,6 +15,11 @@ program
   .command("init")
   .description("인증 및 SessionEnd hook 등록")
   .action(runInit);
+
+program
+  .command("repair")
+  .description("API 키 유지하고 hook·스케줄만 재등록")
+  .action(runRepair);
 
 program
   .command("reset")
