@@ -289,6 +289,10 @@ export async function runRepair() {
   }
   console.log("✅ API 키 확인됨\n");
 
+  // submit.mjs는 standalone 실행이라 keytar 없음 → 항상 파일에도 보장
+  const fallbackPath = path.join(os.homedir(), ".primus-usage-key");
+  fs.writeFileSync(fallbackPath, apiKey, { mode: 0o600 });
+
   fs.mkdirSync(STABLE_DIR, { recursive: true });
   fs.copyFileSync(path.join(__dirname, "submit.mjs"), STABLE_SUBMIT);
   removeHook();
