@@ -4,6 +4,36 @@
 
 ---
 
+## Session 2026-04-28 20:43 — 데이터 수집 파이프라인 E2E 검증 완료
+
+### 작업 요약
+- **`589ed52` 적용 후 repair 재실행**: API 키 fallback 파일 (`~/.primus-usage-key`) 정상 재작성 확인
+- **`launchctl kickstart -k`로 즉시 실행 검증**: Vercel `/api/ingest 200` 도착 확인 (사용자 확인)
+- **3가지 수정 모두 동시 동작 확인**:
+  1. SessionStart/SessionEnd hook 제거
+  2. launchd plist `EnvironmentVariables` PATH 주입 (codeburn 인식)
+  3. repair 시 `~/.primus-usage-key` 재작성 (submit.mjs standalone keytar 부재 대응)
+- 06:00 launchd 자동 실행 검증은 내일 아침 확인 예정
+
+### 다음 액션
+- 내일 아침 06:00 자동 실행으로 들어온 데이터 확인
+- 검증되면 팀원들에게 repair 명령 공유
+
+---
+
+## Session 2026-04-28 20:26 — repair 후 submit.mjs API 키 미전달 버그 수정
+
+### 작업 요약
+- **원인 파악**: `~/.primus-usage-key` 파일 없음 → submit.mjs의 `loadApiKey()` null 반환 → 조용히 종료
+- **배경**: submit.mjs는 standalone 실행이라 keytar 없음. repair는 keytar로 키 확인만 하고 fallback 파일 재작성 안 함
+- **수정**: `runRepair`에서 API 키 확인 후 `~/.primus-usage-key` 파일도 재작성하도록 추가
+- **빌드·커밋·푸시**: `cli/src/init.ts`, `cli/src/index.mjs` → commit `589ed52`
+
+### 다음 액션
+- repair 재실행 후 kickstart로 검증
+
+---
+
 ## Session 2026-04-28 20:17 — launchd PATH 누락으로 codeburn 미실행 버그 수정
 
 ### 작업 요약
