@@ -201,36 +201,35 @@ function registerDailySchedule(submitPath: string): void {
   }
 }
 
-function mergeHook(submitPath: string) {
+function removeHook() {
+  if (!fs.existsSync(CLAUDE_SETTINGS_PATH)) return;
   let settings: Record<string, unknown> = {};
-  if (fs.existsSync(CLAUDE_SETTINGS_PATH)) {
-    try {
-      settings = JSON.parse(fs.readFileSync(CLAUDE_SETTINGS_PATH, "utf8"));
-    } catch {
-      settings = {};
-    }
+  try {
+    settings = JSON.parse(fs.readFileSync(CLAUDE_SETTINGS_PATH, "utf8"));
+  } catch {
+    return;
   }
 
   type HookEntry = { matcher: string; hooks: Array<{ type: string; command: string }> };
   const hooks = (settings.hooks as Record<string, HookEntry[]>) ?? {};
-  const submitEntry: HookEntry = {
-    matcher: ".*",
-    hooks: [{ type: "command", command: `node "${submitPath}"` }],
-  };
+  let changed = false;
 
   for (const event of ["SessionStart", "SessionEnd"] as const) {
     const existing: HookEntry[] = (hooks[event] as HookEntry[]) ?? [];
     const cleaned = existing.filter(
       (group) => !group.hooks?.some((h) => h.command.includes("submit.mjs"))
     );
-    cleaned.push(submitEntry);
-    hooks[event] = cleaned;
+    if (cleaned.length !== existing.length) {
+      hooks[event] = cleaned;
+      changed = true;
+    }
   }
 
-  settings.hooks = hooks;
-  fs.mkdirSync(path.dirname(CLAUDE_SETTINGS_PATH), { recursive: true });
-  fs.writeFileSync(CLAUDE_SETTINGS_PATH, JSON.stringify(settings, null, 2));
-  console.log("✅ SessionStart + SessionEnd hook 등록 완료");
+  if (changed) {
+    settings.hooks = hooks;
+    fs.writeFileSync(CLAUDE_SETTINGS_PATH, JSON.stringify(settings, null, 2));
+    console.log("✅ 기존 세션 hook 제거 완료");
+  }
 }
 
 function runBackfill(apiKey: string) {
@@ -286,19 +285,11 @@ export async function runRepair() {
 
   fs.mkdirSync(STABLE_DIR, { recursive: true });
   fs.copyFileSync(path.join(__dirname, "submit.mjs"), STABLE_SUBMIT);
-  mergeHook(STABLE_SUBMIT);
+  removeHook();
   registerDailySchedule(STABLE_SUBMIT);
 
-  console.log("\n📡 현재 데이터 즉시 수집 중...");
-  const child = spawn(process.execPath, [STABLE_SUBMIT], {
-    detached: true,
-    stdio: "inherit",
-    env: { ...process.env, USAGE_TRACKER_API_KEY: apiKey, USAGE_TRACKER_URL: SERVER_URL },
-  });
-  await new Promise<void>((resolve) => child.on("close", () => resolve()));
-
   console.log("\n✨ 복구 완료!");
-  console.log("   VS Code 열 때 + 0/6/12/18시마다 자동으로 사용량이 수집됩니다.");
+  console.log("   0/6/12/18시마다 자동으로 사용량이 수집됩니다.");
   console.log(`   대시보드: ${SERVER_URL}/dashboard\n`);
   process.exit(0);
 }
@@ -356,12 +347,12 @@ export async function runInit() {
   // submit.mjs를 안정적인 경로에 복사 (npx 캐시 경로는 갱신 시 깨짐)
   fs.mkdirSync(STABLE_DIR, { recursive: true });
   fs.copyFileSync(path.join(__dirname, "submit.mjs"), STABLE_SUBMIT);
-  mergeHook(STABLE_SUBMIT);
+  removeHook();
   registerDailySchedule(STABLE_SUBMIT);
   runBackfill(apiKey);
 
   console.log("\n✨ 설치 완료!");
-  console.log("   Claude Code 세션 종료 시 + 매일 오전 9시 자동으로 사용량이 수집됩니다.");
+  console.log("   0/6/12/18시마다 자동으로 사용량이 수집됩니다.");
   console.log(`   대시보드: ${SERVER_URL}/dashboard\n`);
   process.exit(0);
 }
