@@ -213,23 +213,24 @@ function mergeHook(submitPath: string) {
 
   type HookEntry = { matcher: string; hooks: Array<{ type: string; command: string }> };
   const hooks = (settings.hooks as Record<string, HookEntry[]>) ?? {};
-  const sessionEndHooks: HookEntry[] = (hooks.SessionEnd as HookEntry[]) ?? [];
-
-  // 기존 usage-tracker hook 제거 (경로 변경 대응)
-  const cleaned = sessionEndHooks.filter(
-    (group) => !group.hooks?.some((h) => h.command.includes("submit.mjs"))
-  );
-
-  cleaned.push({
+  const submitEntry: HookEntry = {
     matcher: ".*",
     hooks: [{ type: "command", command: `node "${submitPath}"` }],
-  });
-  hooks.SessionEnd = cleaned;
-  settings.hooks = hooks;
+  };
 
+  for (const event of ["SessionStart", "SessionEnd"] as const) {
+    const existing: HookEntry[] = (hooks[event] as HookEntry[]) ?? [];
+    const cleaned = existing.filter(
+      (group) => !group.hooks?.some((h) => h.command.includes("submit.mjs"))
+    );
+    cleaned.push(submitEntry);
+    hooks[event] = cleaned;
+  }
+
+  settings.hooks = hooks;
   fs.mkdirSync(path.dirname(CLAUDE_SETTINGS_PATH), { recursive: true });
   fs.writeFileSync(CLAUDE_SETTINGS_PATH, JSON.stringify(settings, null, 2));
-  console.log("✅ SessionEnd hook 등록 완료");
+  console.log("✅ SessionStart + SessionEnd hook 등록 완료");
 }
 
 function runBackfill(apiKey: string) {
