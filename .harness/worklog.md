@@ -4,6 +4,21 @@
 
 ---
 
+## Session 2026-04-28 08:40 — 어드민 전용 팀원 메뉴 추가 및 자세히 보기 버튼 제거
+
+### 작업 요약
+- **요구사항 파악**: 코드 구조 탐색 후 변경 범위 확인 (nav, team/[userId], DashboardView, team/[userId]/dashboard)
+- **nav.tsx 수정**: `isAdmin()` 체크로 어드민에게만 "팀원" 탭 표시 (팀~셋업 사이)
+- **dashboard-view.tsx 수정**: `onMemberSelect` 옵션 prop 추가 — 페이지 이동 없이 상태 업데이트 가능
+- **`/member/page.tsx` 신규 생성**: 어드민 전용, `localStorage` 키 `teamMemberSelectedUserId`로 마지막 선택 팀원 기억, 미선택 시 본인 표시
+- **`/team/[userId]/page.tsx` 수정**: `canViewFullDashboard` 및 "자세히 보기" 버튼 제거
+- **커밋·푸시**: `bce7bfe`
+
+### 다음 액션
+- 없음 (신규 요청 대기)
+
+---
+
 ## Session 2026-04-28 08:07 — 어드민 팀원 상세 화면 메뉴 재배치 설계
 
 ### 작업 요약
