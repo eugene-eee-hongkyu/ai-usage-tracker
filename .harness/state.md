@@ -6,19 +6,17 @@
 
 ---
 
-## 마지막 실행: 2026-04-28 13:44
-## 마지막 업데이트: 2026-04-28 13:44
+## 마지막 실행: 2026-04-28 14:09
+## 마지막 업데이트: 2026-04-28 14:09
 ## 현재 모드: bypassPermissions
 
 ### 현재 집중
 
-- 자동 수집(9시) 미작동 버그 수정 (Mac launchd plist 미설치 원인 파악 완료, 수정 진행 중)
+- 운영 단계 — 팀원들에게 repair 명령 공유 후 데이터 수집 안정화 모니터링 중
 
 ### 이어서 할 것
 
-1. init.mjs의 `registerDailySchedule` 로직 상세 확인 및 버그 수정
-2. plist 파일이 `~/Library/LaunchAgents/`에 실제로 생성되는지 검증
-3. launchctl 등록 및 자동 실행 E2E 검증
+1. 없음 (신규 요청 대기)
 
 ### 막힌 것
 
@@ -122,4 +120,9 @@
 - [x] 팀 API cache hit 100% 버그 수정 (토큰 기반 계산 전 기간 통일)
 - [x] dead code 정리: collectors/claude-code.ts 삭제, ccusage 텍스트 제거
 - [x] 팀 페이지 시각 시스템 개인 대시보드 정합 (GRADE_VALUE_COLOR, Usage 레이아웃, Activities pink)
-- [x] 팀
+- [x] 팀 랭킹 개인 프로필 카드 + 어드민 팀원 상세 뷰 통합 (reading-guide 기반 검증)
+- [x] 어드민 전용 "팀원" 탭 추가 (nav.tsx, /member 페이지, localStorage 팀원 기억)
+- [x] launchctl bootstrap/bootout 수정 (macOS Sequoia deprecated load/unload 대응)
+- [x] repair 명령 추가 (hook·스케줄 재등록 + 즉시 수집)
+- [x] SessionStart hook 추가 (VS Code 재시작 시 수집)
+- [x] launchd 스케줄 0/6/12/18시 4회로 확장 (최대 6시간 지연 보장)

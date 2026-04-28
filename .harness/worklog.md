@@ -4,6 +4,30 @@
 
 ---
 
+## Session 2026-04-28 14:09 — 데이터 수집 신뢰성 전면 개선 + 어드민 팀원 메뉴 추가
+
+### 작업 요약
+- **어드민 팀원 메뉴 추가**: nav.tsx에 어드민 전용 "팀원" 탭 추가 (팀~셋업 사이)
+- **dashboard-view.tsx**: `onMemberSelect` prop 추가 — 페이지 이동 없이 상태 업데이트
+- **`/member/page.tsx` 신규 생성**: `localStorage`로 마지막 선택 팀원 기억
+- **`/team/[userId]/page.tsx`**: "자세히 보기" 버튼 제거
+- **launchctl 수정**: macOS Sequoia에서 deprecated `load/unload` → `bootstrap/bootout` 으로 교체
+- **launchd 스케줄 4회로 확장**: 9시 1회 → 0/6/12/18시 4회 (최대 6시간 지연 보장)
+- **repair 명령 추가**: API 키 유지한 채 hook·스케줄만 재등록 + 즉시 데이터 수집
+- **SessionStart hook 추가**: VS Code 열 때도 수집 (SessionEnd만으로는 세션 미종료 팀원 누락)
+- **CLI 빌드 재실행**: `bun run build` 후 `repair` 명령 포함 번들 확인
+- **팀원 공유 명령 확정**: `npx --yes --ignore-cache github:eugene-eee-hongkyu/ai-usage-tracker repair`
+- **검증 완료**: launchd 4회 등록 확인, DB updated_at `2026-04-28 06:01 UTC` (즉시 수집 PASS)
+- **~/.claude/settings.json 변경**: SessionStart hook 등록 (submit.mjs)
+
+### 실패한 시도
+- plist 자동 생성 버그: 기존 `index.mjs` 번들이 구버전 (registerDailySchedule 미포함) → 수동 plist 생성 후 `bun run build` 재빌드
+
+### 다음 액션
+- 없음 (팀원들에게 repair 명령 공유 후 대기)
+
+---
+
 ## Session 2026-04-28 13:44 — 자동 수집(9시) 미작동 버그 원인 파악
 
 ### 작업 요약

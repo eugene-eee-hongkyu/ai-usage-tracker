@@ -4,6 +4,19 @@
 
 ---
 
+## 2026-04-28: 데이터 수집 트리거 — SessionStart + SessionEnd + launchd 4회
+
+- **선택**: SessionStart hook + SessionEnd hook + launchd 0/6/12/18시 4회 중복 수집
+- **대안 검토**:
+  - _SessionEnd 단독_: 기존 방식. VS Code를 끄지 않고 계속 사용하는 팀원은 수집 0 → 팀 랭킹 데이터 공백
+  - _launchd 1회(9시) 단독_: 자동 보장되나 최대 24시간 지연, 첫 설치 시 plist 미생성 버그 존재
+  - _SessionStart + SessionEnd + launchd 4회_: 선택. VS Code 재시작(팀 실제 패턴) + 정기 백업으로 최대 6시간 지연 보장
+- **선택 이유**: 팀원들이 세션을 끄지 않고 VS Code를 통째로 끌 때 SessionEnd 미발화 확인. SessionStart가 실질적으로 더 신뢰할 수 있는 트리거. launchd는 보험
+- **영향 범위**: `cli/src/init.ts` (mergeHook, registerLaunchd), `~/.claude/settings.json`, `~/Library/LaunchAgents/*.plist`
+- **되돌리는 방법**: SessionStart 항목을 settings.json hooks에서 제거, launchctl bootout 후 plist 삭제
+
+---
+
 ## 2026-04-27: Cache hit 공식 — 표준 공식 (cacheWrite 분모 포함)
 
 - **선택**: `cacheRead ÷ (cacheRead + cacheWrite + input) × 100` (Anthropic 표준)
