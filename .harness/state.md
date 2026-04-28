@@ -6,23 +6,22 @@
 
 ---
 
-## 마지막 실행: 2026-04-28 20:12
-## 마지막 업데이트: 2026-04-28 20:12
+## 마지막 실행: 2026-04-28 20:17
+## 마지막 업데이트: 2026-04-28 20:17
 ## 현재 모드: bypassPermissions
 
 ### 현재 집중
 
-- launchd 15분 수집 누락 버그 수정 중
+- 운영 단계 — launchd PATH 수정 후 kickstart 검증 중, 내일 팀 배포 예정
 
 ### 이어서 할 것
 
-1. launchd 재등록 후 16:16 이후 데이터 실제 수신 여부 확인
-2. 15:54 이후 누락 구간 백필 필요 여부 판단
-3. 수집 정상화 확인 후 팀원 repair 명령 공유
+1. kickstart 결과 Vercel `/api/ingest 200` 로그 확인
+2. 팀원들에게 repair 명령 공유 (내일)
 
 ### 막힌 것
 
-- launchd 15분 수집이 16:00, 16:15 실행 시도에서 실패 (ModuleNotFoundError: No module named 'anthropic') — plist python3 경로 수정 및 재등록 완료, 수동 테스트 통과했으나 이후 자동 실행 정상화 여부 미확인
+- 없음
 
 ### 사람 판단 필요
 
@@ -120,4 +119,15 @@
 - [x] Windows CLI 호환성: sync.ts shell:false→shell:true, init.ts where vs which 분기
 - [x] 팀 API prevCostPerSession/teamActivities/dailyByMember/memberNames 추가, 시각 개선
 - [x] 팀 API cache hit 100% 버그 수정 (토큰 기반 계산 전 기간 통일)
-- [x] dead code 정리: collectors/claude-code.ts 삭제, ccusage 텍
+- [x] dead code 정리: collectors/claude-code.ts 삭제, ccusage 텍스트 제거
+- [x] 팀 페이지 시각 시스템 개인 대시보드 정합 (GRADE_VALUE_COLOR, Usage 레이아웃, Activities pink)
+- [x] 팀 랭킹 개인 프로필 카드 + 어드민 팀원 상세 뷰 통합 (reading-guide 기반 검증)
+- [x] 어드민 전용 "팀원" 탭 추가 (nav.tsx, /member 페이지, localStorage 팀원 기억)
+- [x] launchctl bootstrap/bootout 수정 (macOS Sequoia deprecated load/unload 대응)
+- [x] repair 명령 추가 (hook·스케줄 재등록 + 즉시 수집)
+- [x] SessionStart hook 추가 (VS Code 재시작 시 수집)
+- [x] launchd 스케줄 0/6/12/18시 4회로 확장 (최대 6시간 지연 보장)
+- [x] 팀 화면 Last Sync 테이블 추가 (어드민 전용, isAdmin 서버 사이드 이동)
+- [x] SessionStart/SessionEnd hook 제거 → launchd 4회/일 단독 수집 전환 (repair 명령 업데이트)
+- [x] launchd plist PATH 누락 수정 (EnvironmentVariables로 사용자 PATH 주입, commit 95ec4e1)
+- [ ] launchd PATH 수정 kickstart 검증 (Vercel ingest 로그 확인)

@@ -4,6 +4,22 @@
 
 ---
 
+## Session 2026-04-28 20:17 — launchd PATH 누락으로 codeburn 미실행 버그 수정
+
+### 작업 요약
+- **18:00 ingest 공백 확인**: launchd가 18:00에 실행됐으나 Vercel 로그 없음
+- **원인 파악**: `launchctl print`로 launchd 환경 확인 → `PATH=/usr/bin:/bin:/usr/sbin:/sbin`만 있어 `.nvm` 경로 없음 → codeburn 못 찾음
+- **수정**: `registerLaunchd()` plist에 `EnvironmentVariables` 블록 추가 — `process.env.PATH` (설치 시점 사용자 셸 PATH 전체) 주입
+- **빌드·커밋·푸시**: `cli/src/init.ts`, `cli/src/index.mjs` rebuild → `95ec4e1` push
+- **repair 재실행**: 새 plist에 `.nvm` 경로 포함된 PATH 확인
+- **launchctl kickstart -k**: 즉시 강제 실행으로 수정 검증 시작 (Vercel 로그 결과 대기 중)
+
+### 다음 액션
+- Vercel `/api/ingest 200` 로그 확인으로 PATH 수정 검증
+- 확인 후 팀원들에게 repair 명령 공유 (내일)
+
+---
+
 ## Session 2026-04-28 20:12 — launchd Python 경로 오류로 인한 데이터 수집 중단 수정
 
 ### 작업 요약
