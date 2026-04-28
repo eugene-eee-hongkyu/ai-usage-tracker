@@ -114,6 +114,7 @@ function registerLaunchd(submitPath: string): void {
   const plistDir = path.join(os.homedir(), "Library", "LaunchAgents");
   const plistPath = path.join(plistDir, `${label}.plist`);
 
+  const envPath = process.env.PATH ?? "/usr/bin:/bin:/usr/sbin:/sbin";
   const plist = `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
@@ -125,6 +126,11 @@ function registerLaunchd(submitPath: string): void {
     <string>${process.execPath}</string>
     <string>${submitPath}</string>
   </array>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PATH</key>
+    <string>${envPath}</string>
+  </dict>
   <key>StartCalendarInterval</key>
   <array>
     <dict><key>Hour</key><integer>0</integer><key>Minute</key><integer>0</integer></dict>
