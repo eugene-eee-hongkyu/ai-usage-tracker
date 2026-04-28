@@ -117,12 +117,12 @@ function registerLaunchd(submitPath) {
     <string>${submitPath}</string>
   </array>
   <key>StartCalendarInterval</key>
-  <dict>
-    <key>Hour</key>
-    <integer>9</integer>
-    <key>Minute</key>
-    <integer>0</integer>
-  </dict>
+  <array>
+    <dict><key>Hour</key><integer>0</integer><key>Minute</key><integer>0</integer></dict>
+    <dict><key>Hour</key><integer>6</integer><key>Minute</key><integer>0</integer></dict>
+    <dict><key>Hour</key><integer>12</integer><key>Minute</key><integer>0</integer></dict>
+    <dict><key>Hour</key><integer>18</integer><key>Minute</key><integer>0</integer></dict>
+  </array>
   <key>StandardOutPath</key>
   <string>${path.join(STABLE_DIR, "daily.log")}</string>
   <key>StandardErrorPath</key>
@@ -141,7 +141,7 @@ function registerLaunchd(submitPath) {
     } catch {}
     fs.writeFileSync(plistPath, plist);
     execSync(`launchctl bootstrap ${gui} "${plistPath}"`, { stdio: "ignore" });
-    console.log("✅ 일간 자동 동기화 등록 완료 (매일 오전 9시, launchd)");
+    console.log("✅ 자동 동기화 등록 완료 (0/6/12/18시, launchd)");
   } catch {
     console.log("⚠️  일간 자동 동기화 등록 실패 (선택 사항, 수동으로 등록 가능)");
   }
@@ -156,10 +156,10 @@ function registerWindowsTask(submitPath) {
   const xml = `<?xml version="1.0" encoding="UTF-16"?>
 <Task version="1.2" xmlns="http://schemas.microsoft.com/windows/2004/02/mit/task">
   <Triggers>
-    <CalendarTrigger>
-      <StartBoundary>2000-01-01T09:00:00</StartBoundary>
-      <ScheduleByDay><DaysInterval>1</DaysInterval></ScheduleByDay>
-    </CalendarTrigger>
+    <CalendarTrigger><StartBoundary>2000-01-01T00:00:00</StartBoundary><ScheduleByDay><DaysInterval>1</DaysInterval></ScheduleByDay></CalendarTrigger>
+    <CalendarTrigger><StartBoundary>2000-01-01T06:00:00</StartBoundary><ScheduleByDay><DaysInterval>1</DaysInterval></ScheduleByDay></CalendarTrigger>
+    <CalendarTrigger><StartBoundary>2000-01-01T12:00:00</StartBoundary><ScheduleByDay><DaysInterval>1</DaysInterval></ScheduleByDay></CalendarTrigger>
+    <CalendarTrigger><StartBoundary>2000-01-01T18:00:00</StartBoundary><ScheduleByDay><DaysInterval>1</DaysInterval></ScheduleByDay></CalendarTrigger>
   </Triggers>
   <Settings>
     <StartWhenAvailable>true</StartWhenAvailable>
@@ -180,7 +180,7 @@ function registerWindowsTask(submitPath) {
     "/F"
   ], { stdio: "ignore" });
   if (result.status === 0) {
-    console.log("✅ 일간 자동 동기화 등록 완료 (매일 오전 9시, Task Scheduler)");
+    console.log("✅ 자동 동기화 등록 완료 (0/6/12/18시, Task Scheduler)");
   } else {
     console.log("⚠️  일간 자동 동기화 등록 실패 (선택 사항, 수동으로 등록 가능)");
   }
@@ -270,8 +270,16 @@ async function runRepair() {
   mergeHook(STABLE_SUBMIT);
   registerDailySchedule(STABLE_SUBMIT);
   console.log(`
+\uD83D\uDCE1 현재 데이터 즉시 수집 중...`);
+  const child = spawn(process.execPath, [STABLE_SUBMIT], {
+    detached: true,
+    stdio: "inherit",
+    env: { ...process.env, USAGE_TRACKER_API_KEY: apiKey, USAGE_TRACKER_URL: SERVER_URL }
+  });
+  await new Promise((resolve) => child.on("close", () => resolve()));
+  console.log(`
 ✨ 복구 완료!`);
-  console.log("   Claude Code 세션 종료 시 + 매일 오전 9시 자동으로 사용량이 수집됩니다.");
+  console.log("   VS Code 열 때 + 0/6/12/18시마다 자동으로 사용량이 수집됩니다.");
   console.log(`   대시보드: ${SERVER_URL}/dashboard
 `);
   process.exit(0);
