@@ -6,18 +6,17 @@
 
 ---
 
-## 마지막 실행: 2026-04-28 22:45
-## 마지막 업데이트: 2026-04-28 22:45
+## 마지막 실행: 2026-04-29 07:56
+## 마지막 업데이트: 2026-04-29 07:56
 ## 현재 모드: bypassPermissions
 
 ### 현재 집중
 
-- 운영 단계 — kickstart 즉시 실행 검증 PASS, 06:00 자동 실행 검증 후 팀 배포
+- 운영 단계 — 스크롤바 숨김 처리 (스크롤 동작 유지) 적용 중
 
 ### 이어서 할 것
 
-1. 내일 아침 06:00 launchd 자동 실행으로 데이터 도착 여부 확인
-2. 도착 확인되면 팀원들에게 `npx --yes --ignore-cache github:eugene-eee-hongkyu/ai-usage-tracker repair` 공유
+1. grep 결과 확인 후 `overflow-y-auto`, `overflow-auto` 위치에 스크롤바 숨김 스타일 일괄 적용
 
 ### 막힌 것
 
@@ -122,3 +121,4 @@
 - [x] dead code 정리: collectors/claude-code.ts 삭제, ccusage 텍스트 제거
 - [x] 팀 페이지 시각 시스템 개인 대시보드 정합 (GRADE_VALUE_COLOR, Usage 레이아웃, Activities pink)
 - [x] 팀 랭킹 개인 프로필
+- [ ] 스크롤바 숨김 처리 — grep 결과 확인 및 일괄 적용 (진행 중)
