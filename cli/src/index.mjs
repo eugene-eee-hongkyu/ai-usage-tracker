@@ -1068,17 +1068,20 @@ function mergeHook(submitPath) {
     }
   }
   const hooks = settings.hooks ?? {};
-  const sessionEndHooks = hooks.SessionEnd ?? [];
-  const cleaned = sessionEndHooks.filter((group) => !group.hooks?.some((h) => h.command.includes("submit.mjs")));
-  cleaned.push({
+  const submitEntry = {
     matcher: ".*",
     hooks: [{ type: "command", command: `node "${submitPath}"` }]
-  });
-  hooks.SessionEnd = cleaned;
+  };
+  for (const event of ["SessionStart", "SessionEnd"]) {
+    const existing = hooks[event] ?? [];
+    const cleaned = existing.filter((group) => !group.hooks?.some((h) => h.command.includes("submit.mjs")));
+    cleaned.push(submitEntry);
+    hooks[event] = cleaned;
+  }
   settings.hooks = hooks;
   fs.mkdirSync(path.dirname(CLAUDE_SETTINGS_PATH), { recursive: true });
   fs.writeFileSync(CLAUDE_SETTINGS_PATH, JSON.stringify(settings, null, 2));
-  console.log("✅ SessionEnd hook 등록 완료");
+  console.log("✅ SessionStart + SessionEnd hook 등록 완료");
 }
 function runBackfill(apiKey) {
   const syncScript = path.join(__dirname2, "sync.mjs");
