@@ -5,6 +5,7 @@ import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Nav } from "@/components/nav";
+import { isAdmin } from "@/lib/admin";
 import {
   AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
 } from "recharts";
@@ -130,6 +131,23 @@ function overallGrade(cacheHitPct: number, oneShotRate: number, costPerSession: 
   if (composite >= 0.88) return "탁월"; if (composite >= 0.72) return "양호"; if (composite >= 0.52) return "보통"; if (composite >= 0.32) return "부족"; return "경고";
 }
 
+function fmtSyncTime(ts: string): string {
+  const d = new Date(ts);
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  const hh = String(d.getHours()).padStart(2, "0");
+  const min = String(d.getMinutes()).padStart(2, "0");
+  return `${mm}-${dd} ${hh}:${min}`;
+}
+
+function syncStyle(lastSyncedAt: string | null): { timeClass: string; badge: React.ReactNode } {
+  if (!lastSyncedAt) return { timeClass: "text-red-400", badge: <span className="text-[10px] text-red-400">미수신</span> };
+  const days = Math.floor((Date.now() - new Date(lastSyncedAt).getTime()) / 86_400_000);
+  if (days >= 5) return { timeClass: "text-red-400", badge: <span className="text-[10px] text-red-400">⚠{days}일</span> };
+  if (days >= 2) return { timeClass: "text-yellow-500", badge: <span className="text-[10px] text-yellow-500">{days}일전</span> };
+  return { timeClass: "text-neutral-300", badge: null };
+}
+
 function fmtDate(d: string): string {
   const m = d.match(/^\d{4}-(\d{2})-(\d{2})$/);
   return m ? `${parseInt(m[1])}/${parseInt(m[2])}` : d;
@@ -197,6 +215,7 @@ export default function TeamPage() {
     </div>
   );
 
+  const adminUser = isAdmin(session?.user?.email ?? "");
   const members = data.byEfficiency;
   const sum = data.teamSummary;
   const byCost = [...members].sort((a, b) => b.totalCost - a.totalCost);
@@ -531,6 +550,49 @@ export default function TeamPage() {
                 </div>
               </div>
             </div>
+
+            {/* Row 4: Last Sync (admin only) */}
+            {adminUser && (
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <div className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-slate-500 rounded">
+                  <div className="px-3 py-2 border-b border-neutral-800">
+                    <span className="text-xs font-mono font-bold text-slate-400 uppercase tracking-wider">Last Sync</span>
+                  </div>
+                  <div className="p-3">
+                    <table className="w-full text-xs font-mono border-collapse">
+                      <thead>
+                        <tr className="border-b border-neutral-800">
+                          <th className="text-left text-neutral-500 pb-2 font-normal">멤버</th>
+                          <th className="text-right text-neutral-500 pb-2 font-normal">마지막 수신</th>
+                          <th className="w-12 text-right text-neutral-500 pb-2 pl-3 font-normal" />
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {[...members]
+                          .sort((a, b) => {
+                            if (!a.lastSyncedAt && !b.lastSyncedAt) return 0;
+                            if (!a.lastSyncedAt) return -1;
+                            if (!b.lastSyncedAt) return 1;
+                            return new Date(a.lastSyncedAt).getTime() - new Date(b.lastSyncedAt).getTime();
+                          })
+                          .map((m) => {
+                            const { timeClass, badge } = syncStyle(m.lastSyncedAt);
+                            return (
+                              <tr key={m.userId} className="border-b border-neutral-800/40 hover:bg-neutral-800/20 transition-colors">
+                                <td className="py-2 text-neutral-300">{m.name}</td>
+                                <td className={`py-2 text-right tabular-nums ${timeClass}`}>
+                                  {m.lastSyncedAt ? fmtSyncTime(m.lastSyncedAt) : "—"}
+                                </td>
+                                <td className="py-2 pl-3 text-right">{badge}</td>
+                              </tr>
+                            );
+                          })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            )}
           </>
         )}
       </main>
