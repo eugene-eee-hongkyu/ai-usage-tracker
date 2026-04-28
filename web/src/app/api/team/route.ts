@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { db, userSnapshots, users } from "@/lib/db";
 import { computeEfficiencyScore } from "@/lib/rules";
+import { isAdmin } from "@/lib/admin";
 
 type Period = "today" | "week" | "month" | "all";
 
@@ -270,5 +271,6 @@ export async function GET(req: NextRequest) {
     dailyByMember,
     memberNames,
     topSessions,
+    isAdminUser: isAdmin(session.user.email),
   });
 }
