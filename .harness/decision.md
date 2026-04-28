@@ -4,16 +4,16 @@
 
 ---
 
-## 2026-04-28: 데이터 수집 트리거 — SessionStart + SessionEnd + launchd 4회
+## 2026-04-28: 데이터 수집 트리거 — launchd 4회 단독 (hook 완전 제거)
 
-- **선택**: SessionStart hook + SessionEnd hook + launchd 0/6/12/18시 4회 중복 수집
+- **선택**: launchd 0/6/12/18시 4회만 유지. SessionStart/SessionEnd hook 완전 제거
 - **대안 검토**:
-  - _SessionEnd 단독_: 기존 방식. VS Code를 끄지 않고 계속 사용하는 팀원은 수집 0 → 팀 랭킹 데이터 공백
-  - _launchd 1회(9시) 단독_: 자동 보장되나 최대 24시간 지연, 첫 설치 시 plist 미생성 버그 존재
-  - _SessionStart + SessionEnd + launchd 4회_: 선택. VS Code 재시작(팀 실제 패턴) + 정기 백업으로 최대 6시간 지연 보장
-- **선택 이유**: 팀원들이 세션을 끄지 않고 VS Code를 통째로 끌 때 SessionEnd 미발화 확인. SessionStart가 실질적으로 더 신뢰할 수 있는 트리거. launchd는 보험
-- **영향 범위**: `cli/src/init.ts` (mergeHook, registerLaunchd), `~/.claude/settings.json`, `~/Library/LaunchAgents/*.plist`
-- **되돌리는 방법**: SessionStart 항목을 settings.json hooks에서 제거, launchctl bootout 후 plist 삭제
+  - _SessionStart + SessionEnd + launchd 4회 (오전 결정)_: 실제 운영 시 SessionStart + SessionEnd 동시 발화 → lock 충돌로 누락. codeburn "Today" period 레이블이 KST 기준 하루 뒤처지는 버그도 확인
+  - _lock TTL 조정_: 근본적 해결 아님. 동시 발화 자체를 막을 수 없음
+  - _launchd 4회 단독 (선택)_: 최대 6시간 지연이지만 누락 없음. "한 달에 한 번 보면 성공" 목표에 충분
+- **선택 이유**: hook 기반 수집의 구조적 한계(동시 발화 lock 충돌, VSCode 강제 종료 시 미보장)를 확인. 6시간 지연은 제품 목표 대비 허용 가능. 단순화로 신뢰성 확보
+- **영향 범위**: `cli/src/init.ts` (mergeHook → removeHook), `~/.claude/settings.json` (SessionStart/SessionEnd submit.mjs 항목 제거), `~/Library/LaunchAgents/*.plist`
+- **되돌리는 방법**: `removeHook` → `mergeHook`으로 되돌리고 rebuild/push 후 repair 재실행
 
 ---
 
