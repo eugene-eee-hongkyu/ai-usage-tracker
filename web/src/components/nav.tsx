@@ -4,15 +4,19 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useSession, signOut } from "next-auth/react";
 import { useState } from "react";
+import { isAdmin } from "@/lib/admin";
 
 export function Nav() {
   const path = usePathname();
   const { data: session } = useSession();
   const [open, setOpen] = useState(false);
 
+  const adminUser = isAdmin(session?.user?.email ?? "");
+
   const tabs = [
     { href: "/dashboard", label: "개인" },
     { href: "/team", label: "팀" },
+    ...(adminUser ? [{ href: "/member", label: "팀원" }] : []),
     { href: "/setup-status", label: "셋업" },
   ];
 

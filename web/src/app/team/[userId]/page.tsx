@@ -12,7 +12,6 @@ interface MemberData {
   daily: Array<{ date: string; cost: number; sessions: number }>;
   streak: number;
   projects: Array<{ name: string; cost: number; sessions: number; avgCost: number }>;
-  canViewFullDashboard: boolean;
 }
 
 export default function MemberProfilePage() {
@@ -113,16 +112,6 @@ export default function MemberProfilePage() {
           </div>
         )}
 
-        {data.canViewFullDashboard && (
-          <div className="pt-2">
-            <Link
-              href={`/team/${userId}/dashboard`}
-              className="block w-full text-center py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-mono rounded-lg transition-colors"
-            >
-              자세히 보기 →
-            </Link>
-          </div>
-        )}
       </main>
     </div>
   );

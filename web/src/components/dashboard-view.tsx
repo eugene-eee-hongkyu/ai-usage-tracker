@@ -268,7 +268,7 @@ function TipBtn({ label, onClick, variant = "action" }: { label: string; onClick
 
 interface TeamMember { userId: string; name: string }
 
-export function DashboardView({ targetUserId }: { targetUserId?: string }) {
+export function DashboardView({ targetUserId, onMemberSelect }: { targetUserId?: string; onMemberSelect?: (userId: string) => void }) {
   const viewOnly = !!targetUserId;
   const { data: session, status } = useSession();
   const router = useRouter();
@@ -445,7 +445,7 @@ export function DashboardView({ targetUserId }: { targetUserId?: string }) {
           {viewOnly && teamMembers.length > 0 && (
             <select
               value={targetUserId}
-              onChange={(e) => router.push(`/team/${e.target.value}/dashboard`)}
+              onChange={(e) => onMemberSelect ? onMemberSelect(e.target.value) : router.push(`/team/${e.target.value}/dashboard`)}
               className="ml-auto text-xs font-mono bg-neutral-800 text-neutral-300 border border-neutral-700 rounded px-2 py-1 self-center hover:border-neutral-500 focus:outline-none focus:border-indigo-500 cursor-pointer"
             >
               {teamMembers.map((m) => (
