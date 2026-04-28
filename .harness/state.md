@@ -6,17 +6,19 @@
 
 ---
 
-## 마지막 실행: 2026-04-28 10:43
-## 마지막 업데이트: 2026-04-28 10:43
+## 마지막 실행: 2026-04-28 13:44
+## 마지막 업데이트: 2026-04-28 13:44
 ## 현재 모드: bypassPermissions
 
 ### 현재 집중
 
-- 운영 중 (신규 요청 대기)
+- 자동 수집(9시) 미작동 버그 수정 (Mac launchd plist 미설치 원인 파악 완료, 수정 진행 중)
 
 ### 이어서 할 것
 
-1. 없음
+1. init.mjs의 `registerDailySchedule` 로직 상세 확인 및 버그 수정
+2. plist 파일이 `~/Library/LaunchAgents/`에 실제로 생성되는지 검증
+3. launchctl 등록 및 자동 실행 E2E 검증
 
 ### 막힌 것
 
@@ -120,7 +122,4 @@
 - [x] 팀 API cache hit 100% 버그 수정 (토큰 기반 계산 전 기간 통일)
 - [x] dead code 정리: collectors/claude-code.ts 삭제, ccusage 텍스트 제거
 - [x] 팀 페이지 시각 시스템 개인 대시보드 정합 (GRADE_VALUE_COLOR, Usage 레이아웃, Activities pink)
-- [x] 팀 페이지 레이아웃 재편: By Member+Team Total / Usage+Efficiency / Top Sessions+Team Activities
-- [x] Efficiency 테이블 셀 배경색 등급별 적용 (GRADE_CELL_BG, GradeCell 컴포넌트)
-- [x] Top Sessions 카드 추가 (팀 페이지 Row 3)
-- [x] 어드민 전용 "팀원"
+- [x] 팀

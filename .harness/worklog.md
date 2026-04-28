@@ -4,6 +4,19 @@
 
 ---
 
+## Session 2026-04-28 13:44 — 자동 수집(9시) 미작동 버그 원인 파악
+
+### 작업 요약
+- LaunchAgents에 plist 파일 존재 여부 확인
+- launchctl 등록 상태 확인
+- `init.ts` / `init.mjs` 내 스케줄 등록 로직 분석
+- **원인 파악**: `~/Library/LaunchAgents/`에 plist 파일 없음 + launchd 미등록 → 자동 수집 스케줄이 실제로 설치되지 않은 상태임을 확인
+
+### 다음 액션
+- `init.mjs`의 `registerDailySchedule` 등 스케줄 등록 로직 상세 분석
+- plist 생성 및 launchctl 등록 흐름 수정
+
+
 ## Session 2026-04-28 10:43 — 워크로그/상태 파일 업데이트 및 커밋
 
 ### 작업 요약
