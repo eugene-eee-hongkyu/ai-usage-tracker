@@ -507,27 +507,34 @@ export function DashboardView({ targetUserId, onMemberSelect }: { targetUserId?:
 
           {/* Daily Activity */}
           <div className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-cyan-500 rounded">
-            <div className="px-3 py-2 border-b border-neutral-800">
+            <div className="px-3 py-2 border-b border-neutral-800 flex items-center justify-between">
               <span className="text-xs font-mono font-bold text-cyan-400 uppercase tracking-wider">Daily Activity</span>
+              {chartData.length > 45 && (
+                <span className="flex items-center gap-1 text-[10px] font-mono bg-cyan-900/40 text-cyan-300 border border-cyan-700/60 rounded px-1.5 py-0.5">
+                  ↕ scroll · {chartData.length}
+                </span>
+              )}
             </div>
             <div className="p-3">
               {chartData.length === 0 ? (
                 <div className="h-32 flex items-center justify-center text-neutral-600 text-xs font-mono">no data</div>
               ) : (
-                <div className="space-y-1">
-                  {(() => {
-                    const maxCost = Math.max(...chartData.map((d) => d.cost), 0.01);
-                    return chartData.map((d) => (
-                      <div key={d.date} className="flex items-center gap-1.5 text-xs font-mono">
-                        <span className="w-10 text-neutral-500 shrink-0">{d.date}</span>
-                        <div className="w-20 h-1.5 bg-neutral-800 rounded overflow-hidden shrink-0">
-                          <div className="h-full bg-cyan-500 rounded" style={{ width: `${(d.cost / maxCost) * 100}%` }} />
+                <div className={chartData.length > 45 ? "overflow-y-auto max-h-[300px] no-scrollbar" : ""}>
+                  <div className="space-y-1">
+                    {(() => {
+                      const maxCost = Math.max(...chartData.map((d) => d.cost), 0.01);
+                      return chartData.map((d) => (
+                        <div key={d.date} className="flex items-center gap-1.5 text-xs font-mono">
+                          <span className="w-10 text-neutral-500 shrink-0">{d.date}</span>
+                          <div className="w-20 h-1.5 bg-neutral-800 rounded overflow-hidden shrink-0">
+                            <div className="h-full bg-cyan-500 rounded" style={{ width: `${(d.cost / maxCost) * 100}%` }} />
+                          </div>
+                          <span className="text-yellow-400 flex-1">{fmt$(d.cost)}</span>
+                          {d.sessions > 0 && <span className="text-neutral-600 w-6 text-right">{d.sessions}s</span>}
                         </div>
-                        <span className="text-yellow-400 flex-1">{fmt$(d.cost)}</span>
-                        {d.sessions > 0 && <span className="text-neutral-600 w-6 text-right">{d.sessions}s</span>}
-                      </div>
-                    ));
-                  })()}
+                      ));
+                    })()}
+                  </div>
                 </div>
               )}
             </div>
@@ -683,7 +690,7 @@ export function DashboardView({ targetUserId, onMemberSelect }: { targetUserId?:
                 <span className="w-14 text-right">avg/s</span>
                 <span className="w-6 text-right">s</span>
               </div>
-              <div className={data.projects.length > 15 ? "overflow-y-auto max-h-[300px] pr-1" : ""}>
+              <div className={data.projects.length > 15 ? "overflow-y-auto max-h-[300px] no-scrollbar" : ""}>
                 <div className="space-y-1">
                   {data.projects.map((p) => {
                     const displayPath = formatPath(p.path || p.name);
@@ -725,7 +732,7 @@ export function DashboardView({ targetUserId, onMemberSelect }: { targetUserId?:
                 <span className="w-12 text-right">turns</span>
                 <span className="w-14 text-right">1-shot</span>
               </div>
-              <div className={data.activities.length > 15 ? "overflow-y-auto max-h-[300px] pr-1" : ""}>
+              <div className={data.activities.length > 15 ? "overflow-y-auto max-h-[300px] no-scrollbar" : ""}>
                 <div className="space-y-1">
                   {(() => {
                     const maxCost = Math.max(...data.activities.map((a) => a.cost), 0.01);
@@ -847,7 +854,7 @@ export function DashboardView({ targetUserId, onMemberSelect }: { targetUserId?:
                 <span className="flex-1">tool</span>
                 <span className="w-16 text-right">calls</span>
               </div>
-              <div className={(data.tools ?? []).length > 15 ? "overflow-y-auto max-h-[300px] pr-1" : ""}>
+              <div className={(data.tools ?? []).length > 15 ? "overflow-y-auto max-h-[300px] no-scrollbar" : ""}>
                 <div className="space-y-1">
                   {(data.tools ?? []).map((t) => {
                     const maxCalls = Math.max(...(data.tools ?? []).map((x) => x.calls), 0.01);
@@ -882,7 +889,7 @@ export function DashboardView({ targetUserId, onMemberSelect }: { targetUserId?:
                 <span className="flex-1">command</span>
                 <span className="w-16 text-right">calls</span>
               </div>
-              <div className={(data.shellCommands ?? []).length > 15 ? "overflow-y-auto max-h-[300px] pr-1" : ""}>
+              <div className={(data.shellCommands ?? []).length > 15 ? "overflow-y-auto max-h-[300px] no-scrollbar" : ""}>
                 <div className="space-y-1">
                   {(data.shellCommands ?? []).map((s) => {
                     const maxCalls = Math.max(...(data.shellCommands ?? []).map((x) => x.calls), 0.01);
@@ -919,7 +926,7 @@ export function DashboardView({ targetUserId, onMemberSelect }: { targetUserId?:
                 <span className="flex-1">server</span>
                 <span className="w-16 text-right">calls</span>
               </div>
-              <div className={(data.mcpServers ?? []).length > 15 ? "overflow-y-auto max-h-[300px] pr-1" : ""}>
+              <div className={(data.mcpServers ?? []).length > 15 ? "overflow-y-auto max-h-[300px] no-scrollbar" : ""}>
                 <div className="space-y-1">
                   {(data.mcpServers ?? []).map((m) => {
                     const maxCalls = Math.max(...(data.mcpServers ?? []).map((x) => x.calls), 0.01);
