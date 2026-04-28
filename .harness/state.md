@@ -6,17 +6,17 @@
 
 ---
 
-## 마지막 실행: 2026-04-27 20:50
-## 마지막 업데이트: 2026-04-27 20:50
+## 마지막 실행: 2026-04-28 08:07
+## 마지막 업데이트: 2026-04-28 08:07
 ## 현재 모드: bypassPermissions
 
 ### 현재 집중
 
-- 모든 계획된 마일스톤 완료. reading-guide 초기화·검증·적용까지 완료.
+- 어드민 팀원 상세 화면 메뉴 재배치 구현
 
 ### 이어서 할 것
 
-1. 없음 (신규 요청 대기)
+1. Claude가 요구사항 재설명 후 실제 구현 작업 착수
 
 ### 막힌 것
 
@@ -122,4 +122,4 @@
 - [x] 팀 페이지 시각 시스템 개인 대시보드 정합 (GRADE_VALUE_COLOR, Usage 레이아웃, Activities pink)
 - [x] 팀 페이지 레이아웃 재편: By Member+Team Total / Usage+Efficiency / Top Sessions+Team Activities
 - [x] Efficiency 테이블 셀 배경색 등급별 적용 (GRADE_CELL_BG, GradeCell 컴포넌트)
-- [x] Top Sessions 카드 추가
+- [x] Top Sessions 카드 추
