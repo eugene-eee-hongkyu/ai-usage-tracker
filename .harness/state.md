@@ -6,17 +6,17 @@
 
 ---
 
-## 마지막 실행: 2026-04-28 15:59
-## 마지막 업데이트: 2026-04-28 15:59
+## 마지막 실행: 2026-04-28 18:01
+## 마지막 업데이트: 2026-04-28 18:01
 ## 현재 모드: bypassPermissions
 
 ### 현재 집중
 
-- 운영 단계 — 신규 요청 대기 중
+- 운영 단계 — 팀원 repair 명령 공유 대기 중
 
 ### 이어서 할 것
 
-1. 없음
+1. 팀원들에게 repair 명령 공유 (`npx ... repair`)
 
 ### 막힌 것
 
@@ -122,4 +122,3 @@
 - [x] 팀 페이지 시각 시스템 개인 대시보드 정합 (GRADE_VALUE_COLOR, Usage 레이아웃, Activities pink)
 - [x] 팀 랭킹 개인 프로필 카드 + 어드민 팀원 상세 뷰 통합 (reading-guide 기반 검증)
 - [x] 어드민 전용 "팀원" 탭 추가 (nav.tsx, /member 페이지, localStorage 팀원 기억)
-- [x] launchctl bootstrap/bootout 수정 (macOS Sequoia deprecated load/un

@@ -4,6 +4,16 @@
 
 ---
 
+## Session 2026-04-28 18:01 — decision.md 확정 및 워크로그 커밋/푸시
+
+### 작업 요약
+- `decision.md` 최종 결정 내용으로 업데이트
+- worklog/state/decision 파일 커밋 & 푸시
+
+### 다음 액션
+- 팀원들에게 repair 명령 공유 (`npx ... repair`)
+
+
 ## Session 2026-04-28 15:59 — worklog.md 업데이트 및 프로젝트 설정 확인
 
 ### 작업 요약
