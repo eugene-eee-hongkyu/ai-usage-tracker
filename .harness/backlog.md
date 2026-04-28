@@ -12,4 +12,3 @@ NONE
 
 ## 완료 / 취소
 
-~~[0] 2026-04-28: LaunchAgents 스케줄 등록 로직 수정 — bootstrap/bootout + 4회 스케줄 + repair 명령으로 완료~~

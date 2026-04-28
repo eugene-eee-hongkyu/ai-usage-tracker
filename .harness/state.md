@@ -6,8 +6,8 @@
 
 ---
 
-## 마지막 실행: 2026-04-28 14:42
-## 마지막 업데이트: 2026-04-28 14:42
+## 마지막 실행: 2026-04-28 15:59
+## 마지막 업데이트: 2026-04-28 15:59
 ## 현재 모드: bypassPermissions
 
 ### 현재 집중
@@ -122,8 +122,4 @@
 - [x] 팀 페이지 시각 시스템 개인 대시보드 정합 (GRADE_VALUE_COLOR, Usage 레이아웃, Activities pink)
 - [x] 팀 랭킹 개인 프로필 카드 + 어드민 팀원 상세 뷰 통합 (reading-guide 기반 검증)
 - [x] 어드민 전용 "팀원" 탭 추가 (nav.tsx, /member 페이지, localStorage 팀원 기억)
-- [x] launchctl bootstrap/bootout 수정 (macOS Sequoia deprecated load/unload 대응)
-- [x] repair 명령 추가 (hook·스케줄 재등록 + 즉시 수집)
-- [x] SessionStart hook 추가 (VS Code 재시작 시 수집)
-- [x] launchd 스케줄 0/6/12/18시 4회로 확장 (최대 6시간 지연 보장)
-- [x] 팀 화면 Last Sync 테이블 추가 (어드민 전용, isAdmin 서버 사이드 이동)
+- [x] launchctl bootstrap/bootout 수정 (macOS Sequoia deprecated load/un

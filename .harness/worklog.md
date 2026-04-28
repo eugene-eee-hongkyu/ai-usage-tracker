@@ -4,6 +4,38 @@
 
 ---
 
+## Session 2026-04-28 15:59 — worklog.md 업데이트 및 프로젝트 설정 확인
+
+### 작업 요약
+- `.claude/settings.json` 프로젝트 설정 파일 읽기 및 `permissions defaultMode` 값 확인
+- `worklog.md` 파일 라인 수 확인 후 내용 업데이트
+
+
+## Session 2026-04-28 15:57 — SessionStart/SessionEnd hook 제거 → launchd 단독 수집 전환
+
+### 작업 요약
+- **Hook 동작 원리 Q&A**: VSCode 종료/+ 버튼/X 버튼 별 SessionStart·SessionEnd 트리거 조건 정리
+- **Vercel 로그 분석**: 3:43 + / X 동작 후 ingest 공백 확인 (15:09 이후 로그 없음)
+- **원인 분석**: SessionStart + SessionEnd 동시 발화 → lock 충돌 구조적 문제, codeburn "Today (2026-04-27)" period 레이블 버그 확인
+- **결정**: SessionStart/SessionEnd hook 완전 제거, launchd 4회/일(0/6/12/18시) 단독 수집으로 전환
+- **`cli/src/init.ts` 수정**:
+  - `mergeHook` → `removeHook` (hook 추가 대신 기존 submit.mjs 항목 제거)
+  - `runRepair`: 즉시 수집 블록 제거, removeHook 호출로 전환
+  - `runInit`: 동일하게 mergeHook → removeHook
+- **빌드 1차**: `bun build src/init.ts` → `init.mjs` 재빌드, push
+- **repair 재실행 → 구버전**: `index.mjs`가 `init.ts`를 인라인 번들한 파일임을 파악 — build:index 미실행이 원인
+- **빌드 2차**: `bun build src/index.ts` → `index.mjs` 재빌드, push
+- **repair 정상 확인**: settings.json에서 SessionStart/SessionEnd submit.mjs 항목 제거됨, launchd 활성 확인
+- 내일 팀원들에게 repair 명령 배포 예정
+
+### 실패한 시도
+- init.mjs만 빌드하고 index.mjs 미빌드 → repair 실행 시 구버전 동작 (SessionStart/SessionEnd 재등록)
+
+### 다음 액션
+- 팀원들에게 `npx --yes --ignore-cache github:eugene-eee-hongkyu/ai-usage-tracker repair` 공유 (내일)
+
+---
+
 ## Session 2026-04-28 14:42 — 팀 화면 Last Sync 테이블 추가 (어드민 전용)
 
 ### 작업 요약
