@@ -118,8 +118,24 @@ export async function POST(req: NextRequest) {
   const newMonthStart = firstOfMonthInTz(now, userTz);
 
   const bodyObj = (body && typeof body === "object" ? body : {}) as Record<string, unknown>;
-  const weekData = bodyObj.week ?? null;
-  const monthData = bodyObj.month ?? null;
+  const rawWeekData = bodyObj.week as Record<string, unknown> | null | undefined;
+  const rawMonthData = bodyObj.month as Record<string, unknown> | null | undefined;
+
+  // Filter ccusage daily rows to a date range and embed alongside codeburn data
+  // so promoted snapshots carry token info.
+  const ccusageDaily = (bodyObj.ccusageDaily as { daily?: Array<{ date?: string }> } | undefined)?.daily ?? [];
+  const filterCcusage = (startYmd: string, endYmd: string) =>
+    ccusageDaily.filter((d) => d.date && d.date >= startYmd && d.date <= endYmd);
+
+  const weekEnd = shiftDate(newWeekStart, 6);
+  const monthEnd = shiftDate(shiftMonths(newMonthStart, 1), -1);
+
+  const weekData = rawWeekData
+    ? { ...rawWeekData, ccusageDaily: { daily: filterCcusage(newWeekStart, weekEnd) } }
+    : null;
+  const monthData = rawMonthData
+    ? { ...rawMonthData, ccusageDaily: { daily: filterCcusage(newMonthStart, monthEnd) } }
+    : null;
 
   // Read existing to detect period boundary crossings
   const existing = await db
