@@ -4,6 +4,32 @@
 
 ---
 
+worklog + state.md 갱신 완료.
+
+## Session 2026-04-30 05:46 — Supabase RLS 보안 경고 확인
+
+### 작업 요약
+- Supabase 보안 경고 수신 — `public` 스키마 테이블에 RLS 미설정, anon key로 누구나 데이터 접근 가능한 상태 확인
+
+### 다음 액션
+- RLS 미설정 테이블 식별 → `ALTER TABLE ... ENABLE ROW LEVEL SECURITY` 적용
+- 접근 정책(Policy) 정의 (service_role 전체 접근, anon 차단 등)
+- 5월 1일 monthly 스냅샷 promote 검증
+
+
+## Session 2026-04-30 05:46 — Supabase RLS 보안 경고 확인
+
+### 작업 요약
+- Supabase 보안 경고 수신 — `public` 스키마 테이블에 Row-Level Security(RLS) 미설정 확인
+- RLS 꺼져 있어 `anon` key로 누구나 데이터 읽기/쓰기/삭제 가능한 상태
+
+### 다음 액션
+- RLS 미설정 테이블 식별 (Supabase 대시보드 또는 코드 기반 확인)
+- `ALTER TABLE <table> ENABLE ROW LEVEL SECURITY` 적용
+- 접근 정책(Policy) 정의 — service_role 전체 접근, anon 차단 또는 인증 사용자만 자기 데이터
+
+---
+
 ## Session 2026-04-29 15:59 — 세션 워크로그 기록 및 상태 갱신
 
 ### 작업 요약
