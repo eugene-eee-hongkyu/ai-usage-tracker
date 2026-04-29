@@ -24,6 +24,25 @@ function spawnCodeburn(period: string): Promise<unknown> {
   });
 }
 
+function spawnCcusageDaily(): Promise<unknown> {
+  return new Promise((resolve) => {
+    const chunks: Buffer[] = [];
+    const proc = spawn("ccusage", ["daily", "--json"], {
+      stdio: ["ignore", "pipe", "pipe"],
+      shell: true,
+    });
+    proc.stdout.on("data", (d: Buffer) => chunks.push(d));
+    proc.on("close", (code: number) => {
+      if (code !== 0) return resolve(null);
+      try {
+        resolve(JSON.parse(Buffer.concat(chunks).toString("utf8").trim()));
+      } catch { resolve(null); }
+    });
+    proc.on("error", () => resolve(null));
+    setTimeout(() => { proc.kill(); resolve(null); }, 120_000);
+  });
+}
+
 export async function runSync(_days?: number) {
   const apiKey = process.env.USAGE_TRACKER_API_KEY ?? await loadApiKey();
   if (!apiKey) {
@@ -31,11 +50,15 @@ export async function runSync(_days?: number) {
     process.exit(1);
   }
 
-  console.log("codeburn 데이터 수집 중...");
+  console.log("codeburn + ccusage 데이터 수집 중...");
 
   try {
-    const results = await Promise.all(PERIODS.map(p => spawnCodeburn(p)));
-    const report = Object.fromEntries(PERIODS.map((p, i) => [p, results[i]]));
+    const [results, ccusageDaily] = await Promise.all([
+      Promise.all(PERIODS.map(p => spawnCodeburn(p))),
+      spawnCcusageDaily(),
+    ]);
+    const report: Record<string, unknown> = Object.fromEntries(PERIODS.map((p, i) => [p, results[i]]));
+    if (ccusageDaily) report.ccusageDaily = ccusageDaily;
 
     const resp = await fetch(`${SERVER_URL}/api/ingest`, {
       method: "POST",

@@ -65,16 +65,45 @@ function spawnCodeburn(period) {
     }, 120000);
   });
 }
+function spawnCcusageDaily() {
+  return new Promise((resolve) => {
+    const chunks = [];
+    const proc = spawn("ccusage", ["daily", "--json"], {
+      stdio: ["ignore", "pipe", "pipe"],
+      shell: true
+    });
+    proc.stdout.on("data", (d) => chunks.push(d));
+    proc.on("close", (code) => {
+      if (code !== 0)
+        return resolve(null);
+      try {
+        resolve(JSON.parse(Buffer.concat(chunks).toString("utf8").trim()));
+      } catch {
+        resolve(null);
+      }
+    });
+    proc.on("error", () => resolve(null));
+    setTimeout(() => {
+      proc.kill();
+      resolve(null);
+    }, 120000);
+  });
+}
 async function runSync(_days) {
   const apiKey = process.env.USAGE_TRACKER_API_KEY ?? await loadApiKey();
   if (!apiKey) {
     console.error("API 키가 없습니다. 먼저 init을 실행하세요.");
     process.exit(1);
   }
-  console.log("codeburn 데이터 수집 중...");
+  console.log("codeburn + ccusage 데이터 수집 중...");
   try {
-    const results = await Promise.all(PERIODS.map((p) => spawnCodeburn(p)));
+    const [results, ccusageDaily] = await Promise.all([
+      Promise.all(PERIODS.map((p) => spawnCodeburn(p))),
+      spawnCcusageDaily()
+    ]);
     const report = Object.fromEntries(PERIODS.map((p, i) => [p, results[i]]));
+    if (ccusageDaily)
+      report.ccusageDaily = ccusageDaily;
     const resp = await fetch(`${SERVER_URL2}/api/ingest`, {
       method: "POST",
       headers: { "Content-Type": "application/json", "x-api-key": apiKey },

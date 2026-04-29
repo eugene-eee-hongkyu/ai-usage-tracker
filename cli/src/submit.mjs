@@ -80,6 +80,27 @@ function spawnCodeburn(period) {
   });
 }
 
+function spawnCcusageDaily() {
+  return new Promise((resolve) => {
+    const chunks = [];
+    const proc = spawn("ccusage", ["daily", "--json"], {
+      stdio: ["ignore", "pipe", "pipe"],
+      shell: true,
+    });
+    proc.stdout.on("data", (d) => chunks.push(d));
+    proc.on("close", (code) => {
+      if (code !== 0) return resolve(null);
+      try {
+        resolve(JSON.parse(Buffer.concat(chunks).toString("utf8").trim()));
+      } catch {
+        resolve(null);
+      }
+    });
+    proc.on("error", () => resolve(null));
+    setTimeout(() => { proc.kill(); resolve(null); }, 60_000);
+  });
+}
+
 async function main() {
   if (!acquireLock()) process.exit(0);
 
@@ -89,8 +110,12 @@ async function main() {
 
     let report;
     try {
-      const results = await Promise.all(PERIODS.map((p) => spawnCodeburn(p)));
-      report = Object.fromEntries(PERIODS.map((p, i) => [p, results[i]]));
+      const [codeburnResults, ccusageDaily] = await Promise.all([
+        Promise.all(PERIODS.map((p) => spawnCodeburn(p))),
+        spawnCcusageDaily(),
+      ]);
+      report = Object.fromEntries(PERIODS.map((p, i) => [p, codeburnResults[i]]));
+      if (ccusageDaily) report.ccusageDaily = ccusageDaily;
     } catch {
       return;
     }
