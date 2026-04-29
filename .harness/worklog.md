@@ -4,6 +4,36 @@
 
 ---
 
+## Session 2026-04-29 08:46 — 주별/월별 스냅샷 누적 기능 구현
+
+### 작업 요약
+- **데이터 수집 검증 완료**: 06:00 launchd 자동 실행으로 데이터 도착 확인 (PC 켜져 있을 때 검증, 사용자 보고)
+- **Daily Activity 카드**: 45건 임계 + `↕ scroll · N` cyan 배지 + `no-scrollbar` 적용 (커밋 `e523de0`)
+- **스크롤바 숨김 일괄 적용**: globals.css에 `.no-scrollbar` 유틸 추가, dashboard-view.tsx 5곳(projects/activities/tools/shellCommands/mcpServers) 적용
+- **주차 표시 기간 조사**: codeburn `--period week` = "Last 7 Days" rolling 7일 (캘린더 주 아님)
+- **지난주 보기 설계 논의**: rolling 7d 한계로 일~금 정확 매칭 불가 → "주별 스냅샷 누적" 방식 확정
+- **스펙 확정**:
+  - 캘린더 주 = 월요일 시작
+  - 드롭다운: 1주전~10주전 / 1달전~6달전, 가용한 만큼만 메뉴 항목
+  - 보관: 50주 / 12달
+  - 캡처 정책: 항상 캡처, 캡처 시간 + 데이터 범위 표시 (사용자 판단)
+  - Monthly: 옵션 A (정확도 우선, current_month_raw_json 보존 후 promote)
+  - 타임존: 사용자별 timezone 컬럼 기준, SGT/KST 표시
+- **codeburn 검증**: `--period month` = "April 2026" 캘린더 월 확인 → 옵션 A 가능
+- **DB 스키마**: `period_snapshots` 테이블 신설 + `user_snapshots`에 4컬럼 추가 (`current_week_*`, `current_month_*`)
+- **마이그레이션 SQL**: `web/drizzle/0001_period_snapshots.sql` 작성 + Supabase 수동 실행 (사용자 검증 완료, period_snapshots 6컬럼 + current_* 4컬럼 확인)
+- **Ingest 로직**: 사용자 timezone 기반 ISO 월요일/1일 계산, 경계 감지 시 직전 데이터를 period_snapshots로 promote, 50주/12달 retention DELETE
+- **Dashboard API**: `weekOffset` / `monthOffset` 파라미터, `availableSnapshots` + `snapshot` 메타 응답 추가
+- **UI**: 이번주/이번달 활성 시 드롭다운 표시, 스냅샷 선택 시 indigo 활성 표시 + 라이브 버튼은 항상 클릭 가능, 마지막 수신 영역에 `📌 captured ... KST · M/D-M/D` 표시
+- **빌드 통과 + lint 통과**, 커밋 `6e42db2` 푸시
+
+### 다음 액션
+- 다음 sync에서 `current_week_start` / `current_month_start` 채워지는지 Supabase 확인
+- 다음 주 월요일 첫 sync로 첫 weekly 스냅샷 promote 확인 → `[지난주 ▼]` 드롭다운 등장
+- 5월 1일 첫 sync로 첫 monthly 스냅샷 promote 확인 → `[지난달 ▼]` 드롭다운 등장
+
+---
+
 ## Session 2026-04-29 07:56 — 스크롤바 숨김 처리 (스크롤 동작 유지)
 
 ### 작업 요약

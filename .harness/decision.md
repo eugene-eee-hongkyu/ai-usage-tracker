@@ -4,6 +4,37 @@
 
 ---
 
+## 2026-04-29: 주별/월별 스냅샷 누적 — 별도 테이블 + Monthly 옵션 A (in-progress 보존)
+
+- **선택**: `period_snapshots` 테이블 신설(50주/12달 retention) + `user_snapshots`에 `current_week/month_raw_json` + `_start` 4컬럼 추가. 매 ingest 시 경계 감지하여 직전 데이터 promote
+- **대안 검토**:
+  - _현 상태 유지 (rolling 7d만)_: 가장 단순. 단 "지난주" 같은 요청 충족 불가
+  - _user_snapshots에 JSONB 배열 컬럼_: 단순하지만 무한 누적, 풀 디코드 부담
+  - _별도 테이블 (선택)_: PRIMARY KEY (user, type, period_start) 인덱스로 쿼리 깔끔. 10명 × 62 = 620 rows/년 → 무시 가능
+  - _Monthly 옵션 B (30days fallback)_: 단순하나 캘린더 월과 어긋남(4/2~5/1을 "4월"이라 표기 → 혼란)
+  - _Monthly 옵션 A (선택)_: in-progress month 데이터 보존 후 월 경계에 promote → 캘린더 월 정확도 보장. 추가 상태(`current_month_raw_json`) 1개 + ingest if문 비용
+- **선택 이유**:
+  - codeburn은 calendar week를 별도로 노출하지 않으나 `month`는 캘린더 월. activities/projects/topSessions는 raw 세션 단위 노출 안 됨 → 우리가 캡처 시점 데이터를 그대로 보존하는 것이 유일한 방법
+  - 주별/월별 일관된 패턴(symmetrical promote-on-boundary)으로 유지보수성 ↑
+  - 50주/12달 보관 시 약 50MB → Supabase 무료 티어 500MB 대비 10%
+- **영향 범위**: `web/drizzle/0001_period_snapshots.sql`, `schema.ts`, `api/ingest/route.ts`, `api/dashboard/route.ts`, `dashboard-view.tsx`
+- **되돌리는 방법**: `DROP TABLE period_snapshots`, `ALTER TABLE user_snapshots DROP COLUMN current_*` 4개. 코드는 git revert `6e42db2`
+
+---
+
+## 2026-04-29: 스냅샷 캡처 정책 — 항상 캡처 + 캡처 시간/범위 표시 (임계 없음)
+
+- **선택**: 매 sync마다 경계 넘어가면 무조건 promote. UI에 `📌 captured 2026-04-29 00:01 KST · 4/22-4/28` 표시해서 사용자가 신뢰도 판단
+- **대안 검토**:
+  - _임계 정해서 늦으면 폐기 ("수요일 지나면 데이터 없음")_: 깔끔. 단 보더라인(화 23:59 vs 수 00:00) 자의적, 데이터 손실
+  - _신뢰도 라벨 ("불완전 캡처" 경고)_: 절충. 라벨 기준 정의 필요
+  - _항상 캡처 + 범위 명시 (선택)_: 데이터 손실 0, 사용자가 캡처 시간과 daily 첫/끝 보고 직접 판단
+- **선택 이유**: codeburn week가 rolling 7d라 "정확한 일~일" 보장 불가능. 임계 정해도 1~6시간 단위 보더라인은 항상 발생. 캡처 시간을 명시하면 사용자가 알아서 판단 → 시스템 단순화 + 데이터 보존
+- **영향 범위**: `dashboard-view.tsx` 마지막 수신 영역, `api/dashboard/route.ts` snapshot 메타 응답
+- **되돌리는 방법**: ingest의 promote 직전에 `now - prev.updatedAt < threshold` 가드 추가
+
+---
+
 ## 2026-04-28: 데이터 수집 트리거 — launchd 4회 단독 (hook 완전 제거)
 
 - **선택**: launchd 0/6/12/18시 4회만 유지. SessionStart/SessionEnd hook 완전 제거
