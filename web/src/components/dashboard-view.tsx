@@ -47,6 +47,19 @@ interface DailyRow { date: string; cost: number; sessions: number }
 interface Model { name: string; cost: number; calls: number; cacheHitPct: number }
 interface NameCalls { name: string; calls: number }
 
+interface SnapshotMeta {
+  periodStart: string;
+  capturedAt: string;
+}
+
+interface SnapshotInfo {
+  type: "weekly" | "monthly";
+  periodStart: string;
+  capturedAt: string;
+  dataRangeStart: string | null;
+  dataRangeEnd: string | null;
+}
+
 interface DashboardData {
   user: { name: string; lastSyncedAt: string | null; timezone: string | null };
   overview: Overview | null;
@@ -58,6 +71,8 @@ interface DashboardData {
   tools: NameCalls[];
   shellCommands: NameCalls[];
   mcpServers: NameCalls[];
+  availableSnapshots?: { weekly: SnapshotMeta[]; monthly: SnapshotMeta[] };
+  snapshot?: SnapshotInfo | null;
 }
 
 const PERIOD_LABELS: Record<Period, string> = {
@@ -225,6 +240,28 @@ function fmtSyncedAt(ts: string | null, tz: string): string {
   return `${get("month")}-${get("day")} ${get("hour")}:${get("minute")}`;
 }
 
+function formatWeekRange(periodStart: string): string {
+  const [y, m, d] = periodStart.split("-").map(Number);
+  const start = new Date(Date.UTC(y, m - 1, d));
+  const end = new Date(start);
+  end.setUTCDate(end.getUTCDate() + 6);
+  const fmt = (dt: Date) => `${dt.getUTCMonth() + 1}/${dt.getUTCDate()}`;
+  return `${fmt(start)}-${fmt(end)}`;
+}
+
+function formatMonthLabel(periodStart: string): string {
+  return periodStart.slice(0, 7);
+}
+
+function formatDateRange(start: string | null, end: string | null): string {
+  if (!start || !end) return "";
+  const fmt = (s: string) => {
+    const [, m, d] = s.split("-");
+    return `${parseInt(m)}/${parseInt(d)}`;
+  };
+  return `${fmt(start)}-${fmt(end)}`;
+}
+
 const TZ_ABBR_MAP: Record<string, string> = {
   "Asia/Singapore": "SGT",
   "Asia/Seoul": "KST",
@@ -296,9 +333,16 @@ export function DashboardView({ targetUserId, onMemberSelect }: { targetUserId?:
       ? Intl.DateTimeFormat().resolvedOptions().timeZone
       : "UTC"
   );
+  const [weekOffset, setWeekOffset] = useState(0);
+  const [monthOffset, setMonthOffset] = useState(0);
 
-  const apiUrl = (p: Period) =>
-    `/api/dashboard?period=${p}${targetUserId ? `&userId=${targetUserId}` : ""}`;
+  const apiUrl = (p: Period, wOff: number, mOff: number) => {
+    const params = new URLSearchParams({ period: p });
+    if (targetUserId) params.set("userId", targetUserId);
+    if (p === "week" && wOff > 0) params.set("weekOffset", String(wOff));
+    if (p === "month" && mOff > 0) params.set("monthOffset", String(mOff));
+    return `/api/dashboard?${params.toString()}`;
+  };
 
   useEffect(() => {
     if (status === "unauthenticated") router.push("/login");
@@ -321,7 +365,7 @@ export function DashboardView({ targetUserId, onMemberSelect }: { targetUserId?:
   useEffect(() => {
     if (!session) return;
     setLoading(true);
-    fetch(apiUrl(period))
+    fetch(apiUrl(period, weekOffset, monthOffset))
       .then((r) => r.json())
       .then((d) => {
         if (d?.error) { setFetchError(true); setLoading(false); return; }
@@ -331,7 +375,7 @@ export function DashboardView({ targetUserId, onMemberSelect }: { targetUserId?:
       })
       .catch(() => { setFetchError(true); setLoading(false); });
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [session, period, targetUserId]);
+  }, [session, period, weekOffset, monthOffset, targetUserId]);
 
   useEffect(() => {
     if (data?.user?.timezone) setUserTz(data.user.timezone);
@@ -350,13 +394,13 @@ export function DashboardView({ targetUserId, onMemberSelect }: { targetUserId?:
   useEffect(() => {
     if (!session || !data || data.overview) return;
     const timer = setInterval(() => {
-      fetch(apiUrl(period))
+      fetch(apiUrl(period, weekOffset, monthOffset))
         .then((r) => r.json())
         .then((d) => { if (d.overview) setData(d); });
     }, 4000);
     return () => clearInterval(timer);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [session, data, period]);
+  }, [session, data, period, weekOffset, monthOffset]);
 
   if (status === "loading" || (!data && !fetchError)) return (
     <div className="min-h-screen bg-neutral-950">
@@ -375,7 +419,7 @@ export function DashboardView({ targetUserId, onMemberSelect }: { targetUserId?:
         <button
           onClick={() => {
             setFetchError(false); setLoading(true);
-            fetch(apiUrl(period)).then((r) => r.json()).then((d) => {
+            fetch(apiUrl(period, weekOffset, monthOffset)).then((r) => r.json()).then((d) => {
               if (!d?.error) { setData(d); setLoading(false); }
             });
           }}
@@ -434,14 +478,46 @@ export function DashboardView({ targetUserId, onMemberSelect }: { targetUserId?:
 
       {/* Period Tabs */}
       <div className="border-b border-neutral-800">
-        <div className="max-w-6xl mx-auto px-4 pt-3 pb-2 flex gap-1">
+        <div className="max-w-6xl mx-auto px-4 pt-3 pb-2 flex gap-1 items-center">
           {(["today", "week", "month", "all"] as Period[]).map((p) => (
             <button
               key={p}
-              onClick={() => setPeriod(p)}
-              className={`w-16 text-center py-1 rounded text-xs font-mono transition-colors ${period === p ? "bg-indigo-600 text-white" : "bg-neutral-800 text-neutral-400 hover:text-neutral-200"}`}
+              onClick={() => {
+                setPeriod(p);
+                if (p !== "week") setWeekOffset(0);
+                if (p !== "month") setMonthOffset(0);
+              }}
+              className={`w-16 text-center py-1 rounded text-xs font-mono transition-colors ${period === p && !(p === "week" && weekOffset > 0) && !(p === "month" && monthOffset > 0) ? "bg-indigo-600 text-white" : "bg-neutral-800 text-neutral-400 hover:text-neutral-200"}`}
             >{PERIOD_LABELS[p]}</button>
           ))}
+          {period === "week" && (data.availableSnapshots?.weekly?.length ?? 0) > 0 && (
+            <select
+              value={weekOffset}
+              onChange={(e) => setWeekOffset(Number(e.target.value))}
+              className={`text-xs font-mono border rounded px-2 py-1 cursor-pointer focus:outline-none ${weekOffset > 0 ? "bg-indigo-600 text-white border-indigo-500" : "bg-neutral-800 text-neutral-400 border-neutral-700 hover:text-neutral-200"}`}
+            >
+              <option value={0}>지난주 ▼</option>
+              {data.availableSnapshots!.weekly.map((s, i) => (
+                <option key={s.periodStart} value={i + 1}>
+                  {`${i + 1}주전 (${formatWeekRange(s.periodStart)})`}
+                </option>
+              ))}
+            </select>
+          )}
+          {period === "month" && (data.availableSnapshots?.monthly?.length ?? 0) > 0 && (
+            <select
+              value={monthOffset}
+              onChange={(e) => setMonthOffset(Number(e.target.value))}
+              className={`text-xs font-mono border rounded px-2 py-1 cursor-pointer focus:outline-none ${monthOffset > 0 ? "bg-indigo-600 text-white border-indigo-500" : "bg-neutral-800 text-neutral-400 border-neutral-700 hover:text-neutral-200"}`}
+            >
+              <option value={0}>지난달 ▼</option>
+              {data.availableSnapshots!.monthly.map((s, i) => (
+                <option key={s.periodStart} value={i + 1}>
+                  {`${i + 1}달전 (${formatMonthLabel(s.periodStart)})`}
+                </option>
+              ))}
+            </select>
+          )}
           {viewOnly && teamMembers.length > 0 && (
             <select
               value={targetUserId}
@@ -469,7 +545,14 @@ export function DashboardView({ targetUserId, onMemberSelect }: { targetUserId?:
           <span><span className="text-violet-400 font-bold">{Math.round(ov.oneShotRate * 100)}%</span><span className="text-neutral-500 ml-1 text-xs">1-shot</span></span>
           <span className="text-neutral-600 text-xs self-center ml-auto flex items-center gap-3">
             <span>활성 {ov.activeDays}일</span>
-            {!viewOnly && (
+            {data.snapshot ? (
+              <span className="text-amber-400">
+                📌 captured {fmtSyncedAt(data.snapshot.capturedAt, userTz)} {tzAbbr(userTz)}
+                {data.snapshot.dataRangeStart && data.snapshot.dataRangeEnd && (
+                  <span className="text-neutral-500"> · {formatDateRange(data.snapshot.dataRangeStart, data.snapshot.dataRangeEnd)}</span>
+                )}
+              </span>
+            ) : !viewOnly ? (
               <span className="relative">
                 마지막 수신{" "}
                 <span className="text-neutral-500">{fmtSyncedAt(data.user.lastSyncedAt, userTz)}</span>{" "}
@@ -490,8 +573,7 @@ export function DashboardView({ targetUserId, onMemberSelect }: { targetUserId?:
                   </div>
                 )}
               </span>
-            )}
-            {viewOnly && (
+            ) : (
               <span className="text-neutral-500">
                 마지막 수신 {fmtSyncedAt(data.user.lastSyncedAt, userTz)}
               </span>

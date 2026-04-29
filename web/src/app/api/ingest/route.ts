@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { db, userSnapshots, users } from "@/lib/db";
-import { eq, sql } from "drizzle-orm";
+import { db, userSnapshots, users, periodSnapshots } from "@/lib/db";
+import { and, eq, lt, sql } from "drizzle-orm";
 import crypto from "crypto";
 
 interface CodeburnActivity {
@@ -17,7 +17,6 @@ interface CodeburnOverview {
   sessions?: number;
   calls?: number;
   cacheHitPercent?: number;
-  // legacy field names
   totalCost?: number;
   totalSessions?: number;
   callsCount?: number;
@@ -33,7 +32,6 @@ interface CodeburnPeriodReport {
 function getBaseReport(body: unknown): CodeburnPeriodReport {
   if (typeof body !== "object" || body === null) return {};
   const b = body as Record<string, unknown>;
-  // Multi-period format: { today: {...}, week: {...}, month: {...}, all: {...} }
   if ("all" in b || "today" in b) {
     return (b.all ?? Object.values(b)[0] ?? {}) as CodeburnPeriodReport;
   }
@@ -51,17 +49,57 @@ function computeOverallOneShot(activities: CodeburnActivity[]): number {
   return weighted / totalWeight;
 }
 
+function ymdInTz(date: Date, tz: string): string {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: tz,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(date);
+  const get = (t: string) => parts.find((p) => p.type === t)?.value ?? "00";
+  return `${get("year")}-${get("month")}-${get("day")}`;
+}
+
+function isoMondayInTz(date: Date, tz: string): string {
+  const ymd = ymdInTz(date, tz);
+  const [y, m, d] = ymd.split("-").map(Number);
+  const utc = new Date(Date.UTC(y, m - 1, d));
+  const dayOfWeek = utc.getUTCDay();
+  const distance = (dayOfWeek + 6) % 7;
+  utc.setUTCDate(utc.getUTCDate() - distance);
+  return utc.toISOString().slice(0, 10);
+}
+
+function firstOfMonthInTz(date: Date, tz: string): string {
+  const ymd = ymdInTz(date, tz);
+  return ymd.slice(0, 7) + "-01";
+}
+
+function shiftDate(ymd: string, days: number): string {
+  const [y, m, d] = ymd.split("-").map(Number);
+  const utc = new Date(Date.UTC(y, m - 1, d));
+  utc.setUTCDate(utc.getUTCDate() + days);
+  return utc.toISOString().slice(0, 10);
+}
+
+function shiftMonths(ymd: string, months: number): string {
+  const [y, m, d] = ymd.split("-").map(Number);
+  const utc = new Date(Date.UTC(y, m - 1, d));
+  utc.setUTCMonth(utc.getUTCMonth() + months);
+  return utc.toISOString().slice(0, 10);
+}
+
 export async function POST(req: NextRequest) {
   const apiKey = req.headers.get("x-api-key");
   if (!apiKey) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
 
-  const user = await db
+  const userRow = await db
     .select()
     .from(users)
     .where(eq(users.apiKeyHash, crypto.createHash("sha256").update(apiKey).digest("hex")))
     .limit(1);
 
-  if (!user[0]) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  if (!userRow[0]) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
 
   const body = await req.json();
   const base = getBaseReport(body);
@@ -74,17 +112,67 @@ export async function POST(req: NextRequest) {
   const cacheHitPct = ov.cacheHitPercent ?? ov.cacheHitPct ?? 0;
   const overallOneShot = computeOverallOneShot(activities);
 
+  const userTz = userRow[0].timezone ?? "UTC";
+  const now = new Date();
+  const newWeekStart = isoMondayInTz(now, userTz);
+  const newMonthStart = firstOfMonthInTz(now, userTz);
+
+  const bodyObj = (body && typeof body === "object" ? body : {}) as Record<string, unknown>;
+  const weekData = bodyObj.week ?? null;
+  const monthData = bodyObj.month ?? null;
+
+  // Read existing to detect period boundary crossings
+  const existing = await db
+    .select()
+    .from(userSnapshots)
+    .where(eq(userSnapshots.userId, userRow[0].id))
+    .limit(1);
+
+  const prev = existing[0];
+
+  // Promote previous-week snapshot if week boundary crossed
+  if (prev?.currentWeekStart && prev.currentWeekStart !== newWeekStart && prev.currentWeekRawJson) {
+    await db
+      .insert(periodSnapshots)
+      .values({
+        userId: userRow[0].id,
+        periodType: "weekly",
+        periodStart: prev.currentWeekStart,
+        capturedAt: prev.updatedAt ?? now,
+        rawJson: prev.currentWeekRawJson,
+      })
+      .onConflictDoNothing();
+  }
+
+  // Promote previous-month snapshot if month boundary crossed
+  if (prev?.currentMonthStart && prev.currentMonthStart !== newMonthStart && prev.currentMonthRawJson) {
+    await db
+      .insert(periodSnapshots)
+      .values({
+        userId: userRow[0].id,
+        periodType: "monthly",
+        periodStart: prev.currentMonthStart,
+        capturedAt: prev.updatedAt ?? now,
+        rawJson: prev.currentMonthRawJson,
+      })
+      .onConflictDoNothing();
+  }
+
   await db
     .insert(userSnapshots)
     .values({
-      userId: user[0].id,
+      userId: userRow[0].id,
       rawJson: body,
       totalCost,
       sessionsCount,
       callsCount,
       cacheHitPct,
       overallOneShot,
-      updatedAt: new Date(),
+      currentWeekRawJson: weekData as object,
+      currentWeekStart: newWeekStart,
+      currentMonthRawJson: monthData as object,
+      currentMonthStart: newMonthStart,
+      updatedAt: now,
     })
     .onConflictDoUpdate({
       target: [userSnapshots.userId],
@@ -95,14 +183,42 @@ export async function POST(req: NextRequest) {
         callsCount: sql`excluded.calls_count`,
         cacheHitPct: sql`excluded.cache_hit_pct`,
         overallOneShot: sql`excluded.overall_one_shot`,
+        currentWeekRawJson: sql`excluded.current_week_raw_json`,
+        currentWeekStart: sql`excluded.current_week_start`,
+        currentMonthRawJson: sql`excluded.current_month_raw_json`,
+        currentMonthStart: sql`excluded.current_month_start`,
         updatedAt: sql`excluded.updated_at`,
       },
     });
 
+  // Retention cleanup
+  const retentionWeekStart = shiftDate(newWeekStart, -50 * 7);
+  const retentionMonthStart = shiftMonths(newMonthStart, -12);
+
+  await db
+    .delete(periodSnapshots)
+    .where(
+      and(
+        eq(periodSnapshots.userId, userRow[0].id),
+        eq(periodSnapshots.periodType, "weekly"),
+        lt(periodSnapshots.periodStart, retentionWeekStart),
+      )
+    );
+
+  await db
+    .delete(periodSnapshots)
+    .where(
+      and(
+        eq(periodSnapshots.userId, userRow[0].id),
+        eq(periodSnapshots.periodType, "monthly"),
+        lt(periodSnapshots.periodStart, retentionMonthStart),
+      )
+    );
+
   await db
     .update(users)
-    .set({ lastSyncedAt: new Date() })
-    .where(eq(users.id, user[0].id));
+    .set({ lastSyncedAt: now })
+    .where(eq(users.id, userRow[0].id));
 
   return NextResponse.json({ ok: true });
 }
