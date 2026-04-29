@@ -105,6 +105,7 @@ function registerLaunchd(submitPath) {
   const label = "com.primus.usage-tracker.daily";
   const plistDir = path.join(os.homedir(), "Library", "LaunchAgents");
   const plistPath = path.join(plistDir, `${label}.plist`);
+  const envPath = process.env.PATH ?? "/usr/bin:/bin:/usr/sbin:/sbin";
   const plist = `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
@@ -116,6 +117,11 @@ function registerLaunchd(submitPath) {
     <string>${process.execPath}</string>
     <string>${submitPath}</string>
   </array>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PATH</key>
+    <string>${envPath}</string>
+  </dict>
   <key>StartCalendarInterval</key>
   <array>
     <dict><key>Hour</key><integer>0</integer><key>Minute</key><integer>0</integer></dict>
@@ -236,6 +242,22 @@ function runBackfill(apiKey) {
   child.unref();
   console.log("\uD83D\uDCE6 과거 데이터 백그라운드 수집 시작 (최대 90일)");
 }
+function runImmediateSync(apiKey) {
+  if (!fs.existsSync(STABLE_SUBMIT))
+    return;
+  const child = spawn(process.execPath, [STABLE_SUBMIT], {
+    detached: true,
+    stdio: "ignore",
+    env: {
+      ...process.env,
+      USAGE_TRACKER_API_KEY: apiKey,
+      USAGE_TRACKER_URL: SERVER_URL,
+      _USAGE_TRACKER_DETACHED: "1"
+    }
+  });
+  child.unref();
+  console.log("\uD83D\uDCE4 현재 데이터 즉시 수집 시작 (백그라운드)");
+}
 function checkCodeburn() {
   try {
     const cmd = process.platform === "win32" ? "where codeburn" : "which codeburn";
@@ -265,10 +287,13 @@ async function runRepair() {
   }
   console.log(`✅ API 키 확인됨
 `);
+  const fallbackPath = path.join(os.homedir(), ".primus-usage-key");
+  fs.writeFileSync(fallbackPath, apiKey, { mode: 384 });
   fs.mkdirSync(STABLE_DIR, { recursive: true });
   fs.copyFileSync(path.join(__dirname2, "submit.mjs"), STABLE_SUBMIT);
   removeHook();
   registerDailySchedule(STABLE_SUBMIT);
+  runImmediateSync(apiKey);
   console.log(`
 ✨ 복구 완료!`);
   console.log("   0/6/12/18시마다 자동으로 사용량이 수집됩니다.");

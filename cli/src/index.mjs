@@ -1108,6 +1108,22 @@ function runBackfill(apiKey) {
   child.unref();
   console.log("\uD83D\uDCE6 과거 데이터 백그라운드 수집 시작 (최대 90일)");
 }
+function runImmediateSync(apiKey) {
+  if (!fs.existsSync(STABLE_SUBMIT))
+    return;
+  const child = spawn(process.execPath, [STABLE_SUBMIT], {
+    detached: true,
+    stdio: "ignore",
+    env: {
+      ...process.env,
+      USAGE_TRACKER_API_KEY: apiKey,
+      USAGE_TRACKER_URL: SERVER_URL,
+      _USAGE_TRACKER_DETACHED: "1"
+    }
+  });
+  child.unref();
+  console.log("\uD83D\uDCE4 현재 데이터 즉시 수집 시작 (백그라운드)");
+}
 function checkCodeburn() {
   try {
     const cmd = process.platform === "win32" ? "where codeburn" : "which codeburn";
@@ -1143,6 +1159,7 @@ async function runRepair() {
   fs.copyFileSync(path.join(__dirname2, "submit.mjs"), STABLE_SUBMIT);
   removeHook();
   registerDailySchedule(STABLE_SUBMIT);
+  runImmediateSync(apiKey);
   console.log(`
 ✨ 복구 완료!`);
   console.log("   0/6/12/18시마다 자동으로 사용량이 수집됩니다.");
