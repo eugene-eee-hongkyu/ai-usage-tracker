@@ -4,6 +4,19 @@
 
 ---
 
+## Session 2026-04-29 10:46 — 세션 종료 후 워크로그/하네스 파일 정리 및 커밋
+
+### 작업 요약
+- `worklog.md`, `state.md`, `decision.md`, `backlog.md` 업데이트
+- 완료된 스크롤바 항목을 backlog에서 완료/취소로 이동
+- `.harness` 파일 전체 git commit & push
+
+### 다음 액션
+- Supabase에서 `current_week` / `month_start` 필드 채워지는지 확인
+- 첫 weekly 스냅샷 promote 검증 (다음 월요일)
+- 첫 monthly 스냅샷 promote 검증 (5월 1일)
+
+
 ## Session 2026-04-29 08:46 — 주별/월별 스냅샷 누적 기능 구현
 
 ### 작업 요약
