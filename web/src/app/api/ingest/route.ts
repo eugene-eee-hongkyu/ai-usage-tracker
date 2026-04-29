@@ -116,10 +116,12 @@ export async function POST(req: NextRequest) {
   const now = new Date();
   const newWeekStart = isoMondayInTz(now, userTz);
   const newMonthStart = firstOfMonthInTz(now, userTz);
+  const newDayStart = ymdInTz(now, userTz);
 
   const bodyObj = (body && typeof body === "object" ? body : {}) as Record<string, unknown>;
   const rawWeekData = bodyObj.week as Record<string, unknown> | null | undefined;
   const rawMonthData = bodyObj.month as Record<string, unknown> | null | undefined;
+  const rawDayData = bodyObj.today as Record<string, unknown> | null | undefined;
 
   // Filter ccusage daily rows to a date range and embed alongside codeburn data
   // so promoted snapshots carry token info.
@@ -135,6 +137,9 @@ export async function POST(req: NextRequest) {
     : null;
   const monthData = rawMonthData
     ? { ...rawMonthData, ccusageDaily: { daily: filterCcusage(newMonthStart, monthEnd) } }
+    : null;
+  const dayData = rawDayData
+    ? { ...rawDayData, ccusageDaily: { daily: filterCcusage(newDayStart, newDayStart) } }
     : null;
 
   // Read existing to detect period boundary crossings
@@ -174,6 +179,20 @@ export async function POST(req: NextRequest) {
       .onConflictDoNothing();
   }
 
+  // Promote previous-day snapshot if day boundary crossed
+  if (prev?.currentDayStart && prev.currentDayStart !== newDayStart && prev.currentDayRawJson) {
+    await db
+      .insert(periodSnapshots)
+      .values({
+        userId: userRow[0].id,
+        periodType: "daily",
+        periodStart: prev.currentDayStart,
+        capturedAt: prev.updatedAt ?? now,
+        rawJson: prev.currentDayRawJson,
+      })
+      .onConflictDoNothing();
+  }
+
   await db
     .insert(userSnapshots)
     .values({
@@ -188,6 +207,8 @@ export async function POST(req: NextRequest) {
       currentWeekStart: newWeekStart,
       currentMonthRawJson: monthData as object,
       currentMonthStart: newMonthStart,
+      currentDayRawJson: dayData as object,
+      currentDayStart: newDayStart,
       updatedAt: now,
     })
     .onConflictDoUpdate({
@@ -203,13 +224,16 @@ export async function POST(req: NextRequest) {
         currentWeekStart: sql`excluded.current_week_start`,
         currentMonthRawJson: sql`excluded.current_month_raw_json`,
         currentMonthStart: sql`excluded.current_month_start`,
+        currentDayRawJson: sql`excluded.current_day_raw_json`,
+        currentDayStart: sql`excluded.current_day_start`,
         updatedAt: sql`excluded.updated_at`,
       },
     });
 
   // Retention cleanup
-  const retentionWeekStart = shiftDate(newWeekStart, -50 * 7);
+  const retentionWeekStart = shiftDate(newWeekStart, -10 * 7);
   const retentionMonthStart = shiftMonths(newMonthStart, -12);
+  const retentionDayStart = shiftDate(newDayStart, -7);
 
   await db
     .delete(periodSnapshots)
@@ -228,6 +252,16 @@ export async function POST(req: NextRequest) {
         eq(periodSnapshots.userId, userRow[0].id),
         eq(periodSnapshots.periodType, "monthly"),
         lt(periodSnapshots.periodStart, retentionMonthStart),
+      )
+    );
+
+  await db
+    .delete(periodSnapshots)
+    .where(
+      and(
+        eq(periodSnapshots.userId, userRow[0].id),
+        eq(periodSnapshots.periodType, "daily"),
+        lt(periodSnapshots.periodStart, retentionDayStart),
       )
     );
 

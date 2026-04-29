@@ -104,6 +104,7 @@ export async function GET(req: NextRequest) {
   const requestedUserId = req.nextUrl.searchParams.get("userId");
   const weekOffset = parseInt(req.nextUrl.searchParams.get("weekOffset") ?? "0") || 0;
   const monthOffset = parseInt(req.nextUrl.searchParams.get("monthOffset") ?? "0") || 0;
+  const dayOffset = parseInt(req.nextUrl.searchParams.get("dayOffset") ?? "0") || 0;
 
   let targetEmail = session.user.email!;
   if (requestedUserId) {
@@ -139,10 +140,16 @@ export async function GET(req: NextRequest) {
     .from(periodSnapshots)
     .where(and(eq(periodSnapshots.userId, user[0].id), eq(periodSnapshots.periodType, "monthly")))
     .orderBy(desc(periodSnapshots.periodStart));
+  const availableDailyRows = await db
+    .select({ periodStart: periodSnapshots.periodStart, capturedAt: periodSnapshots.capturedAt })
+    .from(periodSnapshots)
+    .where(and(eq(periodSnapshots.userId, user[0].id), eq(periodSnapshots.periodType, "daily")))
+    .orderBy(desc(periodSnapshots.periodStart));
 
   const availableSnapshots = {
     weekly: availableWeeklyRows.map((r) => ({ periodStart: r.periodStart, capturedAt: r.capturedAt })),
     monthly: availableMonthlyRows.map((r) => ({ periodStart: r.periodStart, capturedAt: r.capturedAt })),
+    daily: availableDailyRows.map((r) => ({ periodStart: r.periodStart, capturedAt: r.capturedAt })),
   };
 
   // Load snapshot if requested
@@ -165,6 +172,15 @@ export async function GET(req: NextRequest) {
       .limit(1)
       .offset(monthOffset - 1);
     if (rows[0]) snapshotRow = { periodType: "monthly", periodStart: rows[0].periodStart, capturedAt: rows[0].capturedAt, rawJson: rows[0].rawJson };
+  } else if (dayOffset > 0 && period === "today") {
+    const rows = await db
+      .select()
+      .from(periodSnapshots)
+      .where(and(eq(periodSnapshots.userId, user[0].id), eq(periodSnapshots.periodType, "daily")))
+      .orderBy(desc(periodSnapshots.periodStart))
+      .limit(1)
+      .offset(dayOffset - 1);
+    if (rows[0]) snapshotRow = { periodType: "daily", periodStart: rows[0].periodStart, capturedAt: rows[0].capturedAt, rawJson: rows[0].rawJson };
   }
 
   // Suppress unused import warning when snapshots feature isn't yet exercised
@@ -290,7 +306,7 @@ export async function GET(req: NextRequest) {
 
   // Snapshot metadata: capture time + actual data range
   let snapshotInfo: {
-    type: "weekly" | "monthly";
+    type: "weekly" | "monthly" | "daily";
     periodStart: string;
     capturedAt: string;
     dataRangeStart: string | null;
@@ -298,8 +314,9 @@ export async function GET(req: NextRequest) {
   } | null = null;
   if (snapshotRow) {
     const sortedDaily = [...daily].sort((a, b) => a.date.localeCompare(b.date));
+    const t = snapshotRow.periodType === "monthly" ? "monthly" : snapshotRow.periodType === "daily" ? "daily" : "weekly";
     snapshotInfo = {
-      type: snapshotRow.periodType === "monthly" ? "monthly" : "weekly",
+      type: t,
       periodStart: snapshotRow.periodStart,
       capturedAt: snapshotRow.capturedAt.toISOString(),
       dataRangeStart: sortedDaily[0]?.date ?? null,
