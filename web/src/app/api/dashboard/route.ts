@@ -194,7 +194,6 @@ export async function GET(req: NextRequest) {
   const tWrite = ov.tokens?.cacheWrite ?? 0;
   const tInput = ov.tokens?.input ?? 0;
   const tOutput = ov.tokens?.output ?? 0;
-  const costPerCall = calls > 0 ? cost / calls : 0;
   const outputInputRatio = tInput > 0 ? tOutput / tInput : 0;
   const cacheHitPct = (tRead + tWrite + tInput) > 0
     ? (tRead / (tRead + tWrite + tInput)) * 100
@@ -209,21 +208,37 @@ export async function GET(req: NextRequest) {
   );
   const oneShotRate = totalTurns > 0 ? weightedOneShot / totalTurns : 0;
 
-  const daily = d.daily ?? [];
-  const activeDays = daily.filter((day) => day.cost > 0).length;
-
-  // ccusage daily token data — snapshots also carry filtered ccusageDaily after first promote
+  // ccusage daily — snapshots also carry filtered ccusageDaily after first promote
   const ccusageRows = snapshotRow
     ? getCcusageDaily(snapshotRow.rawJson)
     : getCcusageDaily(snap[0].rawJson);
-  const tokenMap: Record<string, number> = {};
+  const ccusageMap: Record<string, { tokens: number; cost: number }> = {};
   for (const r of ccusageRows) {
-    if (r.date) tokenMap[r.date] = r.totalTokens ?? 0;
+    if (r.date) ccusageMap[r.date] = {
+      tokens: r.totalTokens ?? 0,
+      cost: (r as { totalCost?: number }).totalCost ?? 0,
+    };
   }
+
+  // Override codeburn daily cost with ccusage calendar-day cost (codeburn week
+  // truncates the boundary day mid-hour, ccusage gives the full day total)
+  const rawDaily = d.daily ?? [];
+  const daily = rawDaily.map((day) => ({
+    ...day,
+    cost: ccusageMap[day.date]?.cost ?? day.cost,
+  }));
+  const activeDays = daily.filter((day) => day.cost > 0).length;
+
   const dailyTokens = daily.map((day) => ({
     date: day.date,
-    totalTokens: tokenMap[day.date] ?? 0,
+    totalTokens: ccusageMap[day.date]?.tokens ?? 0,
   }));
+
+  // Recompute period totals from ccusage-corrected daily (only override if ccusage data exists)
+  const ccusageHasData = Object.keys(ccusageMap).length > 0;
+  const correctedTotalCost = ccusageHasData
+    ? daily.reduce((s, day) => s + day.cost, 0)
+    : null;
 
   // Build path lookup for topSessions
   const projectPathMap: Record<string, string> = {};
@@ -292,9 +307,13 @@ export async function GET(req: NextRequest) {
     };
   }
 
+  // Apply ccusage-corrected cost to overview-derived metrics
+  const finalCost = correctedTotalCost ?? cost;
+  const finalCostPerCall = calls > 0 ? finalCost / calls : 0;
+
   return NextResponse.json({
     user: { name: user[0].name, lastSyncedAt: user[0].lastSyncedAt, timezone: user[0].timezone ?? null },
-    overview: { cost, sessions, calls, cacheHitPct, oneShotRate, activeDays, costPerCall, outputInputRatio },
+    overview: { cost: finalCost, sessions, calls, cacheHitPct, oneShotRate, activeDays, costPerCall: finalCostPerCall, outputInputRatio },
     daily,
     dailyTokens,
     activities,
