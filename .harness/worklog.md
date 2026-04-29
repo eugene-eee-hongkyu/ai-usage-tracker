@@ -4,6 +4,18 @@
 
 ---
 
+## Session 2026-04-29 15:59 — 세션 워크로그 기록 및 상태 갱신
+
+### 작업 요약
+- `.harness/worklog.md`, `state.md` 갱신 (state.md는 122라인에서 잘려 Write로 전체 재작성)
+- 변경사항 git add → commit → push, snooze_attention.sh 실행
+
+### 다음 액션
+- repair 재실행으로 즉시 수집 검증
+- 다음 주 월요일 첫 weekly 스냅샷 promote 검증
+- 5월 1일 첫 monthly 스냅샷 promote 검증
+
+
 ## Session 2026-04-29 13:59 — repair 시 즉시 데이터 수집 추가
 
 ### 작업 요약
