@@ -212,8 +212,10 @@ export async function GET(req: NextRequest) {
   const daily = d.daily ?? [];
   const activeDays = daily.filter((day) => day.cost > 0).length;
 
-  // ccusage daily token data (live mode only — snapshots don't carry it yet)
-  const ccusageRows = snapshotRow ? [] : getCcusageDaily(snap[0].rawJson);
+  // ccusage daily token data — snapshots also carry filtered ccusageDaily after first promote
+  const ccusageRows = snapshotRow
+    ? getCcusageDaily(snapshotRow.rawJson)
+    : getCcusageDaily(snap[0].rawJson);
   const tokenMap: Record<string, number> = {};
   for (const r of ccusageRows) {
     if (r.date) tokenMap[r.date] = r.totalTokens ?? 0;
