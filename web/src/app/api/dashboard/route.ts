@@ -70,6 +70,22 @@ interface RawPeriodData {
   mcpServers?: RawNameCalls[];
 }
 
+interface CcusageDailyRow {
+  date?: string;
+  inputTokens?: number;
+  outputTokens?: number;
+  cacheCreationTokens?: number;
+  cacheReadTokens?: number;
+  totalTokens?: number;
+}
+
+function getCcusageDaily(raw: unknown): CcusageDailyRow[] {
+  if (typeof raw !== "object" || raw === null) return [];
+  const r = raw as Record<string, unknown>;
+  const cu = r.ccusageDaily as { daily?: CcusageDailyRow[] } | undefined;
+  return cu?.daily ?? [];
+}
+
 function getPeriodData(raw: unknown, period: string): RawPeriodData {
   if (typeof raw !== "object" || raw === null) return {};
   const r = raw as Record<string, unknown>;
@@ -196,6 +212,17 @@ export async function GET(req: NextRequest) {
   const daily = d.daily ?? [];
   const activeDays = daily.filter((day) => day.cost > 0).length;
 
+  // ccusage daily token data (live mode only — snapshots don't carry it yet)
+  const ccusageRows = snapshotRow ? [] : getCcusageDaily(snap[0].rawJson);
+  const tokenMap: Record<string, number> = {};
+  for (const r of ccusageRows) {
+    if (r.date) tokenMap[r.date] = r.totalTokens ?? 0;
+  }
+  const dailyTokens = daily.map((day) => ({
+    date: day.date,
+    totalTokens: tokenMap[day.date] ?? 0,
+  }));
+
   // Build path lookup for topSessions
   const projectPathMap: Record<string, string> = {};
   for (const p of d.projects ?? []) {
@@ -267,6 +294,7 @@ export async function GET(req: NextRequest) {
     user: { name: user[0].name, lastSyncedAt: user[0].lastSyncedAt, timezone: user[0].timezone ?? null },
     overview: { cost, sessions, calls, cacheHitPct, oneShotRate, activeDays, costPerCall, outputInputRatio },
     daily,
+    dailyTokens,
     activities,
     projects,
     topSessions,

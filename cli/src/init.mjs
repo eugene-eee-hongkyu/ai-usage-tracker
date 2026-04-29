@@ -276,6 +276,41 @@ async function installCodeburn() {
     return false;
   }
 }
+function checkCcusage() {
+  try {
+    const cmd = process.platform === "win32" ? "where ccusage" : "which ccusage";
+    execSync(cmd, { stdio: "ignore" });
+    return true;
+  } catch {
+    return false;
+  }
+}
+async function installCcusage() {
+  console.log("\uD83D\uDCE6 ccusage 설치 중...");
+  try {
+    execSync("npm install -g ccusage", { stdio: "inherit" });
+    return true;
+  } catch {
+    return false;
+  }
+}
+async function ensureCcusage() {
+  if (checkCcusage()) {
+    console.log(`✅ ccusage 확인됨
+`);
+    return;
+  }
+  console.log("⚠️  ccusage가 설치되어 있지 않습니다. 설치 시도 중...");
+  const ok = await installCcusage();
+  if (ok) {
+    console.log(`✅ ccusage 설치 완료
+`);
+  } else {
+    console.log("⚠️  ccusage 설치 실패. 토큰 그래프는 비어 있을 수 있습니다.");
+    console.log(`   수동 설치: npm install -g ccusage
+`);
+  }
+}
 async function runRepair() {
   console.log(`\uD83D\uDD27 Usage Tracker 복구 시작
 `);
@@ -287,6 +322,7 @@ async function runRepair() {
   }
   console.log(`✅ API 키 확인됨
 `);
+  await ensureCcusage();
   const fallbackPath = path.join(os.homedir(), ".primus-usage-key");
   fs.writeFileSync(fallbackPath, apiKey, { mode: 384 });
   fs.mkdirSync(STABLE_DIR, { recursive: true });
@@ -325,6 +361,7 @@ async function runInit() {
     console.log(`✅ codeburn 확인됨
 `);
   }
+  await ensureCcusage();
   const existingKey = await loadApiKey();
   if (existingKey) {
     const rl = readline.createInterface({ input: process.stdin, output: process.stdout });

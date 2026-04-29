@@ -294,6 +294,41 @@ async function installCodeburn(): Promise<boolean> {
   }
 }
 
+function checkCcusage(): boolean {
+  try {
+    const cmd = process.platform === "win32" ? "where ccusage" : "which ccusage";
+    execSync(cmd, { stdio: "ignore" });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function installCcusage(): Promise<boolean> {
+  console.log("📦 ccusage 설치 중...");
+  try {
+    execSync("npm install -g ccusage", { stdio: "inherit" });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function ensureCcusage(): Promise<void> {
+  if (checkCcusage()) {
+    console.log("✅ ccusage 확인됨\n");
+    return;
+  }
+  console.log("⚠️  ccusage가 설치되어 있지 않습니다. 설치 시도 중...");
+  const ok = await installCcusage();
+  if (ok) {
+    console.log("✅ ccusage 설치 완료\n");
+  } else {
+    console.log("⚠️  ccusage 설치 실패. 토큰 그래프는 비어 있을 수 있습니다.");
+    console.log("   수동 설치: npm install -g ccusage\n");
+  }
+}
+
 export async function runRepair() {
   console.log("🔧 Usage Tracker 복구 시작\n");
 
@@ -304,6 +339,8 @@ export async function runRepair() {
     process.exit(1);
   }
   console.log("✅ API 키 확인됨\n");
+
+  await ensureCcusage();
 
   // submit.mjs는 standalone 실행이라 keytar 없음 → 항상 파일에도 보장
   const fallbackPath = path.join(os.homedir(), ".primus-usage-key");
@@ -345,6 +382,8 @@ export async function runInit() {
   } else {
     console.log("✅ codeburn 확인됨\n");
   }
+
+  await ensureCcusage();
 
   const existingKey = await loadApiKey();
   if (existingKey) {

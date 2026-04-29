@@ -44,6 +44,7 @@ interface TopSession {
 }
 
 interface DailyRow { date: string; cost: number; sessions: number }
+interface DailyTokenRow { date: string; totalTokens: number }
 interface Model { name: string; cost: number; calls: number; cacheHitPct: number }
 interface NameCalls { name: string; calls: number }
 
@@ -64,6 +65,7 @@ interface DashboardData {
   user: { name: string; lastSyncedAt: string | null; timezone: string | null };
   overview: Overview | null;
   daily: DailyRow[];
+  dailyTokens?: DailyTokenRow[];
   activities: Activity[];
   projects: Project[];
   topSessions: TopSession[];
@@ -238,6 +240,13 @@ function fmtSyncedAt(ts: string | null, tz: string): string {
   }).formatToParts(d);
   const get = (t: string) => parts.find((p) => p.type === t)?.value ?? "00";
   return `${get("month")}-${get("day")} ${get("hour")}:${get("minute")}`;
+}
+
+function fmtTokens(n: number): string {
+  if (n >= 1_000_000_000) return `${(n / 1_000_000_000).toFixed(1)}B`;
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
+  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}k`;
+  return String(n);
 }
 
 function formatWeekRange(periodStart: string): string {
@@ -469,6 +478,9 @@ export function DashboardView({ targetUserId, onMemberSelect }: { targetUserId?:
 
   const ov = data.overview;
   const chartData = data.daily.map((d) => ({ date: d.date.slice(5), cost: d.cost, sessions: d.sessions }));
+  const tokenMap: Record<string, number> = {};
+  for (const t of data.dailyTokens ?? []) tokenMap[t.date.slice(5)] = t.totalTokens;
+  const chartTokenData = chartData.map((d) => ({ date: d.date, tokens: tokenMap[d.date] ?? 0 }));
   const maxProjectCost = Math.max(...data.projects.map((p) => p.cost), 0.01);
   const maxSessionCost = Math.max(...data.topSessions.map((s) => s.cost), 0.01);
 
@@ -584,15 +596,49 @@ export function DashboardView({ targetUserId, onMemberSelect }: { targetUserId?:
 
       <main className="px-4 py-4 space-y-4 max-w-6xl mx-auto">
 
-        {/* Row 1: Daily Activity + Efficiency */}
+        {/* Row 1: Daily Activity (tokens) + Daily Cost */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
 
-          {/* Daily Activity */}
+          {/* Daily Activity (tokens) */}
           <div className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-cyan-500 rounded">
             <div className="px-3 py-2 border-b border-neutral-800 flex items-center justify-between">
               <span className="text-xs font-mono font-bold text-cyan-400 uppercase tracking-wider">Daily Activity</span>
-              {chartData.length > 45 && (
+              {chartTokenData.length > 45 && (
                 <span className="flex items-center gap-1 text-[10px] font-mono bg-cyan-900/40 text-cyan-300 border border-cyan-700/60 rounded px-1.5 py-0.5">
+                  ↕ scroll · {chartTokenData.length}
+                </span>
+              )}
+            </div>
+            <div className="p-3">
+              {chartTokenData.length === 0 || chartTokenData.every((d) => d.tokens === 0) ? (
+                <div className="h-32 flex items-center justify-center text-neutral-600 text-xs font-mono">no data</div>
+              ) : (
+                <div className={chartTokenData.length > 45 ? "overflow-y-auto max-h-[300px] no-scrollbar" : ""}>
+                  <div className="space-y-1">
+                    {(() => {
+                      const maxTokens = Math.max(...chartTokenData.map((d) => d.tokens), 1);
+                      return chartTokenData.map((d) => (
+                        <div key={d.date} className="flex items-center gap-1.5 text-xs font-mono">
+                          <span className="w-10 text-neutral-500 shrink-0">{d.date}</span>
+                          <div className="w-20 h-1.5 bg-neutral-800 rounded overflow-hidden shrink-0">
+                            <div className="h-full bg-cyan-500 rounded" style={{ width: `${(d.tokens / maxTokens) * 100}%` }} />
+                          </div>
+                          <span className="text-cyan-300 flex-1">{fmtTokens(d.tokens)}</span>
+                        </div>
+                      ));
+                    })()}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Daily Cost */}
+          <div className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-yellow-500 rounded">
+            <div className="px-3 py-2 border-b border-neutral-800 flex items-center justify-between">
+              <span className="text-xs font-mono font-bold text-yellow-400 uppercase tracking-wider">Daily Cost</span>
+              {chartData.length > 45 && (
+                <span className="flex items-center gap-1 text-[10px] font-mono bg-yellow-900/40 text-yellow-300 border border-yellow-700/60 rounded px-1.5 py-0.5">
                   ↕ scroll · {chartData.length}
                 </span>
               )}
@@ -609,7 +655,7 @@ export function DashboardView({ targetUserId, onMemberSelect }: { targetUserId?:
                         <div key={d.date} className="flex items-center gap-1.5 text-xs font-mono">
                           <span className="w-10 text-neutral-500 shrink-0">{d.date}</span>
                           <div className="w-20 h-1.5 bg-neutral-800 rounded overflow-hidden shrink-0">
-                            <div className="h-full bg-cyan-500 rounded" style={{ width: `${(d.cost / maxCost) * 100}%` }} />
+                            <div className="h-full bg-yellow-500 rounded" style={{ width: `${(d.cost / maxCost) * 100}%` }} />
                           </div>
                           <span className="text-yellow-400 flex-1">{fmt$(d.cost)}</span>
                           {d.sessions > 0 && <span className="text-neutral-600 w-6 text-right">{d.sessions}s</span>}
@@ -621,6 +667,10 @@ export function DashboardView({ targetUserId, onMemberSelect }: { targetUserId?:
               )}
             </div>
           </div>
+        </div>
+
+        {/* Row 2: Efficiency + By Model */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
 
           {/* Efficiency Metrics */}
           <div className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-fuchsia-500 rounded">
@@ -750,9 +800,41 @@ export function DashboardView({ targetUserId, onMemberSelect }: { targetUserId?:
               })()}
             </div>
           </div>
+
+          {/* By Model */}
+          <div className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-pink-500 rounded">
+            <div className="px-3 py-2 border-b border-neutral-800">
+              <span className="text-xs font-mono font-bold text-pink-400 uppercase tracking-wider">By Model</span>
+            </div>
+            <div className="p-3">
+              <div className="flex text-xs text-neutral-600 font-mono mb-1.5">
+                <span className="flex-1">model</span>
+                <span className="w-16 text-right">cost</span>
+                <span className="w-14 text-right">cache</span>
+                <span className="w-14 text-right">calls</span>
+              </div>
+              <div className="space-y-1">
+                {(data.models ?? []).map((m) => {
+                  const maxCost = Math.max(...(data.models ?? []).map((x) => x.cost), 0.01);
+                  return (
+                    <div key={m.name} className="flex items-center gap-1.5 text-xs font-mono">
+                      <div className="w-16 h-1.5 bg-neutral-800 rounded overflow-hidden shrink-0">
+                        <div className="h-full bg-pink-500 rounded" style={{ width: `${(m.cost / maxCost) * 100}%` }} />
+                      </div>
+                      <span className="flex-1 text-neutral-300 truncate">{m.name}</span>
+                      <span className="w-16 text-yellow-400 text-right">{fmt$(m.cost)}</span>
+                      <span className="w-14 text-emerald-400 text-right">{m.cacheHitPct.toFixed(1)}%</span>
+                      <span className="w-14 text-neutral-500 text-right">{m.calls.toLocaleString()}</span>
+                    </div>
+                  );
+                })}
+                {(data.models ?? []).length === 0 && <p className="text-neutral-600 text-xs font-mono">no data</p>}
+              </div>
+            </div>
+          </div>
         </div>
 
-        {/* Row 2: By Project + By Activity */}
+        {/* Row 3: By Project + By Activity */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
 
           {/* By Project */}
@@ -844,7 +926,7 @@ export function DashboardView({ targetUserId, onMemberSelect }: { targetUserId?:
           </div>
         </div>
 
-        {/* Row 3: Top Sessions + By Model */}
+        {/* Row 4: Top Sessions + MCP Servers */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
 
           {/* Top Sessions */}
@@ -885,40 +967,43 @@ export function DashboardView({ targetUserId, onMemberSelect }: { targetUserId?:
             </div>
           </div>
 
-          {/* By Model */}
-          <div className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-pink-500 rounded">
-            <div className="px-3 py-2 border-b border-neutral-800">
-              <span className="text-xs font-mono font-bold text-pink-400 uppercase tracking-wider">By Model</span>
+          {/* MCP Servers */}
+          <div className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-cyan-500 rounded">
+            <div className="px-3 py-2 border-b border-neutral-800 flex items-center justify-between">
+              <span className="text-xs font-mono font-bold text-cyan-400 uppercase tracking-wider">MCP Servers</span>
+              {(data.mcpServers ?? []).length > 15 && (
+                <span className="flex items-center gap-1 text-[10px] font-mono bg-cyan-900/40 text-cyan-300 border border-cyan-700/60 rounded px-1.5 py-0.5">
+                  ↕ scroll · {(data.mcpServers ?? []).length}
+                </span>
+              )}
             </div>
             <div className="p-3">
               <div className="flex text-xs text-neutral-600 font-mono mb-1.5">
-                <span className="flex-1">model</span>
-                <span className="w-16 text-right">cost</span>
-                <span className="w-14 text-right">cache</span>
-                <span className="w-14 text-right">calls</span>
+                <span className="flex-1">server</span>
+                <span className="w-16 text-right">calls</span>
               </div>
-              <div className="space-y-1">
-                {(data.models ?? []).map((m) => {
-                  const maxCost = Math.max(...(data.models ?? []).map((x) => x.cost), 0.01);
-                  return (
-                    <div key={m.name} className="flex items-center gap-1.5 text-xs font-mono">
-                      <div className="w-16 h-1.5 bg-neutral-800 rounded overflow-hidden shrink-0">
-                        <div className="h-full bg-pink-500 rounded" style={{ width: `${(m.cost / maxCost) * 100}%` }} />
+              <div className={(data.mcpServers ?? []).length > 15 ? "overflow-y-auto max-h-[300px] no-scrollbar" : ""}>
+                <div className="space-y-1">
+                  {(data.mcpServers ?? []).map((m) => {
+                    const maxCalls = Math.max(...(data.mcpServers ?? []).map((x) => x.calls), 0.01);
+                    return (
+                      <div key={m.name} className="flex items-center gap-1.5 text-xs font-mono">
+                        <div className="w-16 h-1.5 bg-neutral-800 rounded overflow-hidden shrink-0">
+                          <div className="h-full bg-cyan-500 rounded" style={{ width: `${(m.calls / maxCalls) * 100}%` }} />
+                        </div>
+                        <span className="flex-1 text-neutral-300 truncate">{m.name}</span>
+                        <span className="w-16 text-blue-400 text-right">{m.calls.toLocaleString()}</span>
                       </div>
-                      <span className="flex-1 text-neutral-300 truncate">{m.name}</span>
-                      <span className="w-16 text-yellow-400 text-right">{fmt$(m.cost)}</span>
-                      <span className="w-14 text-emerald-400 text-right">{m.cacheHitPct.toFixed(1)}%</span>
-                      <span className="w-14 text-neutral-500 text-right">{m.calls.toLocaleString()}</span>
-                    </div>
-                  );
-                })}
-                {(data.models ?? []).length === 0 && <p className="text-neutral-600 text-xs font-mono">no data</p>}
+                    );
+                  })}
+                  {(data.mcpServers ?? []).length === 0 && <p className="text-neutral-600 text-xs font-mono">no data</p>}
+                </div>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Row 4: Core Tools + Shell Commands */}
+        {/* Row 5: Core Tools + Shell Commands */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
 
           {/* Core Tools */}
@@ -986,43 +1071,6 @@ export function DashboardView({ targetUserId, onMemberSelect }: { targetUserId?:
                     );
                   })}
                   {(data.shellCommands ?? []).length === 0 && <p className="text-neutral-600 text-xs font-mono">no data</p>}
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Row 5: MCP Servers */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <div className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-cyan-500 rounded">
-            <div className="px-3 py-2 border-b border-neutral-800 flex items-center justify-between">
-              <span className="text-xs font-mono font-bold text-cyan-400 uppercase tracking-wider">MCP Servers</span>
-              {(data.mcpServers ?? []).length > 15 && (
-                <span className="flex items-center gap-1 text-[10px] font-mono bg-cyan-900/40 text-cyan-300 border border-cyan-700/60 rounded px-1.5 py-0.5">
-                  ↕ scroll · {(data.mcpServers ?? []).length}
-                </span>
-              )}
-            </div>
-            <div className="p-3">
-              <div className="flex text-xs text-neutral-600 font-mono mb-1.5">
-                <span className="flex-1">server</span>
-                <span className="w-16 text-right">calls</span>
-              </div>
-              <div className={(data.mcpServers ?? []).length > 15 ? "overflow-y-auto max-h-[300px] no-scrollbar" : ""}>
-                <div className="space-y-1">
-                  {(data.mcpServers ?? []).map((m) => {
-                    const maxCalls = Math.max(...(data.mcpServers ?? []).map((x) => x.calls), 0.01);
-                    return (
-                      <div key={m.name} className="flex items-center gap-1.5 text-xs font-mono">
-                        <div className="w-16 h-1.5 bg-neutral-800 rounded overflow-hidden shrink-0">
-                          <div className="h-full bg-cyan-500 rounded" style={{ width: `${(m.calls / maxCalls) * 100}%` }} />
-                        </div>
-                        <span className="flex-1 text-neutral-300 truncate">{m.name}</span>
-                        <span className="w-16 text-blue-400 text-right">{m.calls.toLocaleString()}</span>
-                      </div>
-                    );
-                  })}
-                  {(data.mcpServers ?? []).length === 0 && <p className="text-neutral-600 text-xs font-mono">no data</p>}
                 </div>
               </div>
             </div>
