@@ -39,6 +39,8 @@ export const userSnapshots = pgTable(
     currentWeekStart: date("current_week_start"),
     currentMonthRawJson: jsonb("current_month_raw_json"),
     currentMonthStart: date("current_month_start"),
+    currentDayRawJson: jsonb("current_day_raw_json"),
+    currentDayStart: date("current_day_start"),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
   },
   (t) => ({

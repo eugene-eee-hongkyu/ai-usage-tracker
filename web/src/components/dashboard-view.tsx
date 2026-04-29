@@ -54,7 +54,7 @@ interface SnapshotMeta {
 }
 
 interface SnapshotInfo {
-  type: "weekly" | "monthly";
+  type: "weekly" | "monthly" | "daily";
   periodStart: string;
   capturedAt: string;
   dataRangeStart: string | null;
@@ -73,7 +73,7 @@ interface DashboardData {
   tools: NameCalls[];
   shellCommands: NameCalls[];
   mcpServers: NameCalls[];
-  availableSnapshots?: { weekly: SnapshotMeta[]; monthly: SnapshotMeta[] };
+  availableSnapshots?: { weekly: SnapshotMeta[]; monthly: SnapshotMeta[]; daily?: SnapshotMeta[] };
   snapshot?: SnapshotInfo | null;
 }
 
@@ -262,6 +262,15 @@ function formatMonthLabel(periodStart: string): string {
   return periodStart.slice(0, 7);
 }
 
+function formatDayLabel(periodStart: string): string {
+  const [, m, d] = periodStart.split("-");
+  return `${parseInt(m)}/${parseInt(d)}`;
+}
+
+const DAY_OFFSET_LABELS: Record<number, string> = {
+  1: "어제", 2: "그제", 3: "3일전", 4: "4일전", 5: "5일전", 6: "6일전", 7: "7일전",
+};
+
 function formatDateRange(start: string | null, end: string | null): string {
   if (!start || !end) return "";
   const fmt = (s: string) => {
@@ -344,12 +353,14 @@ export function DashboardView({ targetUserId, onMemberSelect }: { targetUserId?:
   );
   const [weekOffset, setWeekOffset] = useState(0);
   const [monthOffset, setMonthOffset] = useState(0);
+  const [dayOffset, setDayOffset] = useState(0);
 
-  const apiUrl = (p: Period, wOff: number, mOff: number) => {
+  const apiUrl = (p: Period, wOff: number, mOff: number, dOff: number) => {
     const params = new URLSearchParams({ period: p });
     if (targetUserId) params.set("userId", targetUserId);
     if (p === "week" && wOff > 0) params.set("weekOffset", String(wOff));
     if (p === "month" && mOff > 0) params.set("monthOffset", String(mOff));
+    if (p === "today" && dOff > 0) params.set("dayOffset", String(dOff));
     return `/api/dashboard?${params.toString()}`;
   };
 
@@ -374,7 +385,7 @@ export function DashboardView({ targetUserId, onMemberSelect }: { targetUserId?:
   useEffect(() => {
     if (!session) return;
     setLoading(true);
-    fetch(apiUrl(period, weekOffset, monthOffset))
+    fetch(apiUrl(period, weekOffset, monthOffset, dayOffset))
       .then((r) => r.json())
       .then((d) => {
         if (d?.error) { setFetchError(true); setLoading(false); return; }
@@ -384,7 +395,7 @@ export function DashboardView({ targetUserId, onMemberSelect }: { targetUserId?:
       })
       .catch(() => { setFetchError(true); setLoading(false); });
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [session, period, weekOffset, monthOffset, targetUserId]);
+  }, [session, period, weekOffset, monthOffset, dayOffset, targetUserId]);
 
   useEffect(() => {
     if (data?.user?.timezone) setUserTz(data.user.timezone);
@@ -403,13 +414,13 @@ export function DashboardView({ targetUserId, onMemberSelect }: { targetUserId?:
   useEffect(() => {
     if (!session || !data || data.overview) return;
     const timer = setInterval(() => {
-      fetch(apiUrl(period, weekOffset, monthOffset))
+      fetch(apiUrl(period, weekOffset, monthOffset, dayOffset))
         .then((r) => r.json())
         .then((d) => { if (d.overview) setData(d); });
     }, 4000);
     return () => clearInterval(timer);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [session, data, period, weekOffset, monthOffset]);
+  }, [session, data, period, weekOffset, monthOffset, dayOffset]);
 
   if (status === "loading" || (!data && !fetchError)) return (
     <div className="min-h-screen bg-neutral-950">
@@ -428,7 +439,7 @@ export function DashboardView({ targetUserId, onMemberSelect }: { targetUserId?:
         <button
           onClick={() => {
             setFetchError(false); setLoading(true);
-            fetch(apiUrl(period, weekOffset, monthOffset)).then((r) => r.json()).then((d) => {
+            fetch(apiUrl(period, weekOffset, monthOffset, dayOffset)).then((r) => r.json()).then((d) => {
               if (!d?.error) { setData(d); setLoading(false); }
             });
           }}
@@ -498,10 +509,25 @@ export function DashboardView({ targetUserId, onMemberSelect }: { targetUserId?:
                 setPeriod(p);
                 if (p !== "week") setWeekOffset(0);
                 if (p !== "month") setMonthOffset(0);
+                if (p !== "today") setDayOffset(0);
               }}
-              className={`w-16 text-center py-1 rounded text-xs font-mono transition-colors ${period === p && !(p === "week" && weekOffset > 0) && !(p === "month" && monthOffset > 0) ? "bg-indigo-600 text-white" : "bg-neutral-800 text-neutral-400 hover:text-neutral-200"}`}
+              className={`w-16 text-center py-1 rounded text-xs font-mono transition-colors ${period === p && !(p === "week" && weekOffset > 0) && !(p === "month" && monthOffset > 0) && !(p === "today" && dayOffset > 0) ? "bg-indigo-600 text-white" : "bg-neutral-800 text-neutral-400 hover:text-neutral-200"}`}
             >{PERIOD_LABELS[p]}</button>
           ))}
+          {period === "today" && (data.availableSnapshots?.daily?.length ?? 0) > 0 && (
+            <select
+              value={dayOffset}
+              onChange={(e) => setDayOffset(Number(e.target.value))}
+              className={`text-xs font-mono border rounded px-2 py-1 cursor-pointer focus:outline-none ${dayOffset > 0 ? "bg-indigo-600 text-white border-indigo-500" : "bg-neutral-800 text-neutral-400 border-neutral-700 hover:text-neutral-200"}`}
+            >
+              <option value={0}>이전 ▼</option>
+              {data.availableSnapshots!.daily!.slice(0, 7).map((s, i) => (
+                <option key={s.periodStart} value={i + 1}>
+                  {`${DAY_OFFSET_LABELS[i + 1] ?? `${i + 1}일전`} (${formatDayLabel(s.periodStart)})`}
+                </option>
+              ))}
+            </select>
+          )}
           {period === "week" && (data.availableSnapshots?.weekly?.length ?? 0) > 0 && (
             <select
               value={weekOffset}
