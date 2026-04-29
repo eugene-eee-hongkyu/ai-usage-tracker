@@ -6,6 +6,7 @@ import {
   real,
   timestamp,
   jsonb,
+  date,
   uniqueIndex,
 } from "drizzle-orm/pg-core";
 
@@ -34,9 +35,30 @@ export const userSnapshots = pgTable(
     callsCount: integer("calls_count").notNull().default(0),
     cacheHitPct: real("cache_hit_pct").notNull().default(0),
     overallOneShot: real("overall_one_shot").notNull().default(0),
+    currentWeekRawJson: jsonb("current_week_raw_json"),
+    currentWeekStart: date("current_week_start"),
+    currentMonthRawJson: jsonb("current_month_raw_json"),
+    currentMonthStart: date("current_month_start"),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
   },
   (t) => ({
     userUniq: uniqueIndex("user_snapshots_user_uniq").on(t.userId),
+  })
+);
+
+export const periodSnapshots = pgTable(
+  "period_snapshots",
+  {
+    id: serial("id").primaryKey(),
+    userId: integer("user_id")
+      .notNull()
+      .references(() => users.id),
+    periodType: text("period_type").notNull(),
+    periodStart: date("period_start").notNull(),
+    capturedAt: timestamp("captured_at").defaultNow().notNull(),
+    rawJson: jsonb("raw_json").notNull(),
+  },
+  (t) => ({
+    uniq: uniqueIndex("period_snapshots_uniq").on(t.userId, t.periodType, t.periodStart),
   })
 );

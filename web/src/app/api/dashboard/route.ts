@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import { db, userSnapshots, users } from "@/lib/db";
-import { eq } from "drizzle-orm";
+import { db, userSnapshots, users, periodSnapshots } from "@/lib/db";
+import { and, asc, desc, eq } from "drizzle-orm";
 import { isAdmin } from "@/lib/admin";
 
 type Period = "today" | "week" | "month" | "all";
@@ -86,6 +86,8 @@ export async function GET(req: NextRequest) {
 
   const period = (req.nextUrl.searchParams.get("period") ?? "week") as Period;
   const requestedUserId = req.nextUrl.searchParams.get("userId");
+  const weekOffset = parseInt(req.nextUrl.searchParams.get("weekOffset") ?? "0") || 0;
+  const monthOffset = parseInt(req.nextUrl.searchParams.get("monthOffset") ?? "0") || 0;
 
   let targetEmail = session.user.email!;
   if (requestedUserId) {
@@ -110,6 +112,48 @@ export async function GET(req: NextRequest) {
     .where(eq(userSnapshots.userId, user[0].id))
     .limit(1);
 
+  // Available snapshot list (always returned for dropdown population)
+  const availableWeeklyRows = await db
+    .select({ periodStart: periodSnapshots.periodStart, capturedAt: periodSnapshots.capturedAt })
+    .from(periodSnapshots)
+    .where(and(eq(periodSnapshots.userId, user[0].id), eq(periodSnapshots.periodType, "weekly")))
+    .orderBy(desc(periodSnapshots.periodStart));
+  const availableMonthlyRows = await db
+    .select({ periodStart: periodSnapshots.periodStart, capturedAt: periodSnapshots.capturedAt })
+    .from(periodSnapshots)
+    .where(and(eq(periodSnapshots.userId, user[0].id), eq(periodSnapshots.periodType, "monthly")))
+    .orderBy(desc(periodSnapshots.periodStart));
+
+  const availableSnapshots = {
+    weekly: availableWeeklyRows.map((r) => ({ periodStart: r.periodStart, capturedAt: r.capturedAt })),
+    monthly: availableMonthlyRows.map((r) => ({ periodStart: r.periodStart, capturedAt: r.capturedAt })),
+  };
+
+  // Load snapshot if requested
+  let snapshotRow: { periodType: string; periodStart: string; capturedAt: Date; rawJson: unknown } | null = null;
+  if (weekOffset > 0 && period === "week") {
+    const rows = await db
+      .select()
+      .from(periodSnapshots)
+      .where(and(eq(periodSnapshots.userId, user[0].id), eq(periodSnapshots.periodType, "weekly")))
+      .orderBy(desc(periodSnapshots.periodStart))
+      .limit(1)
+      .offset(weekOffset - 1);
+    if (rows[0]) snapshotRow = { periodType: "weekly", periodStart: rows[0].periodStart, capturedAt: rows[0].capturedAt, rawJson: rows[0].rawJson };
+  } else if (monthOffset > 0 && period === "month") {
+    const rows = await db
+      .select()
+      .from(periodSnapshots)
+      .where(and(eq(periodSnapshots.userId, user[0].id), eq(periodSnapshots.periodType, "monthly")))
+      .orderBy(desc(periodSnapshots.periodStart))
+      .limit(1)
+      .offset(monthOffset - 1);
+    if (rows[0]) snapshotRow = { periodType: "monthly", periodStart: rows[0].periodStart, capturedAt: rows[0].capturedAt, rawJson: rows[0].rawJson };
+  }
+
+  // Suppress unused import warning when snapshots feature isn't yet exercised
+  void asc;
+
   if (!snap[0]) {
     return NextResponse.json({
       user: { name: user[0].name, lastSyncedAt: user[0].lastSyncedAt, timezone: user[0].timezone ?? null },
@@ -118,10 +162,13 @@ export async function GET(req: NextRequest) {
       activities: [],
       projects: [],
       topSessions: [],
+      availableSnapshots,
     });
   }
 
-  const d = getPeriodData(snap[0].rawJson, period);
+  const d: RawPeriodData = snapshotRow
+    ? (snapshotRow.rawJson as RawPeriodData) ?? {}
+    : getPeriodData(snap[0].rawJson, period);
   const ov = d.overview ?? d.summary ?? {};
 
   const cost = ov.cost ?? ov.totalCost ?? 0;
@@ -197,6 +244,25 @@ export async function GET(req: NextRequest) {
   const toNameCalls = (arr: RawNameCalls[]) =>
     arr.map((x) => ({ name: x.name ?? "", calls: x.calls ?? 0 }));
 
+  // Snapshot metadata: capture time + actual data range
+  let snapshotInfo: {
+    type: "weekly" | "monthly";
+    periodStart: string;
+    capturedAt: string;
+    dataRangeStart: string | null;
+    dataRangeEnd: string | null;
+  } | null = null;
+  if (snapshotRow) {
+    const sortedDaily = [...daily].sort((a, b) => a.date.localeCompare(b.date));
+    snapshotInfo = {
+      type: snapshotRow.periodType === "monthly" ? "monthly" : "weekly",
+      periodStart: snapshotRow.periodStart,
+      capturedAt: snapshotRow.capturedAt.toISOString(),
+      dataRangeStart: sortedDaily[0]?.date ?? null,
+      dataRangeEnd: sortedDaily[sortedDaily.length - 1]?.date ?? null,
+    };
+  }
+
   return NextResponse.json({
     user: { name: user[0].name, lastSyncedAt: user[0].lastSyncedAt, timezone: user[0].timezone ?? null },
     overview: { cost, sessions, calls, cacheHitPct, oneShotRate, activeDays, costPerCall, outputInputRatio },
@@ -208,5 +274,7 @@ export async function GET(req: NextRequest) {
     tools: toNameCalls(d.tools ?? []),
     shellCommands: toNameCalls(d.shellCommands ?? []),
     mcpServers: toNameCalls(d.mcpServers ?? []),
+    availableSnapshots,
+    snapshot: snapshotInfo,
   });
 }
