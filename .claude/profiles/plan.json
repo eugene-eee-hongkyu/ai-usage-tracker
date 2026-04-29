@@ -101,7 +101,8 @@
       "WebFetch(domain:kotlinlang.org)",
       "WebFetch(domain:typescriptlang.org)",
       "WebFetch(domain:react.dev)",
-      "WebFetch(domain:nextjs.org)"
+      "WebFetch(domain:nextjs.org)",
+      "Bash(gh auth *)"
     ],
     "ask": [],
     "deny": [
