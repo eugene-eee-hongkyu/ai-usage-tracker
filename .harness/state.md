@@ -6,17 +6,17 @@
 
 ---
 
-## 마지막 실행: 2026-04-30 05:46
-## 마지막 업데이트: 2026-04-30 05:46
+## 마지막 실행: 2026-04-30 07:51
+## 마지막 업데이트: 2026-04-30 07:51
 ## 현재 모드: bypassPermissions
 
 ### 현재 집중
 
-- Supabase RLS 보안 조치 — public 테이블 RLS 활성화 + 정책 정의 필요
+- ccusage 토큰 통합 마무리 — Supabase 0002 마이그레이션 SQL 실행 필요
 
 ### 이어서 할 것
 
-1. RLS 미설정 테이블 식별 → RLS 활성화 + 접근 정책 적용
+1. Supabase에서 0002 마이그레이션 SQL 실행 (daily 스냅샷 테이블)
 2. 다음 주 월요일 첫 weekly 스냅샷 promote 검증
 3. 5월 1일 첫 monthly 스냅샷 promote 검증
 
@@ -26,7 +26,7 @@
 
 ### 사람 판단 필요
 
-- Supabase RLS 정책 범위 결정 — 현재 접근 패턴(service_role만? anon도?) 확인 후 정책 설계 필요
+- 없음
 
 ### 진행 상황
 
@@ -136,6 +136,17 @@
 - [x] 대시보드 카드 스크롤바 숨김 (`.no-scrollbar` 유틸, 5개 카드 + Daily Activity 45건 임계, 커밋 e523de0)
 - [x] 주별/월별 스냅샷 누적 기능 — DB 마이그레이션 + ingest promote + UI 드롭다운 (커밋 6e42db2)
 - [x] repair 시 즉시 데이터 수집 추가 (`runImmediateSync`, submit.mjs 백그라운드 spawn, 커밋 bc6c29f)
+- [x] ccusage daily 토큰 연동 (submit.mjs + sync.ts, 토큰 4종 수집)
+- [x] init에 ccusage 자동 설치 추가 (repair 시 자동)
+- [x] Daily Activity 카드 신설 (토큰 totalTokens 막대그래프), Daily → Daily Cost rename
+- [x] 카드 순서 3차 재배치 (Daily Activity/Cost → Efficiency/By Model → By Project/By Activity → Top Sessions/MCP → Core Tools/Shell)
+- [x] Overview Bar 토큰 합계 추가 + 바 너비 확장 + 값 오른쪽 정렬
+- [x] codeburn week period rolling 7일 비용 잘림 발견 → Daily Cost·Overview cost를 ccusage 출처로 교체
+- [x] Efficiency cost/session·cost/call ccusage 기반 자동 교정
+- [x] 스냅샷 promote 시 ccusageDaily 주/월 범위 필터링 동봉
+- [x] Weekly retention 50주 → 10주 축소
+- [x] Daily 스냅샷 신설 (어제~7일전 드롭다운, migration 0002)
+- [ ] Supabase에서 0002 마이그레이션 SQL 실행
 - [ ] 다음 sync에서 current_week/month 컬럼 채워지는지 Supabase 확인
 - [ ] 다음 주 월요일 첫 weekly 스냅샷 promote 검증
 - [ ] 5월 1일 첫 monthly 스냅샷 promote 검증

@@ -4,6 +4,17 @@
 
 ---
 
+## 2026-04-30: 비용 데이터 소스를 codeburn → ccusage로 교체
+
+- **선택**: Daily Cost·Overview cost·Efficiency 지표의 출처를 ccusage daily로 교체
+- **대안 검토**:
+  - **codeburn 유지**: 기존 파이프라인 변경 없음. 단, week period가 rolling 7일이라 경계일(4/22 등)에서 cost가 심하게 잘림 ($7.10 vs 실제 $117). 근본 수정하려면 codeburn 쪽 period 로직 패치 필요
+  - **ccusage daily 사용**: 토큰 4종(input/output/cacheRead/cacheWrite)을 이미 수집하고 있고, 일별 단위로 정확한 비용 산출 가능. 추가 의존성(ccusage CLI)이 생기지만 init/repair에서 자동 설치로 해결
+- **선택 이유**: codeburn의 rolling window 문제는 구조적이라 단순 패치가 어렵고, ccusage는 이미 토큰 연동을 위해 추가한 상태여서 비용 소스로도 쓰면 단일 출처(single source of truth) 달성
+- **영향 범위**: `submit.mjs`, `sync.ts` (데이터 수집), Dashboard의 Daily Cost·Overview Bar·Efficiency 카드, 스냅샷 promote 로직 (`rawJson.ccusageDaily`)
+- **되돌리는 방법**: Dashboard 카드에서 `ccusageDaily` 대신 `codeburn` 필드를 다시 참조하도록 변경. submit/sync에서 ccusage 호출 제거. 단, codeburn rolling window 문제는 별도 해결 필요
+
+
 ## 2026-04-29: 주별/월별 스냅샷 누적 — 별도 테이블 + Monthly 옵션 A (in-progress 보존)
 
 - **선택**: `period_snapshots` 테이블 신설(50주/12달 retention) + `user_snapshots`에 `current_week/month_raw_json` + `_start` 4컬럼 추가. 매 ingest 시 경계 감지하여 직전 데이터 promote

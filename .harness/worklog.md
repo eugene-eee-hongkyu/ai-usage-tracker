@@ -4,7 +4,26 @@
 
 ---
 
-worklog + state.md 갱신 완료.
+worklog에 추가했습니다. state.md도 갱신할까요? (다음 액션: 0002 마이그레이션 SQL 실행)
+
+
+## Session 2026-04-30 07:51 — ccusage 토큰 통합 + 대시보드 카드 재구성
+
+### 작업 요약
+- ccusage daily --json 연동: codeburn에 일별 토큰 데이터 없음 확인 → submit.mjs/sync.ts에 토큰 4종(input/output/cacheRead/cacheWrite) 수집 추가
+- init에 ccusage 자동 설치 추가 (repair 시 자동)
+- Daily Activity 카드 신설 (totalTokens 막대그래프), 기존 daily → "Daily Cost"로 rename
+- 카드 순서 재배치: Daily Activity/Cost → Efficiency/By Model → By Project/By Activity → Top Sessions/MCP → Core Tools/Shell
+- Overview Bar에 토큰 합계 추가, 바 너비 확장 + 값 오른쪽 정렬
+- codeburn 비용 오류 발견: week period가 rolling 7일이라 경계일(4/22) cost 잘림 ($7.10 vs 실제 $117) → Daily Cost와 Overview cost를 ccusage 출처로 교체, Efficiency cost/session·cost/call 자동 교정
+- 스냅샷에 ccusage 포함: promote 시 ccusageDaily를 주/월 범위 필터링해 rawJson에 동봉 → 지난주/지난달에서도 토큰 그래프 표시
+- Weekly retention 50주 → 10주 축소
+- Daily 스냅샷 신설: 어제~7일전 드롭다운 추가 (migration 0002 필요)
+
+### 다음 액션
+- Supabase에서 0002 마이그레이션 SQL 실행
+
+---
 
 ## Session 2026-04-30 05:46 — Supabase RLS 보안 경고 확인
 
