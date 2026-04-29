@@ -550,6 +550,7 @@ export function DashboardView({ targetUserId, onMemberSelect }: { targetUserId?:
           {viewOnly && (
             <span className="text-indigo-400 font-semibold self-center mr-2">{data.user.name}</span>
           )}
+          <span><span className="text-cyan-400 font-bold">{fmtTokens(chartTokenData.reduce((s, d) => s + d.tokens, 0))}</span><span className="text-neutral-500 ml-1 text-xs">tokens</span></span>
           <span><span className="text-yellow-400 font-bold">${ov.cost.toFixed(2)}</span><span className="text-neutral-500 ml-1 text-xs">cost</span></span>
           <span><span className="text-blue-400 font-bold">{ov.calls.toLocaleString()}</span><span className="text-neutral-500 ml-1 text-xs">calls</span></span>
           <span><span className="text-cyan-400 font-bold">{ov.sessions}</span><span className="text-neutral-500 ml-1 text-xs">sessions</span></span>
@@ -620,10 +621,10 @@ export function DashboardView({ targetUserId, onMemberSelect }: { targetUserId?:
                       return chartTokenData.map((d) => (
                         <div key={d.date} className="flex items-center gap-1.5 text-xs font-mono">
                           <span className="w-10 text-neutral-500 shrink-0">{d.date}</span>
-                          <div className="w-20 h-1.5 bg-neutral-800 rounded overflow-hidden shrink-0">
+                          <div className="flex-1 h-1.5 bg-neutral-800 rounded overflow-hidden">
                             <div className="h-full bg-cyan-500 rounded" style={{ width: `${(d.tokens / maxTokens) * 100}%` }} />
                           </div>
-                          <span className="text-cyan-300 flex-1">{fmtTokens(d.tokens)}</span>
+                          <span className="text-cyan-300 w-16 text-right shrink-0">{fmtTokens(d.tokens)}</span>
                         </div>
                       ));
                     })()}
@@ -654,11 +655,11 @@ export function DashboardView({ targetUserId, onMemberSelect }: { targetUserId?:
                       return chartData.map((d) => (
                         <div key={d.date} className="flex items-center gap-1.5 text-xs font-mono">
                           <span className="w-10 text-neutral-500 shrink-0">{d.date}</span>
-                          <div className="w-20 h-1.5 bg-neutral-800 rounded overflow-hidden shrink-0">
+                          <div className="flex-1 h-1.5 bg-neutral-800 rounded overflow-hidden">
                             <div className="h-full bg-yellow-500 rounded" style={{ width: `${(d.cost / maxCost) * 100}%` }} />
                           </div>
-                          <span className="text-yellow-400 flex-1">{fmt$(d.cost)}</span>
-                          {d.sessions > 0 && <span className="text-neutral-600 w-6 text-right">{d.sessions}s</span>}
+                          <span className="text-yellow-400 w-16 text-right shrink-0">{fmt$(d.cost)}</span>
+                          {d.sessions > 0 && <span className="text-neutral-600 w-8 text-right shrink-0">{d.sessions}s</span>}
                         </div>
                       ));
                     })()}
