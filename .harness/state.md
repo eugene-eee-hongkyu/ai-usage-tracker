@@ -6,17 +6,17 @@
 
 ---
 
-## 마지막 실행: 2026-04-29 10:46
-## 마지막 업데이트: 2026-04-29 10:46
+## 마지막 실행: 2026-04-29 13:59
+## 마지막 업데이트: 2026-04-29 13:59
 ## 현재 모드: bypassPermissions
 
 ### 현재 집중
 
-- 운영 단계 — 주별/월별 스냅샷 누적 기능 배포 완료, 다음 sync로 데이터 채워지는지 검증 대기
+- 운영 단계 — repair 즉시 수집 추가 배포 완료, 동작 검증 + 팀 배포 대기
 
 ### 이어서 할 것
 
-1. 다음 sync (12:00/18:00) 후 Supabase에서 `current_week_start` / `current_month_start` 채워지는지 확인
+1. repair 재실행으로 "📤 현재 데이터 즉시 수집 시작" 출력 확인 + Vercel ingest 200 검증
 2. 다음 주 월요일 첫 sync로 첫 weekly 스냅샷 promote → `[지난주 ▼]` 드롭다운 등장 확인
 3. 5월 1일 첫 sync로 첫 monthly 스냅샷 promote → `[지난달 ▼]` 드롭다운 등장 확인
 
@@ -120,4 +120,22 @@
 - [x] Windows CLI 호환성: sync.ts shell:false→shell:true, init.ts where vs which 분기
 - [x] 팀 API prevCostPerSession/teamActivities/dailyByMember/memberNames 추가, 시각 개선
 - [x] 팀 API cache hit 100% 버그 수정 (토큰 기반 계산 전 기간 통일)
-- [x] dead code 정리: collectors/claude-code.ts 삭제,
+- [x] dead code 정리: collectors/claude-code.ts 삭제, ccusage 텍스트 제거
+- [x] 팀 페이지 시각 시스템 개인 대시보드 정합 (GRADE_VALUE_COLOR, Usage 레이아웃, Activities pink)
+- [x] 팀 랭킹 개인 프로필 카드 + 어드민 팀원 상세 뷰 통합 (reading-guide 기반 검증)
+- [x] 어드민 전용 "팀원" 탭 추가 (nav.tsx, /member 페이지, localStorage 팀원 기억)
+- [x] launchctl bootstrap/bootout 수정 (macOS Sequoia deprecated load/unload 대응)
+- [x] repair 명령 추가 (hook·스케줄 재등록)
+- [x] launchd 스케줄 0/6/12/18시 4회로 확장 (최대 6시간 지연 보장)
+- [x] 팀 화면 Last Sync 테이블 추가 (어드민 전용, isAdmin 서버 사이드 이동)
+- [x] SessionStart/SessionEnd hook 제거 → launchd 4회/일 단독 수집 전환 (repair 명령 업데이트)
+- [x] launchd plist PATH 누락 수정 (EnvironmentVariables로 사용자 PATH 주입, commit 95ec4e1)
+- [x] repair API 키 fallback 파일 재작성 수정 (submit.mjs standalone keytar 없음 대응, commit 589ed52)
+- [x] kickstart 즉시 실행 검증 PASS (Vercel ingest 200 확인)
+- [x] 06:00 launchd 자동 실행 검증 완료
+- [x] 대시보드 카드 스크롤바 숨김 (`.no-scrollbar` 유틸, 5개 카드 + Daily Activity 45건 임계, 커밋 e523de0)
+- [x] 주별/월별 스냅샷 누적 기능 — DB 마이그레이션 + ingest promote + UI 드롭다운 (커밋 6e42db2)
+- [x] repair 시 즉시 데이터 수집 추가 (`runImmediateSync`, submit.mjs 백그라운드 spawn, 커밋 bc6c29f)
+- [ ] 다음 sync에서 current_week/month 컬럼 채워지는지 Supabase 확인
+- [ ] 다음 주 월요일 첫 weekly 스냅샷 promote 검증
+- [ ] 5월 1일 첫 monthly 스냅샷 promote 검증

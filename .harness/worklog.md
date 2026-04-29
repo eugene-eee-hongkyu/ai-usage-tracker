@@ -4,6 +4,21 @@
 
 ---
 
+## Session 2026-04-29 13:59 — repair 시 즉시 데이터 수집 추가
+
+### 작업 요약
+- `cli/src/init.ts`에 `runImmediateSync()` 함수 추가 — STABLE_SUBMIT 경로의 `submit.mjs`를 detached 백그라운드로 spawn
+- `_USAGE_TRACKER_DETACHED=1` 플래그 주입해 self-detach 1단계 건너뛰고 본 작업 즉시 진입
+- `runRepair()`에서 `registerDailySchedule` 직후 `runImmediateSync(apiKey)` 호출
+- `bun run build` (build:index + build:sync + build:init 3개 모두 재빌드) — `index.mjs` 45.12KB 산출, "즉시 수집" 문자열 3회 포함 확인
+- 커밋 `bc6c29f` 푸시
+
+### 다음 액션
+- 사용자가 repair 재실행으로 즉시 수집 동작 검증
+- 검증되면 팀원 대상 repair 명령 공유
+
+---
+
 ## Session 2026-04-29 10:46 — 세션 종료 후 워크로그/하네스 파일 정리 및 커밋
 
 ### 작업 요약
