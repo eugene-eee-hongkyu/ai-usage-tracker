@@ -89,6 +89,38 @@ function shiftMonths(ymd: string, months: number): string {
   return utc.toISOString().slice(0, 10);
 }
 
+function isoMondayFromYmd(ymd: string): string {
+  const [y, m, d] = ymd.split("-").map(Number);
+  const utc = new Date(Date.UTC(y, m - 1, d));
+  const dayOfWeek = utc.getUTCDay();
+  const distance = (dayOfWeek + 6) % 7;
+  utc.setUTCDate(utc.getUTCDate() - distance);
+  return utc.toISOString().slice(0, 10);
+}
+
+// codeburn / ccusage 데이터에서 사용자 로컬 시각의 "오늘" 날짜 추출.
+// users.timezone이 NULL일 때도 정확한 boundary 계산이 가능하도록 사용.
+function deriveUserTodayFromBody(body: unknown): string | null {
+  if (typeof body !== "object" || body === null) return null;
+  const b = body as Record<string, unknown>;
+
+  // 1순위: codeburn today.daily[0].date
+  const today = b.today as { daily?: Array<{ date?: string }> } | undefined;
+  const cbDate = today?.daily?.[0]?.date;
+  if (cbDate && /^\d{4}-\d{2}-\d{2}$/.test(cbDate)) return cbDate;
+
+  // 2순위: ccusageDaily.daily의 가장 최근(max) 날짜
+  const cu = b.ccusageDaily as { daily?: Array<{ date?: string }> } | undefined;
+  const dates = (cu?.daily ?? [])
+    .map((r) => r.date)
+    .filter((d): d is string => !!d && /^\d{4}-\d{2}-\d{2}$/.test(d));
+  if (dates.length) {
+    return dates.sort()[dates.length - 1];
+  }
+
+  return null;
+}
+
 export async function POST(req: NextRequest) {
   const apiKey = req.headers.get("x-api-key");
   if (!apiKey) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
@@ -114,9 +146,13 @@ export async function POST(req: NextRequest) {
 
   const userTz = userRow[0].timezone ?? "UTC";
   const now = new Date();
-  const newWeekStart = isoMondayInTz(now, userTz);
-  const newMonthStart = firstOfMonthInTz(now, userTz);
-  const newDayStart = ymdInTz(now, userTz);
+
+  // codeburn / ccusage 데이터의 날짜를 우선 사용 — users.timezone이 NULL이어도
+  // 사용자 로컬 시각 기준 boundary 계산이 가능. 없을 때만 timezone 폴백.
+  const userTodayDate = deriveUserTodayFromBody(body);
+  const newDayStart = userTodayDate ?? ymdInTz(now, userTz);
+  const newWeekStart = userTodayDate ? isoMondayFromYmd(userTodayDate) : isoMondayInTz(now, userTz);
+  const newMonthStart = userTodayDate ? userTodayDate.slice(0, 7) + "-01" : firstOfMonthInTz(now, userTz);
 
   const bodyObj = (body && typeof body === "object" ? body : {}) as Record<string, unknown>;
   const rawWeekData = bodyObj.week as Record<string, unknown> | null | undefined;
