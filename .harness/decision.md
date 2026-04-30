@@ -4,6 +4,24 @@
 
 ---
 
+## 2026-05-01: boundary 계산을 payload 기반으로 (timezone 컬럼 의존 제거)
+
+- **선택**: ingest의 day/week/month boundary를 `body.today.daily[0].date` (codeburn이 사용자 로컬 시각으로 계산해서 보낸 날짜)로 계산. `users.timezone` NULL이어도 정확히 동작
+- **대안 검토**:
+  - _users.timezone 일괄 UPDATE_: 즉시 fix 가능. 단 사용자 위치 직접 알아야 하고 향후 신규 유저도 같은 문제 반복
+  - _CLI에서 `Intl.DateTimeFormat().resolvedOptions().timeZone` 송신 → 서버 ingest가 사용 + DB 저장_: 가장 정석. 단 모든 사용자가 repair 재실행해야 새 submit.mjs 받음 (피하려던 흐름)
+  - _대시보드 UI에서 timezone 강제 설정 유도_: 기존 setup에 이미 있으나 사용자 액션 필요
+  - _payload 기반 (선택)_: codeburn 호출 결과의 `today.daily[0].date` 또는 `ccusageDaily.daily`의 max 날짜 사용. 사용자 액션·CLI 변경 모두 불필요. 다음 launchd sync에서 자동 자가 치유
+- **선택 이유**:
+  - 이미 ingest로 받는 payload에 사용자 로컬 날짜가 포함되어 있어 추가 정보원 불필요
+  - 기존 5명 + 신규 가입자 모두 자동 처리. 사용자에게 별도 안내·repair 요청 없음
+  - timezone 컬럼은 표시용으로만 남고 boundary 로직은 컬럼 NULL 무관
+- **영향 범위**: `web/src/app/api/ingest/route.ts` (`deriveUserTodayFromBody`, `isoMondayFromYmd` 추가, `newDayStart/newWeekStart/newMonthStart` 계산 분기)
+- **되돌리는 방법**: `userTodayDate` 분기 제거하고 기존 `ymdInTz(now, userTz)` / `isoMondayInTz` / `firstOfMonthInTz` 직접 사용으로 복원
+- **알려진 손실**: fix 직전 5/1 00:00 SGT sync에서 4/30 daily / April monthly promote 누락 + `current_*_raw_json` 덮어씀 → 두 스냅샷은 영영 안 만들어짐 (rawJson.all에 데이터는 보존되어 "전체" 탭은 정상)
+
+---
+
 ## 2026-04-30: 비용 데이터 소스를 codeburn → ccusage로 교체
 
 - **선택**: Daily Cost·Overview cost·Efficiency 지표의 출처를 ccusage daily로 교체

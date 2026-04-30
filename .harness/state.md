@@ -6,19 +6,19 @@
 
 ---
 
-## 마지막 실행: 2026-04-30 15:59
-## 마지막 업데이트: 2026-04-30 15:59
+## 마지막 실행: 2026-05-01 01:26
+## 마지막 업데이트: 2026-05-01 01:26
 ## 현재 모드: bypassPermissions
 
 ### 현재 집중
 
-- 운영 단계 — 팀/개인 화면 기능 안정화 + 한방 설치 스크립트 배포 완료, 첫 스냅샷 promote 검증 대기
+- 운영 단계 — boundary 계산 timezone 의존성 제거 fix 배포 완료, 다음 sync들로 자가 치유 검증 대기
 
 ### 이어서 할 것
 
-1. 5월 5일(다음 주 월요일) 첫 weekly 스냅샷 promote 검증 → `[지난주 ▼]` 드롭다운 등장
-2. 5월 1일 첫 monthly 스냅샷 promote 검증 → `[지난달 ▼]` 드롭다운 등장
-3. 팀원 대상 install.sh / install.ps1 한방 설치 안내 (Mac/Win 모두 가능)
+1. 5/2 00:00+ 첫 sync 후 daily promote 검증 (`[이전 ▼ → 어제(5/1)]` 등장)
+2. 5/4 (월) 00:00+ 첫 sync 후 weekly promote 검증 (`[지난주 ▼]` 등장)
+3. 6/1 00:00+ 첫 sync 후 monthly promote 검증 (`[지난달 ▼]` 등장)
 
 ### 막힌 것
 
@@ -30,8 +30,8 @@
 
 ### 백로그 요약
 
-- 대기 중: 2개
-- 최근 추가: 2026-04-29 — 다음 주 월요일 첫 weekly 스냅샷 promote 검증
+- 대기 중: 3개
+- 최근 추가: 2026-05-01 — 6/1 첫 monthly 스냅샷 promote 검증
 
 ### 진행 상황
 
@@ -44,6 +44,8 @@
 - [x] Supabase 마이그레이션 — 0001 (period_snapshots), 0002 (current_day_*) 적용 완료
 - [x] 한방 설치 스크립트 — install.sh (nvm), install.ps1 (winget), Setup 페이지 OS-aware one-liner
 - [x] ADMIN 배지 — nav 팀원 탭, team Last Sync/Top Sessions
-- [x] 2026-04-30 세션 워크로그 정리 — worklog.md / state.md / backlog.md 갱신, git commit/push, snooze_attention 실행
-- [ ] 5월 5일 첫 weekly 스냅샷 promote 검증
-- [ ] 5월 1일 첫 monthly 스냅샷 promote 검증
+- [x] 2026-04-30 세션 워크로그 정리
+- [x] boundary timezone 의존성 제거 fix — `deriveUserTodayFromBody` (commit `a4a82bf`)
+- [ ] 5/2 첫 daily 스냅샷 promote 검증
+- [ ] 5/4 첫 weekly 스냅샷 promote 검증
+- [ ] 6/1 첫 monthly 스냅샷 promote 검증

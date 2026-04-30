@@ -4,6 +4,35 @@
 
 ---
 
+## Session 2026-05-01 01:26 — boundary 계산 timezone 의존성 제거 (DB timezone NULL fix)
+
+### 작업 요약
+- **5/1 SGT 자정 sync 후 `[지난달 ▼]` 드롭다운 미등장 신고**: 4월 데이터 promote 안 됨
+- **Supabase MCP 인증 + 직접 쿼리로 진단**:
+  - 5명 전원 `users.timezone = NULL`
+  - `current_day_start = 2026-04-30`, `current_month_start = 2026-04-01` (5/1 sync 후에도 4/30 그대로)
+  - `period_snapshots` 비어있음 (promote 한 번도 안 됨)
+- **원인**: ingest의 `userTz = userRow[0].timezone ?? "UTC"` → SGT 자정 sync(=UTC 16:00 4/30) 시점에 `newDayStart = "2026-04-30"`로 계산 → prev=4/30, new=4/30 boundary 미감지 → promote 스킵, 동시에 새 5/1 데이터로 `current_*_raw_json` 덮어씀
+- **fix (`a4a82bf`)**: `deriveUserTodayFromBody()` 헬퍼 추가
+  - 1순위: `body.today.daily[0].date` (codeburn이 사용자 로컬 시각으로 계산)
+  - 2순위: `body.ccusageDaily.daily`의 max 날짜
+  - 3순위: 기존 `ymdInTz(now, userTz)` 폴백
+- newDayStart / newWeekStart / newMonthStart 모두 위 신호 우선 사용
+- **자가 치유**: 다음 launchd sync (06:00 SGT 등)에서 prev=4/30, new=5/1(payload-derived) → boundary 감지 → 4/30 daily / April monthly promote
+- 빌드/lint 통과, 커밋·푸시 완료
+
+### 손실 (복구 안 함)
+- 4/30 daily 스냅샷: 5/1 00:00 sync가 `current_day_raw_json`을 5/1 빈 데이터로 덮어쓴 후 promote 누락 → 영영 못 만듦
+- April monthly 스냅샷: 같은 이유로 영영 못 만듦
+- `rawJson.all.daily` + `ccusageDaily.daily`엔 4월 데이터 그대로 살아있어 "전체" 탭에선 정상 표시. 잃은 건 드롭다운 진입점만
+
+### 다음 액션
+- 5/2 00:00+ 첫 sync 후 daily promote 검증 (`[이전 ▼ → 어제(5/1)]`)
+- 5/4 (월) 00:00+ 첫 sync 후 weekly promote 검증
+- 6/1 00:00+ 첫 sync 후 monthly promote 검증
+
+---
+
 ## Session 2026-04-30 15:59 — 세션 워크로그 정리 및 커밋
 
 ### 작업 요약
