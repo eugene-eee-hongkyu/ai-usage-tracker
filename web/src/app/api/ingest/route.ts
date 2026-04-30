@@ -231,7 +231,7 @@ export async function POST(req: NextRequest) {
     });
 
   // Retention cleanup
-  const retentionWeekStart = shiftDate(newWeekStart, -10 * 7);
+  const retentionWeekStart = shiftDate(newWeekStart, -5 * 7);
   const retentionMonthStart = shiftMonths(newMonthStart, -12);
   const retentionDayStart = shiftDate(newDayStart, -7);
 
