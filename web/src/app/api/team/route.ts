@@ -117,6 +117,16 @@ export async function GET(req: NextRequest) {
       const d = getPeriodData(snap.rawJson, period);
       const dAll = getPeriodData(snap.rawJson, "all");
 
+      // ccusage daily tokens — sum by dates that appear in this period's daily array
+      const periodDates = new Set((d.daily ?? []).map((day) => day.date));
+      const ccusageDaily =
+        ((snap.rawJson as Record<string, unknown>).ccusageDaily as
+          | { daily?: Array<{ date?: string; totalTokens?: number }> }
+          | undefined)?.daily ?? [];
+      const totalTokens = ccusageDaily
+        .filter((row) => row.date && periodDates.has(row.date))
+        .reduce((s, row) => s + (row.totalTokens ?? 0), 0);
+
       if (period === "all") {
         totalCost = snap.totalCost;
         sessionsCount = snap.sessionsCount;
@@ -207,6 +217,7 @@ export async function GET(req: NextRequest) {
         callsCount,
         outputInputRatio,
         prevCostPerSession,
+        totalTokens,
       };
     })
     .filter((m): m is NonNullable<typeof m> => m !== null);

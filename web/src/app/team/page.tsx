@@ -51,6 +51,7 @@ interface MemberStat {
   avatarUrl: string | null;
   lastSyncedAt: string | null;
   totalCost: number;
+  totalTokens: number;
   sessionsCount: number;
   cacheHitPct: number;
   overallOneShot: number;
@@ -65,16 +66,6 @@ interface TeamActivity {
   totalCost: number;
   totalTurns: number;
   memberCount: number;
-}
-
-interface TopSession {
-  userId: number;
-  userName: string;
-  id: string;
-  date: string;
-  project: string;
-  cost: number;
-  calls: number;
 }
 
 interface TeamData {
@@ -92,7 +83,6 @@ interface TeamData {
   teamActivities: TeamActivity[];
   dailyByMember: Array<Record<string, number | string>>;
   memberNames: string[];
-  topSessions: TopSession[];
 }
 
 function SyncBadge({ lastSyncedAt }: { lastSyncedAt: string | null }) {
@@ -151,6 +141,13 @@ function syncStyle(lastSyncedAt: string | null): { timeClass: string; badge: Rea
 function fmtDate(d: string): string {
   const m = d.match(/^\d{4}-(\d{2})-(\d{2})$/);
   return m ? `${parseInt(m[1])}/${parseInt(m[2])}` : d;
+}
+
+function fmtTokens(n: number): string {
+  if (n >= 1_000_000_000) return `${(n / 1_000_000_000).toFixed(1)}B`;
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
+  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}k`;
+  return String(n);
 }
 
 // memberNames are "name__userId" keys; strip the suffix for display
@@ -219,9 +216,10 @@ export default function TeamPage() {
   const members = data.byEfficiency;
   const sum = data.teamSummary;
   const byCost = [...members].sort((a, b) => b.totalCost - a.totalCost);
+  const byTokens = [...members].sort((a, b) => b.totalTokens - a.totalTokens);
   const maxCost = Math.max(...byCost.map((m) => m.totalCost), 0.01);
+  const maxTokens = Math.max(...byTokens.map((m) => m.totalTokens), 1);
   const maxActivity = Math.max(...(data.teamActivities ?? []).map((a) => a.totalTurns), 0.01);
-  const memberColorMap = Object.fromEntries(members.map((m, i) => [m.name, MEMBER_COLORS[i % MEMBER_COLORS.length]]));
 
   // Compute team total from dailyByMember — same source as By Member chart to stay in sync
   const dailyTotal = (data.dailyByMember ?? []).map((row) => ({
@@ -362,13 +360,47 @@ export default function TeamPage() {
               </div>
             )}
 
-            {/* Row 2: Usage + Efficiency */}
+            {/* Row 2: Activity (tokens) + Cost */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
 
-              {/* Usage */}
+              {/* Activity (tokens) */}
+              <div className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-cyan-500 rounded">
+                <div className="px-3 py-2 border-b border-neutral-800">
+                  <span className="text-xs font-mono font-bold text-cyan-400 uppercase tracking-wider">Activity</span>
+                </div>
+                <div className="p-3">
+                  <div className="flex text-xs text-neutral-600 font-mono mb-1.5">
+                    <span className="w-16 shrink-0" />
+                    <span className="flex-1">member</span>
+                    <span className="w-16 text-right">tokens</span>
+                  </div>
+                  <div className="space-y-1">
+                    {byTokens.map((m) => {
+                      const idx = members.findIndex((x) => x.userId === m.userId);
+                      return (
+                        <div key={m.userId} className="flex items-center gap-1.5 text-xs font-mono">
+                          <div className="w-16 h-1.5 bg-neutral-800 rounded overflow-hidden shrink-0">
+                            <div
+                              className="h-full rounded"
+                              style={{
+                                width: `${(m.totalTokens / maxTokens) * 100}%`,
+                                background: MEMBER_COLORS[idx % MEMBER_COLORS.length],
+                              }}
+                            />
+                          </div>
+                          <span className="flex-1 text-neutral-300 truncate">{m.name}</span>
+                          <span className="w-16 text-cyan-300 text-right tabular-nums">{fmtTokens(m.totalTokens)}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+
+              {/* Cost */}
               <div className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-yellow-500 rounded">
                 <div className="px-3 py-2 border-b border-neutral-800">
-                  <span className="text-xs font-mono font-bold text-yellow-400 uppercase tracking-wider">Usage</span>
+                  <span className="text-xs font-mono font-bold text-yellow-400 uppercase tracking-wider">Cost</span>
                 </div>
                 <div className="p-3">
                   <div className="flex text-xs text-neutral-600 font-mono mb-1.5">
@@ -378,25 +410,32 @@ export default function TeamPage() {
                     <span className="w-12 text-right">s</span>
                   </div>
                   <div className="space-y-1">
-                    {byCost.map((m, i) => (
-                      <div key={m.userId} className="flex items-center gap-1.5 text-xs font-mono">
-                        <div className="w-16 h-1.5 bg-neutral-800 rounded overflow-hidden shrink-0">
-                          <div
-                            className="h-full rounded"
-                            style={{
-                              width: `${(m.totalCost / maxCost) * 100}%`,
-                              background: MEMBER_COLORS[i % MEMBER_COLORS.length],
-                            }}
-                          />
+                    {byCost.map((m) => {
+                      const idx = members.findIndex((x) => x.userId === m.userId);
+                      return (
+                        <div key={m.userId} className="flex items-center gap-1.5 text-xs font-mono">
+                          <div className="w-16 h-1.5 bg-neutral-800 rounded overflow-hidden shrink-0">
+                            <div
+                              className="h-full rounded"
+                              style={{
+                                width: `${(m.totalCost / maxCost) * 100}%`,
+                                background: MEMBER_COLORS[idx % MEMBER_COLORS.length],
+                              }}
+                            />
+                          </div>
+                          <span className="flex-1 text-neutral-300 truncate">{m.name}</span>
+                          <span className="w-16 text-yellow-400 text-right tabular-nums">${m.totalCost.toFixed(2)}</span>
+                          <span className="w-12 text-neutral-600 text-right tabular-nums">{m.sessionsCount}s</span>
                         </div>
-                        <span className="flex-1 text-neutral-300 truncate">{m.name}</span>
-                        <span className="w-16 text-yellow-400 text-right tabular-nums">${m.totalCost.toFixed(2)}</span>
-                        <span className="w-12 text-neutral-600 text-right tabular-nums">{m.sessionsCount}s</span>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
               </div>
+            </div>
+
+            {/* Row 3: Efficiency + Team Activities */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
 
               {/* Efficiency Table */}
               <div className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-fuchsia-500 rounded">
@@ -454,68 +493,6 @@ export default function TeamPage() {
                       })}
                     </tbody>
                   </table>
-                </div>
-              </div>
-
-            </div>
-
-            {/* Row 3: Top Sessions + Team Activities */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-
-              {/* Top Sessions (moved from Row 2) */}
-              <div className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-red-500 rounded">
-                <div className="px-3 py-2 border-b border-neutral-800">
-                  <span className="text-xs font-mono font-bold text-red-400 uppercase tracking-wider">Top Sessions</span>
-                </div>
-                <div className="p-3 overflow-x-auto">
-                  {(data.topSessions ?? []).length === 0 ? (
-                    <p className="text-neutral-600 text-xs font-mono">no data</p>
-                  ) : (
-                    <table className="w-full text-xs font-mono border-collapse">
-                      <thead>
-                        <tr className="border-b border-neutral-800">
-                          <th className="text-left text-neutral-500 pb-2 pr-3 font-normal">멤버</th>
-                          <th className="text-left text-neutral-500 pb-2 pr-3 font-normal">프로젝트</th>
-                          <th className="text-right text-neutral-500 pb-2 pr-3 font-normal">date</th>
-                          <th className="text-right text-neutral-500 pb-2 pr-3 font-normal">calls</th>
-                          <th className="text-right text-neutral-500 pb-2 font-normal">cost</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {(data.topSessions ?? []).map((s, i) => (
-                          <tr key={`${s.userId}-${s.id}-${i}`} className="border-b border-neutral-800/40 hover:bg-neutral-800/30 transition-colors">
-                            <td className="py-1.5 pr-3">
-                              <span className="flex items-center gap-1.5 text-neutral-300">
-                                <span
-                                  className="w-1.5 h-1.5 rounded-full shrink-0"
-                                  style={{ background: memberColorMap[s.userName] ?? "#6b7280" }}
-                                />
-                                <span className="truncate max-w-[64px]">{s.userName}</span>
-                              </span>
-                            </td>
-                            <td className="py-1.5 pr-3">
-                              <div
-                                className="truncate max-w-[96px] text-neutral-400"
-                                style={{ direction: "rtl" }}
-                                title={s.project || undefined}
-                              >
-                                {s.project || "—"}
-                              </div>
-                            </td>
-                            <td className="py-1.5 pr-3 text-right text-neutral-500 tabular-nums">
-                              {fmtDate(s.date)}
-                            </td>
-                            <td className="py-1.5 pr-3 text-right text-neutral-500 tabular-nums">
-                              {s.calls}
-                            </td>
-                            <td className="py-1.5 text-right text-yellow-400 tabular-nums font-bold">
-                              ${s.cost.toFixed(2)}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  )}
                 </div>
               </div>
 
