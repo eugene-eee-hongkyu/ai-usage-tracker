@@ -535,7 +535,7 @@ export function DashboardView({ targetUserId, onMemberSelect }: { targetUserId?:
               className={`text-xs font-mono border rounded px-2 py-1 cursor-pointer focus:outline-none ${weekOffset > 0 ? "bg-indigo-600 text-white border-indigo-500" : "bg-neutral-800 text-neutral-400 border-neutral-700 hover:text-neutral-200"}`}
             >
               <option value={0}>지난주 ▼</option>
-              {data.availableSnapshots!.weekly.map((s, i) => (
+              {data.availableSnapshots!.weekly.slice(0, 5).map((s, i) => (
                 <option key={s.periodStart} value={i + 1}>
                   {`${i + 1}주전 (${formatWeekRange(s.periodStart)})`}
                 </option>
