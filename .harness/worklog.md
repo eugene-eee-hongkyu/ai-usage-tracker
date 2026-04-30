@@ -4,8 +4,30 @@
 
 ---
 
-worklog에 추가했습니다. state.md도 갱신할까요? (다음 액션: 0002 마이그레이션 SQL 실행)
+## Session 2026-04-30 08:26 — 팀 화면 재구성 + 한방 설치 스크립트 + period localStorage
 
+### 작업 요약
+- **Team Activity 카드**: ccusage 기반 토큰 합계 + Top 10 표시. Usage → Cost rename, Top Sessions 제거 (`f856f13`)
+- **ADMIN 배지**: nav `팀원` 탭, team Last Sync, team Top Sessions(admin 복원, `af7829f`)
+- **Team aggregated 카드 신설** (`671e728`):
+  - Core Tools (top 10 calls), Shell Commands (top 10 calls), By Model — 모두 멤버 합산
+  - Row 4: Core Tools + Shell Commands, Row 5: By Model + 빈칸
+  - 성능 분석: 현재 풀스캔 구조에서 누적 3개 추가는 ms 단위 영향. 1000명+ 시점에 별도 리팩터 필요 (모델/툴 추가가 그걸 앞당기지 않음)
+- **Team Summary Bar 토큰 합계** (`6f04934`): cyan `XX.XM 총토큰` 맨 앞에 추가
+- **한방 설치 스크립트** (`64ea2bf`):
+  - `web/public/install.sh`: nvm으로 Node 자동 설치 → `npx ... init`
+  - `web/public/install.ps1`: winget으로 Node 자동 설치 → `npx ... init`
+  - Setup 페이지: NodeInstallGuide 카드 제거, Step 1을 OS-aware one-liner로 교체
+  - 수동 fallback (`npx --yes ... init`)은 접이식 details에 보존
+- **Period localStorage** (`1f8ebd1`):
+  - team_period (default 이번달), dashboard_period (default 이번주), member_period (member + admin 팀원 상세 공유)
+  - 새 페이지 마운트 시 직전 선택 복원, 클릭마다 저장. 스냅샷 offset은 저장 안 함 (의도적)
+
+### 다음 액션
+- 5월 5일(다음 주 월요일) 첫 weekly 스냅샷 promote 검증
+- 5월 1일 첫 monthly 스냅샷 promote 검증
+
+---
 
 ## Session 2026-04-30 07:51 — ccusage 토큰 통합 + 대시보드 카드 재구성
 
