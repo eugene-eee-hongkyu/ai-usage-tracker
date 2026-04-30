@@ -35,5 +35,5 @@ export default function MemberPage() {
   if (status === "loading" || selectedId === null) return null;
   if (!isAdmin(session?.user?.email ?? "")) return null;
 
-  return <DashboardView targetUserId={selectedId} onMemberSelect={handleMemberSelect} />;
+  return <DashboardView targetUserId={selectedId} onMemberSelect={handleMemberSelect} storageKey="member_period" />;
 }

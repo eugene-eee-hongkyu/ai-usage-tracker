@@ -323,11 +323,22 @@ function TipBtn({ label, onClick, variant = "action" }: { label: string; onClick
 
 interface TeamMember { userId: string; name: string }
 
-export function DashboardView({ targetUserId, onMemberSelect }: { targetUserId?: string; onMemberSelect?: (userId: string) => void }) {
+export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dashboard_period" }: { targetUserId?: string; onMemberSelect?: (userId: string) => void; storageKey?: string }) {
   const viewOnly = !!targetUserId;
   const { data: session, status } = useSession();
   const router = useRouter();
   const [period, setPeriod] = useState<Period>("week");
+
+  useEffect(() => {
+    const saved = localStorage.getItem(storageKey);
+    if (saved && ["today", "week", "month", "all"].includes(saved)) {
+      setPeriod(saved as Period);
+    }
+  }, [storageKey]);
+
+  useEffect(() => {
+    localStorage.setItem(storageKey, period);
+  }, [period, storageKey]);
   const [data, setData] = useState<DashboardData | null>(null);
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
   const [loading, setLoading] = useState(true);
