@@ -99,26 +99,28 @@ function isoMondayFromYmd(ymd: string): string {
 }
 
 // codeburn / ccusage 데이터에서 사용자 로컬 시각의 "오늘" 날짜 추출.
-// users.timezone이 NULL일 때도 정확한 boundary 계산이 가능하도록 사용.
+// codeburn은 UTC 기준으로 today를 리턴하는 버그가 있어 SGT/KST 사용자에서
+// 자정~UTC 자정 사이엔 어제 날짜가 나옴. ccusage는 로컬 timezone을 지키므로
+// 두 신호 중 더 미래(max) 날짜를 채택해 boundary 누락을 방지.
 function deriveUserTodayFromBody(body: unknown): string | null {
   if (typeof body !== "object" || body === null) return null;
   const b = body as Record<string, unknown>;
 
-  // 1순위: codeburn today.daily[0].date
+  const candidates: string[] = [];
+
+  // codeburn today.daily[0].date
   const today = b.today as { daily?: Array<{ date?: string }> } | undefined;
   const cbDate = today?.daily?.[0]?.date;
-  if (cbDate && /^\d{4}-\d{2}-\d{2}$/.test(cbDate)) return cbDate;
+  if (cbDate && /^\d{4}-\d{2}-\d{2}$/.test(cbDate)) candidates.push(cbDate);
 
-  // 2순위: ccusageDaily.daily의 가장 최근(max) 날짜
+  // ccusageDaily.daily의 모든 날짜 (정확한 로컬 timezone)
   const cu = b.ccusageDaily as { daily?: Array<{ date?: string }> } | undefined;
-  const dates = (cu?.daily ?? [])
-    .map((r) => r.date)
-    .filter((d): d is string => !!d && /^\d{4}-\d{2}-\d{2}$/.test(d));
-  if (dates.length) {
-    return dates.sort()[dates.length - 1];
+  for (const row of cu?.daily ?? []) {
+    if (row.date && /^\d{4}-\d{2}-\d{2}$/.test(row.date)) candidates.push(row.date);
   }
 
-  return null;
+  if (!candidates.length) return null;
+  return candidates.sort()[candidates.length - 1];  // max
 }
 
 export async function POST(req: NextRequest) {
