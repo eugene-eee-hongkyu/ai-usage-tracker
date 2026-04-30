@@ -238,7 +238,26 @@ export async function GET(req: NextRequest) {
 
   // Override codeburn daily cost with ccusage calendar-day cost (codeburn week
   // truncates the boundary day mid-hour, ccusage gives the full day total)
-  const rawDaily = d.daily ?? [];
+  let rawDaily = d.daily ?? [];
+
+  // "오늘" 보정: codeburn은 UTC 기준 today를 리턴하므로 SGT/KST 사용자에서
+  // 자정~UTC 자정 사이엔 어제 날짜가 들어옴. ccusage의 max 날짜가 더 미래면
+  // 그 행을 사용자 로컬 today로 채택.
+  if (period === "today" && !snapshotRow && ccusageRows.length > 0) {
+    const sortedCc = [...ccusageRows]
+      .filter((r) => !!r.date)
+      .sort((a, b) => (a.date ?? "").localeCompare(b.date ?? ""));
+    const latestCc = sortedCc[sortedCc.length - 1];
+    const latestCb = rawDaily[rawDaily.length - 1]?.date;
+    if (latestCc?.date && (!latestCb || latestCc.date > latestCb)) {
+      rawDaily = [{
+        date: latestCc.date,
+        cost: (latestCc as { totalCost?: number }).totalCost ?? 0,
+        sessions: 0,
+      }];
+    }
+  }
+
   const daily = rawDaily.map((day) => ({
     ...day,
     cost: ccusageMap[day.date]?.cost ?? day.cost,
