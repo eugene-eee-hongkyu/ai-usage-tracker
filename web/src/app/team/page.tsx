@@ -207,7 +207,18 @@ function MemberTooltip({ active, payload, label }: { active?: boolean; payload?:
 export default function TeamPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
-  const [period, setPeriod] = useState<Period>("all");
+  const [period, setPeriod] = useState<Period>("month");
+
+  useEffect(() => {
+    const saved = localStorage.getItem("team_period");
+    if (saved && ["today", "week", "month", "all"].includes(saved)) {
+      setPeriod(saved as Period);
+    }
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem("team_period", period);
+  }, [period]);
   const [data, setData] = useState<TeamData | null>(null);
   const [loading, setLoading] = useState(true);
 

@@ -22,5 +22,5 @@ export default function AdminMemberDashboardPage() {
   if (status === "loading") return null;
   if (!isAdmin(session?.user?.email ?? "")) return null;
 
-  return <DashboardView targetUserId={userId} />;
+  return <DashboardView targetUserId={userId} storageKey="member_period" />;
 }
