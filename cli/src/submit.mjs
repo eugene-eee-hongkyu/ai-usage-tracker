@@ -6,36 +6,39 @@
  */
 
 import { spawn } from "child_process";
-import { existsSync, readFileSync, writeFileSync, unlinkSync, openSync, statSync, truncateSync } from "fs";
+import { existsSync, readFileSync, writeFileSync, unlinkSync, appendFileSync, statSync, truncateSync, mkdirSync } from "fs";
 import { join } from "path";
 import { homedir } from "os";
 
 const STABLE_DIR_EARLY = join(homedir(), ".primus-usage-tracker");
 const SUBMIT_LOG = join(STABLE_DIR_EARLY, "submit.log");
 
-// 로그 파일 1MB 초과 시 truncate (지난 N번 실행으로 쌓이면 너무 커짐 방지)
+// 로그 파일 1MB 초과 시 truncate
+try { mkdirSync(STABLE_DIR_EARLY, { recursive: true }); } catch {}
 try {
   if (existsSync(SUBMIT_LOG) && statSync(SUBMIT_LOG).size > 1_000_000) {
     truncateSync(SUBMIT_LOG, 0);
   }
 } catch {}
 
+const ts = () => new Date().toISOString();
+const log = (msg) => {
+  const line = `[${ts()}] ${msg}\n`;
+  try { appendFileSync(SUBMIT_LOG, line); } catch {}
+};
+
 // Self-detach: SessionEnd hook 부모 프로세스는 VS Code 종료 시 SIGKILL될 수 있음.
 // _USAGE_TRACKER_DETACHED 없으면 자신을 detached 백그라운드로 재생성하고 즉시 종료.
-// 자식의 stdout/stderr는 submit.log에 append — 이전엔 stdio:"ignore"라 디버깅 불가했음.
 if (!process.env._USAGE_TRACKER_DETACHED) {
-  const out = openSync(SUBMIT_LOG, "a");
+  log("self-detach (parent will exit)");
   const child = spawn(process.execPath, [join(homedir(), ".primus-usage-tracker", "submit.mjs")], {
     detached: true,
-    stdio: ["ignore", out, out],
+    stdio: "ignore",
     env: { ...process.env, _USAGE_TRACKER_DETACHED: "1" },
   });
   child.unref();
   process.exit(0);
 }
-
-const ts = () => new Date().toISOString();
-const log = (msg) => process.stdout.write(`[${ts()}] ${msg}\n`);
 
 log("=== submit.mjs start ===");
 
