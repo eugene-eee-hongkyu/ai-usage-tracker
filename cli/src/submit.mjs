@@ -6,21 +6,38 @@
  */
 
 import { spawn } from "child_process";
-import { existsSync, readFileSync, writeFileSync, unlinkSync } from "fs";
+import { existsSync, readFileSync, writeFileSync, unlinkSync, openSync, statSync, truncateSync } from "fs";
 import { join } from "path";
 import { homedir } from "os";
 
+const STABLE_DIR_EARLY = join(homedir(), ".primus-usage-tracker");
+const SUBMIT_LOG = join(STABLE_DIR_EARLY, "submit.log");
+
+// 로그 파일 1MB 초과 시 truncate (지난 N번 실행으로 쌓이면 너무 커짐 방지)
+try {
+  if (existsSync(SUBMIT_LOG) && statSync(SUBMIT_LOG).size > 1_000_000) {
+    truncateSync(SUBMIT_LOG, 0);
+  }
+} catch {}
+
 // Self-detach: SessionEnd hook 부모 프로세스는 VS Code 종료 시 SIGKILL될 수 있음.
 // _USAGE_TRACKER_DETACHED 없으면 자신을 detached 백그라운드로 재생성하고 즉시 종료.
+// 자식의 stdout/stderr는 submit.log에 append — 이전엔 stdio:"ignore"라 디버깅 불가했음.
 if (!process.env._USAGE_TRACKER_DETACHED) {
+  const out = openSync(SUBMIT_LOG, "a");
   const child = spawn(process.execPath, [join(homedir(), ".primus-usage-tracker", "submit.mjs")], {
     detached: true,
-    stdio: "ignore",
+    stdio: ["ignore", out, out],
     env: { ...process.env, _USAGE_TRACKER_DETACHED: "1" },
   });
   child.unref();
   process.exit(0);
 }
+
+const ts = () => new Date().toISOString();
+const log = (msg) => process.stdout.write(`[${ts()}] ${msg}\n`);
+
+log("=== submit.mjs start ===");
 
 const SERVER_URL = process.env.USAGE_TRACKER_URL ?? "https://ai-usage-tracker-web-psi.vercel.app";
 const KEYTAR_SERVICE = "primus-usage-tracker";
@@ -102,38 +119,53 @@ function spawnCcusageDaily() {
 }
 
 async function main() {
-  if (!acquireLock()) process.exit(0);
+  if (!acquireLock()) {
+    log("lock skip — another instance running");
+    process.exit(0);
+  }
+  log("lock acquired");
 
   try {
     const apiKey = await loadApiKey();
-    if (!apiKey) return;
+    if (!apiKey) {
+      log("ERROR: API key not found");
+      return;
+    }
+    log("API key loaded");
 
     let report;
     try {
+      log("spawning codeburn x4 + ccusage...");
       const [codeburnResults, ccusageDaily] = await Promise.all([
         Promise.all(PERIODS.map((p) => spawnCodeburn(p))),
         spawnCcusageDaily(),
       ]);
       report = Object.fromEntries(PERIODS.map((p, i) => [p, codeburnResults[i]]));
       if (ccusageDaily) report.ccusageDaily = ccusageDaily;
-    } catch {
+      log(`spawn done — codeburn periods=${PERIODS.length}, ccusage=${ccusageDaily ? "ok" : "null"}`);
+    } catch (e) {
+      log(`ERROR: codeburn/ccusage failed — ${e?.message ?? e}`);
       return;
     }
 
     try {
+      log(`POST ${SERVER_URL}/api/ingest ...`);
       const resp = await fetch(`${SERVER_URL}/api/ingest`, {
         method: "POST",
         headers: { "Content-Type": "application/json", "x-api-key": apiKey },
         body: JSON.stringify(report),
       });
+      log(`ingest response: ${resp.status} ${resp.statusText}`);
       if (!resp.ok) {
         process.stderr.write(`[usage-tracker] ingest failed: ${resp.status}\n`);
       }
-    } catch {
+    } catch (e) {
+      log(`ERROR: ingest network — ${e?.message ?? e}`);
       // Network error — silent
     }
   } finally {
     releaseLock();
+    log("=== submit.mjs end ===");
   }
 
   process.exit(0);
