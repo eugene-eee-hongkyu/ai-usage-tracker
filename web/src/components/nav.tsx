@@ -14,10 +14,10 @@ export function Nav() {
   const adminUser = isAdmin(session?.user?.email ?? "");
 
   const tabs = [
-    { href: "/dashboard", label: "개인" },
-    { href: "/team", label: "팀" },
-    ...(adminUser ? [{ href: "/member", label: "팀원" }] : []),
-    { href: "/setup-status", label: "셋업" },
+    { href: "/dashboard", label: "개인", admin: false },
+    { href: "/team", label: "팀", admin: false },
+    ...(adminUser ? [{ href: "/member", label: "팀원", admin: true }] : []),
+    { href: "/setup-status", label: "셋업", admin: false },
   ];
 
   return (
@@ -29,13 +29,16 @@ export function Nav() {
             <Link
               key={t.href}
               href={t.href}
-              className={`text-sm px-2 sm:px-3 py-1 rounded transition-colors whitespace-nowrap ${
+              className={`text-sm px-2 sm:px-3 py-1 rounded transition-colors whitespace-nowrap inline-flex items-center gap-1 ${
                 path.startsWith(t.href)
                   ? "bg-slate-700 text-slate-100"
                   : "text-slate-400 hover:text-slate-200"
               }`}
             >
               {t.label}
+              {t.admin && (
+                <span className="text-[9px] font-mono font-bold px-1 py-0.5 rounded bg-amber-500/20 text-amber-400 border border-amber-500/40 leading-none">ADMIN</span>
+              )}
             </Link>
           ))}
         </nav>

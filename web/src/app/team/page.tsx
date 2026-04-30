@@ -68,6 +68,16 @@ interface TeamActivity {
   memberCount: number;
 }
 
+interface TopSession {
+  userId: number;
+  userName: string;
+  id: string;
+  date: string;
+  project: string;
+  cost: number;
+  calls: number;
+}
+
 interface TeamData {
   byEfficiency: MemberStat[];
   bySessions: MemberStat[];
@@ -83,6 +93,13 @@ interface TeamData {
   teamActivities: TeamActivity[];
   dailyByMember: Array<Record<string, number | string>>;
   memberNames: string[];
+  topSessions: TopSession[];
+}
+
+function AdminBadge() {
+  return (
+    <span className="text-[9px] font-mono font-bold px-1 py-0.5 rounded bg-amber-500/20 text-amber-400 border border-amber-500/40 leading-none">ADMIN</span>
+  );
 }
 
 function SyncBadge({ lastSyncedAt }: { lastSyncedAt: string | null }) {
@@ -217,6 +234,7 @@ export default function TeamPage() {
   const sum = data.teamSummary;
   const byCost = [...members].sort((a, b) => b.totalCost - a.totalCost);
   const byTokens = [...members].sort((a, b) => b.totalTokens - a.totalTokens);
+  const memberColorMap = Object.fromEntries(members.map((m, i) => [m.name, MEMBER_COLORS[i % MEMBER_COLORS.length]]));
   const maxCost = Math.max(...byCost.map((m) => m.totalCost), 0.01);
   const maxTokens = Math.max(...byTokens.map((m) => m.totalTokens), 1);
   const maxActivity = Math.max(...(data.teamActivities ?? []).map((a) => a.totalTurns), 0.01);
@@ -528,12 +546,13 @@ export default function TeamPage() {
               </div>
             </div>
 
-            {/* Row 4: Last Sync (admin only) */}
+            {/* Row 4: Last Sync + Top Sessions (admin only) */}
             {adminUser && (
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                 <div className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-slate-500 rounded">
-                  <div className="px-3 py-2 border-b border-neutral-800">
+                  <div className="px-3 py-2 border-b border-neutral-800 flex items-center gap-2">
                     <span className="text-xs font-mono font-bold text-slate-400 uppercase tracking-wider">Last Sync</span>
+                    <AdminBadge />
                   </div>
                   <div className="p-3">
                     <table className="w-full text-xs font-mono border-collapse">
@@ -566,6 +585,64 @@ export default function TeamPage() {
                           })}
                       </tbody>
                     </table>
+                  </div>
+                </div>
+
+                {/* Top Sessions (admin only) */}
+                <div className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-red-500 rounded">
+                  <div className="px-3 py-2 border-b border-neutral-800 flex items-center gap-2">
+                    <span className="text-xs font-mono font-bold text-red-400 uppercase tracking-wider">Top Sessions</span>
+                    <AdminBadge />
+                  </div>
+                  <div className="p-3 overflow-x-auto">
+                    {(data.topSessions ?? []).length === 0 ? (
+                      <p className="text-neutral-600 text-xs font-mono">no data</p>
+                    ) : (
+                      <table className="w-full text-xs font-mono border-collapse">
+                        <thead>
+                          <tr className="border-b border-neutral-800">
+                            <th className="text-left text-neutral-500 pb-2 pr-3 font-normal">멤버</th>
+                            <th className="text-left text-neutral-500 pb-2 pr-3 font-normal">프로젝트</th>
+                            <th className="text-right text-neutral-500 pb-2 pr-3 font-normal">date</th>
+                            <th className="text-right text-neutral-500 pb-2 pr-3 font-normal">calls</th>
+                            <th className="text-right text-neutral-500 pb-2 font-normal">cost</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {(data.topSessions ?? []).map((s, i) => (
+                            <tr key={`${s.userId}-${s.id}-${i}`} className="border-b border-neutral-800/40 hover:bg-neutral-800/30 transition-colors">
+                              <td className="py-1.5 pr-3">
+                                <span className="flex items-center gap-1.5 text-neutral-300">
+                                  <span
+                                    className="w-1.5 h-1.5 rounded-full shrink-0"
+                                    style={{ background: memberColorMap[s.userName] ?? "#6b7280" }}
+                                  />
+                                  <span className="truncate max-w-[64px]">{s.userName}</span>
+                                </span>
+                              </td>
+                              <td className="py-1.5 pr-3">
+                                <div
+                                  className="truncate max-w-[96px] text-neutral-400"
+                                  style={{ direction: "rtl" }}
+                                  title={s.project || undefined}
+                                >
+                                  {s.project || "—"}
+                                </div>
+                              </td>
+                              <td className="py-1.5 pr-3 text-right text-neutral-500 tabular-nums">
+                                {fmtDate(s.date)}
+                              </td>
+                              <td className="py-1.5 pr-3 text-right text-neutral-500 tabular-nums">
+                                {s.calls}
+                              </td>
+                              <td className="py-1.5 text-right text-yellow-400 tabular-nums font-bold">
+                                ${s.cost.toFixed(2)}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    )}
                   </div>
                 </div>
               </div>
