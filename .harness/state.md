@@ -6,8 +6,8 @@
 
 ---
 
-## 마지막 실행: 2026-04-30 08:26
-## 마지막 업데이트: 2026-04-30 08:26
+## 마지막 실행: 2026-04-30 15:59
+## 마지막 업데이트: 2026-04-30 15:59
 ## 현재 모드: bypassPermissions
 
 ### 현재 집중
@@ -44,5 +44,6 @@
 - [x] Supabase 마이그레이션 — 0001 (period_snapshots), 0002 (current_day_*) 적용 완료
 - [x] 한방 설치 스크립트 — install.sh (nvm), install.ps1 (winget), Setup 페이지 OS-aware one-liner
 - [x] ADMIN 배지 — nav 팀원 탭, team Last Sync/Top Sessions
+- [x] 2026-04-30 세션 워크로그 정리 — worklog.md / state.md / backlog.md 갱신, git commit/push, snooze_attention 실행
 - [ ] 5월 5일 첫 weekly 스냅샷 promote 검증
 - [ ] 5월 1일 첫 monthly 스냅샷 promote 검증

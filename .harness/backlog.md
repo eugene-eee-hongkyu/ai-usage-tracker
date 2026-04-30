@@ -24,6 +24,6 @@
 
 ## 완료 / 취소
 
-~~[3] 2026-04-30: Supabase 0002 마이그레이션 실행 — daily snapshot 컬럼 추가, 사용자 검증 완료~~
-~~[3] 2026-04-30: Supabase RLS 보안 설정 — 3개 테이블 RLS 활성, 앱 동작 검증 완료~~
-~~[3] 2026-04-29: repair 재실행으로 즉시 수집 검증 — runImmediateSync 추가 + Vercel 200 확인~~
+~~[2] 2026-04-30: Supabase 0002 마이그레이션 실행 — daily snapshot 컬럼 추가, 사용자 검증 완료~~
+~~[2] 2026-04-30: Supabase RLS 보안 설정 — 3개 테이블 RLS 활성, 앱 동작 검증 완료~~
+~~[2] 2026-04-29: repair 재실행으로 즉시 수집 검증 — runImmediateSync 추가 + Vercel 200 확인~~
