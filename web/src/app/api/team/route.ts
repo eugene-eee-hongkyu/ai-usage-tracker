@@ -177,8 +177,6 @@ export async function GET(req: NextRequest) {
         topProject = (d.projects ?? []).sort((a, b) => (b.cost ?? 0) - (a.cost ?? 0))[0]?.name ?? "unknown";
       }
 
-      if (sessionsCount === 0) return null;
-
       // Trend: prev period $/session from all-time daily data
       const allDailyData = dAll.daily ?? [];
       const prevCostPerSession = computePrevCostPerSession(allDailyData, period);
