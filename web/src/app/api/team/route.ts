@@ -43,6 +43,18 @@ interface RawTopSession {
   turns?: number;
 }
 
+interface RawModel {
+  name?: string;
+  cost?: number;
+  calls?: number;
+  inputTokens?: number;
+  outputTokens?: number;
+  cacheReadTokens?: number;
+  cacheWriteTokens?: number;
+}
+
+interface RawNameCalls { name?: string; calls?: number }
+
 interface RawPeriodData {
   overview?: RawOverview;
   summary?: RawOverview;
@@ -50,6 +62,9 @@ interface RawPeriodData {
   projects?: RawProject[];
   topSessions?: RawTopSession[];
   daily?: Array<{ date: string; cost: number; sessions?: number }>;
+  models?: RawModel[];
+  tools?: RawNameCalls[];
+  shellCommands?: RawNameCalls[];
 }
 
 function getPeriodData(raw: unknown, period: string): RawPeriodData {
@@ -100,6 +115,9 @@ export async function GET(req: NextRequest) {
   const activityAgg = new Map<string, { totalCost: number; totalTurns: number; members: Set<number> }>();
   const dailyMemberMap = new Map<string, Record<string, number>>();
   const allTopSessions: Array<{ userId: number; userName: string; id: string; date: string; project: string; cost: number; calls: number }> = [];
+  const modelAgg = new Map<string, { cost: number; calls: number; cacheRead: number; cacheWrite: number; input: number }>();
+  const toolAgg = new Map<string, number>();
+  const shellAgg = new Map<string, number>();
 
   const memberStats = allUsers
     .map((u) => {
@@ -189,6 +207,26 @@ export async function GET(req: NextRequest) {
         existing[memberKey] = (existing[memberKey] ?? 0) + day.cost;
       }
 
+      // Aggregate by model
+      for (const m of d.models ?? []) {
+        const name = m.name ?? "unknown";
+        const entry = modelAgg.get(name) ?? { cost: 0, calls: 0, cacheRead: 0, cacheWrite: 0, input: 0 };
+        entry.cost += m.cost ?? 0;
+        entry.calls += m.calls ?? 0;
+        entry.cacheRead += m.cacheReadTokens ?? 0;
+        entry.cacheWrite += m.cacheWriteTokens ?? 0;
+        entry.input += m.inputTokens ?? 0;
+        modelAgg.set(name, entry);
+      }
+
+      // Aggregate tools and shell commands
+      for (const t of d.tools ?? []) {
+        if (t.name) toolAgg.set(t.name, (toolAgg.get(t.name) ?? 0) + (t.calls ?? 0));
+      }
+      for (const s of d.shellCommands ?? []) {
+        if (s.name) shellAgg.set(s.name, (shellAgg.get(s.name) ?? 0) + (s.calls ?? 0));
+      }
+
       const efficiencyScore = computeEfficiencyScore(overallOneShot, cacheHitPct, totalCost, sessionsCount, callsCount, outputInputRatio);
 
       for (const s of d.topSessions ?? []) {
@@ -273,6 +311,24 @@ export async function GET(req: NextRequest) {
     .sort((a, b) => b.cost - a.cost)
     .slice(0, 15);
 
+  const teamModels = [...modelAgg.entries()]
+    .map(([name, agg]) => {
+      const denom = agg.input + agg.cacheRead + agg.cacheWrite;
+      const cacheHitPct = denom > 0 ? (agg.cacheRead / denom) * 100 : 0;
+      return { name, cost: agg.cost, calls: agg.calls, cacheHitPct };
+    })
+    .sort((a, b) => b.cost - a.cost);
+
+  const teamTools = [...toolAgg.entries()]
+    .map(([name, calls]) => ({ name, calls }))
+    .sort((a, b) => b.calls - a.calls)
+    .slice(0, 10);
+
+  const teamShellCommands = [...shellAgg.entries()]
+    .map(([name, calls]) => ({ name, calls }))
+    .sort((a, b) => b.calls - a.calls)
+    .slice(0, 10);
+
   return NextResponse.json({
     byEfficiency,
     bySessions,
@@ -282,6 +338,9 @@ export async function GET(req: NextRequest) {
     dailyByMember,
     memberNames,
     topSessions,
+    teamModels,
+    teamTools,
+    teamShellCommands,
     isAdminUser: isAdmin(session.user.email),
   });
 }

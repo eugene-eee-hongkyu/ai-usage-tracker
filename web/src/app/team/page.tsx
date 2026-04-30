@@ -94,6 +94,9 @@ interface TeamData {
   dailyByMember: Array<Record<string, number | string>>;
   memberNames: string[];
   topSessions: TopSession[];
+  teamModels?: Array<{ name: string; cost: number; calls: number; cacheHitPct: number }>;
+  teamTools?: Array<{ name: string; calls: number }>;
+  teamShellCommands?: Array<{ name: string; calls: number }>;
 }
 
 function AdminBadge() {
@@ -546,7 +549,118 @@ export default function TeamPage() {
               </div>
             </div>
 
-            {/* Row 4: Last Sync + Top Sessions (admin only) */}
+            {/* Row 4: Core Tools + Shell Commands */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+
+              {/* Core Tools */}
+              <div className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-teal-500 rounded">
+                <div className="px-3 py-2 border-b border-neutral-800">
+                  <span className="text-xs font-mono font-bold text-teal-400 uppercase tracking-wider">Core Tools</span>
+                </div>
+                <div className="p-3">
+                  {(data.teamTools ?? []).length === 0 ? (
+                    <p className="text-neutral-600 text-xs font-mono">no data</p>
+                  ) : (
+                    <div className="space-y-1.5">
+                      <div className="flex text-[10px] text-neutral-600 font-mono mb-1">
+                        <span className="w-16 shrink-0" />
+                        <span className="flex-1">tool</span>
+                        <span className="w-16 text-right">calls</span>
+                      </div>
+                      {(() => {
+                        const maxCalls = Math.max(...(data.teamTools ?? []).map((t) => t.calls), 1);
+                        return (data.teamTools ?? []).map((t) => (
+                          <div key={t.name} className="flex items-center gap-1.5 text-xs font-mono">
+                            <div className="w-16 h-1.5 bg-neutral-800 rounded overflow-hidden shrink-0">
+                              <div className="h-full bg-teal-500 rounded" style={{ width: `${(t.calls / maxCalls) * 100}%` }} />
+                            </div>
+                            <span className="flex-1 text-neutral-300 truncate">{t.name}</span>
+                            <span className="w-16 text-blue-400 text-right tabular-nums">{t.calls.toLocaleString()}</span>
+                          </div>
+                        ));
+                      })()}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Shell Commands */}
+              <div className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-orange-500 rounded">
+                <div className="px-3 py-2 border-b border-neutral-800">
+                  <span className="text-xs font-mono font-bold text-orange-400 uppercase tracking-wider">Shell Commands</span>
+                </div>
+                <div className="p-3">
+                  {(data.teamShellCommands ?? []).length === 0 ? (
+                    <p className="text-neutral-600 text-xs font-mono">no data</p>
+                  ) : (
+                    <div className="space-y-1.5">
+                      <div className="flex text-[10px] text-neutral-600 font-mono mb-1">
+                        <span className="w-16 shrink-0" />
+                        <span className="flex-1">command</span>
+                        <span className="w-16 text-right">calls</span>
+                      </div>
+                      {(() => {
+                        const maxCalls = Math.max(...(data.teamShellCommands ?? []).map((s) => s.calls), 1);
+                        return (data.teamShellCommands ?? []).map((s) => (
+                          <div key={s.name} className="flex items-center gap-1.5 text-xs font-mono">
+                            <div className="w-16 h-1.5 bg-neutral-800 rounded overflow-hidden shrink-0">
+                              <div className="h-full bg-orange-500 rounded" style={{ width: `${(s.calls / maxCalls) * 100}%` }} />
+                            </div>
+                            <span className="flex-1 text-neutral-300 truncate">{s.name}</span>
+                            <span className="w-16 text-blue-400 text-right tabular-nums">{s.calls.toLocaleString()}</span>
+                          </div>
+                        ));
+                      })()}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Row 5: By Model + (empty) */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+
+              {/* By Model */}
+              <div className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-pink-500 rounded">
+                <div className="px-3 py-2 border-b border-neutral-800">
+                  <span className="text-xs font-mono font-bold text-pink-400 uppercase tracking-wider">By Model</span>
+                </div>
+                <div className="p-3">
+                  {(data.teamModels ?? []).length === 0 ? (
+                    <p className="text-neutral-600 text-xs font-mono">no data</p>
+                  ) : (
+                    <div className="space-y-1.5">
+                      <div className="flex text-[10px] text-neutral-600 font-mono mb-1">
+                        <span className="w-16 shrink-0" />
+                        <span className="flex-1">model</span>
+                        <span className="w-16 text-right">cost</span>
+                        <span className="w-14 text-right">cache</span>
+                        <span className="w-14 text-right">calls</span>
+                      </div>
+                      {(() => {
+                        const maxCost = Math.max(...(data.teamModels ?? []).map((m) => m.cost), 0.01);
+                        return (data.teamModels ?? []).map((m) => (
+                          <div key={m.name} className="flex items-center gap-1.5 text-xs font-mono">
+                            <div className="w-16 h-1.5 bg-neutral-800 rounded overflow-hidden shrink-0">
+                              <div className="h-full bg-pink-500 rounded" style={{ width: `${(m.cost / maxCost) * 100}%` }} />
+                            </div>
+                            <span className="flex-1 text-neutral-300 truncate">{m.name}</span>
+                            <span className="w-16 text-yellow-400 text-right tabular-nums">${m.cost.toFixed(2)}</span>
+                            <span className="w-14 text-emerald-400 text-right tabular-nums">{m.cacheHitPct.toFixed(1)}%</span>
+                            <span className="w-14 text-neutral-500 text-right tabular-nums">{m.calls.toLocaleString()}</span>
+                          </div>
+                        ));
+                      })()}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* placeholder right column to keep grid alignment */}
+              <div />
+            </div>
+
+            {/* Row 6: Last Sync + Top Sessions (admin only) */}
             {adminUser && (
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                 <div className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-slate-500 rounded">
