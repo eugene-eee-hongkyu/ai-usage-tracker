@@ -4,6 +4,23 @@
 
 ---
 
+## Session 2026-05-01 15:59 — UTC 버그 우회 + 30일 period + 팀 stale 멤버 필터
+
+### 작업 요약
+- 하네스 상태 확인 및 worklog/decision/state/backlog 파일 업데이트
+- decision.md에 3건 결정 추가: stale 필터 적용, 30일 period 설정, TZ env 주입
+- 모든 변경사항 Git 커밋 및 푸시 완료
+
+### 다음 액션
+- 팀원 4명의 12:00/18:00 SGT sync 후 자가 치유 promote 확인
+- 5/2 첫 sync 후 본인 머신의 5/1 daily promote 확인
+- 5/4(월) 첫 sync 후 weekly promote 확인
+
+---
+
+이 항목을 어디에 저장할까요? `docs/` 디렉토리 구조를 먼저 확인하고, 적절한 위치에 저장할게요.
+
+
 ## Session 2026-05-01 10:37 — codeburn UTC 버그 우회 + 30일 period + 팀 stale 멤버 필터
 
 ### 작업 요약

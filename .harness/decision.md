@@ -6,6 +6,35 @@
 
 ## 2026-05-01: 팀 페이지 stale 멤버 필터 (current month/day 미일치 시 0 처리)
 
+- **선택**: 팀 API에서 멤버 `rawJson.{month,today}.daily[0].date`가 현재 UTC YYYY-MM(또는 YYYY-MM-DD)와 다르면 그 멤버를 0 처리 + 활동 합산에서 제외
+- **대안 검토**: 자연 해소(다음 sync에서 정상화, 그 동안 혼란) vs 서버 필터(즉시 깨끗) vs viewer timezone 고려(불가능, tz NULL)
+- **선택 이유**: 4/30 마지막 sync와 5/1 sync가 섞이면 팀 합산이 혼재되므로 즉시 깨끗한 화면 유지
+- **영향 범위**: `web/src/app/api/team/route.ts` 멤버 루프
+- **되돌리는 방법**: `isStale` 분기 제거, 모든 멤버 그대로 집계
+
+---
+
+## 2026-05-01: 30일 period 추가 (codeburn parity)
+
+- **선택**: CLI PERIODS에 `"30days"` 추가, UI 버튼 `[오늘][이번주][이번달][30일][전체]`
+- **대안 검토**: 4 버튼 유지(단순하나 30days 미표시) vs 30일 추가(사용자 요청, schema 변경 없음) vs 30일과 이번달 통합(의미 다름)
+- **선택 이유**: 사용자 명시 요청, codeburn UI 일관성, schema 변경 0, 데이터 50KB/유저 추가뿐
+- **영향 범위**: `cli/src/submit.mjs`, `cli/src/sync.ts`, `web/src/app/api/dashboard/route.ts`, `web/src/app/api/team/route.ts`, dashboard-view.tsx, team/page.tsx
+- **되돌리는 방법**: PERIODS, Period type, button list, PERIOD_LABELS에서 제거. rawJson 키는 미사용 그대로 보존
+
+---
+
+## 2026-05-01: launchd codeburn UTC 버그 — TZ env 명시 주입으로 우회
+
+- **선택**: submit.mjs/sync.ts에서 system timezone을 읽어서 spawn env에 `TZ` + `CODEBURN_TZ` 명시
+- **대안 검토**: 업스트림 fix 기다리기(무한 대기) vs GitHub master 직접 설치(미빌드) vs 서버 측 fallback만 유지(경계 정확도만, 라벨은 여전히 UTC) vs CLI TZ 주입(선택)
+- **선택 이유**: 5분 코드 변경으로 launchd 환경에서도 codeburn이 사용자 로컬 today 리턴, 향후 업스트림 배포 시에도 해롭지 않음
+- **영향 범위**: `cli/src/submit.mjs`, `cli/src/sync.ts`. 사용자 머신은 repair 1번으로 새 코드 필요
+- **되돌리는 방법**: spawn env 옵션 제거, codeburn은 다시 launchd에서 UTC fallback
+
+
+## 2026-05-01: 팀 페이지 stale 멤버 필터 (current month/day 미일치 시 0 처리)
+
 - **선택**: 팀 API에서 멤버 `rawJson.{month,today}.daily[0].date`가 현재 UTC YYYY-MM(또는 YYYY-MM-DD)와 다르면 그 멤버를 0 처리 + activities/daily/models/tools/shells 합산에서 제외
 - **대안 검토**:
   - _자연 해소 (no code)_: 그분들이 다음 sync 하면 자동 정상화. 단 그 동안 잘못된 숫자 표시
