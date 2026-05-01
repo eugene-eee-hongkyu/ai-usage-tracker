@@ -40,7 +40,13 @@ if (!process.env._USAGE_TRACKER_DETACHED) {
   process.exit(0);
 }
 
+// launchd가 Node에 TZ env를 안 넘겨주면 codeburn이 UTC로 today 계산.
+// 시스템 timezone을 명시적으로 자식에 주입.
+const SYSTEM_TZ = Intl.DateTimeFormat().resolvedOptions().timeZone;
+const childEnv = { ...process.env, TZ: SYSTEM_TZ, CODEBURN_TZ: SYSTEM_TZ };
+
 log("=== submit.mjs start ===");
+log(`SYSTEM_TZ=${SYSTEM_TZ}, process.env.TZ=${process.env.TZ ?? "(unset)"}`);
 
 const SERVER_URL = process.env.USAGE_TRACKER_URL ?? "https://ai-usage-tracker-web-psi.vercel.app";
 const KEYTAR_SERVICE = "primus-usage-tracker";
@@ -77,11 +83,6 @@ function acquireLock() {
 function releaseLock() {
   try { unlinkSync(LOCK_FILE); } catch {}
 }
-
-// launchd가 Node에 TZ env를 안 넘겨주면 codeburn이 UTC로 today 계산.
-// 시스템 timezone을 명시적으로 자식에 주입.
-const SYSTEM_TZ = Intl.DateTimeFormat().resolvedOptions().timeZone;
-const childEnv = { ...process.env, TZ: SYSTEM_TZ, CODEBURN_TZ: SYSTEM_TZ };
 
 function spawnCodeburn(period) {
   return new Promise((resolve, reject) => {
