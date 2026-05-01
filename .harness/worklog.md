@@ -4,6 +4,27 @@
 
 ---
 
+## Session 2026-05-01 10:37 — codeburn UTC 버그 우회 + 30일 period + 팀 stale 멤버 필터
+
+### 작업 요약
+- **submit.log 가시성 fix** (`47539f0` → `cc17d9b`): 자식 stdio가 `"ignore"`라 디버깅 불가했던 문제. `openSync(out)` 후 `[ignore, out, out]`로 바꿨지만 repair의 immediate sync는 `_USAGE_TRACKER_DETACHED=1` 미리 set되어 self-detach 우회 → stdout=/dev/null. `appendFileSync(SUBMIT_LOG, line)` 직접 쓰기로 바꿔 어떤 호출 경로든 로그 남도록.
+- **dashboard 오늘 override** (`e58a475`): codeburn UTC today가 SGT 자정~UTC 자정 사이엔 어제 날짜 리턴. ccusage max date가 더 미래면 `rawDaily = [{ date: ccusage today, cost, sessions:0 }]`로 교체. Daily Activity / Cost 차트와 overview cost/tokens가 사용자 로컬 today로 보임. activities/projects/sessions/calls은 codeburn UTC 그대로 (재집계 불가).
+- **codeburn 업스트림 PR #186 merged**: `--timezone` flag + `CODEBURN_TZ` env var 추가됐으나 npm 0.9.4까지 미배포. GitHub master에서 직접 설치 시 `dist/` 미빌드라 실패. 일단 우회 진행.
+- **CLI TZ env 주입** (`1eb917f` + `c2b655e`): launchd가 Node에 TZ env 안 넘겨주는 게 근본 원인. `Intl.DateTimeFormat().resolvedOptions().timeZone`로 system tz 읽어서 `spawn(codeburn, ..., env: { TZ, CODEBURN_TZ })` 명시 주입. submit.log에 `SYSTEM_TZ=Asia/Singapore` 진단 라인 추가. 본인 머신 검증 → codeburn `period: "Today (2026-05-01)"`, `daily: [{date: "2026-05-01"}]` 정상 리턴.
+- **자가 치유 검증**: 본인 사용자 1명에서 `current_day_start`/`current_month_start` 4/30→5/1, period_snapshots에 daily(4/30) + monthly(4/1) promote 자동 발생. April monthly + 4/30 daily 데이터 손실 없이 회수.
+- **DB 클린업**: period_snapshots에서 daily(4/30), monthly(4/1) 행 사용자 요청으로 DELETE. 다른 4명 팀원의 다음 sync에서 자가 치유 재검증 예정.
+- **팀 페이지 fix** — sessionsCount==0 필터 제거 (`a770ceb`): 모든 멤버가 항상 보이도록.
+- **드롭다운 UX fix** (`8e20ef9`): period 버튼 클릭 시 모든 offset 0으로 리셋(이전엔 같은 period 클릭하면 offset 유지돼서 라이브 복귀 안 됨). 라벨 통일: placeholder 모두 `이전 ▼`, items의 1번째는 자연어(`어제/지난주/지난달`), 2번째부터 `N단위전`. monthly dropdown `slice(0, 6)` 추가.
+- **30일 period 추가** (`4fc5db8`): codeburn parity. CLI PERIODS에 `"30days"` 추가, Period type 확장, 버튼 `[오늘][이번주][이번달][30일][전체]`. JSONB 컬럼이라 schema 변경 0.
+- **팀 stale 멤버 필터** (`f81a8dd`): "이번달" 탭에서 4/30 마지막 sync 멤버(rawJson.month=April)와 5/1 sync 멤버(rawJson.month=May)가 섞여 팀 합산이 April 41일 + May 1일이 됨. 멤버의 `daily[0].date`가 현재 month/day와 다르면 0 처리 + 활동 집계에서 제외.
+- **백로그 정리**: backlog에 5/2 daily, 5/4 weekly, 6/1 monthly promote 검증 항목 (이미 추가됨)
+
+### 다음 액션
+- 다른 4명 팀원의 다음 launchd sync (12:00 SGT 등)에서 daily/monthly promote 자동 발생 확인
+- 5/2 00:00+ 첫 sync 후 본인 머신의 5/1 daily promote 확인
+
+---
+
 ## Session 2026-05-01 01:26 — boundary 계산 timezone 의존성 제거 (DB timezone NULL fix)
 
 ### 작업 요약

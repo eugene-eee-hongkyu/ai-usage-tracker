@@ -4,6 +4,46 @@
 
 ---
 
+## 2026-05-01: 팀 페이지 stale 멤버 필터 (current month/day 미일치 시 0 처리)
+
+- **선택**: 팀 API에서 멤버 `rawJson.{month,today}.daily[0].date`가 현재 UTC YYYY-MM(또는 YYYY-MM-DD)와 다르면 그 멤버를 0 처리 + activities/daily/models/tools/shells 합산에서 제외
+- **대안 검토**:
+  - _자연 해소 (no code)_: 그분들이 다음 sync 하면 자동 정상화. 단 그 동안 잘못된 숫자 표시
+  - _서버 필터 (선택)_: 즉시 깨끗. stale 멤버는 0 + 활동 없는 상태로 보임
+  - _viewer timezone 고려_: 더 정확하지만 viewer tz가 NULL이라 derive 불가. UTC 기준으로 충분
+- **선택 이유**: 4/30 마지막 sync 멤버(rawJson.month=April)와 5/1 sync 멤버(rawJson.month=May)가 섞이면 팀 합산이 4월+5월 mixed로 나와 사용자 혼란. 즉시 깨끗한 화면 유지 우선
+- **영향 범위**: `web/src/app/api/team/route.ts` 멤버 루프에 `isStale` early-return 추가
+- **되돌리는 방법**: `isStale` 분기 제거. period=month/today에서 모든 멤버 그대로 집계
+
+---
+
+## 2026-05-01: 30일 period 추가 (codeburn parity)
+
+- **선택**: CLI PERIODS에 `"30days"` 추가, codeburn 호출 1번 더 (병렬), UI 버튼 `[오늘][이번주][이번달][30일][전체]`
+- **대안 검토**:
+  - _현 상태 유지 (4 buttons)_: 가장 단순. 단 codeburn 자체는 30days 지원하니 표시 가능한 값을 안 쓰는 셈
+  - _30일 추가 (선택)_: rolling 30일 보고 싶다는 명시 요청. JSONB 컬럼이라 schema 변경 없이 rawJson에 키 1개만 추가됨
+  - _30일과 이번달 통합_: 의미가 다름 (rolling vs calendar)
+- **선택 이유**: 사용자 요청, codeburn UI 일관성, schema 변경 0, 데이터 약 50KB/유저 추가뿐
+- **영향 범위**: `cli/src/submit.mjs`, `cli/src/sync.ts`, `web/src/app/api/dashboard/route.ts`, `web/src/app/api/team/route.ts`, `web/src/components/dashboard-view.tsx`, `web/src/app/team/page.tsx`
+- **되돌리는 방법**: PERIODS에서 `"30days"` 제거, Period type/button list/PERIOD_LABELS에서 제거. rawJson에 `30days` 키는 그대로 남지만 미사용
+
+---
+
+## 2026-05-01: launchd codeburn UTC 버그 — TZ env 명시 주입으로 우회
+
+- **선택**: submit.mjs/sync.ts에서 `Intl.DateTimeFormat().resolvedOptions().timeZone`로 system tz 읽어서 `spawn` env에 `TZ` + `CODEBURN_TZ` 명시. codeburn 업스트림 fix 기다리지 않고 즉시 적용
+- **대안 검토**:
+  - _업스트림 fix 기다리기_: codeburn PR #186 merged됐으나 npm 미배포. 무한 대기 어려움
+  - _GitHub master에서 직접 설치_: `dist/` 미빌드 상태라 npm install 실패. 사용자가 빌드해야 함
+  - _서버 측 ccusage max 우회만 유지_: 이미 적용된 fallback. 단 boundary 정확도만 잡고 codeburn output 자체의 UTC 라벨은 그대로
+  - _CLI에서 TZ 주입 (선택)_: codeburn 0.9.4도 local-tz getters 사용하지만 launchd가 Node에 TZ env 안 넘겨주면 UTC fallback. 명시 주입 시 즉시 정상
+- **선택 이유**: 5분 코드 변경으로 launchd 환경에서도 codeburn이 사용자 로컬 today 리턴. 향후 업스트림 npm 배포 시점에도 해롭지 않음 (CODEBURN_TZ는 그때 의미 가짐)
+- **영향 범위**: `cli/src/submit.mjs`, `cli/src/sync.ts`. 사용자 머신은 repair 1번으로 새 submit.mjs 받아야 효과 발생
+- **되돌리는 방법**: spawn env 옵션 제거. codeburn은 다시 launchd 환경에서 UTC fallback
+
+---
+
 ## 2026-05-01: boundary 계산을 payload 기반으로 (timezone 컬럼 의존 제거)
 
 - **선택**: ingest의 day/week/month boundary를 `body.today.daily[0].date` (codeburn이 사용자 로컬 시각으로 계산해서 보낸 날짜)로 계산. `users.timezone` NULL이어도 정확히 동작
