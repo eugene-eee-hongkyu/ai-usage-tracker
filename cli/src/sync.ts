@@ -3,7 +3,7 @@ import { loadApiKey } from "./init.js";
 
 const SERVER_URL = process.env.USAGE_TRACKER_URL ?? "https://ai-usage-tracker-web-psi.vercel.app";
 
-const PERIODS = ["today", "week", "month", "all"] as const;
+const PERIODS = ["today", "week", "month", "30days", "all"] as const;
 
 // launchd가 Node에 TZ env를 안 넘겨주면 codeburn이 UTC로 today 계산. 명시 주입.
 const SYSTEM_TZ = Intl.DateTimeFormat().resolvedOptions().timeZone;

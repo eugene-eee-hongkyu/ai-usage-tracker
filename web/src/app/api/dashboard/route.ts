@@ -5,7 +5,7 @@ import { db, userSnapshots, users, periodSnapshots } from "@/lib/db";
 import { and, asc, desc, eq } from "drizzle-orm";
 import { isAdmin } from "@/lib/admin";
 
-type Period = "today" | "week" | "month" | "all";
+type Period = "today" | "week" | "month" | "30days" | "all";
 
 interface RawOverview {
   cost?: number;

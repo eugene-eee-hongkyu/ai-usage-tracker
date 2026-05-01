@@ -51,7 +51,7 @@ log(`SYSTEM_TZ=${SYSTEM_TZ}, process.env.TZ=${process.env.TZ ?? "(unset)"}`);
 const SERVER_URL = process.env.USAGE_TRACKER_URL ?? "https://ai-usage-tracker-web-psi.vercel.app";
 const KEYTAR_SERVICE = "primus-usage-tracker";
 const KEYTAR_ACCOUNT = "api-key";
-const PERIODS = ["today", "week", "month", "all"];
+const PERIODS = ["today", "week", "month", "30days", "all"];
 
 const STABLE_DIR = join(homedir(), ".primus-usage-tracker");
 const LOCK_FILE = join(STABLE_DIR, "submit.lock");

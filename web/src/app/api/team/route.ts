@@ -5,7 +5,7 @@ import { db, userSnapshots, users } from "@/lib/db";
 import { computeEfficiencyScore } from "@/lib/rules";
 import { isAdmin } from "@/lib/admin";
 
-type Period = "today" | "week" | "month" | "all";
+type Period = "today" | "week" | "month" | "30days" | "all";
 
 interface RawOverview {
   cost?: number;
@@ -91,7 +91,7 @@ function computePrevCostPerSession(
   period: Period
 ): number | null {
   if (period === "all") return null;
-  const n = period === "today" ? 1 : period === "week" ? 7 : 30;
+  const n = period === "today" ? 1 : period === "week" ? 7 : 30;  // month / 30days 둘 다 30
   const sorted = [...allDaily].sort((a, b) => b.date.localeCompare(a.date));
   const prev = sorted.slice(n, n * 2);
   const cost = prev.reduce((s, d) => s + d.cost, 0);
