@@ -41,12 +41,15 @@ async function loadApiKey() {
 // src/sync.ts
 var SERVER_URL2 = process.env.USAGE_TRACKER_URL ?? "https://ai-usage-tracker-web-psi.vercel.app";
 var PERIODS = ["today", "week", "month", "all"];
+var SYSTEM_TZ = Intl.DateTimeFormat().resolvedOptions().timeZone;
+var childEnv = { ...process.env, TZ: SYSTEM_TZ, CODEBURN_TZ: SYSTEM_TZ };
 function spawnCodeburn(period) {
   return new Promise((resolve, reject) => {
     const chunks = [];
     const proc = spawn("codeburn", ["report", "--format", "json", "--provider", "claude", "--period", period], {
       stdio: ["ignore", "pipe", "pipe"],
-      shell: true
+      shell: true,
+      env: childEnv
     });
     proc.stdout.on("data", (d) => chunks.push(d));
     proc.on("close", (code) => {
@@ -70,7 +73,8 @@ function spawnCcusageDaily() {
     const chunks = [];
     const proc = spawn("ccusage", ["daily", "--json"], {
       stdio: ["ignore", "pipe", "pipe"],
-      shell: true
+      shell: true,
+      env: childEnv
     });
     proc.stdout.on("data", (d) => chunks.push(d));
     proc.on("close", (code) => {

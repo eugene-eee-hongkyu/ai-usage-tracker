@@ -5,12 +5,17 @@ const SERVER_URL = process.env.USAGE_TRACKER_URL ?? "https://ai-usage-tracker-we
 
 const PERIODS = ["today", "week", "month", "all"] as const;
 
+// launchd가 Node에 TZ env를 안 넘겨주면 codeburn이 UTC로 today 계산. 명시 주입.
+const SYSTEM_TZ = Intl.DateTimeFormat().resolvedOptions().timeZone;
+const childEnv = { ...process.env, TZ: SYSTEM_TZ, CODEBURN_TZ: SYSTEM_TZ };
+
 function spawnCodeburn(period: string): Promise<unknown> {
   return new Promise((resolve, reject) => {
     const chunks: Buffer[] = [];
     const proc = spawn("codeburn", ["report", "--format", "json", "--provider", "claude", "--period", period], {
       stdio: ["ignore", "pipe", "pipe"],
       shell: true,
+      env: childEnv,
     });
     proc.stdout.on("data", (d: Buffer) => chunks.push(d));
     proc.on("close", (code: number) => {
@@ -30,6 +35,7 @@ function spawnCcusageDaily(): Promise<unknown> {
     const proc = spawn("ccusage", ["daily", "--json"], {
       stdio: ["ignore", "pipe", "pipe"],
       shell: true,
+      env: childEnv,
     });
     proc.stdout.on("data", (d: Buffer) => chunks.push(d));
     proc.on("close", (code: number) => {
