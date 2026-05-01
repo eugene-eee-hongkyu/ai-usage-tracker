@@ -40,7 +40,7 @@ async function loadApiKey() {
 
 // src/sync.ts
 var SERVER_URL2 = process.env.USAGE_TRACKER_URL ?? "https://ai-usage-tracker-web-psi.vercel.app";
-var PERIODS = ["today", "week", "month", "all"];
+var PERIODS = ["today", "week", "month", "30days", "all"];
 var SYSTEM_TZ = Intl.DateTimeFormat().resolvedOptions().timeZone;
 var childEnv = { ...process.env, TZ: SYSTEM_TZ, CODEBURN_TZ: SYSTEM_TZ };
 function spawnCodeburn(period) {
