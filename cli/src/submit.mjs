@@ -78,6 +78,11 @@ function releaseLock() {
   try { unlinkSync(LOCK_FILE); } catch {}
 }
 
+// launchd가 Node에 TZ env를 안 넘겨주면 codeburn이 UTC로 today 계산.
+// 시스템 timezone을 명시적으로 자식에 주입.
+const SYSTEM_TZ = Intl.DateTimeFormat().resolvedOptions().timeZone;
+const childEnv = { ...process.env, TZ: SYSTEM_TZ, CODEBURN_TZ: SYSTEM_TZ };
+
 function spawnCodeburn(period) {
   return new Promise((resolve, reject) => {
     const chunks = [];
@@ -85,6 +90,7 @@ function spawnCodeburn(period) {
     const proc = spawn("codeburn", ["report", "--format", "json", "--provider", "claude", "--period", period], {
       stdio: ["ignore", "pipe", "pipe"],
       shell: true,
+      env: childEnv,
     });
     proc.stdout.on("data", (d) => chunks.push(d));
     proc.on("close", (code) => {
@@ -106,6 +112,7 @@ function spawnCcusageDaily() {
     const proc = spawn("ccusage", ["daily", "--json"], {
       stdio: ["ignore", "pipe", "pipe"],
       shell: true,
+      env: childEnv,
     });
     proc.stdout.on("data", (d) => chunks.push(d));
     proc.on("close", (code) => {

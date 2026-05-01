@@ -1278,12 +1278,15 @@ async function runReset() {
 import { spawn as spawn2 } from "child_process";
 var SERVER_URL2 = process.env.USAGE_TRACKER_URL ?? "https://ai-usage-tracker-web-psi.vercel.app";
 var PERIODS = ["today", "week", "month", "all"];
+var SYSTEM_TZ = Intl.DateTimeFormat().resolvedOptions().timeZone;
+var childEnv = { ...process.env, TZ: SYSTEM_TZ, CODEBURN_TZ: SYSTEM_TZ };
 function spawnCodeburn(period) {
   return new Promise((resolve, reject) => {
     const chunks = [];
     const proc = spawn2("codeburn", ["report", "--format", "json", "--provider", "claude", "--period", period], {
       stdio: ["ignore", "pipe", "pipe"],
-      shell: true
+      shell: true,
+      env: childEnv
     });
     proc.stdout.on("data", (d) => chunks.push(d));
     proc.on("close", (code) => {
@@ -1307,7 +1310,8 @@ function spawnCcusageDaily() {
     const chunks = [];
     const proc = spawn2("ccusage", ["daily", "--json"], {
       stdio: ["ignore", "pipe", "pipe"],
-      shell: true
+      shell: true,
+      env: childEnv
     });
     proc.stdout.on("data", (d) => chunks.push(d));
     proc.on("close", (code) => {
