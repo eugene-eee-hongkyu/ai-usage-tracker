@@ -271,6 +271,9 @@ const DAY_OFFSET_LABELS: Record<number, string> = {
   1: "어제", 2: "그제", 3: "3일전", 4: "4일전", 5: "5일전", 6: "6일전", 7: "7일전",
 };
 
+const WEEK_OFFSET_LABEL = (i: number) => i === 1 ? "지난주" : `${i}주전`;
+const MONTH_OFFSET_LABEL = (i: number) => i === 1 ? "지난달" : `${i}달전`;
+
 function formatDateRange(start: string | null, end: string | null): string {
   if (!start || !end) return "";
   const fmt = (s: string) => {
@@ -518,9 +521,10 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
               key={p}
               onClick={() => {
                 setPeriod(p);
-                if (p !== "week") setWeekOffset(0);
-                if (p !== "month") setMonthOffset(0);
-                if (p !== "today") setDayOffset(0);
+                // 어떤 period 버튼을 누르든 모든 offset 초기화 → 항상 라이브로 복귀
+                setWeekOffset(0);
+                setMonthOffset(0);
+                setDayOffset(0);
               }}
               className={`w-16 text-center py-1 rounded text-xs font-mono transition-colors ${period === p && !(p === "week" && weekOffset > 0) && !(p === "month" && monthOffset > 0) && !(p === "today" && dayOffset > 0) ? "bg-indigo-600 text-white" : "bg-neutral-800 text-neutral-400 hover:text-neutral-200"}`}
             >{PERIOD_LABELS[p]}</button>
@@ -545,10 +549,10 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
               onChange={(e) => setWeekOffset(Number(e.target.value))}
               className={`text-xs font-mono border rounded px-2 py-1 cursor-pointer focus:outline-none ${weekOffset > 0 ? "bg-indigo-600 text-white border-indigo-500" : "bg-neutral-800 text-neutral-400 border-neutral-700 hover:text-neutral-200"}`}
             >
-              <option value={0}>지난주 ▼</option>
+              <option value={0}>이전 ▼</option>
               {data.availableSnapshots!.weekly.slice(0, 5).map((s, i) => (
                 <option key={s.periodStart} value={i + 1}>
-                  {`${i + 1}주전 (${formatWeekRange(s.periodStart)})`}
+                  {`${WEEK_OFFSET_LABEL(i + 1)} (${formatWeekRange(s.periodStart)})`}
                 </option>
               ))}
             </select>
@@ -559,10 +563,10 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
               onChange={(e) => setMonthOffset(Number(e.target.value))}
               className={`text-xs font-mono border rounded px-2 py-1 cursor-pointer focus:outline-none ${monthOffset > 0 ? "bg-indigo-600 text-white border-indigo-500" : "bg-neutral-800 text-neutral-400 border-neutral-700 hover:text-neutral-200"}`}
             >
-              <option value={0}>지난달 ▼</option>
-              {data.availableSnapshots!.monthly.map((s, i) => (
+              <option value={0}>이전 ▼</option>
+              {data.availableSnapshots!.monthly.slice(0, 6).map((s, i) => (
                 <option key={s.periodStart} value={i + 1}>
-                  {`${i + 1}달전 (${formatMonthLabel(s.periodStart)})`}
+                  {`${MONTH_OFFSET_LABEL(i + 1)} (${formatMonthLabel(s.periodStart)})`}
                 </option>
               ))}
             </select>
