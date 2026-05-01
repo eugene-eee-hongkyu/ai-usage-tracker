@@ -135,6 +135,39 @@ export async function GET(req: NextRequest) {
       const d = getPeriodData(snap.rawJson, period);
       const dAll = getPeriodData(snap.rawJson, "all");
 
+      // Stale month/day check — codeburn에서 4월 데이터를 받은 멤버가 다른 멤버와
+      // 함께 "이번달"로 집계되면 May와 April이 섞인다. 첫 daily 날짜가 현재
+      // month/day와 다르면 그 멤버를 0으로 처리하고 활동 집계에서 제외.
+      const firstDailyDate = (d.daily ?? [])[0]?.date;
+      const nowUtc = new Date().toISOString();
+      const currentMonthKey = nowUtc.slice(0, 7);   // "YYYY-MM"
+      const currentDayKey = nowUtc.slice(0, 10);    // "YYYY-MM-DD"
+      const isStale = (() => {
+        if (!firstDailyDate) return false;
+        if (period === "month") return !firstDailyDate.startsWith(currentMonthKey);
+        if (period === "today") return firstDailyDate !== currentDayKey;
+        return false;
+      })();
+
+      if (isStale) {
+        return {
+          userId: u.id,
+          name: u.name,
+          avatarUrl: u.avatarUrl,
+          lastSyncedAt: u.lastSyncedAt?.toISOString() ?? null,
+          totalCost: 0,
+          totalTokens: 0,
+          sessionsCount: 0,
+          cacheHitPct: 0,
+          overallOneShot: 0,
+          efficiencyScore: 0,
+          topProject: "",
+          callsCount: 0,
+          outputInputRatio: 0,
+          prevCostPerSession: null,
+        };
+      }
+
       // ccusage daily tokens — sum by dates that appear in this period's daily array
       const periodDates = new Set((d.daily ?? []).map((day) => day.date));
       const ccusageDaily =
