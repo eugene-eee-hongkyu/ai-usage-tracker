@@ -6,19 +6,19 @@
 
 ---
 
-## 마지막 실행: 2026-05-01 15:59
-## 마지막 업데이트: 2026-05-01 10:37
+## 마지막 실행: 2026-05-02 09:41
+## 마지막 업데이트: 2026-05-02 09:41
 ## 현재 모드: bypassPermissions
 
 ### 현재 집중
 
-- 운영 안정화 — codeburn UTC 버그 우회 + 30일 period + 팀 stale 필터 배포 완료. 다른 4명 팀원의 다음 sync로 자가 치유 재검증 대기
+- 운영 안정화 — codeburn timeout/allSettled/today.period 파싱 fix 배포. 본인 + 팀원 repair로 새 코드 적용 + 다음 launchd sync 검증
 
 ### 이어서 할 것
 
-1. 다른 팀원들의 12:00/18:00 SGT launchd sync 후 period_snapshots에 daily(4/30) / monthly(4/1) 자동 promote 확인
-2. 5/2 00:00+ 첫 sync 후 본인 머신의 5/1 daily promote 확인
-3. 5/4(월) 첫 sync 후 weekly 스냅샷 promote 확인
+1. 본인 머신 repair → 새 submit.mjs(timeout 600s + allSettled) 적용 + 다음 launchd sync에서 timeout 미발생 확인
+2. 팀원 4명도 repair 안내 → ccusage 5/1 entry 가져와 자가 치유 promote
+3. 5/4(월) 첫 weekly promote 검증
 
 ### 막힌 것
 
@@ -30,8 +30,8 @@
 
 ### 백로그 요약
 
-- 대기 중: 3개
-- 최근 추가: 2026-05-01 — 6/1 첫 monthly 스냅샷 promote 검증
+- 대기 중: 4개
+- 최근 추가: 2026-05-02 — 팀원 4명 자가 치유 promote 검증
 
 ### 진행 상황
 
@@ -43,16 +43,18 @@
 - [x] Supabase 마이그레이션 0001 / 0002 적용 완료
 - [x] 한방 설치 스크립트 — install.sh / install.ps1
 - [x] ADMIN 배지 — nav 팀원 / team Last Sync / Top Sessions
-- [x] boundary timezone 의존성 제거 — `deriveUserTodayFromBody` (`a4a82bf`)
-- [x] codeburn UTC 버그 우회 — payload max date (`82698a9`) + CLI TZ 주입 (`1eb917f`, `c2b655e`)
-- [x] submit.log via appendFileSync — 모든 호출 경로 로그 (`cc17d9b`)
-- [x] dashboard 오늘 override — codeburn UTC daily → ccusage local-today (`e58a475`)
-- [x] period button 모든 offset 리셋 + 드롭다운 라벨 통일 (`8e20ef9`)
-- [x] 30일 period 추가 (codeburn parity, `4fc5db8`)
-- [x] 팀 stale 멤버 필터 — 4월/5월 mixed 방지 (`f81a8dd`)
-- [x] 본인 머신 자가 치유 검증 — daily/monthly promote 자동 발생 + DB 클린업
-- [ ] 다른 팀원 4명의 다음 sync로 자가 치유 재검증
-- [ ] 5/2 첫 daily 스냅샷 promote 검증
+- [x] boundary timezone 의존성 제거 — `deriveUserTodayFromBody`
+- [x] codeburn UTC 버그 우회 — payload max date + CLI TZ 주입
+- [x] submit.log via appendFileSync — 모든 호출 경로 로그
+- [x] dashboard 오늘 override — codeburn UTC daily → ccusage local-today
+- [x] period button 모든 offset 리셋 + 드롭다운 라벨 통일
+- [x] 30일 period 추가 (codeburn parity)
+- [x] 팀 stale 멤버 필터 — 4월/5월 mixed 방지
+- [x] 본인 머신 자가 치유 검증 — daily/monthly promote 자동 발생
+- [x] codeburn/ccusage timeout 600s 확장 + Promise.allSettled (`d29ed62`, `a95dae2`)
+- [x] today.period 라벨 정규식 파싱 — daily 빈 케이스 boundary 감지 (`fb5815e`)
+- [ ] 본인 repair → 새 submit.mjs + 다음 sync에서 timeout 미발생 검증
+- [ ] 팀원 4명 자가 치유 promote 검증
 - [ ] 5/4 첫 weekly 스냅샷 promote 검증
 - [ ] 6/1 첫 monthly 스냅샷 promote 검증
-- [ ] codeburn npm 새 버전 배포 시 `--timezone` flag 활용 가능 (현재는 TZ env로 우회 중)
+- [ ] codeburn npm 새 버전 배포 시 `--timezone` flag 활용 (현재는 TZ env로 우회)

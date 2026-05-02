@@ -4,6 +4,22 @@
 
 ---
 
+## 2026-05-02: codeburn/ccusage spawn 견고화 — 600s timeout + Promise.allSettled + today.period 파싱
+
+- **선택**: 60s codeburn timeout을 600s로 확장, `Promise.all` → `Promise.allSettled`로 변경, `deriveUserTodayFromBody`에 codeburn `today.period` 라벨 정규식 파싱 추가
+- **대안 검토**:
+  - _현 상태(60s) 유지_: 정상 14~15초인데 변동성으로 가끔 60s+ 초과 → ingest 누락. 근본 원인(codeburn 변동성) 우리가 못 고치는데 fail rate 높음
+  - _180s로 소폭 상향_: 대부분 통과. 단 진짜 느린 edge case 미보장
+  - _600s + allSettled (선택)_: timeout은 거의 모든 정상 케이스 커버 + 한 period 실패해도 나머지 살림 + period 라벨에서 날짜 추출로 boundary 누락 방지
+- **선택 이유**:
+  - timeout 600s는 launchd 6시간 간격 대비 무시 가능. 진짜 hung process는 차단됨
+  - allSettled로 today만 실패해도 week/month/30days/all + ccusage는 ingest. 부분 데이터라도 살려서 "이번주" 등 다른 탭 정상 동작
+  - today.period 파싱: codeburn은 `"Today (2026-05-02)"` 라벨에 정확한 날짜 명시. daily 배열 비어있어도(새 날 시작인데 작업 X) boundary 감지 가능
+- **영향 범위**: `cli/src/submit.mjs`, `cli/src/sync.ts`, `web/src/app/api/ingest/route.ts`. 사용자 머신은 repair 1번 필요
+- **되돌리는 방법**: timeout 60_000으로 원복, `Promise.all` 다시 사용, `today.period` 파싱 라인 제거
+
+---
+
 ## 2026-05-01: 팀 페이지 stale 멤버 필터 (current month/day 미일치 시 0 처리)
 
 - **선택**: 팀 API에서 멤버 `rawJson.{month,today}.daily[0].date`가 현재 UTC YYYY-MM(또는 YYYY-MM-DD)와 다르면 그 멤버를 0 처리 + 활동 합산에서 제외
