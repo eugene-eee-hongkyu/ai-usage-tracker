@@ -25,7 +25,7 @@ function spawnCodeburn(period: string): Promise<unknown> {
       } catch (e) { reject(e); }
     });
     proc.on("error", reject);
-    setTimeout(() => { proc.kill(); reject(new Error(`codeburn timeout (period=${period})`)); }, 120_000);
+    setTimeout(() => { proc.kill(); reject(new Error(`codeburn timeout (period=${period})`)); }, 600_000);
   });
 }
 
