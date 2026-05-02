@@ -45,7 +45,7 @@ function spawnCcusageDaily(): Promise<unknown> {
       } catch { resolve(null); }
     });
     proc.on("error", () => resolve(null));
-    setTimeout(() => { proc.kill(); resolve(null); }, 120_000);
+    setTimeout(() => { proc.kill(); resolve(null); }, 600_000);
   });
 }
 
