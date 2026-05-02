@@ -90,7 +90,7 @@ function spawnCcusageDaily() {
     setTimeout(() => {
       proc.kill();
       resolve(null);
-    }, 120000);
+    }, 600000);
   });
 }
 async function runSync(_days) {

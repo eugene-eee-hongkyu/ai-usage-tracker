@@ -125,7 +125,7 @@ function spawnCcusageDaily() {
       }
     });
     proc.on("error", () => resolve(null));
-    setTimeout(() => { proc.kill(); resolve(null); }, 60_000);
+    setTimeout(() => { proc.kill(); resolve(null); }, 600_000);
   });
 }
 
