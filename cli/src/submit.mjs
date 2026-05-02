@@ -103,7 +103,7 @@ function spawnCodeburn(period) {
       }
     });
     proc.on("error", reject);
-    setTimeout(() => { proc.kill(); reject(new Error(`codeburn timeout (period=${period})`)); }, 60_000);
+    setTimeout(() => { proc.kill(); reject(new Error(`codeburn timeout (period=${period})`)); }, 180_000);
   });
 }
 
@@ -144,18 +144,37 @@ async function main() {
     }
     log("API key loaded");
 
-    let report;
+    let report = {};
     try {
-      log("spawning codeburn x4 + ccusage...");
-      const [codeburnResults, ccusageDaily] = await Promise.all([
-        Promise.all(PERIODS.map((p) => spawnCodeburn(p))),
+      log(`spawning codeburn x${PERIODS.length} + ccusage...`);
+      const settled = await Promise.allSettled([
+        ...PERIODS.map((p) => spawnCodeburn(p)),
         spawnCcusageDaily(),
       ]);
-      report = Object.fromEntries(PERIODS.map((p, i) => [p, codeburnResults[i]]));
+      const cbResults = settled.slice(0, PERIODS.length);
+      const ccResult = settled[PERIODS.length];
+
+      const okPeriods = [];
+      const failPeriods = [];
+      for (let i = 0; i < PERIODS.length; i++) {
+        const r = cbResults[i];
+        if (r.status === "fulfilled" && r.value) {
+          report[PERIODS[i]] = r.value;
+          okPeriods.push(PERIODS[i]);
+        } else {
+          failPeriods.push(`${PERIODS[i]}:${r.status === "rejected" ? r.reason?.message ?? r.reason : "empty"}`);
+        }
+      }
+      const ccusageDaily = ccResult.status === "fulfilled" ? ccResult.value : null;
       if (ccusageDaily) report.ccusageDaily = ccusageDaily;
-      log(`spawn done — codeburn periods=${PERIODS.length}, ccusage=${ccusageDaily ? "ok" : "null"}`);
+
+      if (okPeriods.length === 0 && !ccusageDaily) {
+        log(`ERROR: all spawns failed — ${failPeriods.join(", ")}`);
+        return;
+      }
+      log(`spawn done — codeburn ok=[${okPeriods.join(",")}]${failPeriods.length ? ` fail=[${failPeriods.join(",")}]` : ""}, ccusage=${ccusageDaily ? "ok" : "null"}`);
     } catch (e) {
-      log(`ERROR: codeburn/ccusage failed — ${e?.message ?? e}`);
+      log(`ERROR: spawn block — ${e?.message ?? e}`);
       return;
     }
 

@@ -109,9 +109,14 @@ function deriveUserTodayFromBody(body: unknown): string | null {
   const candidates: string[] = [];
 
   // codeburn today.daily[0].date
-  const today = b.today as { daily?: Array<{ date?: string }> } | undefined;
+  const today = b.today as { daily?: Array<{ date?: string }>; period?: string } | undefined;
   const cbDate = today?.daily?.[0]?.date;
   if (cbDate && /^\d{4}-\d{2}-\d{2}$/.test(cbDate)) candidates.push(cbDate);
+
+  // codeburn today.period 라벨 — "Today (YYYY-MM-DD)" 형태에서 날짜 추출.
+  // daily가 비어있어도(사용자가 새 날에 아직 작업 안 함) period 라벨엔 정확한 날짜 있음.
+  const periodMatch = today?.period?.match?.(/(\d{4}-\d{2}-\d{2})/);
+  if (periodMatch) candidates.push(periodMatch[1]);
 
   // ccusageDaily.daily의 모든 날짜 (정확한 로컬 timezone)
   const cu = b.ccusageDaily as { daily?: Array<{ date?: string }> } | undefined;
