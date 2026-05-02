@@ -103,7 +103,7 @@ function spawnCodeburn(period) {
       }
     });
     proc.on("error", reject);
-    setTimeout(() => { proc.kill(); reject(new Error(`codeburn timeout (period=${period})`)); }, 180_000);
+    setTimeout(() => { proc.kill(); reject(new Error(`codeburn timeout (period=${period})`)); }, 600_000);
   });
 }
 

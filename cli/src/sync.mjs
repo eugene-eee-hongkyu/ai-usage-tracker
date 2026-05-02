@@ -65,7 +65,7 @@ function spawnCodeburn(period) {
     setTimeout(() => {
       proc.kill();
       reject(new Error(`codeburn timeout (period=${period})`));
-    }, 120000);
+    }, 600000);
   });
 }
 function spawnCcusageDaily() {
