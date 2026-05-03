@@ -275,6 +275,25 @@ export async function GET(req: NextRequest) {
     ? daily.reduce((s, day) => s + day.cost, 0)
     : null;
 
+  // Heatmap (period 무관, 항상 직전 28일치). ccusage 우선, 없으면 codeburn all daily.
+  const heatmapDailySource: Array<{ date?: string; totalCost?: number; cost?: number }> =
+    ccusageRows.length > 0
+      ? ccusageRows
+      : (((snap[0].rawJson as Record<string, unknown>).all as { daily?: Array<{ date?: string; cost?: number }> } | undefined)?.daily ?? []);
+  const heatmapMap: Record<string, number> = {};
+  for (const r of heatmapDailySource) {
+    if (!r.date) continue;
+    heatmapMap[r.date] = (r as { totalCost?: number; cost?: number }).totalCost ?? r.cost ?? 0;
+  }
+  const heatmapDaily: Array<{ date: string; cost: number }> = [];
+  const heatmapBase = new Date();
+  for (let i = 27; i >= 0; i--) {
+    const d2 = new Date(heatmapBase);
+    d2.setDate(d2.getDate() - i);
+    const key = d2.toISOString().slice(0, 10);
+    heatmapDaily.push({ date: key, cost: heatmapMap[key] ?? 0 });
+  }
+
   // Build path lookup for topSessions
   const projectPathMap: Record<string, string> = {};
   for (const p of d.projects ?? []) {
@@ -352,6 +371,7 @@ export async function GET(req: NextRequest) {
     overview: { cost: finalCost, sessions, calls, cacheHitPct, oneShotRate, activeDays, costPerCall: finalCostPerCall, outputInputRatio },
     daily,
     dailyTokens,
+    heatmapDaily,
     activities,
     projects,
     topSessions,

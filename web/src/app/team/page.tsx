@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
 import { Nav } from "@/components/nav";
 import {
   AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
@@ -497,14 +496,14 @@ export default function TeamPage() {
                         return (
                           <tr key={m.userId} className="border-b border-neutral-800/50 hover:bg-neutral-800/30 transition-colors">
                             <td className="py-2.5 pr-4">
-                              <Link href={`/team/${m.userId}`} className="flex items-center gap-2 hover:text-neutral-200 text-neutral-300">
+                              <span className="flex items-center gap-2 text-neutral-300">
                                 <span
                                   className="w-2 h-2 rounded-full shrink-0"
                                   style={{ background: MEMBER_COLORS[i % MEMBER_COLORS.length] }}
                                 />
                                 <span>{m.name}</span>
                                 <SyncBadge lastSyncedAt={m.lastSyncedAt} />
-                              </Link>
+                              </span>
                             </td>
                             <GradeCell grade={cacheHitGrade(m.cacheHitPct)}>
                               {m.cacheHitPct.toFixed(1)}%

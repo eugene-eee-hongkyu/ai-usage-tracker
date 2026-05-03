@@ -92,7 +92,7 @@ export default function MemberProfilePage() {
             data={calData}
             colorScheme="dark"
             theme={{ dark: ["#1e293b", "#4338ca", "#6366f1", "#818cf8", "#a5b4fc"] }}
-            labels={{ legend: { less: "낮음", more: "높음" } }}
+            labels={{ legend: { less: "낮음", more: "높음" }, totalCount: "" }}
             showWeekdayLabels
             blockSize={14}
           />

@@ -5,6 +5,7 @@ import { useSession, signOut } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { Nav } from "@/components/nav";
 import { CacheHitModal, OneShotRateModal, CostPerSessionModal, CallsPerSessionModal, CostPerCallModal, OutputInputRatioModal } from "@/components/metric-modal";
+import { ActivityCalendar } from "react-activity-calendar";
 
 type Period = "today" | "week" | "month" | "30days" | "all";
 
@@ -66,6 +67,7 @@ interface DashboardData {
   overview: Overview | null;
   daily: DailyRow[];
   dailyTokens?: DailyTokenRow[];
+  heatmapDaily?: Array<{ date: string; cost: number }>;
   activities: Activity[];
   projects: Project[];
   topSessions: TopSession[];
@@ -1118,6 +1120,32 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
             </div>
           </div>
         </div>
+
+        {/* Activity Heatmap (last 4 weeks, cost-based) */}
+        {(data.heatmapDaily ?? []).length > 0 && (() => {
+          const calData = (data.heatmapDaily ?? []).map((row) => {
+            const cost = row.cost;
+            const level: 0 | 1 | 2 | 3 | 4 = cost === 0 ? 0 : cost < 0.5 ? 1 : cost < 2 ? 2 : cost < 5 ? 3 : 4;
+            return { date: row.date, count: Math.round(cost * 100), level };
+          });
+          return (
+            <div className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-indigo-500 rounded">
+              <div className="px-3 py-2 border-b border-neutral-800">
+                <span className="text-xs font-mono font-bold text-indigo-400 uppercase tracking-wider">활동 히트맵 (4주, 비용 기준)</span>
+              </div>
+              <div className="p-3">
+                <ActivityCalendar
+                  data={calData}
+                  colorScheme="dark"
+                  theme={{ dark: ["#1e293b", "#4338ca", "#6366f1", "#818cf8", "#a5b4fc"] }}
+                  labels={{ legend: { less: "낮음", more: "높음" }, totalCount: "" }}
+                  showWeekdayLabels
+                  blockSize={14}
+                />
+              </div>
+            </div>
+          );
+        })()}
 
       </main>
 
