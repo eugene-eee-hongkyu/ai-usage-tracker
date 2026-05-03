@@ -287,7 +287,8 @@ export async function GET(req: NextRequest) {
   }
   const heatmapDaily: Array<{ date: string; cost: number }> = [];
   const heatmapBase = new Date();
-  for (let i = 27; i >= 0; i--) {
+  // 13주 = 91일
+  for (let i = 90; i >= 0; i--) {
     const d2 = new Date(heatmapBase);
     d2.setDate(d2.getDate() - i);
     const key = d2.toISOString().slice(0, 10);
