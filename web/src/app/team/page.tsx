@@ -301,6 +301,11 @@ export default function TeamPage() {
             >{PERIOD_LABELS[p]}</button>
           ))}
         </div>
+        {period === "week" && (
+          <div className="max-w-6xl mx-auto px-4 pb-2 text-[11px] font-mono text-amber-400/80">
+            이번주(월~오늘) 는 일자별 합계 · 토큰 · Top Sessions 만 정확합니다. Activities / Models / Tools 등 활동별 상세는 <span className="font-bold">8일</span> 또는 <span className="font-bold">이번달</span> 탭을 참조하세요.
+          </div>
+        )}
       </div>
 
       {/* Team Summary Bar */}

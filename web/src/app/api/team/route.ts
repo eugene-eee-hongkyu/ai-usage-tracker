@@ -91,9 +91,11 @@ function isoMondayFromYmd(ymd: string): string {
 }
 
 // "이번주" = calendar week (Mon ~ today). codeburn's rawJson.week is rolling
-// 8-day so we re-derive: filter rawJson.all.daily to Mon~today and recompute
-// overview totals. Activities/projects/etc. inherit from the rolling-week
-// snapshot as best approximation (they aren't date-bucketed in codeburn output).
+// 8-day so we re-derive: filter rawJson.all.daily to Mon~today + recompute
+// overview totals + filter topSessions to date range. Activities / projects /
+// models / tools / shellCommands aren't date-bucketed in codeburn output so we
+// return empty arrays for week — UI shows a banner pointing users to 8일 /
+// 이번달 tabs for those breakdowns.
 function computeCalendarWeek(raw: unknown, userTz: string | null | undefined): RawPeriodData {
   if (typeof raw !== "object" || raw === null) return {};
   const r = raw as Record<string, unknown>;
@@ -104,16 +106,39 @@ function computeCalendarWeek(raw: unknown, userTz: string | null | undefined): R
   const cost = filtered.reduce((s, day) => s + (day.cost ?? 0), 0);
   const sessions = filtered.reduce((s, day) => s + (day.sessions ?? 0), 0);
   const calls = filtered.reduce((s, day) => s + (day.calls ?? 0), 0);
-  const base = (r.week as RawPeriodData | undefined) ?? {};
+  const baseWeek = (r.week as RawPeriodData | undefined) ?? {};
+
+  // Top sessions: union week + all (codeburn caps each), dedupe by id, keep
+  // only entries that fall in [monday, today].
+  const seen = new Set<string>();
+  const topSessions: RawTopSession[] = [];
+  const candidates = [
+    ...(baseWeek.topSessions ?? []),
+    ...(((r.all as RawPeriodData | undefined)?.topSessions) ?? []),
+  ];
+  for (const s of candidates) {
+    if (!s.date || s.date < monday || s.date > today) continue;
+    const id = s.id ?? s.sessionId ?? `${s.date}-${s.cost ?? 0}`;
+    if (seen.has(id)) continue;
+    seen.add(id);
+    topSessions.push(s);
+  }
+  topSessions.sort((a, b) => (b.cost ?? 0) - (a.cost ?? 0));
+
   return {
-    ...base,
     daily: filtered,
     overview: {
-      ...(base.overview ?? {}),
+      ...(baseWeek.overview ?? {}),
       cost,
       sessions: sessions || calls,
       calls,
     },
+    topSessions,
+    activities: [],
+    projects: [],
+    models: [],
+    tools: [],
+    shellCommands: [],
   };
 }
 
