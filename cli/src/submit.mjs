@@ -107,25 +107,60 @@ function spawnCodeburn(period) {
   });
 }
 
+// ccusage 결과 + 실패 사유. main()에서 ingest payload에 ccusageMissing 플래그를 붙이고
+// submit.log에 명확한 진단 라인을 남긴다.
+let ccusageStatus = "unknown"; // "ok" | "missing" | "error" | "timeout" | "parse"
+
 function spawnCcusageDaily() {
   return new Promise((resolve) => {
-    const chunks = [];
+    const stdoutChunks = [];
+    const stderrChunks = [];
     const proc = spawn("ccusage", ["daily", "--json"], {
       stdio: ["ignore", "pipe", "pipe"],
       shell: true,
       env: childEnv,
     });
-    proc.stdout.on("data", (d) => chunks.push(d));
+    proc.stdout.on("data", (d) => stdoutChunks.push(d));
+    proc.stderr.on("data", (d) => stderrChunks.push(d));
     proc.on("close", (code) => {
-      if (code !== 0) return resolve(null);
+      if (code !== 0) {
+        // shell: true → ENOENT는 exit 127 + stderr "command not found"로 나타남
+        const stderr = Buffer.concat(stderrChunks).toString("utf8");
+        if (code === 127 || /not found|not recognized|cannot find/i.test(stderr)) {
+          ccusageStatus = "missing";
+          log("ccusage NOT INSTALLED — token graphs will be empty. Run: npm install -g ccusage");
+        } else {
+          ccusageStatus = "error";
+          log(`ccusage exited ${code} — ${stderr.trim().slice(0, 200)}`);
+        }
+        return resolve(null);
+      }
       try {
-        resolve(JSON.parse(Buffer.concat(chunks).toString("utf8").trim()));
-      } catch {
+        const data = JSON.parse(Buffer.concat(stdoutChunks).toString("utf8").trim());
+        ccusageStatus = "ok";
+        resolve(data);
+      } catch (e) {
+        ccusageStatus = "parse";
+        log(`ccusage JSON parse error: ${e?.message ?? e}`);
         resolve(null);
       }
     });
-    proc.on("error", () => resolve(null));
-    setTimeout(() => { proc.kill(); resolve(null); }, 600_000);
+    proc.on("error", (err) => {
+      if (err && err.code === "ENOENT") {
+        ccusageStatus = "missing";
+        log("ccusage NOT INSTALLED — token graphs will be empty. Run: npm install -g ccusage");
+      } else {
+        ccusageStatus = "error";
+        log(`ccusage spawn error: ${err?.message ?? err}`);
+      }
+      resolve(null);
+    });
+    setTimeout(() => {
+      proc.kill();
+      ccusageStatus = "timeout";
+      log("ccusage timeout (600s)");
+      resolve(null);
+    }, 600_000);
   });
 }
 
@@ -167,12 +202,13 @@ async function main() {
       }
       const ccusageDaily = ccResult.status === "fulfilled" ? ccResult.value : null;
       if (ccusageDaily) report.ccusageDaily = ccusageDaily;
+      if (ccusageStatus === "missing") report.ccusageMissing = true;
 
       if (okPeriods.length === 0 && !ccusageDaily) {
         log(`ERROR: all spawns failed — ${failPeriods.join(", ")}`);
         return;
       }
-      log(`spawn done — codeburn ok=[${okPeriods.join(",")}]${failPeriods.length ? ` fail=[${failPeriods.join(",")}]` : ""}, ccusage=${ccusageDaily ? "ok" : "null"}`);
+      log(`spawn done — codeburn ok=[${okPeriods.join(",")}]${failPeriods.length ? ` fail=[${failPeriods.join(",")}]` : ""}, ccusage=${ccusageStatus}`);
     } catch (e) {
       log(`ERROR: spawn block — ${e?.message ?? e}`);
       return;

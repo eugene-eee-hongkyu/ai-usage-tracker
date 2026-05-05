@@ -58,6 +58,7 @@ interface MemberStat {
   topProject: string;
   callsCount: number;
   outputInputRatio: number;
+  ccusageMissing?: boolean;
 }
 
 interface TeamActivity {
@@ -110,6 +111,18 @@ function SyncBadge({ lastSyncedAt }: { lastSyncedAt: string | null }) {
   if (days >= 5) return <span className="text-[10px] text-red-400 font-mono" title="데이터 수신 없음">⚠{days}일</span>;
   if (days >= 2) return <span className="text-[10px] text-yellow-500 font-mono">{days}일전</span>;
   return null;
+}
+
+function CcusageMissingBadge({ missing }: { missing: boolean | undefined }) {
+  if (!missing) return null;
+  return (
+    <span
+      className="text-[10px] text-orange-400 font-mono px-1 py-0.5 rounded bg-orange-500/10 border border-orange-500/40 leading-none"
+      title="ccusage 미설치 — 토큰/비용 데이터가 수집되지 않습니다. npm install -g ccusage 후 repair 실행 필요"
+    >
+      ccusage❌
+    </span>
+  );
 }
 
 function GradePill({ grade }: { grade: GradeLevel }) {
@@ -420,7 +433,10 @@ export default function TeamPage() {
                               }}
                             />
                           </div>
-                          <span className="flex-1 text-neutral-300 truncate">{m.name}</span>
+                          <span className="flex-1 text-neutral-300 truncate flex items-center gap-1.5">
+                            <span className="truncate">{m.name}</span>
+                            <CcusageMissingBadge missing={m.ccusageMissing} />
+                          </span>
                           <span className="w-16 text-cyan-300 text-right tabular-nums">{fmtTokens(m.totalTokens)}</span>
                         </div>
                       );
@@ -503,6 +519,7 @@ export default function TeamPage() {
                                 />
                                 <span>{m.name}</span>
                                 <SyncBadge lastSyncedAt={m.lastSyncedAt} />
+                                <CcusageMissingBadge missing={m.ccusageMissing} />
                               </span>
                             </td>
                             <GradeCell grade={cacheHitGrade(m.cacheHitPct)}>

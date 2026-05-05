@@ -314,19 +314,27 @@ async function installCcusage(): Promise<boolean> {
   }
 }
 
-async function ensureCcusage(): Promise<void> {
+async function ensureCcusage(): Promise<boolean> {
   if (checkCcusage()) {
     console.log("✅ ccusage 확인됨\n");
-    return;
+    return true;
   }
   console.log("⚠️  ccusage가 설치되어 있지 않습니다. 설치 시도 중...");
-  const ok = await installCcusage();
-  if (ok) {
+  const installed = await installCcusage();
+  // npm exit 0 이어도 PATH 갱신 지연/권한 문제로 실제 호출이 실패할 수 있으니 재확인.
+  if (installed && checkCcusage()) {
     console.log("✅ ccusage 설치 완료\n");
-  } else {
-    console.log("⚠️  ccusage 설치 실패. 토큰 그래프는 비어 있을 수 있습니다.");
-    console.log("   수동 설치: npm install -g ccusage\n");
+    return true;
   }
+  const bar = "═".repeat(60);
+  console.log("\n" + bar);
+  console.log("❌ ccusage 설치 실패");
+  console.log("   → 토큰/비용 데이터가 수집되지 않습니다.");
+  console.log("   → 수동 설치 후 repair 를 다시 실행하세요:");
+  console.log("       npm install -g ccusage");
+  console.log("       npx --yes github:eugene-eee-hongkyu/ai-usage-tracker repair");
+  console.log(bar + "\n");
+  return false;
 }
 
 export async function runRepair() {
@@ -340,7 +348,7 @@ export async function runRepair() {
   }
   console.log("✅ API 키 확인됨\n");
 
-  await ensureCcusage();
+  const ccusageOk = await ensureCcusage();
 
   // submit.mjs는 standalone 실행이라 keytar 없음 → 항상 파일에도 보장
   const fallbackPath = path.join(os.homedir(), ".primus-usage-key");
@@ -355,6 +363,9 @@ export async function runRepair() {
   console.log("\n✨ 복구 완료!");
   console.log("   0/6/12/18시마다 자동으로 사용량이 수집됩니다.");
   console.log(`   대시보드: ${SERVER_URL}/dashboard\n`);
+  if (!ccusageOk) {
+    console.log("⚠️  주의: ccusage 미설치 상태로 저장되어 토큰/비용은 비어 있습니다.\n");
+  }
   process.exit(0);
 }
 
@@ -383,7 +394,7 @@ export async function runInit() {
     console.log("✅ codeburn 확인됨\n");
   }
 
-  await ensureCcusage();
+  const ccusageOk = await ensureCcusage();
 
   const existingKey = await loadApiKey();
   if (existingKey) {
@@ -420,5 +431,8 @@ export async function runInit() {
   console.log("\n✨ 설치 완료!");
   console.log("   0/6/12/18시마다 자동으로 사용량이 수집됩니다.");
   console.log(`   대시보드: ${SERVER_URL}/dashboard\n`);
+  if (!ccusageOk) {
+    console.log("⚠️  주의: ccusage 미설치 상태로 저장되어 토큰/비용은 비어 있습니다.\n");
+  }
   process.exit(0);
 }

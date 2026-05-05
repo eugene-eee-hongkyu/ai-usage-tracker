@@ -1164,18 +1164,26 @@ async function ensureCcusage() {
   if (checkCcusage()) {
     console.log(`✅ ccusage 확인됨
 `);
-    return;
+    return true;
   }
   console.log("⚠️  ccusage가 설치되어 있지 않습니다. 설치 시도 중...");
-  const ok = await installCcusage();
-  if (ok) {
+  const installed = await installCcusage();
+  if (installed && checkCcusage()) {
     console.log(`✅ ccusage 설치 완료
 `);
-  } else {
-    console.log("⚠️  ccusage 설치 실패. 토큰 그래프는 비어 있을 수 있습니다.");
-    console.log(`   수동 설치: npm install -g ccusage
-`);
+    return true;
   }
+  const bar = "═".repeat(60);
+  console.log(`
+` + bar);
+  console.log("❌ ccusage 설치 실패");
+  console.log("   → 토큰/비용 데이터가 수집되지 않습니다.");
+  console.log("   → 수동 설치 후 repair 를 다시 실행하세요:");
+  console.log("       npm install -g ccusage");
+  console.log("       npx --yes github:eugene-eee-hongkyu/ai-usage-tracker repair");
+  console.log(bar + `
+`);
+  return false;
 }
 async function runRepair() {
   console.log(`\uD83D\uDD27 Usage Tracker 복구 시작
@@ -1188,7 +1196,7 @@ async function runRepair() {
   }
   console.log(`✅ API 키 확인됨
 `);
-  await ensureCcusage();
+  const ccusageOk = await ensureCcusage();
   const fallbackPath = path.join(os.homedir(), ".primus-usage-key");
   fs.writeFileSync(fallbackPath, apiKey, { mode: 384 });
   fs.mkdirSync(STABLE_DIR, { recursive: true });
@@ -1201,6 +1209,10 @@ async function runRepair() {
   console.log("   0/6/12/18시마다 자동으로 사용량이 수집됩니다.");
   console.log(`   대시보드: ${SERVER_URL}/dashboard
 `);
+  if (!ccusageOk) {
+    console.log(`⚠️  주의: ccusage 미설치 상태로 저장되어 토큰/비용은 비어 있습니다.
+`);
+  }
   process.exit(0);
 }
 async function runInit() {
@@ -1227,7 +1239,7 @@ async function runInit() {
     console.log(`✅ codeburn 확인됨
 `);
   }
-  await ensureCcusage();
+  const ccusageOk = await ensureCcusage();
   const existingKey = await loadApiKey();
   if (existingKey) {
     const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
@@ -1258,6 +1270,10 @@ async function runInit() {
   console.log("   0/6/12/18시마다 자동으로 사용량이 수집됩니다.");
   console.log(`   대시보드: ${SERVER_URL}/dashboard
 `);
+  if (!ccusageOk) {
+    console.log(`⚠️  주의: ccusage 미설치 상태로 저장되어 토큰/비용은 비어 있습니다.
+`);
+  }
   process.exit(0);
 }
 

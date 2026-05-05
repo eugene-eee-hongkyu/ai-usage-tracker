@@ -149,6 +149,9 @@ export async function GET(req: NextRequest) {
         return false;
       })();
 
+      const ccusageMissing =
+        (snap.rawJson as Record<string, unknown> | null)?.ccusageMissing === true;
+
       if (isStale) {
         return {
           userId: u.id,
@@ -165,6 +168,7 @@ export async function GET(req: NextRequest) {
           callsCount: 0,
           outputInputRatio: 0,
           prevCostPerSession: null,
+          ccusageMissing,
         };
       }
 
@@ -287,6 +291,7 @@ export async function GET(req: NextRequest) {
         outputInputRatio,
         prevCostPerSession,
         totalTokens,
+        ccusageMissing,
       };
     })
     .filter((m): m is NonNullable<typeof m> => m !== null);
