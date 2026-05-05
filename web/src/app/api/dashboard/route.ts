@@ -5,7 +5,7 @@ import { db, userSnapshots, users, periodSnapshots } from "@/lib/db";
 import { and, asc, desc, eq } from "drizzle-orm";
 import { isAdmin } from "@/lib/admin";
 
-type Period = "today" | "week" | "month" | "30days" | "all";
+type Period = "today" | "week" | "month" | "8days" | "30days" | "all";
 
 interface RawOverview {
   cost?: number;
@@ -60,7 +60,7 @@ interface RawNameCalls { name?: string; calls?: number }
 interface RawPeriodData {
   overview?: RawOverview;
   summary?: RawOverview;
-  daily?: Array<{ date: string; cost: number; sessions: number }>;
+  daily?: Array<{ date: string; cost: number; sessions: number; calls?: number }>;
   activities?: RawActivity[];
   projects?: RawProject[];
   topSessions?: RawTopSession[];
@@ -86,9 +86,65 @@ function getCcusageDaily(raw: unknown): CcusageDailyRow[] {
   return cu?.daily ?? [];
 }
 
-function getPeriodData(raw: unknown, period: string): RawPeriodData {
+function deriveTodayYmd(rawJson: unknown, userTz: string | null | undefined): string {
+  if (typeof rawJson === "object" && rawJson !== null) {
+    const r = rawJson as Record<string, unknown>;
+    const todayPeriod = (r.today as { period?: string } | undefined)?.period;
+    const m = todayPeriod?.match?.(/(\d{4}-\d{2}-\d{2})/);
+    if (m) return m[1];
+  }
+  const tz = userTz ?? "UTC";
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: tz, year: "numeric", month: "2-digit", day: "2-digit",
+  }).formatToParts(new Date());
+  const get = (t: string) => parts.find((p) => p.type === t)?.value ?? "00";
+  return `${get("year")}-${get("month")}-${get("day")}`;
+}
+
+function isoMondayFromYmd(ymd: string): string {
+  const [y, m, d] = ymd.split("-").map(Number);
+  const utc = new Date(Date.UTC(y, m - 1, d));
+  const dow = utc.getUTCDay();
+  utc.setUTCDate(utc.getUTCDate() - ((dow + 6) % 7));
+  return utc.toISOString().slice(0, 10);
+}
+
+// "이번주" = calendar week (Mon ~ today). codeburn's rawJson.week is rolling
+// 8-day so we re-derive: filter rawJson.all.daily to Mon~today and recompute
+// overview totals. Activities/projects/etc inherit from rolling-week as
+// approximation (codeburn doesn't return date-bucketed activity breakdowns).
+function computeCalendarWeek(raw: unknown, userTz: string | null | undefined): RawPeriodData {
   if (typeof raw !== "object" || raw === null) return {};
   const r = raw as Record<string, unknown>;
+  const today = deriveTodayYmd(raw, userTz);
+  const monday = isoMondayFromYmd(today);
+  const allDaily = (r.all as RawPeriodData | undefined)?.daily ?? [];
+  const filtered = allDaily.filter((day) => day.date >= monday && day.date <= today);
+  const cost = filtered.reduce((s, day) => s + (day.cost ?? 0), 0);
+  const sessions = filtered.reduce((s, day) => s + (day.sessions ?? 0), 0);
+  const calls = filtered.reduce((s, day) => s + (day.calls ?? 0), 0);
+  const base = (r.week as RawPeriodData | undefined) ?? {};
+  return {
+    ...base,
+    daily: filtered,
+    overview: {
+      ...(base.overview ?? {}),
+      cost,
+      sessions: sessions || calls,
+      calls,
+    },
+  };
+}
+
+function getPeriodData(raw: unknown, period: string, userTz?: string | null): RawPeriodData {
+  if (typeof raw !== "object" || raw === null) return {};
+  const r = raw as Record<string, unknown>;
+  if (period === "week" && "all" in r) {
+    return computeCalendarWeek(raw, userTz);
+  }
+  if (period === "8days") {
+    return ((r.week as RawPeriodData | undefined) ?? {}) as RawPeriodData;
+  }
   if ("all" in r || "today" in r) {
     return (r[period] ?? r.all ?? {}) as RawPeriodData;
   }
@@ -200,7 +256,7 @@ export async function GET(req: NextRequest) {
 
   const d: RawPeriodData = snapshotRow
     ? (snapshotRow.rawJson as RawPeriodData) ?? {}
-    : getPeriodData(snap[0].rawJson, period);
+    : getPeriodData(snap[0].rawJson, period, user[0].timezone);
   const ov = d.overview ?? d.summary ?? {};
 
   const cost = ov.cost ?? ov.totalCost ?? 0;

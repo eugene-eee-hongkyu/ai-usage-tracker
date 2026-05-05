@@ -8,11 +8,11 @@ import {
   AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
 } from "recharts";
 
-type Period = "today" | "week" | "month" | "30days" | "all";
+type Period = "today" | "week" | "month" | "8days" | "30days" | "all";
 type GradeLevel = "탁월" | "양호" | "보통" | "부족" | "경고";
 
 const PERIOD_LABELS: Record<Period, string> = {
-  today: "오늘", week: "이번주", month: "이번달", "30days": "30일", all: "전체",
+  today: "오늘", week: "이번주", month: "이번달", "8days": "8일", "30days": "30일", all: "전체",
 };
 
 const GRADE_STYLES: Record<GradeLevel, string> = {
@@ -223,7 +223,7 @@ export default function TeamPage() {
 
   useEffect(() => {
     const saved = localStorage.getItem("team_period");
-    if (saved && ["today", "week", "month", "30days", "all"].includes(saved)) {
+    if (saved && ["today", "week", "month", "8days", "30days", "all"].includes(saved)) {
       setPeriod(saved as Period);
     }
   }, []);
@@ -293,7 +293,7 @@ export default function TeamPage() {
       {/* Period Tabs */}
       <div className="border-b border-neutral-800">
         <div className="max-w-6xl mx-auto px-4 pt-3 pb-2 flex gap-1">
-          {(["today", "week", "month", "30days", "all"] as Period[]).map((p) => (
+          {(["today", "week", "month", "8days", "30days", "all"] as Period[]).map((p) => (
             <button
               key={p}
               onClick={() => setPeriod(p)}

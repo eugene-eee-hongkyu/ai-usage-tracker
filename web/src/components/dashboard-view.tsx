@@ -7,7 +7,7 @@ import { Nav } from "@/components/nav";
 import { CacheHitModal, OneShotRateModal, CostPerSessionModal, CallsPerSessionModal, CostPerCallModal, OutputInputRatioModal } from "@/components/metric-modal";
 import { ActivityCalendar } from "react-activity-calendar";
 
-type Period = "today" | "week" | "month" | "30days" | "all";
+type Period = "today" | "week" | "month" | "8days" | "30days" | "all";
 
 interface Overview {
   cost: number;
@@ -80,7 +80,7 @@ interface DashboardData {
 }
 
 const PERIOD_LABELS: Record<Period, string> = {
-  today: "오늘", week: "이번주", month: "이번달", "30days": "30일", all: "전체",
+  today: "오늘", week: "이번주", month: "이번달", "8days": "8일", "30days": "30일", all: "전체",
 };
 
 function formatPath(path: string): string {
@@ -336,7 +336,7 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
 
   useEffect(() => {
     const saved = localStorage.getItem(storageKey);
-    if (saved && ["today", "week", "month", "30days", "all"].includes(saved)) {
+    if (saved && ["today", "week", "month", "8days", "30days", "all"].includes(saved)) {
       setPeriod(saved as Period);
     }
   }, [storageKey]);
@@ -518,7 +518,7 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
       {/* Period Tabs */}
       <div className="border-b border-neutral-800">
         <div className="max-w-6xl mx-auto px-4 pt-3 pb-2 flex gap-1 items-center">
-          {(["today", "week", "month", "30days", "all"] as Period[]).map((p) => (
+          {(["today", "week", "month", "8days", "30days", "all"] as Period[]).map((p) => (
             <button
               key={p}
               onClick={() => {
