@@ -5,7 +5,7 @@ import { db, userSnapshots, users, periodSnapshots } from "@/lib/db";
 import { and, asc, desc, eq } from "drizzle-orm";
 import { isAdmin } from "@/lib/admin";
 
-type Period = "today" | "week" | "month" | "8days" | "30days" | "all";
+type Period = "today" | "month" | "8days" | "30days" | "all";
 
 interface RawOverview {
   cost?: number;
@@ -86,86 +86,10 @@ function getCcusageDaily(raw: unknown): CcusageDailyRow[] {
   return cu?.daily ?? [];
 }
 
-function deriveTodayYmd(rawJson: unknown, userTz: string | null | undefined): string {
-  if (typeof rawJson === "object" && rawJson !== null) {
-    const r = rawJson as Record<string, unknown>;
-    const todayPeriod = (r.today as { period?: string } | undefined)?.period;
-    const m = todayPeriod?.match?.(/(\d{4}-\d{2}-\d{2})/);
-    if (m) return m[1];
-  }
-  const tz = userTz ?? "UTC";
-  const parts = new Intl.DateTimeFormat("en-CA", {
-    timeZone: tz, year: "numeric", month: "2-digit", day: "2-digit",
-  }).formatToParts(new Date());
-  const get = (t: string) => parts.find((p) => p.type === t)?.value ?? "00";
-  return `${get("year")}-${get("month")}-${get("day")}`;
-}
-
-function isoMondayFromYmd(ymd: string): string {
-  const [y, m, d] = ymd.split("-").map(Number);
-  const utc = new Date(Date.UTC(y, m - 1, d));
-  const dow = utc.getUTCDay();
-  utc.setUTCDate(utc.getUTCDate() - ((dow + 6) % 7));
-  return utc.toISOString().slice(0, 10);
-}
-
-// "이번주" = calendar week (Mon ~ today). codeburn's rawJson.week is rolling
-// 8-day so we re-derive: filter rawJson.all.daily to Mon~today + recompute
-// overview totals + filter topSessions to date range. Activities / projects /
-// models / tools / shellCommands / mcpServers aren't date-bucketed in codeburn
-// output so we return empty arrays for week — UI shows a banner pointing users
-// to 8일 / 이번달 tabs for those breakdowns.
-function computeCalendarWeek(raw: unknown, userTz: string | null | undefined): RawPeriodData {
+function getPeriodData(raw: unknown, period: string): RawPeriodData {
   if (typeof raw !== "object" || raw === null) return {};
   const r = raw as Record<string, unknown>;
-  const today = deriveTodayYmd(raw, userTz);
-  const monday = isoMondayFromYmd(today);
-  const allDaily = (r.all as RawPeriodData | undefined)?.daily ?? [];
-  const filtered = allDaily.filter((day) => day.date >= monday && day.date <= today);
-  const cost = filtered.reduce((s, day) => s + (day.cost ?? 0), 0);
-  const sessions = filtered.reduce((s, day) => s + (day.sessions ?? 0), 0);
-  const calls = filtered.reduce((s, day) => s + (day.calls ?? 0), 0);
-  const baseWeek = (r.week as RawPeriodData | undefined) ?? {};
-
-  const seen = new Set<string>();
-  const topSessions: RawTopSession[] = [];
-  const candidates = [
-    ...(baseWeek.topSessions ?? []),
-    ...(((r.all as RawPeriodData | undefined)?.topSessions) ?? []),
-  ];
-  for (const s of candidates) {
-    if (!s.date || s.date < monday || s.date > today) continue;
-    const id = s.id ?? s.sessionId ?? `${s.date}-${s.cost ?? 0}`;
-    if (seen.has(id)) continue;
-    seen.add(id);
-    topSessions.push(s);
-  }
-  topSessions.sort((a, b) => (b.cost ?? 0) - (a.cost ?? 0));
-
-  return {
-    daily: filtered,
-    overview: {
-      ...(baseWeek.overview ?? {}),
-      cost,
-      sessions: sessions || calls,
-      calls,
-    },
-    topSessions,
-    activities: [],
-    projects: [],
-    models: [],
-    tools: [],
-    shellCommands: [],
-    mcpServers: [],
-  };
-}
-
-function getPeriodData(raw: unknown, period: string, userTz?: string | null): RawPeriodData {
-  if (typeof raw !== "object" || raw === null) return {};
-  const r = raw as Record<string, unknown>;
-  if (period === "week" && "all" in r) {
-    return computeCalendarWeek(raw, userTz);
-  }
+  // 8days uses codeburn's rolling-week storage key (rawJson.week).
   if (period === "8days") {
     return ((r.week as RawPeriodData | undefined) ?? {}) as RawPeriodData;
   }
@@ -180,7 +104,7 @@ export async function GET(req: NextRequest) {
   if (!session?.user?.email)
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
 
-  const period = (req.nextUrl.searchParams.get("period") ?? "week") as Period;
+  const period = (req.nextUrl.searchParams.get("period") ?? "8days") as Period;
   const requestedUserId = req.nextUrl.searchParams.get("userId");
   const weekOffset = parseInt(req.nextUrl.searchParams.get("weekOffset") ?? "0") || 0;
   const monthOffset = parseInt(req.nextUrl.searchParams.get("monthOffset") ?? "0") || 0;
@@ -234,7 +158,7 @@ export async function GET(req: NextRequest) {
 
   // Load snapshot if requested
   let snapshotRow: { periodType: string; periodStart: string; capturedAt: Date; rawJson: unknown } | null = null;
-  if (weekOffset > 0 && period === "week") {
+  if (weekOffset > 0 && period === "8days") {
     const rows = await db
       .select()
       .from(periodSnapshots)
@@ -280,7 +204,7 @@ export async function GET(req: NextRequest) {
 
   const d: RawPeriodData = snapshotRow
     ? (snapshotRow.rawJson as RawPeriodData) ?? {}
-    : getPeriodData(snap[0].rawJson, period, user[0].timezone);
+    : getPeriodData(snap[0].rawJson, period);
   const ov = d.overview ?? d.summary ?? {};
 
   const cost = ov.cost ?? ov.totalCost ?? 0;

@@ -7,7 +7,7 @@ import { Nav } from "@/components/nav";
 import { CacheHitModal, OneShotRateModal, CostPerSessionModal, CallsPerSessionModal, CostPerCallModal, OutputInputRatioModal } from "@/components/metric-modal";
 import { ActivityCalendar } from "react-activity-calendar";
 
-type Period = "today" | "week" | "month" | "8days" | "30days" | "all";
+type Period = "today" | "month" | "8days" | "30days" | "all";
 
 interface Overview {
   cost: number;
@@ -80,7 +80,7 @@ interface DashboardData {
 }
 
 const PERIOD_LABELS: Record<Period, string> = {
-  today: "오늘", week: "이번주", month: "이번달", "8days": "8일", "30days": "30일", all: "전체",
+  today: "오늘", month: "이번달", "8days": "8일", "30days": "30일", all: "전체",
 };
 
 function formatPath(path: string): string {
@@ -332,12 +332,14 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
   const viewOnly = !!targetUserId;
   const { data: session, status } = useSession();
   const router = useRouter();
-  const [period, setPeriod] = useState<Period>("week");
+  const [period, setPeriod] = useState<Period>("8days");
 
   useEffect(() => {
     const saved = localStorage.getItem(storageKey);
-    if (saved && ["today", "week", "month", "8days", "30days", "all"].includes(saved)) {
-      setPeriod(saved as Period);
+    // legacy "week" → "8days" (calendar week feature was removed)
+    const upgraded = saved === "week" ? "8days" : saved;
+    if (upgraded && ["today", "month", "8days", "30days", "all"].includes(upgraded)) {
+      setPeriod(upgraded as Period);
     }
   }, [storageKey]);
 
@@ -374,7 +376,7 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
   const apiUrl = (p: Period, wOff: number, mOff: number, dOff: number) => {
     const params = new URLSearchParams({ period: p });
     if (targetUserId) params.set("userId", targetUserId);
-    if (p === "week" && wOff > 0) params.set("weekOffset", String(wOff));
+    if (p === "8days" && wOff > 0) params.set("weekOffset", String(wOff));
     if (p === "month" && mOff > 0) params.set("monthOffset", String(mOff));
     if (p === "today" && dOff > 0) params.set("dayOffset", String(dOff));
     return `/api/dashboard?${params.toString()}`;
@@ -518,7 +520,7 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
       {/* Period Tabs */}
       <div className="border-b border-neutral-800">
         <div className="max-w-6xl mx-auto px-4 pt-3 pb-2 flex gap-1 items-center">
-          {(["today", "week", "month", "8days", "30days", "all"] as Period[]).map((p) => (
+          {(["today", "month", "8days", "30days", "all"] as Period[]).map((p) => (
             <button
               key={p}
               onClick={() => {
@@ -528,7 +530,7 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
                 setMonthOffset(0);
                 setDayOffset(0);
               }}
-              className={`w-16 text-center py-1 rounded text-xs font-mono transition-colors ${period === p && !(p === "week" && weekOffset > 0) && !(p === "month" && monthOffset > 0) && !(p === "today" && dayOffset > 0) ? "bg-indigo-600 text-white" : "bg-neutral-800 text-neutral-400 hover:text-neutral-200"}`}
+              className={`w-16 text-center py-1 rounded text-xs font-mono transition-colors ${period === p && !(p === "8days" && weekOffset > 0) && !(p === "month" && monthOffset > 0) && !(p === "today" && dayOffset > 0) ? "bg-indigo-600 text-white" : "bg-neutral-800 text-neutral-400 hover:text-neutral-200"}`}
             >{PERIOD_LABELS[p]}</button>
           ))}
           {period === "today" && (data.availableSnapshots?.daily?.length ?? 0) > 0 && (
@@ -545,7 +547,7 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
               ))}
             </select>
           )}
-          {period === "week" && (data.availableSnapshots?.weekly?.length ?? 0) > 0 && (
+          {period === "8days" && (data.availableSnapshots?.weekly?.length ?? 0) > 0 && (
             <select
               value={weekOffset}
               onChange={(e) => setWeekOffset(Number(e.target.value))}
@@ -585,11 +587,6 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
             </select>
           )}
         </div>
-        {period === "week" && (
-          <div className="max-w-6xl mx-auto px-4 pb-2 text-[11px] font-mono text-amber-400/80">
-            이번주(월~오늘) 는 일자별 합계 · 토큰 · Top Sessions 만 정확합니다. Activities / Projects / Models / Tools 등 활동별 상세는 <span className="font-bold">8일</span> 또는 <span className="font-bold">이번달</span> 탭을 참조하세요.
-          </div>
-        )}
       </div>
 
       {/* Overview Bar */}
