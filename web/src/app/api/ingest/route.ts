@@ -166,6 +166,38 @@ export async function POST(req: NextRequest) {
   const rawMonthData = bodyObj.month as Record<string, unknown> | null | undefined;
   const rawDayData = bodyObj.today as Record<string, unknown> | null | undefined;
 
+  // Read existing snapshot up-front: needed both for boundary-crossing promotion
+  // (below) AND for the ccusage merge logic just below.
+  const existing = await db
+    .select()
+    .from(userSnapshots)
+    .where(eq(userSnapshots.userId, userRow[0].id))
+    .limit(1);
+
+  const prev = existing[0];
+
+  // ccusage merge: if this submission has no ccusage data (spawn failed/timeout/
+  // empty), keep the previous snapshot's ccusageDaily instead of wiping it. A
+  // single bad run otherwise zeroes out tokens for everyone on the team page.
+  const incomingCcusage = bodyObj.ccusageDaily as
+    | { daily?: Array<{ date?: string; totalTokens?: number }> }
+    | undefined;
+  const incomingCcusageEmpty =
+    !incomingCcusage ||
+    !Array.isArray(incomingCcusage.daily) ||
+    incomingCcusage.daily.length === 0;
+  const prevCcusage =
+    (prev?.rawJson as Record<string, unknown> | null | undefined)?.ccusageDaily as
+      | { daily?: Array<{ date?: string; totalTokens?: number }> }
+      | undefined;
+  const prevHasCcusage =
+    prevCcusage &&
+    Array.isArray(prevCcusage.daily) &&
+    prevCcusage.daily.length > 0;
+  if (incomingCcusageEmpty && prevHasCcusage) {
+    bodyObj.ccusageDaily = prevCcusage;
+  }
+
   // Filter ccusage daily rows to a date range and embed alongside codeburn data
   // so promoted snapshots carry token info.
   const ccusageDaily = (bodyObj.ccusageDaily as { daily?: Array<{ date?: string }> } | undefined)?.daily ?? [];
@@ -184,15 +216,6 @@ export async function POST(req: NextRequest) {
   const dayData = rawDayData
     ? { ...rawDayData, ccusageDaily: { daily: filterCcusage(newDayStart, newDayStart) } }
     : null;
-
-  // Read existing to detect period boundary crossings
-  const existing = await db
-    .select()
-    .from(userSnapshots)
-    .where(eq(userSnapshots.userId, userRow[0].id))
-    .limit(1);
-
-  const prev = existing[0];
 
   // Promote previous-week snapshot if week boundary crossed
   if (prev?.currentWeekStart && prev.currentWeekStart !== newWeekStart && prev.currentWeekRawJson) {
