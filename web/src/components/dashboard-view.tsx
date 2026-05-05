@@ -715,7 +715,7 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
           </div>
         </div>
 
-        {/* Row 2: Efficiency + By Model */}
+        {/* Row 2: Efficiency + Activity Heatmap */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
 
           {/* Efficiency Metrics */}
@@ -847,6 +847,37 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
             </div>
           </div>
 
+          {/* Activity Heatmap (last 13 weeks, cost-based) */}
+          {(data.heatmapDaily ?? []).length > 0 ? (() => {
+            const calData = (data.heatmapDaily ?? []).map((row) => {
+              const cost = row.cost;
+              const level: 0 | 1 | 2 | 3 | 4 = cost === 0 ? 0 : cost < 0.5 ? 1 : cost < 2 ? 2 : cost < 5 ? 3 : 4;
+              return { date: row.date, count: Math.round(cost * 100), level };
+            });
+            return (
+              <div className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-indigo-500 rounded">
+                <div className="px-3 py-2 border-b border-neutral-800">
+                  <span className="text-xs font-mono font-bold text-indigo-400 uppercase tracking-wider">활동 히트맵 (13주, 비용 기준)</span>
+                </div>
+                <div className="p-3">
+                  <ActivityCalendar
+                    data={calData}
+                    colorScheme="dark"
+                    theme={{ dark: ["#1e293b", "#4338ca", "#6366f1", "#818cf8", "#a5b4fc"] }}
+                    labels={{ legend: { less: "낮음", more: "높음" } }}
+                    showWeekdayLabels
+                    blockSize={11}
+                    showTotalCount={false}
+                  />
+                </div>
+              </div>
+            );
+          })() : <div />}
+        </div>
+
+        {/* Row 3: By Model + Top Sessions */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+
           {/* By Model */}
           <div className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-pink-500 rounded">
             <div className="px-3 py-2 border-b border-neutral-800">
@@ -878,9 +909,47 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
               </div>
             </div>
           </div>
+
+          {/* Top Sessions */}
+          <div className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-red-500 rounded">
+            <div className="px-3 py-2 border-b border-neutral-800">
+              <span className="text-xs font-mono font-bold text-red-400 uppercase tracking-wider">Top Sessions</span>
+            </div>
+            <div className="p-3">
+              <div className="flex text-xs text-neutral-600 font-mono mb-1.5">
+                <span className="w-5">#</span>
+                <span className="w-20">date</span>
+                <span className="flex-1">project</span>
+                <span className="w-16 text-right">cost</span>
+                <span className="w-16 text-right">calls</span>
+              </div>
+              <div className="space-y-1">
+                {data.topSessions.slice(0, 5).map((s, i) => {
+                  const displayPath = formatPath(s.projectPath || s.project);
+                  return (
+                    <div key={s.id || i} className="flex items-center gap-2 text-xs font-mono">
+                      <span className="w-5 text-neutral-600">{i + 1}.</span>
+                      <span className="w-20 text-neutral-500 shrink-0">{s.date}</span>
+                      <div className="flex-1 flex items-center gap-2 min-w-0">
+                        <div className="w-16 h-1.5 bg-neutral-800 rounded overflow-hidden shrink-0">
+                          <div className="h-full bg-red-500 rounded" style={{ width: `${(s.cost / maxSessionCost) * 100}%` }} />
+                        </div>
+                        <span className="text-neutral-300 overflow-hidden whitespace-nowrap" style={{ direction: "rtl", textOverflow: "ellipsis", textAlign: "left" }} title={s.projectPath || s.project}>{displayPath}</span>
+                      </div>
+                      <span className="w-16 text-yellow-400 text-right shrink-0">{fmt$(s.cost)}</span>
+                      <span className="w-16 text-neutral-500 text-right shrink-0">{s.calls.toLocaleString()}</span>
+                    </div>
+                  );
+                })}
+                {data.topSessions.length === 0 && (
+                  <p className="text-neutral-600 text-xs font-mono">no data</p>
+                )}
+              </div>
+            </div>
+          </div>
         </div>
 
-        {/* Row 3: By Project + By Activity */}
+        {/* Row 4: By Project + By Activity */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
 
           {/* By Project */}
@@ -972,83 +1041,6 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
           </div>
         </div>
 
-        {/* Row 4: Top Sessions + MCP Servers */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-
-          {/* Top Sessions */}
-          <div className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-red-500 rounded">
-            <div className="px-3 py-2 border-b border-neutral-800">
-              <span className="text-xs font-mono font-bold text-red-400 uppercase tracking-wider">Top Sessions</span>
-            </div>
-            <div className="p-3">
-              <div className="flex text-xs text-neutral-600 font-mono mb-1.5">
-                <span className="w-5">#</span>
-                <span className="w-20">date</span>
-                <span className="flex-1">project</span>
-                <span className="w-16 text-right">cost</span>
-                <span className="w-16 text-right">calls</span>
-              </div>
-              <div className="space-y-1">
-                {data.topSessions.slice(0, 5).map((s, i) => {
-                  const displayPath = formatPath(s.projectPath || s.project);
-                  return (
-                    <div key={s.id || i} className="flex items-center gap-2 text-xs font-mono">
-                      <span className="w-5 text-neutral-600">{i + 1}.</span>
-                      <span className="w-20 text-neutral-500 shrink-0">{s.date}</span>
-                      <div className="flex-1 flex items-center gap-2 min-w-0">
-                        <div className="w-16 h-1.5 bg-neutral-800 rounded overflow-hidden shrink-0">
-                          <div className="h-full bg-red-500 rounded" style={{ width: `${(s.cost / maxSessionCost) * 100}%` }} />
-                        </div>
-                        <span className="text-neutral-300 overflow-hidden whitespace-nowrap" style={{ direction: "rtl", textOverflow: "ellipsis", textAlign: "left" }} title={s.projectPath || s.project}>{displayPath}</span>
-                      </div>
-                      <span className="w-16 text-yellow-400 text-right shrink-0">{fmt$(s.cost)}</span>
-                      <span className="w-16 text-neutral-500 text-right shrink-0">{s.calls.toLocaleString()}</span>
-                    </div>
-                  );
-                })}
-                {data.topSessions.length === 0 && (
-                  <p className="text-neutral-600 text-xs font-mono">no data</p>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* MCP Servers */}
-          <div className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-cyan-500 rounded">
-            <div className="px-3 py-2 border-b border-neutral-800 flex items-center justify-between">
-              <span className="text-xs font-mono font-bold text-cyan-400 uppercase tracking-wider">MCP Servers</span>
-              {(data.mcpServers ?? []).length > 15 && (
-                <span className="flex items-center gap-1 text-[10px] font-mono bg-cyan-900/40 text-cyan-300 border border-cyan-700/60 rounded px-1.5 py-0.5">
-                  ↕ scroll · {(data.mcpServers ?? []).length}
-                </span>
-              )}
-            </div>
-            <div className="p-3">
-              <div className="flex text-xs text-neutral-600 font-mono mb-1.5">
-                <span className="flex-1">server</span>
-                <span className="w-16 text-right">calls</span>
-              </div>
-              <div className={(data.mcpServers ?? []).length > 15 ? "overflow-y-auto max-h-[300px] no-scrollbar" : ""}>
-                <div className="space-y-1">
-                  {(data.mcpServers ?? []).map((m) => {
-                    const maxCalls = Math.max(...(data.mcpServers ?? []).map((x) => x.calls), 0.01);
-                    return (
-                      <div key={m.name} className="flex items-center gap-1.5 text-xs font-mono">
-                        <div className="w-16 h-1.5 bg-neutral-800 rounded overflow-hidden shrink-0">
-                          <div className="h-full bg-cyan-500 rounded" style={{ width: `${(m.calls / maxCalls) * 100}%` }} />
-                        </div>
-                        <span className="flex-1 text-neutral-300 truncate">{m.name}</span>
-                        <span className="w-16 text-blue-400 text-right">{m.calls.toLocaleString()}</span>
-                      </div>
-                    );
-                  })}
-                  {(data.mcpServers ?? []).length === 0 && <p className="text-neutral-600 text-xs font-mono">no data</p>}
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
         {/* Row 5: Core Tools + Shell Commands */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
 
@@ -1123,35 +1115,46 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
           </div>
         </div>
 
-        {/* Activity Heatmap (last 13 weeks, cost-based) */}
-        {(data.heatmapDaily ?? []).length > 0 && (() => {
-          const calData = (data.heatmapDaily ?? []).map((row) => {
-            const cost = row.cost;
-            const level: 0 | 1 | 2 | 3 | 4 = cost === 0 ? 0 : cost < 0.5 ? 1 : cost < 2 ? 2 : cost < 5 ? 3 : 4;
-            return { date: row.date, count: Math.round(cost * 100), level };
-          });
-          return (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-              <div className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-indigo-500 rounded">
-                <div className="px-3 py-2 border-b border-neutral-800">
-                  <span className="text-xs font-mono font-bold text-indigo-400 uppercase tracking-wider">활동 히트맵 (13주, 비용 기준)</span>
-                </div>
-                <div className="p-3">
-                  <ActivityCalendar
-                    data={calData}
-                    colorScheme="dark"
-                    theme={{ dark: ["#1e293b", "#4338ca", "#6366f1", "#818cf8", "#a5b4fc"] }}
-                    labels={{ legend: { less: "낮음", more: "높음" } }}
-                    showWeekdayLabels
-                    blockSize={11}
-                    showTotalCount={false}
-                  />
+        {/* Row 6: MCP Servers */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+
+          {/* MCP Servers */}
+          <div className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-cyan-500 rounded">
+            <div className="px-3 py-2 border-b border-neutral-800 flex items-center justify-between">
+              <span className="text-xs font-mono font-bold text-cyan-400 uppercase tracking-wider">MCP Servers</span>
+              {(data.mcpServers ?? []).length > 15 && (
+                <span className="flex items-center gap-1 text-[10px] font-mono bg-cyan-900/40 text-cyan-300 border border-cyan-700/60 rounded px-1.5 py-0.5">
+                  ↕ scroll · {(data.mcpServers ?? []).length}
+                </span>
+              )}
+            </div>
+            <div className="p-3">
+              <div className="flex text-xs text-neutral-600 font-mono mb-1.5">
+                <span className="flex-1">server</span>
+                <span className="w-16 text-right">calls</span>
+              </div>
+              <div className={(data.mcpServers ?? []).length > 15 ? "overflow-y-auto max-h-[300px] no-scrollbar" : ""}>
+                <div className="space-y-1">
+                  {(data.mcpServers ?? []).map((m) => {
+                    const maxCalls = Math.max(...(data.mcpServers ?? []).map((x) => x.calls), 0.01);
+                    return (
+                      <div key={m.name} className="flex items-center gap-1.5 text-xs font-mono">
+                        <div className="w-16 h-1.5 bg-neutral-800 rounded overflow-hidden shrink-0">
+                          <div className="h-full bg-cyan-500 rounded" style={{ width: `${(m.calls / maxCalls) * 100}%` }} />
+                        </div>
+                        <span className="flex-1 text-neutral-300 truncate">{m.name}</span>
+                        <span className="w-16 text-blue-400 text-right">{m.calls.toLocaleString()}</span>
+                      </div>
+                    );
+                  })}
+                  {(data.mcpServers ?? []).length === 0 && <p className="text-neutral-600 text-xs font-mono">no data</p>}
                 </div>
               </div>
-              <div />
             </div>
-          );
-        })()}
+          </div>
+
+          <div />
+        </div>
 
       </main>
 
