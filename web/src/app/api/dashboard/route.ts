@@ -279,7 +279,11 @@ export async function GET(req: NextRequest) {
     ? daily.reduce((s, day) => s + day.cost, 0)
     : null;
 
-  // Heatmap (period 무관, 항상 직전 28일치). ccusage 우선, 없으면 codeburn all daily.
+  // Heatmap (period 무관). ccusage 우선, 없으면 codeburn all daily.
+  // 길이는 사용자 데이터 시작일에 맞춰 15주~26주 사이에서 동적 결정:
+  //   - 데이터가 14주 이하 → 15주 (최소, 신규 사용자 자연스럽게)
+  //   - 데이터가 15~26주  → 데이터 전부 보임
+  //   - 데이터가 26주 초과 → 26주 (최대, half-width 카드 시각적 한계)
   const heatmapDailySource: Array<{ date?: string; totalCost?: number; cost?: number }> =
     ccusageRows.length > 0
       ? ccusageRows
@@ -289,10 +293,23 @@ export async function GET(req: NextRequest) {
     if (!r.date) continue;
     heatmapMap[r.date] = (r as { totalCost?: number; cost?: number }).totalCost ?? r.cost ?? 0;
   }
-  const heatmapDaily: Array<{ date: string; cost: number }> = [];
+  const HEATMAP_MIN_WEEKS = 15;
+  const HEATMAP_MAX_WEEKS = 26;
   const heatmapBase = new Date();
-  // 13주 = 91일
-  for (let i = 90; i >= 0; i--) {
+  const earliestDate = heatmapDailySource
+    .map((r) => r.date)
+    .filter((d): d is string => !!d)
+    .sort()[0];
+  const dataDays = earliestDate
+    ? Math.floor((heatmapBase.getTime() - new Date(earliestDate).getTime()) / 86_400_000) + 1
+    : 0;
+  const targetWeeks = Math.max(
+    HEATMAP_MIN_WEEKS,
+    Math.min(HEATMAP_MAX_WEEKS, Math.ceil(dataDays / 7)),
+  );
+  const heatmapDays = targetWeeks * 7;
+  const heatmapDaily: Array<{ date: string; cost: number }> = [];
+  for (let i = heatmapDays - 1; i >= 0; i--) {
     const d2 = new Date(heatmapBase);
     d2.setDate(d2.getDate() - i);
     const key = d2.toISOString().slice(0, 10);

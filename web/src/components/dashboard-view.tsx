@@ -857,7 +857,7 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
             return (
               <div className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-indigo-500 rounded">
                 <div className="px-3 py-2 border-b border-neutral-800">
-                  <span className="text-xs font-mono font-bold text-indigo-400 uppercase tracking-wider">활동 히트맵 (13주, 비용 기준)</span>
+                  <span className="text-xs font-mono font-bold text-indigo-400 uppercase tracking-wider">활동 히트맵 ({Math.round((data.heatmapDaily ?? []).length / 7)}주, 비용 기준)</span>
                 </div>
                 <div className="p-3">
                   <ActivityCalendar
