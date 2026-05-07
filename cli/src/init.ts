@@ -14,6 +14,7 @@ const KEYTAR_ACCOUNT = "api-key";
 const CLAUDE_SETTINGS_PATH = path.join(os.homedir(), ".claude", "settings.json");
 const STABLE_DIR = path.join(os.homedir(), ".primus-usage-tracker");
 const STABLE_SUBMIT = path.join(STABLE_DIR, "submit.mjs");
+const API_KEY_FALLBACK = path.join(os.homedir(), ".primus-usage-key");
 const CLI_PORT = 9988;
 
 const LAUNCHD_PLIST = process.platform === "darwin"
@@ -44,14 +45,15 @@ function preflightOwnership(): void {
   // a prior elevated install attempt).
   const targets: Array<{ path: string; label: string }> = [
     { path: STABLE_DIR, label: STABLE_DIR },
+    { path: API_KEY_FALLBACK, label: API_KEY_FALLBACK },
   ];
   if (LAUNCHD_PLIST) targets.push({ path: LAUNCHD_PLIST, label: LAUNCHD_PLIST });
 
-  const wrong: Array<{ path: string; label: string; uid: number }> = [];
+  const wrong: Array<{ path: string; label: string; uid: number; isDir: boolean }> = [];
   for (const t of targets) {
     if (!fs.existsSync(t.path)) continue;
     const stat = fs.statSync(t.path);
-    if (stat.uid !== myUid) wrong.push({ ...t, uid: stat.uid });
+    if (stat.uid !== myUid) wrong.push({ ...t, uid: stat.uid, isDir: stat.isDirectory() });
   }
   if (wrong.length === 0) return;
 
@@ -65,7 +67,8 @@ function preflightOwnership(): void {
   console.error("");
   console.error("   다음 명령으로 소유권 복구 후 다시 실행하세요:");
   for (const w of wrong) {
-    console.error(`     sudo chown -R "$(whoami):staff" "${w.path}"`);
+    const flag = w.isDir ? "-R " : "";
+    console.error(`     sudo chown ${flag}"$(whoami):staff" "${w.path}"`);
   }
   console.error(bar + "\n");
   process.exit(1);
