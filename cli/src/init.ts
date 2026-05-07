@@ -16,6 +16,61 @@ const STABLE_DIR = path.join(os.homedir(), ".primus-usage-tracker");
 const STABLE_SUBMIT = path.join(STABLE_DIR, "submit.mjs");
 const CLI_PORT = 9988;
 
+const LAUNCHD_PLIST = process.platform === "darwin"
+  ? path.join(os.homedir(), "Library", "LaunchAgents", "com.primus.usage-tracker.daily.plist")
+  : null;
+
+// Refuse to install/repair if (a) we're running as root or (b) any of our
+// files already exist with a different owner. Both cases produce a broken
+// install where launchd later runs as the user but can't write to its log /
+// lock files (last exit code 78 EX_CONFIG, daily.log never created).
+function preflightOwnership(): void {
+  if (process.platform === "win32" || !process.getuid) return;
+
+  const myUid = process.getuid();
+  const bar = "═".repeat(60);
+
+  // (a) Refuse root execution outright.
+  if (myUid === 0) {
+    console.error("\n" + bar);
+    console.error("❌ root 권한으로 실행되었습니다");
+    console.error("   설치/수리는 일반 사용자 권한으로만 실행하세요.");
+    console.error("   sudo 없이 다시 시도하세요.");
+    console.error(bar + "\n");
+    process.exit(1);
+  }
+
+  // (b) Refuse if existing files belong to another user (typically root from
+  // a prior elevated install attempt).
+  const targets: Array<{ path: string; label: string }> = [
+    { path: STABLE_DIR, label: STABLE_DIR },
+  ];
+  if (LAUNCHD_PLIST) targets.push({ path: LAUNCHD_PLIST, label: LAUNCHD_PLIST });
+
+  const wrong: Array<{ path: string; label: string; uid: number }> = [];
+  for (const t of targets) {
+    if (!fs.existsSync(t.path)) continue;
+    const stat = fs.statSync(t.path);
+    if (stat.uid !== myUid) wrong.push({ ...t, uid: stat.uid });
+  }
+  if (wrong.length === 0) return;
+
+  console.error("\n" + bar);
+  console.error("❌ 다른 사용자 소유의 파일이 있습니다 (보통 root)");
+  console.error("   원인: 과거 설치가 elevated 권한으로 실행됨.");
+  console.error("   현 상태에선 launchd 가 daily.log / submit.lock 을 못 만들어");
+  console.error("   매 실행이 EX_CONFIG (78) 으로 떨어집니다.");
+  console.error("");
+  for (const w of wrong) console.error(`   uid=${w.uid}  ${w.label}`);
+  console.error("");
+  console.error("   다음 명령으로 소유권 복구 후 다시 실행하세요:");
+  for (const w of wrong) {
+    console.error(`     sudo chown -R "$(whoami):staff" "${w.path}"`);
+  }
+  console.error(bar + "\n");
+  process.exit(1);
+}
+
 async function getKeytar() {
   try {
     const kt = await import("keytar");
@@ -339,6 +394,7 @@ async function ensureCcusage(): Promise<boolean> {
 
 export async function runRepair() {
   console.log("🔧 Usage Tracker 복구 시작\n");
+  preflightOwnership();
 
   const apiKey = await loadApiKey();
   if (!apiKey) {
@@ -371,6 +427,7 @@ export async function runRepair() {
 
 export async function runInit() {
   console.log("🚀 Usage Tracker 설치 시작\n");
+  preflightOwnership();
 
   if (!checkCodeburn()) {
     console.log("⚠️  codeburn이 설치되어 있지 않습니다.");

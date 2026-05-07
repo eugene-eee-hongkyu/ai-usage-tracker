@@ -17,6 +17,55 @@ var CLAUDE_SETTINGS_PATH = path.join(os.homedir(), ".claude", "settings.json");
 var STABLE_DIR = path.join(os.homedir(), ".primus-usage-tracker");
 var STABLE_SUBMIT = path.join(STABLE_DIR, "submit.mjs");
 var CLI_PORT = 9988;
+var LAUNCHD_PLIST = process.platform === "darwin" ? path.join(os.homedir(), "Library", "LaunchAgents", "com.primus.usage-tracker.daily.plist") : null;
+function preflightOwnership() {
+  if (process.platform === "win32" || !process.getuid)
+    return;
+  const myUid = process.getuid();
+  const bar = "═".repeat(60);
+  if (myUid === 0) {
+    console.error(`
+` + bar);
+    console.error("❌ root 권한으로 실행되었습니다");
+    console.error("   설치/수리는 일반 사용자 권한으로만 실행하세요.");
+    console.error("   sudo 없이 다시 시도하세요.");
+    console.error(bar + `
+`);
+    process.exit(1);
+  }
+  const targets = [
+    { path: STABLE_DIR, label: STABLE_DIR }
+  ];
+  if (LAUNCHD_PLIST)
+    targets.push({ path: LAUNCHD_PLIST, label: LAUNCHD_PLIST });
+  const wrong = [];
+  for (const t of targets) {
+    if (!fs.existsSync(t.path))
+      continue;
+    const stat = fs.statSync(t.path);
+    if (stat.uid !== myUid)
+      wrong.push({ ...t, uid: stat.uid });
+  }
+  if (wrong.length === 0)
+    return;
+  console.error(`
+` + bar);
+  console.error("❌ 다른 사용자 소유의 파일이 있습니다 (보통 root)");
+  console.error("   원인: 과거 설치가 elevated 권한으로 실행됨.");
+  console.error("   현 상태에선 launchd 가 daily.log / submit.lock 을 못 만들어");
+  console.error("   매 실행이 EX_CONFIG (78) 으로 떨어집니다.");
+  console.error("");
+  for (const w of wrong)
+    console.error(`   uid=${w.uid}  ${w.label}`);
+  console.error("");
+  console.error("   다음 명령으로 소유권 복구 후 다시 실행하세요:");
+  for (const w of wrong) {
+    console.error(`     sudo chown -R "$(whoami):staff" "${w.path}"`);
+  }
+  console.error(bar + `
+`);
+  process.exit(1);
+}
 async function getKeytar() {
   try {
     const kt = await import("keytar");
@@ -322,6 +371,7 @@ async function ensureCcusage() {
 async function runRepair() {
   console.log(`\uD83D\uDD27 Usage Tracker 복구 시작
 `);
+  preflightOwnership();
   const apiKey = await loadApiKey();
   if (!apiKey) {
     console.error("❌ 설치된 API 키가 없습니다. 먼저 init을 실행하세요:");
@@ -352,6 +402,7 @@ async function runRepair() {
 async function runInit() {
   console.log(`\uD83D\uDE80 Usage Tracker 설치 시작
 `);
+  preflightOwnership();
   if (!checkCodeburn()) {
     console.log("⚠️  codeburn이 설치되어 있지 않습니다.");
     const rl = readline.createInterface({ input: process.stdin, output: process.stdout });

@@ -16,6 +16,7 @@ var KEYTAR_ACCOUNT = "api-key";
 var CLAUDE_SETTINGS_PATH = path.join(os.homedir(), ".claude", "settings.json");
 var STABLE_DIR = path.join(os.homedir(), ".primus-usage-tracker");
 var STABLE_SUBMIT = path.join(STABLE_DIR, "submit.mjs");
+var LAUNCHD_PLIST = process.platform === "darwin" ? path.join(os.homedir(), "Library", "LaunchAgents", "com.primus.usage-tracker.daily.plist") : null;
 async function getKeytar() {
   try {
     const kt = await import("keytar");
