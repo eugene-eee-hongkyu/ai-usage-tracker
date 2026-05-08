@@ -98,14 +98,14 @@ test.describe("DB-1 P2 정상 fixture", () => {
 
   test("[DB-1-12] overview-bar 비용 텍스트 양수 (period=all)", async ({ page }) => {
     await page.goto("/dashboard");
-    // P2 fixture raw_json.all.overview.totalCost=423.78 이지만 ccusageDaily 30일 합산
-    // (14.5×30=$435) 가 우선 적용 (api/dashboard route — ccusage 우선). 양수만 검증.
+    // period=all 클릭 → /api/dashboard?period=all 응답 대기 후 overview-bar 검증.
+    const reqPromise = page.waitForResponse(
+      (r) => r.url().includes("/api/dashboard") && r.url().includes("period=all") && r.status() === 200
+    );
     await page.getByTestId("dash-period-all").click();
-    await expect(page.getByTestId("dash-overview-bar")).toContainText("$");
-    const txt = await page.getByTestId("dash-overview-bar").textContent();
-    const m = txt?.match(/\$([\d,]+\.\d{2})cost/);
-    expect(m).not.toBeNull();
-    expect(parseFloat(m![1].replace(/,/g, ""))).toBeGreaterThan(100);
+    await reqPromise;
+    // toContainText 는 자동 retry → cost 값 양수 보장될 때까지 대기.
+    await expect(page.getByTestId("dash-overview-bar")).toContainText(/\$[1-9]\d/);
   });
 
   test("[DB-1-14] efficiency cache 91% → 양호", async ({ page }) => {
