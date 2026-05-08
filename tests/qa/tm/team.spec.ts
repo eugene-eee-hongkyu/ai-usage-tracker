@@ -3,7 +3,7 @@
  * 입력: docs/qa/QA_TM_team.md
  */
 import { test, expect } from "@playwright/test";
-import { seed, signInAs, clearSession } from "../_shared/auth-helper";
+import { seed, signInAs, clearSession, patchOverview, patchSnapshot } from "../_shared/auth-helper";
 
 test.describe.configure({ mode: "serial" });
 
@@ -201,6 +201,50 @@ test.describe("TM-1 industry 분기", () => {
     await page.goto("/team");
     await expect(page.getByTestId("team-summary-bar")).toBeVisible();
     await expect(page.getByTestId("team-card-industry")).toHaveCount(0);
+  });
+});
+
+// ─── TM-1 efficiency cell BG 5단계 (patchOverview 활용) ──
+
+test.describe("TM-1 efficiency cell BG 5단계", () => {
+  test.beforeAll(() => {
+    seed("team-mixed");
+    // team route period=all 분기에서 snap.cacheHitPct 컬럼 사용 → patchSnapshot.
+    patchSnapshot(10, { cache_hit_pct: 96 }); // 탁월
+    patchSnapshot(13, { cache_hit_pct: 91 }); // 양호
+    patchSnapshot(14, { cache_hit_pct: 80 }); // 보통
+    patchSnapshot(15, { cache_hit_pct: 70 }); // 부족
+    patchSnapshot(12, { cache_hit_pct: 50 }); // 경고
+  });
+  test.beforeEach(async ({ page }) => signInAs(page, "team-mixed"));
+
+  // team page default period="month" 인데 team route line 230 분기에서 raw_json.month.overview 우선.
+  // patchOverview 는 raw_json.all.overview 만 변경 → period=all 클릭 후 검증.
+
+  test("[TM-1-06b] alice cache=96 → cell title='탁월'", async ({ page }) => {
+    await page.goto("/team");
+    await page.getByTestId("team-period-all").click();
+    await expect(page.getByTestId("team-eff-cache-10")).toHaveAttribute("title", "탁월");
+  });
+  test("[TM-1-07] bob cache=91 → cell title='양호'", async ({ page }) => {
+    await page.goto("/team");
+    await page.getByTestId("team-period-all").click();
+    await expect(page.getByTestId("team-eff-cache-13")).toHaveAttribute("title", "양호");
+  });
+  test("[TM-1-08] carol cache=80 → cell title='보통'", async ({ page }) => {
+    await page.goto("/team");
+    await page.getByTestId("team-period-all").click();
+    await expect(page.getByTestId("team-eff-cache-14")).toHaveAttribute("title", "보통");
+  });
+  test("[TM-1-09] dave cache=70 → cell title='부족'", async ({ page }) => {
+    await page.goto("/team");
+    await page.getByTestId("team-period-all").click();
+    await expect(page.getByTestId("team-eff-cache-15")).toHaveAttribute("title", "부족");
+  });
+  test("[TM-1-10] eugene cache=50 → cell title='경고'", async ({ page }) => {
+    await page.goto("/team");
+    await page.getByTestId("team-period-all").click();
+    await expect(page.getByTestId("team-eff-cache-12")).toHaveAttribute("title", "경고");
   });
 });
 

@@ -205,9 +205,9 @@ function memberLabel(key: string): string {
   return key.replace(/__\d+$/, "");
 }
 
-function GradeCell({ grade, children }: { grade: GradeLevel; children: React.ReactNode }) {
+function GradeCell({ grade, children, testid }: { grade: GradeLevel; children: React.ReactNode; testid?: string }) {
   return (
-    <td title={grade} className={`py-2.5 px-3 text-right whitespace-nowrap tabular-nums ${GRADE_CELL_BG[grade]}`}>
+    <td data-testid={testid} title={grade} className={`py-2.5 px-3 text-right whitespace-nowrap tabular-nums ${GRADE_CELL_BG[grade]}`}>
       <span className={`font-bold ${GRADE_VALUE_COLOR[grade]}`}>{children}</span>
     </td>
   );
@@ -543,19 +543,19 @@ export default function TeamPage() {
                                 <CcusageMissingBadge missing={m.ccusageMissing} userId={m.userId} />
                               </span>
                             </td>
-                            <GradeCell grade={cacheHitGrade(m.cacheHitPct)}>
+                            <GradeCell testid={`team-eff-cache-${m.userId}`} grade={cacheHitGrade(m.cacheHitPct)}>
                               {m.cacheHitPct.toFixed(1)}%
                             </GradeCell>
-                            <GradeCell grade={oneShotGrade(m.overallOneShot * 100)}>
+                            <GradeCell testid={`team-eff-oneshot-${m.userId}`} grade={oneShotGrade(m.overallOneShot * 100)}>
                               {Math.round(m.overallOneShot * 100)}%
                             </GradeCell>
-                            <GradeCell grade={costGrade(costPerSession)}>
+                            <GradeCell testid={`team-eff-cost-${m.userId}`} grade={costGrade(costPerSession)}>
                               ${costPerSession.toFixed(2)}
                             </GradeCell>
-                            <GradeCell grade={outputInputGrade(m.outputInputRatio)}>
+                            <GradeCell testid={`team-eff-out-in-${m.userId}`} grade={outputInputGrade(m.outputInputRatio)}>
                               {m.outputInputRatio.toFixed(1)}×
                             </GradeCell>
-                            <td className="py-2.5 pl-3 text-right">
+                            <td data-testid={`team-eff-overall-${m.userId}`} className="py-2.5 pl-3 text-right">
                               <GradePill grade={grade} />
                             </td>
                           </tr>
