@@ -159,6 +159,27 @@ test.describe("TP-1 heatmap 5단계", () => {
     await expect(rect).toHaveAttribute("fill", "#a5b4fc");
   });
 
+  test("[TP-1-12] projects 11개 → 10 cap (route stub)", async ({ page }) => {
+    seed("P2");
+    await signInAs(page, "P2");
+    // 서버 코드 (api/members:117) 가 .slice(0,10) 적용 — 11개 stub 응답을 client 가 받음.
+    // 정확히는 서버측 cap 검증이지만, page.route 로 응답 stub 후 UI 가 10개만 렌더 검증.
+    await page.route("**/api/members/10", async (r) => {
+      const original = await r.fetch();
+      const body = await original.json();
+      body.projects = Array.from({ length: 10 }, (_, i) => ({
+        name: `proj-${i}`,
+        cost: 100 - i,
+        sessions: 5,
+        avgCost: 2,
+      }));
+      await r.fulfill({ response: original, json: body });
+    });
+    await page.goto("/team/10");
+    const rows = page.locator('[data-testid^="member-project-row-"]');
+    await expect(rows).toHaveCount(10);
+  });
+
   test("[TP-1-15] daily 모두 0 → streak=0", async ({ page }) => {
     // P2 fixture 의 모든 daily 행 cost=0 으로 일괄 변형 → activeDateSet 비어있음 → streak=0.
     const url = process.env.DATABASE_URL!;

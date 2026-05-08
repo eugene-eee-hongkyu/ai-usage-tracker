@@ -309,6 +309,38 @@ test.describe("TM 잔여", () => {
     await expect(cell).toContainText("$0");
   });
 
+  test("[TM-1-05] activity / cost 카드 visible (P2)", async ({ page }) => {
+    seed("P2");
+    await signInAs(page, "P2");
+    await page.goto("/team");
+    await expect(page.getByTestId("team-card-activity")).toBeVisible();
+    await expect(page.getByTestId("team-card-cost")).toBeVisible();
+  });
+
+  test("[TM-1-13] 미수신 배지 (lastSyncedAt=null user)", async ({ page }) => {
+    seed("team-mixed");
+    await signInAs(page, "team-mixed");
+    // team-mixed 의 alice (id=10) 의 lastSyncedAt 을 null 로 변형 → '미수신' 배지
+    const { execSync } = await import("node:child_process");
+    execSync(
+      `psql "${process.env.DATABASE_URL}" -c "UPDATE users SET last_synced_at = NULL WHERE id = 10"`,
+      { stdio: "pipe" },
+    );
+    await page.goto("/team");
+    await expect(page.getByTestId("team-sync-badge-10")).toContainText("미수신");
+  });
+
+  test("[TM-1-20] top-sessions 응답 length ≤ 15 (서버 cap, supertest)", async ({ page }) => {
+    seed("team-mixed");
+    await signInAs(page, "team-mixed");
+    // 서버측 cap 검증 — /api/team 응답의 topSessions.length 가 15 이하
+    const res = await page.request.get("/api/team?period=all");
+    expect(res.status()).toBe(200);
+    const body = await res.json();
+    expect(Array.isArray(body.topSessions)).toBe(true);
+    expect(body.topSessions.length).toBeLessThanOrEqual(15);
+  });
+
   test("[TM-1-28] by-member 차트 visible — dailyByMember stub", async ({ page }) => {
     seed("team-mixed");
     await signInAs(page, "team-mixed");

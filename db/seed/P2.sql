@@ -97,5 +97,12 @@ INSERT INTO user_snapshots (
   '{}'::jsonb, NOW()::date
 );
 
+-- period_snapshots 시드 (day-offset / week-offset / month-offset dropdown 검증용)
+INSERT INTO period_snapshots (user_id, period_type, period_start, raw_json) VALUES
+  (10, 'daily',   NOW()::date - INTERVAL '1 day', '{"daily":[],"overview":{"totalCost":12,"sessionsCount":2,"callsCount":40,"cacheHitPct":91,"overallOneShot":0.83},"projects":[],"activities":[],"topSessions":[],"models":[],"tools":[],"shellCommands":[],"mcpServers":[]}'::jsonb),
+  (10, 'daily',   NOW()::date - INTERVAL '2 day', '{"daily":[],"overview":{"totalCost":13,"sessionsCount":2,"callsCount":42,"cacheHitPct":91,"overallOneShot":0.83},"projects":[],"activities":[],"topSessions":[],"models":[],"tools":[],"shellCommands":[],"mcpServers":[]}'::jsonb),
+  (10, 'weekly',  NOW()::date - INTERVAL '7 day', '{"daily":[],"overview":{"totalCost":80,"sessionsCount":15,"callsCount":300,"cacheHitPct":91,"overallOneShot":0.83},"projects":[],"activities":[],"topSessions":[],"models":[],"tools":[],"shellCommands":[],"mcpServers":[]}'::jsonb),
+  (10, 'monthly', '2026-04-01',                   '{"daily":[],"overview":{"totalCost":350,"sessionsCount":75,"callsCount":1500,"cacheHitPct":91,"overallOneShot":0.83},"projects":[],"activities":[],"topSessions":[],"models":[],"tools":[],"shellCommands":[],"mcpServers":[]}'::jsonb);
+
 -- 시퀀스 재정렬 (id=10 다음 INSERT 충돌 방지)
 SELECT setval('users_id_seq', 100);

@@ -120,6 +120,65 @@ test.describe("DB-1 P2 정상 fixture", () => {
     // modal 열린 상태 — 텍스트로 dimmed background detection
     await expect(page.locator("text=Cache hit").first()).toBeVisible();
   });
+
+  test("[DB-1-13] by-project 16개 → scroll 영역", async ({ page }) => {
+    await stubDashboard(page, (body) => {
+      body.projects = Array.from({ length: 16 }, (_, i) => ({
+        name: `proj-${i}`,
+        path: `/proj-${i}`,
+        cost: 10 - i * 0.5,
+        sessions: 5,
+        avgCost: 2,
+      }));
+    });
+    await page.goto("/dashboard");
+    await expect(page.getByTestId("dash-card-by-project")).toBeVisible();
+    const overflow = page.getByTestId("dash-card-by-project").locator(".overflow-y-auto");
+    await expect(overflow).toHaveCount(1);
+  });
+});
+
+// ─── DB-1-06 viewOnly empty (admin 본인 데이터 없는 멤버 viewOnly) ──
+
+test.describe("DB-1 viewOnly empty", () => {
+  test("[DB-1-06] admin viewOnly + overview=null stub → '아직 데이터가 없습니다'", async ({ page }) => {
+    seed("P8");
+    await signInAs(page, "P8");
+    // P8 fixture 의 alice 는 overview 있어 정상 진입. stub 으로 overview=null 강제 → viewOnly empty 분기.
+    await page.route("**/api/dashboard*", async (r) => {
+      const original = await r.fetch();
+      const body = await original.json();
+      body.overview = null;
+      await r.fulfill({ response: original, json: body });
+    });
+    await page.goto("/team/10/dashboard");
+    await expect(page.locator("text=아직 데이터가 없습니다").first()).toBeVisible();
+  });
+});
+
+// ─── DB-1-09 snapshot dropdown / DB-1-10 day-offset 선택 ─────────
+
+test.describe("DB-1 snapshot dropdown", () => {
+  test("[DB-1-09] period=today → day-offset dropdown visible", async ({ page }) => {
+    seed("P2"); // P2 fixture 에 period_snapshots daily 2일치 시드 됨
+    await signInAs(page, "P2");
+    await page.goto("/dashboard");
+    await page.getByTestId("dash-period-today").click();
+    await expect(page.getByTestId("dash-day-offset")).toBeVisible();
+  });
+
+  test("[DB-1-10] day-offset 선택 → /api/dashboard?dayOffset=1 요청", async ({ page }) => {
+    seed("P2");
+    await signInAs(page, "P2");
+    await page.goto("/dashboard");
+    await page.getByTestId("dash-period-today").click();
+    await expect(page.getByTestId("dash-day-offset")).toBeVisible();
+    const reqPromise = page.waitForRequest(
+      (r) => r.url().includes("/api/dashboard") && r.url().includes("dayOffset=1"),
+    );
+    await page.getByTestId("dash-day-offset").selectOption("1");
+    await reqPromise;
+  });
 });
 
 // ─── DB-1 fetchError ──────────────────────────────────────
