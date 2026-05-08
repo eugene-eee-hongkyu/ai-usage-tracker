@@ -397,6 +397,59 @@ export async function GET(req: NextRequest) {
     .sort((a, b) => b.calls - a.calls)
     .slice(0, 10);
 
+  // Industry comparison (최근 30일).
+  // 외부 (Anthropic/엔터/ccusage) 와 비교할 우리 팀 통계:
+  //  - active day cost: 각 (멤버, 활성일) 의 cost 분포 → avg, p50/75/90, max
+  //  - per-dev monthly: 각 멤버의 최근 30일 합 → avg, max
+  // 데이터 source: ccusage daily 우선, 없으면 codeburn all.daily (heatmap 과 동일).
+  const today30 = new Date();
+  const thirtyAgo = new Date(today30);
+  thirtyAgo.setDate(thirtyAgo.getDate() - 30);
+  const thirtyAgoYmd = thirtyAgo.toISOString().slice(0, 10);
+
+  const teamActiveDayCosts: number[] = [];
+  const perDevMonthly: number[] = [];
+  for (const u of allUsers) {
+    const snap = snapMap.get(u.id);
+    if (!snap) continue;
+    const raw = snap.rawJson as Record<string, unknown>;
+    const ccusage = (raw.ccusageDaily as { daily?: Array<{ date?: string; totalCost?: number }> } | undefined)?.daily ?? [];
+    const codeburn = ((raw.all as { daily?: Array<{ date?: string; cost?: number }> } | undefined)?.daily) ?? [];
+    const source: Array<{ date?: string; totalCost?: number; cost?: number }> =
+      ccusage.length > 0 ? ccusage : codeburn;
+    let userMonthSum = 0;
+    for (const row of source) {
+      if (!row.date || row.date < thirtyAgoYmd) continue;
+      const cost = row.totalCost ?? row.cost ?? 0;
+      if (cost > 0) {
+        teamActiveDayCosts.push(cost);
+        userMonthSum += cost;
+      }
+    }
+    if (userMonthSum > 0) perDevMonthly.push(userMonthSum);
+  }
+  teamActiveDayCosts.sort((a, b) => a - b);
+  const pct = (arr: number[], p: number) =>
+    arr.length === 0 ? 0 : arr[Math.floor((arr.length - 1) * p)];
+  const sum = (arr: number[]) => arr.reduce((s, c) => s + c, 0);
+  const industryComparison = {
+    windowDays: 30,
+    activeDayCount: teamActiveDayCosts.length,
+    activeDayAvg: teamActiveDayCosts.length > 0
+      ? sum(teamActiveDayCosts) / teamActiveDayCosts.length
+      : 0,
+    activeDayP50: pct(teamActiveDayCosts, 0.5),
+    activeDayP75: pct(teamActiveDayCosts, 0.75),
+    activeDayP90: pct(teamActiveDayCosts, 0.9),
+    activeDayMax: teamActiveDayCosts.length > 0
+      ? teamActiveDayCosts[teamActiveDayCosts.length - 1]
+      : 0,
+    perDevMonthAvg: perDevMonthly.length > 0
+      ? sum(perDevMonthly) / perDevMonthly.length
+      : 0,
+    perDevMonthMax: perDevMonthly.length > 0 ? Math.max(...perDevMonthly) : 0,
+  };
+
   return NextResponse.json({
     byEfficiency,
     bySessions,
@@ -409,6 +462,7 @@ export async function GET(req: NextRequest) {
     teamModels,
     teamTools,
     teamShellCommands,
+    industryComparison,
     isAdminUser: isAdmin(session.user.email),
   });
 }
