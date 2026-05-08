@@ -8,8 +8,8 @@ Primus Labs 사내 개발자 10명 대상 **Claude Code 사용량 자동 수집 
 세션 종료마다 ccusage로 데이터를 수집하고, 개인 효율 지표와 팀 랭킹을 시각화한다.  
 **lower bar**: 본인이 한 달에 한 번 보면 성공.
 
-**현재 단계**: B-1 — 로컬 빌드 (코드 없음, 빌드 시작 전)  
-문서 위치: `docs/03_A-2_…직행.md` (화면 설계), `docs/05_B-1_…압축.md` (빌드 지침)
+**현재 단계**: e2e-v2 자동화 도입 — B-1/B-2 완료, 라이브 배포 중 (`https://ai-usage-tracker-web-psi.vercel.app`)  
+문서 위치: `docs/03_A-2_…v6.md` (화면 설계 freeze), `docs/C-1.qa-implementation-brief.md` (phase1 입력 source-of-truth), `docs/e2e-v2/` (framework v3.2 카피본)
 
 ## 기술 스택
 
