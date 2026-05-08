@@ -131,3 +131,37 @@ test.describe("LO-1 OAuth mock 우회", () => {
     expect(page.url()).toMatch(/\/login/);
   });
 });
+
+// ─── Nav 검증 ──────────────────────────────────────────────
+
+test.describe("Nav 컴포넌트", () => {
+  test.beforeAll(() => seed("P2"));
+  test.beforeEach(async ({ page }) => signInAs(page, "P2"));
+
+  test("[LO-1-13] non-admin Nav 탭 3종 visible (개인/팀/셋업)", async ({ page }) => {
+    await page.goto("/dashboard");
+    await expect(page.getByTestId("nav-tab-dashboard")).toBeVisible();
+    await expect(page.getByTestId("nav-tab-team")).toBeVisible();
+    await expect(page.getByTestId("nav-tab-setup-status")).toBeVisible();
+    // non-admin → 팀원 탭 없음
+    await expect(page.getByTestId("nav-tab-member")).toHaveCount(0);
+  });
+
+  test("[LO-1-14] nav-user-toggle 클릭 → nav-logout visible", async ({ page }) => {
+    await page.goto("/dashboard");
+    await page.getByTestId("nav-user-toggle").click();
+    await expect(page.getByTestId("nav-logout")).toBeVisible();
+  });
+});
+
+test.describe("Nav admin", () => {
+  test("[LO-1-15] admin Nav 4탭 (개인/팀/팀원/셋업)", async ({ page }) => {
+    seed("P3");
+    await signInAs(page, "P3");
+    await page.goto("/dashboard");
+    await expect(page.getByTestId("nav-tab-dashboard")).toBeVisible();
+    await expect(page.getByTestId("nav-tab-team")).toBeVisible();
+    await expect(page.getByTestId("nav-tab-member")).toBeVisible();
+    await expect(page.getByTestId("nav-tab-setup-status")).toBeVisible();
+  });
+});

@@ -266,3 +266,37 @@ test.describe("TM-1 empty + fetchError", () => {
     test.skip(true, "team page fetch 실패 시 동작은 docs (A-2 §4 #4 4-d) 에 카드 자체 미렌더만 명시. 빈 페이지 동작 미정 — 별도 docs 보강 필요");
   });
 });
+
+// ─── TM 잔여 — multiplier / stale 멤버 / by-member 색 ──
+
+test.describe("TM 잔여", () => {
+  test("[TM-1-27] multiplier 3.0 정확 (activeDayAvg=39 stub)", async ({ page }) => {
+    seed("P2");
+    await signInAs(page, "P2");
+    await page.route("**/api/team*", async (r) => {
+      const original = await r.fetch();
+      const body = await original.json();
+      if (body.industryComparison) {
+        body.industryComparison.activeDayAvg = 39;
+        body.industryComparison.activeDayCount = 30;
+      }
+      await r.fulfill({ response: original, json: body });
+    });
+    await page.goto("/team");
+    await expect(page.getByTestId("team-industry-punch")).toContainText("3.0배");
+  });
+
+  test("[TM-1-31] stale 멤버 (P5 carol) cost 0 처리", async ({ page }) => {
+    seed("team-mixed");
+    await signInAs(page, "team-mixed");
+    await page.goto("/team");
+    // P5 carol id=14 → today.daily 비어있어 stale 필터 적용. cost 셀이 $0.00.
+    // period=month default → ov.cost = month.overview.totalCost = 0.
+    const cell = page.getByTestId("team-eff-cost-14");
+    await expect(cell).toContainText("$0");
+  });
+
+  test("[TM-1-28][B] by-member 차트 visible (mixed 5명)", async () => {
+    test.skip(true, "team-mixed 의 ccusageDaily 시드는 있지만 dailyByMember 응답이 length>1 조건 만족 시에만 카드 렌더 ([team/page.tsx:344]). team route 의 dailyByMember 집계 로직이 ccusage 미설치 멤버 (P6) 에서 막힘. 별도 fixture 분리 — phase 2.1");
+  });
+});
