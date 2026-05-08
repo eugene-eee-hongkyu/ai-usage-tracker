@@ -588,6 +588,7 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
           ))}
           {period === "today" && (data.availableSnapshots?.daily?.length ?? 0) > 0 && (
             <select
+              data-testid="dash-day-offset"
               value={dayOffset}
               onChange={(e) => setDayOffset(Number(e.target.value))}
               className={`text-xs font-mono border rounded px-2 py-1 cursor-pointer focus:outline-none ${dayOffset > 0 ? "bg-indigo-600 text-white border-indigo-500" : "bg-neutral-800 text-neutral-400 border-neutral-700 hover:text-neutral-200"}`}
@@ -602,6 +603,7 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
           )}
           {period === "8days" && (data.availableSnapshots?.weekly?.length ?? 0) > 0 && (
             <select
+              data-testid="dash-week-offset"
               value={weekOffset}
               onChange={(e) => setWeekOffset(Number(e.target.value))}
               className={`text-xs font-mono border rounded px-2 py-1 cursor-pointer focus:outline-none ${weekOffset > 0 ? "bg-indigo-600 text-white border-indigo-500" : "bg-neutral-800 text-neutral-400 border-neutral-700 hover:text-neutral-200"}`}
@@ -616,6 +618,7 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
           )}
           {period === "month" && (data.availableSnapshots?.monthly?.length ?? 0) > 0 && (
             <select
+              data-testid="dash-month-offset"
               value={monthOffset}
               onChange={(e) => setMonthOffset(Number(e.target.value))}
               className={`text-xs font-mono border rounded px-2 py-1 cursor-pointer focus:outline-none ${monthOffset > 0 ? "bg-indigo-600 text-white border-indigo-500" : "bg-neutral-800 text-neutral-400 border-neutral-700 hover:text-neutral-200"}`}
@@ -630,6 +633,7 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
           )}
           {viewOnly && teamMembers.length > 0 && (
             <select
+              data-testid="dash-member-select"
               value={targetUserId}
               onChange={(e) => onMemberSelect ? onMemberSelect(e.target.value) : router.push(`/team/${e.target.value}/dashboard`)}
               className="ml-auto text-xs font-mono bg-neutral-800 text-neutral-300 border border-neutral-700 rounded px-2 py-1 self-center hover:border-neutral-500 focus:outline-none focus:border-indigo-500 cursor-pointer"
@@ -643,7 +647,7 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
       </div>
 
       {/* Overview Bar */}
-      <div className="bg-neutral-900 border-b border-neutral-800">
+      <div data-testid="dash-overview-bar" className="bg-neutral-900 border-b border-neutral-800">
         <div className="max-w-6xl mx-auto px-4 py-2.5 flex flex-wrap gap-x-5 gap-y-1 text-sm font-mono">
           {viewOnly && (
             <span className="text-indigo-400 font-semibold self-center mr-2">{data.user.name}</span>
@@ -699,7 +703,7 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
 
           {/* Daily Activity (tokens) */}
-          <div className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-cyan-500 rounded">
+          <div data-testid="dash-card-daily-tokens" className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-cyan-500 rounded">
             <div className="px-3 py-2 border-b border-neutral-800 flex items-center justify-between">
               <span className="text-xs font-mono font-bold text-cyan-400 uppercase tracking-wider">Daily Activity</span>
               {chartTokenData.length > 45 && (
@@ -733,7 +737,7 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
           </div>
 
           {/* Daily Cost */}
-          <div className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-yellow-500 rounded">
+          <div data-testid="dash-card-daily-cost" className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-yellow-500 rounded">
             <div className="px-3 py-2 border-b border-neutral-800 flex items-center justify-between">
               <span className="text-xs font-mono font-bold text-yellow-400 uppercase tracking-wider">Daily Cost</span>
               {chartData.length > 45 && (
@@ -772,7 +776,7 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
 
           {/* Efficiency Metrics */}
-          <div className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-fuchsia-500 rounded">
+          <div data-testid="dash-card-efficiency" className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-fuchsia-500 rounded">
             <div className="px-3 py-2 border-b border-neutral-800 flex items-center justify-between">
               <span className="text-xs font-mono font-bold text-fuchsia-400 uppercase tracking-wider">Efficiency</span>
               {(() => {
@@ -781,7 +785,7 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
                 const callsPs = ov.sessions > 0 ? Math.round(ov.calls / ov.sessions) : 0;
                 return (
                   <div className="relative group/grade">
-                    <span className={`text-xs font-mono font-bold px-2 py-0.5 rounded border cursor-default ${GRADE_STYLES[grade]}`}>
+                    <span data-testid="dash-grade-overall" className={`text-xs font-mono font-bold px-2 py-0.5 rounded border cursor-default ${GRADE_STYLES[grade]}`}>
                       {grade}
                     </span>
                     {grade !== "양호" && (
@@ -918,9 +922,9 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
               return { date: row.date, count: Math.round(cost * 100), level };
             });
             return (
-              <div className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-indigo-500 rounded">
+              <div data-testid="dash-card-activity-heatmap" className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-indigo-500 rounded">
                 <div className="px-3 py-2 border-b border-neutral-800">
-                  <span className="text-xs font-mono font-bold text-indigo-400 uppercase tracking-wider">활동 히트맵 ({Math.round((data.heatmapDaily ?? []).length / 7)}주, 비용 기준)</span>
+                  <span data-testid="dash-heatmap-activity" className="text-xs font-mono font-bold text-indigo-400 uppercase tracking-wider">활동 히트맵 ({Math.round((data.heatmapDaily ?? []).length / 7)}주, 비용 기준)</span>
                 </div>
                 <div className="p-3">
                   <ActivityCalendar
@@ -942,7 +946,7 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
 
           {/* By Model */}
-          <div className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-pink-500 rounded">
+          <div data-testid="dash-card-by-model" className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-pink-500 rounded">
             <div className="px-3 py-2 border-b border-neutral-800">
               <span className="text-xs font-mono font-bold text-pink-400 uppercase tracking-wider">By Model</span>
             </div>
@@ -974,7 +978,7 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
           </div>
 
           {/* Top Sessions */}
-          <div className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-red-500 rounded">
+          <div data-testid="dash-card-top-sessions" className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-red-500 rounded">
             <div className="px-3 py-2 border-b border-neutral-800">
               <span className="text-xs font-mono font-bold text-red-400 uppercase tracking-wider">Top Sessions</span>
             </div>
@@ -1016,7 +1020,7 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
 
           {/* By Project */}
-          <div className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-yellow-500 rounded">
+          <div data-testid="dash-card-by-project" className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-yellow-500 rounded">
             <div className="px-3 py-2 border-b border-neutral-800 flex items-center justify-between">
               <span className="text-xs font-mono font-bold text-yellow-400 uppercase tracking-wider">By Project</span>
               {data.projects.length > 15 && (
@@ -1057,7 +1061,7 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
           </div>
 
           {/* By Activity */}
-          <div className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-violet-500 rounded">
+          <div data-testid="dash-card-by-activity" className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-violet-500 rounded">
             <div className="px-3 py-2 border-b border-neutral-800 flex items-center justify-between">
               <span className="text-xs font-mono font-bold text-violet-400 uppercase tracking-wider">By Activity</span>
               {data.activities.length > 15 && (
@@ -1108,7 +1112,7 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
 
           {/* Core Tools */}
-          <div className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-teal-500 rounded">
+          <div data-testid="dash-card-core-tools" className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-teal-500 rounded">
             <div className="px-3 py-2 border-b border-neutral-800 flex items-center justify-between">
               <span className="text-xs font-mono font-bold text-teal-400 uppercase tracking-wider">Core Tools</span>
               {(data.tools ?? []).length > 15 && (
@@ -1143,7 +1147,7 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
           </div>
 
           {/* Shell Commands */}
-          <div className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-orange-500 rounded">
+          <div data-testid="dash-card-shell-cmd" className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-orange-500 rounded">
             <div className="px-3 py-2 border-b border-neutral-800 flex items-center justify-between">
               <span className="text-xs font-mono font-bold text-orange-400 uppercase tracking-wider">Shell Commands</span>
               {(data.shellCommands ?? []).length > 15 && (
@@ -1182,7 +1186,7 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
 
           {/* MCP Servers */}
-          <div className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-cyan-500 rounded">
+          <div data-testid="dash-card-mcp" className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-cyan-500 rounded">
             <div className="px-3 py-2 border-b border-neutral-800 flex items-center justify-between">
               <span className="text-xs font-mono font-bold text-cyan-400 uppercase tracking-wider">MCP Servers</span>
               {(data.mcpServers ?? []).length > 15 && (
@@ -1243,9 +1247,9 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
             const avgDwellSec = monthVisitsTotal > 0 ? Math.round(monthDwellTotal / monthVisitsTotal) : 0;
             const avgMinSec = `${Math.floor(avgDwellSec / 60)}:${String(avgDwellSec % 60).padStart(2, "0")}`;
             return (
-              <div className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-amber-500 rounded">
+              <div data-testid="dash-card-dwell-heatmap" className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-amber-500 rounded">
                 <div className="px-3 py-2 border-b border-neutral-800">
-                  <span className="text-xs font-mono font-bold text-amber-400 uppercase tracking-wider">
+                  <span data-testid="dash-heatmap-dwell" className="text-xs font-mono font-bold text-amber-400 uppercase tracking-wider">
                     체류 히트맵 ({Math.round(rows.length / 7)}주, 일별 총 분
                     {monthVisitsTotal > 0 && ` · 이번달 ${monthVisitsTotal}회 방문 · 평균 ${avgMinSec}`})
                   </span>
