@@ -72,19 +72,19 @@ export default function MemberProfilePage() {
         {/* Summary */}
         <div className="bg-slate-900 rounded-lg p-4">
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm">
-            <div>
+            <div data-testid="member-summary-cost">
               <p className="text-slate-500 text-xs">총 비용</p>
               <p className="text-slate-200 font-semibold">${data.summary.totalCost.toFixed(2)}</p>
             </div>
-            <div>
+            <div data-testid="member-summary-sessions">
               <p className="text-slate-500 text-xs">세션 수</p>
               <p className="text-slate-200 font-semibold">{data.summary.sessionsCount}회</p>
             </div>
-            <div>
+            <div data-testid="member-summary-cache">
               <p className="text-slate-500 text-xs">Cache hit</p>
               <p className="text-slate-200 font-semibold">{Math.round(data.summary.cacheHitPct)}%</p>
             </div>
-            <div>
+            <div data-testid="member-summary-streak">
               <p className="text-slate-500 text-xs">🔥 Streak</p>
               <p className="text-slate-200 font-semibold">{data.streak}일</p>
             </div>
@@ -92,7 +92,7 @@ export default function MemberProfilePage() {
         </div>
 
         {/* Heatmap (cost-based) */}
-        <div className="bg-slate-900 rounded-lg p-4">
+        <div className="bg-slate-900 rounded-lg p-4" data-testid="member-heatmap-4w">
           <p className="text-sm text-slate-400 mb-4">활동 히트맵 (4주, 비용 기준)</p>
           <ActivityCalendar
             data={calData}
@@ -108,8 +108,12 @@ export default function MemberProfilePage() {
         {data.projects.length > 0 && (
           <div className="bg-slate-900 rounded-lg p-4 space-y-2">
             <p className="text-sm text-slate-400 mb-2">주요 프로젝트</p>
-            {data.projects.map((p) => (
-              <div key={p.name} className="flex items-center justify-between text-sm">
+            {data.projects.map((p, i) => (
+              <div
+                key={p.name}
+                data-testid={`member-project-row-${i}`}
+                className="flex items-center justify-between text-sm"
+              >
                 <span className="text-slate-300 flex-1 truncate">{p.name}</span>
                 <span className="text-slate-400 w-16 text-right">${p.cost.toFixed(2)}</span>
                 <span className="text-slate-600 w-12 text-right text-xs">{p.sessions}회</span>

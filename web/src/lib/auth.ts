@@ -1,8 +1,39 @@
 import type { NextAuthOptions } from "next-auth";
 import GithubProvider from "next-auth/providers/github";
 import GoogleProvider from "next-auth/providers/google";
+import CredentialsProvider from "next-auth/providers/credentials";
 import { db, users } from "@/lib/db";
 import { eq } from "drizzle-orm";
+
+// e2e Credentials provider — NODE_ENV='test' 또는 PRIMUS_E2E_AUTH=1 일 때만 활성
+// 진짜 OAuth (captcha/2FA) 우회용 (C-1 §3 #1 우회 전략)
+const e2eEnabled = process.env.NODE_ENV === "test" || process.env.PRIMUS_E2E_AUTH === "1";
+
+const providers = [
+  GithubProvider({
+    clientId: process.env.GITHUB_CLIENT_ID!,
+    clientSecret: process.env.GITHUB_CLIENT_SECRET!,
+  }),
+  GoogleProvider({
+    clientId: process.env.GOOGLE_CLIENT_ID!,
+    clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+  }),
+];
+
+if (e2eEnabled) {
+  providers.push(
+    CredentialsProvider({
+      id: "credentials",
+      name: "E2E Credentials",
+      credentials: { email: { label: "Email", type: "text" } },
+      async authorize(credentials) {
+        const email = credentials?.email;
+        if (typeof email !== "string" || email.length === 0) return null;
+        return { id: email, email, name: email.split("@")[0] };
+      },
+    }) as never,
+  );
+}
 
 // ALLOWED_EMAIL_DOMAINS: 쉼표 구분 (예: "yourcompany.com,yourcompany.io")
 // 비어 있으면 모든 도메인 허용
@@ -18,16 +49,7 @@ function isEmailAllowed(email: string) {
 }
 
 export const authOptions: NextAuthOptions = {
-  providers: [
-    GithubProvider({
-      clientId: process.env.GITHUB_CLIENT_ID!,
-      clientSecret: process.env.GITHUB_CLIENT_SECRET!,
-    }),
-    GoogleProvider({
-      clientId: process.env.GOOGLE_CLIENT_ID!,
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
-    }),
-  ],
+  providers,
   callbacks: {
     async signIn({ user, account, profile }) {
       const email = user.email ?? "";
