@@ -22,6 +22,8 @@ export default function SetupStatusPage() {
   const router = useRouter();
   const [data, setData] = useState<StatusData | null>(null);
   const [copied, setCopied] = useState(false);
+  const [fetchError, setFetchError] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
     if (status === "unauthenticated") router.push("/login");
@@ -29,10 +31,15 @@ export default function SetupStatusPage() {
 
   useEffect(() => {
     if (!session) return;
+    setFetchError(false);
     fetch("/api/setup/status")
-      .then((r) => r.json())
-      .then(setData);
-  }, [session]);
+      .then((r) => {
+        if (!r.ok) throw new Error(String(r.status));
+        return r.json();
+      })
+      .then(setData)
+      .catch(() => setFetchError(true));
+  }, [session, reloadKey]);
 
   const copy = (text: string) => {
     navigator.clipboard.writeText(text).then(() => {
@@ -42,6 +49,22 @@ export default function SetupStatusPage() {
   };
 
   const npxCmd = "npx github:eugene-eee-hongkyu/ai-usage-tracker init";
+
+  if (fetchError) return (
+    <div className="min-h-screen">
+      <Nav />
+      <div className="flex flex-col items-center justify-center h-64 gap-4">
+        <p className="text-slate-300 text-sm">셋업 상태를 불러오지 못했어요.</p>
+        <p className="text-slate-500 text-xs">네트워크·세션을 확인하고 다시 시도해주세요.</p>
+        <button
+          onClick={() => setReloadKey((k) => k + 1)}
+          className="px-4 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white text-sm rounded-md transition-colors"
+        >
+          다시 시도
+        </button>
+      </div>
+    </div>
+  );
 
   if (!data) return (
     <div className="min-h-screen">
