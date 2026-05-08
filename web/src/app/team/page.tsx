@@ -120,18 +120,21 @@ function AdminBadge() {
   );
 }
 
-function SyncBadge({ lastSyncedAt }: { lastSyncedAt: string | null }) {
-  if (!lastSyncedAt) return <span className="text-[10px] text-red-400 font-mono">미수신</span>;
+function SyncBadge({ lastSyncedAt, userId }: { lastSyncedAt: string | null; userId?: string | number }) {
+  const tid = userId !== undefined ? `team-sync-badge-${userId}` : undefined;
+  if (!lastSyncedAt) return <span data-testid={tid} className="text-[10px] text-red-400 font-mono">미수신</span>;
   const days = Math.floor((Date.now() - new Date(lastSyncedAt).getTime()) / 86_400_000);
-  if (days >= 5) return <span className="text-[10px] text-red-400 font-mono" title="데이터 수신 없음">⚠{days}일</span>;
-  if (days >= 2) return <span className="text-[10px] text-yellow-500 font-mono">{days}일전</span>;
+  if (days >= 5) return <span data-testid={tid} className="text-[10px] text-red-400 font-mono" title="데이터 수신 없음">⚠{days}일</span>;
+  if (days >= 2) return <span data-testid={tid} className="text-[10px] text-yellow-500 font-mono">{days}일전</span>;
   return null;
 }
 
-function CcusageMissingBadge({ missing }: { missing: boolean | undefined }) {
+function CcusageMissingBadge({ missing, userId }: { missing: boolean | undefined; userId?: string | number }) {
   if (!missing) return null;
+  const tid = userId !== undefined ? `team-ccusage-badge-${userId}` : undefined;
   return (
     <span
+      data-testid={tid}
       className="text-[10px] text-orange-400 font-mono px-1 py-0.5 rounded bg-orange-500/10 border border-orange-500/40 leading-none"
       title="ccusage 미설치 — 토큰/비용 데이터가 수집되지 않습니다. npm install -g ccusage 후 repair 실행 필요"
     >
@@ -346,7 +349,7 @@ export default function TeamPage() {
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
 
                 {/* Stacked per-member */}
-                <div className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-cyan-500 rounded">
+                <div data-testid="team-card-by-member" className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-cyan-500 rounded">
                   <div className="px-3 py-2 border-b border-neutral-800 flex items-center justify-between">
                     <span className="text-xs font-mono font-bold text-cyan-400 uppercase tracking-wider">By Member</span>
                     <div className="flex flex-wrap gap-x-3 gap-y-1 justify-end">
@@ -388,7 +391,7 @@ export default function TeamPage() {
                 </div>
 
                 {/* Total aggregated */}
-                <div className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-cyan-500 rounded">
+                <div data-testid="team-card-total" className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-cyan-500 rounded">
                   <div className="px-3 py-2 border-b border-neutral-800">
                     <span className="text-xs font-mono font-bold text-cyan-400 uppercase tracking-wider">Team Total</span>
                   </div>
@@ -427,7 +430,7 @@ export default function TeamPage() {
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
 
               {/* Activity (tokens) */}
-              <div className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-cyan-500 rounded">
+              <div data-testid="team-card-activity" className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-cyan-500 rounded">
                 <div className="px-3 py-2 border-b border-neutral-800">
                   <span className="text-xs font-mono font-bold text-cyan-400 uppercase tracking-wider">Activity</span>
                 </div>
@@ -453,7 +456,7 @@ export default function TeamPage() {
                           </div>
                           <span className="flex-1 text-neutral-300 truncate flex items-center gap-1.5">
                             <span className="truncate">{m.name}</span>
-                            <CcusageMissingBadge missing={m.ccusageMissing} />
+                            <CcusageMissingBadge missing={m.ccusageMissing} userId={m.userId} />
                           </span>
                           <span className="w-16 text-cyan-300 text-right tabular-nums">{fmtTokens(m.totalTokens)}</span>
                         </div>
@@ -464,7 +467,7 @@ export default function TeamPage() {
               </div>
 
               {/* Cost */}
-              <div className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-yellow-500 rounded">
+              <div data-testid="team-card-cost" className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-yellow-500 rounded">
                 <div className="px-3 py-2 border-b border-neutral-800">
                   <span className="text-xs font-mono font-bold text-yellow-400 uppercase tracking-wider">Cost</span>
                 </div>
@@ -504,7 +507,7 @@ export default function TeamPage() {
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
 
               {/* Efficiency Table */}
-              <div className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-fuchsia-500 rounded">
+              <div data-testid="team-card-efficiency" className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-fuchsia-500 rounded">
                 <div className="px-3 py-2 border-b border-neutral-800 flex items-center justify-between gap-2">
                   <span className="text-xs font-mono font-bold text-fuchsia-400 uppercase tracking-wider">Efficiency</span>
                   {gradeSummary && (
@@ -528,7 +531,7 @@ export default function TeamPage() {
                         const costPerSession = m.sessionsCount > 0 ? m.totalCost / m.sessionsCount : 0;
                         const grade = overallGrade(m.cacheHitPct, m.overallOneShot, costPerSession);
                         return (
-                          <tr key={m.userId} className="border-b border-neutral-800/50 hover:bg-neutral-800/30 transition-colors">
+                          <tr key={m.userId} data-testid={`team-eff-row-${m.userId}`} className="border-b border-neutral-800/50 hover:bg-neutral-800/30 transition-colors">
                             <td className="py-2.5 pr-4">
                               <span className="flex items-center gap-2 text-neutral-300">
                                 <span
@@ -536,8 +539,8 @@ export default function TeamPage() {
                                   style={{ background: MEMBER_COLORS[i % MEMBER_COLORS.length] }}
                                 />
                                 <span>{m.name}</span>
-                                <SyncBadge lastSyncedAt={m.lastSyncedAt} />
-                                <CcusageMissingBadge missing={m.ccusageMissing} />
+                                <SyncBadge lastSyncedAt={m.lastSyncedAt} userId={m.userId} />
+                                <CcusageMissingBadge missing={m.ccusageMissing} userId={m.userId} />
                               </span>
                             </td>
                             <GradeCell grade={cacheHitGrade(m.cacheHitPct)}>
@@ -746,12 +749,12 @@ export default function TeamPage() {
                                 ? "text-yellow-500"
                                 : "text-neutral-300";
                             return (
-                              <tr key={m.userId} className="border-b border-neutral-800/40 hover:bg-neutral-800/20 transition-colors">
+                              <tr key={m.userId} data-testid={`team-eng-row-${m.userId}`} className="border-b border-neutral-800/40 hover:bg-neutral-800/20 transition-colors">
                                 <td className="py-2 text-neutral-300">{m.name}</td>
                                 <td className={`py-2 px-3 text-right tabular-nums ${timeClass}`}>
                                   {m.lastSyncedAt ? fmtSyncTime(m.lastSyncedAt) : "—"}
                                 </td>
-                                <td className={`py-2 px-3 text-right tabular-nums ${visitsClass}`}>
+                                <td data-testid={`team-eng-visits-${m.userId}`} className={`py-2 px-3 text-right tabular-nums ${visitsClass}`}>
                                   {m.monthVisits}
                                 </td>
                                 <td className="py-2 px-3 text-right tabular-nums text-neutral-400">
@@ -844,7 +847,7 @@ export default function TeamPage() {
                   </div>
                   <div className="p-3 grid grid-cols-1 lg:grid-cols-2 gap-4">
                     {/* 외부 기준 (hardcoded) */}
-                    <div>
+                    <div data-testid="team-industry-external">
                       <div className="text-[10px] font-mono text-neutral-500 mb-2 uppercase">외부 기준</div>
                       <table className="w-full text-xs font-mono border-collapse">
                         <tbody>
@@ -883,7 +886,7 @@ export default function TeamPage() {
                       <p className="text-[10px] font-mono text-neutral-700 mt-2">as of 2026-05</p>
                     </div>
                     {/* 우리 팀 (라이브, 최근 30일) */}
-                    <div>
+                    <div data-testid="team-industry-ours">
                       <div className="text-[10px] font-mono text-emerald-500 mb-2 uppercase">
                         우리 팀 (최근 {ic.windowDays}일, active day {ic.activeDayCount}개)
                       </div>

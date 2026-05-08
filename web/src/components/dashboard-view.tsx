@@ -318,9 +318,10 @@ const TIMEZONE_LIST: { label: string; value: string }[] = [
   { label: "UTC", value: "UTC" },
 ];
 
-function TipBtn({ label, onClick, variant = "action" }: { label: string; onClick: () => void; variant?: "explain" | "action" }) {
+function TipBtn({ label, onClick, variant = "action", testid }: { label: string; onClick: () => void; variant?: "explain" | "action"; testid?: string }) {
   return (
     <button
+      data-testid={testid}
       onClick={onClick}
       className={`px-1.5 py-0.5 rounded text-[10px] font-mono font-semibold transition-colors leading-none ${variant === "explain" ? "bg-slate-700 text-slate-300 hover:bg-slate-600" : "bg-indigo-600 text-white hover:bg-indigo-500"}`}
     >{label}</button>
@@ -817,6 +818,7 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
                 const isBad = (g: GradeLevel) => BAD.includes(g);
                 return [
                   {
+                    tid: "cache",
                     label: "Cache hit",
                     value: `${ov.cacheHitPct.toFixed(1)}%`,
                     color: "text-emerald-400",
@@ -828,6 +830,7 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
                     actLabel: "늘리는법",
                   },
                   {
+                    tid: "oneshot",
                     label: "One-shot rate",
                     value: `${Math.round(ov.oneShotRate * 100)}%`,
                     color: "text-violet-400",
@@ -839,6 +842,7 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
                     actLabel: "늘리는법",
                   },
                   {
+                    tid: "cost-session",
                     label: "Cost / session",
                     value: ov.sessions > 0 ? fmt$(costPerSession) : "$0.00",
                     color: "text-yellow-400",
@@ -850,6 +854,7 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
                     actLabel: "줄이는법",
                   },
                   {
+                    tid: "calls-session",
                     label: "Calls / session",
                     value: callsPerSession.toString(),
                     color: "text-blue-400",
@@ -861,6 +866,7 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
                     actLabel: "최적화",
                   },
                   {
+                    tid: "cost-call",
                     label: "Cost / call",
                     value: ov.calls > 0 ? `$${(ov.costPerCall ?? 0).toFixed(3)}` : "$0.000",
                     color: "text-orange-400",
@@ -872,6 +878,7 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
                     actLabel: "줄이는법",
                   },
                   {
+                    tid: "out-in",
                     label: "Output / Input",
                     value: (ov.outputInputRatio ?? 0) > 0 ? `${(ov.outputInputRatio ?? 0).toFixed(1)}×` : "—",
                     color: "text-cyan-400",
@@ -882,17 +889,17 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
                     onAct: () => setShowOutputInputMethodsModal(true),
                     actLabel: "올리는법",
                   },
-                ].map(({ label, value, color, grade, gradeRows, gradeTitle, onDesc, onAct, actLabel }) => (
-                  <div key={label} className="flex items-center text-xs py-0.5 gap-2">
+                ].map(({ tid, label, value, color, grade, gradeRows, gradeTitle, onDesc, onAct, actLabel }) => (
+                  <div key={label} data-testid={`dash-metric-${tid}`} className="flex items-center text-xs py-0.5 gap-2">
                     <span className="text-neutral-400 w-28 shrink-0">{label}</span>
                     <span className="flex gap-1 shrink-0 w-24">
-                      <TipBtn label="설명" onClick={onDesc} variant="explain" />
-                      {isBad(grade) && <TipBtn label={actLabel} onClick={onAct} />}
+                      <TipBtn testid={`dash-tip-${tid}-desc`} label="설명" onClick={onDesc} variant="explain" />
+                      {isBad(grade) && <TipBtn testid={`dash-tip-${tid}-act`} label={actLabel} onClick={onAct} />}
                     </span>
                     <div className="ml-auto flex items-center gap-2">
                       <span className={`font-bold ${color}`}>{value}</span>
                       <div className="relative group/mbadge">
-                        <span className={`text-[10px] font-mono font-bold px-1.5 py-0.5 rounded border w-14 text-center block cursor-default ${GRADE_STYLES[grade]}`}>{grade}</span>
+                        <span data-testid={`dash-metric-${tid}-grade`} className={`text-[10px] font-mono font-bold px-1.5 py-0.5 rounded border w-14 text-center block cursor-default ${GRADE_STYLES[grade]}`}>{grade}</span>
                         <div className="absolute right-0 top-full mt-1 z-50 opacity-0 invisible group-hover/mbadge:opacity-100 group-hover/mbadge:visible transition-all duration-100 bg-slate-900 border border-slate-700 rounded-lg shadow-2xl p-3 w-72">
                           <MiniGradeTable title={gradeTitle} rows={gradeRows} current={grade} />
                         </div>
