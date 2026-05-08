@@ -5,7 +5,7 @@
  * 페르소나: C-1 §2 P1·P2·P3 (db/seed/P{n}.sql)
  */
 import { test, expect } from "@playwright/test";
-import { seed, signInAs, clearSession } from "../_shared/auth-helper";
+import { seed, signInAs, clearSession, patchDailyCost } from "../_shared/auth-helper";
 
 test.describe.configure({ mode: "serial" });
 
@@ -107,26 +107,67 @@ test.describe("TP-1 P1 신규 fixture", () => {
   });
 });
 
-// ─── TP-1 데이터 검증 (heatmap 5단계 색) ──────────────
+// ─── TP-1 heatmap 5단계 색 (data-level + fill attr) ──────
 
-test.describe("TP-1 heatmap 5단계 색", () => {
-  // 라이브러리 (react-activity-calendar) 가 fill 속성을 inline style 로 넣는지, CSS class 로 넣는지에 따라
-  // selector 가 달라지므로, fixture cost 만 다르게 시드 + member-heatmap-4w 의 자식 색 검증을
-  // 단순화: '카드가 visible + cost>0 일 때 0이 아닌 fill 가진 cell 1개 이상' 으로 한정.
-  // 정확한 fill hex 검증은 라이브러리 동작 확인 후 별도 확장.
+test.describe("TP-1 heatmap 5단계", () => {
+  // /api/members/[userId] 응답 daily 는 raw_json.all.daily 사용. patchDailyCost 로 변형.
+  // C-1 §4-3 활동 임계: =0 / <5 / 5~24.99 / 25~99.99 / ≥100
 
-  test("TP-1-07~11 heatmap 카드 visible — boundary fixture 별도 시드는 phase 2.1 에서 확장 ([B])", async ({ page }) => {
+  test.beforeEach(async ({ page }) => {
     seed("P2");
     await signInAs(page, "P2");
-    await page.goto("/team/10");
-    await expect(page.getByTestId("member-heatmap-4w")).toBeVisible();
-    // 모든 daily cost=14.5 (level 2) 라 5단계 cell 검증 못 함 — 별도 fixture P2-grade-* 필요
-    // [B] 비고: phase 2.1 에서 db/seed/P2-cost-{0,4,24,99,100}.sql 5종 추가 후 spec 분리
   });
 
-  test("[TP-1-15] daily=0 30일 → streak=0", async ({ page }) => {
-    // P2 fixture 는 cost=14.5 양수. streak=0 검증을 위해 별도 fixture (P2-zero-cost) 필요.
-    // 일단 [B]: phase 2.1 fixture 확장 후 진행.
-    test.skip(true, "P2 fixture 변형 (cost=0 30일) 필요. phase 2.1 fixture 확장 후 진행.");
+  const yesterday = (() => {
+    const d = new Date();
+    d.setDate(d.getDate() - 1);
+    return d.toISOString().slice(0, 10);
+  })();
+
+  test("[TP-1-07] cost=0 → level 0 fill #1e293b", async ({ page }) => {
+    patchDailyCost(10, yesterday, 0);
+    await page.goto("/team/10");
+    const rect = page.locator(`[data-testid="member-heatmap-4w"] rect[data-date="${yesterday}"]`);
+    await expect(rect).toHaveAttribute("fill", "#1e293b");
+  });
+
+  test("[TP-1-08] cost=4 → level 1 fill #4338ca", async ({ page }) => {
+    patchDailyCost(10, yesterday, 4);
+    await page.goto("/team/10");
+    const rect = page.locator(`[data-testid="member-heatmap-4w"] rect[data-date="${yesterday}"]`);
+    await expect(rect).toHaveAttribute("fill", "#4338ca");
+  });
+
+  test("[TP-1-09] cost=24 → level 2 fill #6366f1", async ({ page }) => {
+    patchDailyCost(10, yesterday, 24);
+    await page.goto("/team/10");
+    const rect = page.locator(`[data-testid="member-heatmap-4w"] rect[data-date="${yesterday}"]`);
+    await expect(rect).toHaveAttribute("fill", "#6366f1");
+  });
+
+  test("[TP-1-10] cost=99 → level 3 fill #818cf8", async ({ page }) => {
+    patchDailyCost(10, yesterday, 99);
+    await page.goto("/team/10");
+    const rect = page.locator(`[data-testid="member-heatmap-4w"] rect[data-date="${yesterday}"]`);
+    await expect(rect).toHaveAttribute("fill", "#818cf8");
+  });
+
+  test("[TP-1-11] cost=100 → level 4 fill #a5b4fc", async ({ page }) => {
+    patchDailyCost(10, yesterday, 100);
+    await page.goto("/team/10");
+    const rect = page.locator(`[data-testid="member-heatmap-4w"] rect[data-date="${yesterday}"]`);
+    await expect(rect).toHaveAttribute("fill", "#a5b4fc");
+  });
+
+  test("[TP-1-15] daily 모두 0 → streak=0", async ({ page }) => {
+    // P2 fixture 의 모든 daily 행 cost=0 으로 일괄 변형 → activeDateSet 비어있음 → streak=0.
+    const url = process.env.DATABASE_URL!;
+    const { execSync } = await import("node:child_process");
+    execSync(
+      `psql "${url}" -c "UPDATE user_snapshots SET raw_json = jsonb_set(raw_json, '{all,daily}', (SELECT jsonb_agg(jsonb_set(d, '{cost}', '0'::jsonb)) FROM jsonb_array_elements(raw_json->'all'->'daily') d)) WHERE user_id = 10"`,
+      { stdio: "pipe" },
+    );
+    await page.goto("/team/10");
+    await expect(page.getByTestId("member-summary-streak")).toContainText("0");
   });
 });

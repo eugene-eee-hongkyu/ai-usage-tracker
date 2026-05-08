@@ -3,7 +3,7 @@
  * 입력: docs/qa/QA_DB_dashboard.md
  */
 import { test, expect } from "@playwright/test";
-import { seed, signInAs, clearSession, patchSnapshot, patchDailyCost, patchOverview, stubOverview } from "../_shared/auth-helper";
+import { seed, signInAs, clearSession, patchSnapshot, patchDailyCost, patchOverview, stubOverview, patchCcusageDaily, patchDailyVisit } from "../_shared/auth-helper";
 
 test.describe.configure({ mode: "serial" });
 
@@ -529,14 +529,118 @@ test.describe("DB-1 modal 6종 — 늘리는법/줄이는법 (fixture 부족 시
   }
 });
 
-// ─── DB-1 heatmap 5단계 색 ───────────────────────────────
+// ─── DB-1 activity heatmap 5단계 색 (data-level + fill attr) ──────
 
-test.describe("DB-1 [B] activity / dwell heatmap 5단계", () => {
-  test("[DB-1-25~29][B] activity heatmap 5단계 fill", async () => {
-    test.skip(true, "react-activity-calendar 라이브러리의 SVG rect fill style 이 즉시 evaluate 매칭 안 됨 (timing/library 의존). 별도 selector 패턴 + ccusage daily 우선 처리 + patchCcusageDaily 헬퍼 추가 — phase 2.1");
+test.describe("DB-1 activity heatmap 5단계", () => {
+  // react-activity-calendar 가 rect 에 data-level/data-date/fill 박음.
+  // P2 base + patchCcusageDaily 로 특정 일자 cost 변형 → 그 일자의 data-level 검증.
+
+  test.beforeEach(async ({ page }) => {
+    seed("P2");
+    await signInAs(page, "P2");
   });
 
-  test("[DB-1-30~34][B] dwell heatmap 5단계", async () => {
-    test.skip(true, "DB-1-25~29 와 동일 — 라이브러리 fill style 매칭 phase 2.1");
+  // C-1 §4-3 활동 임계: =0 / <5 / 5~24.99 / 25~99.99 / ≥100
+  // 어제 일자 (오늘 cost 는 codeburn 우선이라 일관성 위해 어제 사용)
+  const yesterday = (() => {
+    const d = new Date();
+    d.setDate(d.getDate() - 1);
+    return d.toISOString().slice(0, 10);
+  })();
+
+  test("[DB-1-25] cost=0 → level 0 + fill #1e293b", async ({ page }) => {
+    patchCcusageDaily(10, yesterday, 0);
+    await page.goto("/dashboard");
+    const rect = page.locator(`[data-testid="dash-card-activity-heatmap"] rect[data-date="${yesterday}"]`);
+    await expect(rect).toHaveAttribute("data-level", "0");
+    await expect(rect).toHaveAttribute("fill", "#1e293b");
+  });
+
+  test("[DB-1-26] cost=4.99 → level 1 + fill #4338ca", async ({ page }) => {
+    patchCcusageDaily(10, yesterday, 4.99);
+    await page.goto("/dashboard");
+    const rect = page.locator(`[data-testid="dash-card-activity-heatmap"] rect[data-date="${yesterday}"]`);
+    await expect(rect).toHaveAttribute("data-level", "1");
+    await expect(rect).toHaveAttribute("fill", "#4338ca");
+  });
+
+  test("[DB-1-27] cost=24.99 → level 2 + fill #6366f1", async ({ page }) => {
+    patchCcusageDaily(10, yesterday, 24.99);
+    await page.goto("/dashboard");
+    const rect = page.locator(`[data-testid="dash-card-activity-heatmap"] rect[data-date="${yesterday}"]`);
+    await expect(rect).toHaveAttribute("data-level", "2");
+    await expect(rect).toHaveAttribute("fill", "#6366f1");
+  });
+
+  test("[DB-1-28] cost=99.99 → level 3 + fill #818cf8", async ({ page }) => {
+    patchCcusageDaily(10, yesterday, 99.99);
+    await page.goto("/dashboard");
+    const rect = page.locator(`[data-testid="dash-card-activity-heatmap"] rect[data-date="${yesterday}"]`);
+    await expect(rect).toHaveAttribute("data-level", "3");
+    await expect(rect).toHaveAttribute("fill", "#818cf8");
+  });
+
+  test("[DB-1-29] cost=100 → level 4 + fill #a5b4fc", async ({ page }) => {
+    patchCcusageDaily(10, yesterday, 100);
+    await page.goto("/dashboard");
+    const rect = page.locator(`[data-testid="dash-card-activity-heatmap"] rect[data-date="${yesterday}"]`);
+    await expect(rect).toHaveAttribute("data-level", "4");
+    await expect(rect).toHaveAttribute("fill", "#a5b4fc");
+  });
+});
+
+// ─── DB-1 dwell heatmap 5단계 (data-level + fill) ─────────
+
+test.describe("DB-1 dwell heatmap 5단계", () => {
+  // C-1 §4-3 체류 임계: =0 / <120 / 120~299 / 300~899 / ≥900
+  test.beforeEach(async ({ page }) => {
+    seed("P2");
+    await signInAs(page, "P2");
+  });
+
+  const yesterday = (() => {
+    const d = new Date();
+    d.setDate(d.getDate() - 1);
+    return d.toISOString().slice(0, 10);
+  })();
+
+  test("[DB-1-30] dwell=0 → level 0 + fill #1e293b", async ({ page }) => {
+    patchDailyVisit(10, yesterday, 0, 0);
+    await page.goto("/dashboard");
+    const rect = page.locator(`[data-testid="dash-card-dwell-heatmap"] rect[data-date="${yesterday}"]`);
+    await expect(rect).toHaveAttribute("data-level", "0");
+    await expect(rect).toHaveAttribute("fill", "#1e293b");
+  });
+
+  test("[DB-1-31] dwell=119 → level 1 + fill #854d0e", async ({ page }) => {
+    patchDailyVisit(10, yesterday, 1, 119);
+    await page.goto("/dashboard");
+    const rect = page.locator(`[data-testid="dash-card-dwell-heatmap"] rect[data-date="${yesterday}"]`);
+    await expect(rect).toHaveAttribute("data-level", "1");
+    await expect(rect).toHaveAttribute("fill", "#854d0e");
+  });
+
+  test("[DB-1-32] dwell=299 → level 2 + fill #a16207", async ({ page }) => {
+    patchDailyVisit(10, yesterday, 1, 299);
+    await page.goto("/dashboard");
+    const rect = page.locator(`[data-testid="dash-card-dwell-heatmap"] rect[data-date="${yesterday}"]`);
+    await expect(rect).toHaveAttribute("data-level", "2");
+    await expect(rect).toHaveAttribute("fill", "#a16207");
+  });
+
+  test("[DB-1-33] dwell=899 → level 3 + fill #ca8a04", async ({ page }) => {
+    patchDailyVisit(10, yesterday, 1, 899);
+    await page.goto("/dashboard");
+    const rect = page.locator(`[data-testid="dash-card-dwell-heatmap"] rect[data-date="${yesterday}"]`);
+    await expect(rect).toHaveAttribute("data-level", "3");
+    await expect(rect).toHaveAttribute("fill", "#ca8a04");
+  });
+
+  test("[DB-1-34] dwell=900 → level 4 + fill #facc15", async ({ page }) => {
+    patchDailyVisit(10, yesterday, 1, 900);
+    await page.goto("/dashboard");
+    const rect = page.locator(`[data-testid="dash-card-dwell-heatmap"] rect[data-date="${yesterday}"]`);
+    await expect(rect).toHaveAttribute("data-level", "4");
+    await expect(rect).toHaveAttribute("fill", "#facc15");
   });
 });

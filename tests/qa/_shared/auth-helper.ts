@@ -46,6 +46,26 @@ export function patchDailyCost(userId: number, date: string, cost: number): void
   );
 }
 
+/** raw_json.ccusageDaily.daily 의 특정 date 의 totalCost 를 변형 (heatmap activity 검증용 — ccusage 우선). */
+export function patchCcusageDaily(userId: number, date: string, totalCost: number): void {
+  const url = process.env.DATABASE_URL;
+  if (!url) throw new Error("DATABASE_URL 미설정");
+  execSync(
+    `psql "${url}" -c "UPDATE user_snapshots SET raw_json = jsonb_set(raw_json, '{ccusageDaily,daily}', (SELECT jsonb_agg(CASE WHEN d->>'date' = '${date}' THEN jsonb_set(d, '{totalCost}', '${totalCost}'::jsonb) ELSE d END) FROM jsonb_array_elements(raw_json->'ccusageDaily'->'daily') d)) WHERE user_id = ${userId}"`,
+    { stdio: "pipe" },
+  );
+}
+
+/** daily_visits 의 특정 date 의 dwell 을 변형 (dwell heatmap boundary 검증용). */
+export function patchDailyVisit(userId: number, date: string, count: number, dwellSec: number): void {
+  const url = process.env.DATABASE_URL;
+  if (!url) throw new Error("DATABASE_URL 미설정");
+  execSync(
+    `psql "${url}" -c "INSERT INTO daily_visits (user_id, date, count, total_dwell_seconds) VALUES (${userId}, '${date}', ${count}, ${dwellSec}) ON CONFLICT (user_id, date) DO UPDATE SET count = ${count}, total_dwell_seconds = ${dwellSec}"`,
+    { stdio: "pipe" },
+  );
+}
+
 /** user_snapshots 컬럼 직접 수정 (efficiency 5단계 검증용). */
 export function patchSnapshot(userId: number, fields: Record<string, number>): void {
   const url = process.env.DATABASE_URL;
