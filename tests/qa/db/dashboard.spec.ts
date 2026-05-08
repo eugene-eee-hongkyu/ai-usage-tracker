@@ -482,9 +482,9 @@ test.describe("DB-1 efficiency calls-session 5단계", () => {
   });
 });
 
-// ─── DB-1 modal 6종 ─────────────────────────────────────
+// ─── DB-1 modal 6종 — 설명 + 늘리는법 ───────────────────
 
-test.describe("DB-1 modal 6종 — 메트릭 설명/늘리는법", () => {
+test.describe("DB-1 modal 6종 — 메트릭 설명", () => {
   test.beforeAll(() => seed("P2"));
   test.beforeEach(async ({ page }) => signInAs(page, "P2"));
 
@@ -493,22 +493,50 @@ test.describe("DB-1 modal 6종 — 메트릭 설명/늘리는법", () => {
     test(`[DB-1-23-${id}] dash-tip-${id}-desc 클릭 → modal 텍스트 노출`, async ({ page }) => {
       await page.goto("/dashboard");
       await page.getByTestId(`dash-tip-${id}-desc`).click();
-      // modal 안에 메트릭 라벨 일치하는 텍스트
       await expect(page.locator("body")).toContainText(/설명|기준|왜/);
     });
   }
 });
 
-// ─── DB-1 heatmap 5단계 색 ──────────────────────────────
+test.describe("DB-1 modal 6종 — 늘리는법/줄이는법 (fixture 부족 시 stub)", () => {
+  test.beforeEach(async ({ page }) => {
+    seed("P2");
+    await signInAs(page, "P2");
+  });
 
-test.describe("DB-1 [B] heatmap 5단계 색", () => {
+  // 각 메트릭의 act 버튼은 grade 가 보통/부족/경고 일 때만 렌더 (코드 line 890 isBad).
+  // stubOverview 로 grade 를 낮춤 → act 버튼 노출 → 클릭 → modal.
+  const cases = [
+    { id: "cache", field: "cacheHitPct", value: 50, label: "늘리는법" },
+    { id: "oneshot", field: "oneShotRate", value: 0.5, label: "늘리는법" },
+    { id: "cost-session", field: "cost", value: 150, sessions: 1, label: "줄이는법" },
+    { id: "calls-session", field: "calls", value: 7, sessions: 1, label: "최적화" },
+    { id: "cost-call", field: "costPerCall", value: 0.25, calls: 1, label: "줄이는법" },
+    { id: "out-in", field: "outputInputRatio", value: 2, label: "올리는법" },
+  ];
+
+  for (const c of cases) {
+    test(`[DB-1-24-${c.id}] dash-tip-${c.id}-act 클릭 (grade 낮음 stub)`, async ({ page }) => {
+      const stub: Record<string, number> = { [c.field]: c.value };
+      if (c.sessions) stub.sessions = c.sessions;
+      if (c.calls) stub.calls = c.calls;
+      await stubOverview(page, stub);
+      await page.goto("/dashboard");
+      await expect(page.getByTestId(`dash-tip-${c.id}-act`)).toBeVisible();
+      await page.getByTestId(`dash-tip-${c.id}-act`).click();
+      await expect(page.locator("body")).toContainText(new RegExp(c.label));
+    });
+  }
+});
+
+// ─── DB-1 heatmap 5단계 색 ───────────────────────────────
+
+test.describe("DB-1 [B] activity / dwell heatmap 5단계", () => {
   test("[DB-1-25~29][B] activity heatmap 5단계 fill", async () => {
-    // react-activity-calendar 가 fill 을 inline style 로 주입 — playwright 의 fill attribute
-    // 매칭이 직접 안 됨. 별도 selector 로직 필요. phase 2.1 fixture + selector 확정 이후.
-    test.skip(true, "react-activity-calendar 라이브러리 fill style 매칭 — phase 2.1");
+    test.skip(true, "react-activity-calendar 라이브러리의 SVG rect fill style 이 즉시 evaluate 매칭 안 됨 (timing/library 의존). 별도 selector 패턴 + ccusage daily 우선 처리 + patchCcusageDaily 헬퍼 추가 — phase 2.1");
   });
 
   test("[DB-1-30~34][B] dwell heatmap 5단계", async () => {
-    test.skip(true, "DB-1-25~29 와 동일 — 라이브러리 selector phase 2.1");
+    test.skip(true, "DB-1-25~29 와 동일 — 라이브러리 fill style 매칭 phase 2.1");
   });
 });
