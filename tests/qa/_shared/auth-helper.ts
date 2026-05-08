@@ -118,3 +118,13 @@ export async function stubOverview(page: Page, fields: Record<string, number>): 
     await r.fulfill({ response: original, json: body });
   });
 }
+
+/** page.route stub — /api/dashboard 응답 임의 변형 (callback). */
+export async function stubDashboard(page: Page, mutate: (body: Record<string, unknown>) => void): Promise<void> {
+  await page.route("**/api/dashboard*", async (r: Route) => {
+    const original = await r.fetch();
+    const body = await original.json();
+    mutate(body);
+    await r.fulfill({ response: original, json: body });
+  });
+}
