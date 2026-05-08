@@ -53,10 +53,11 @@ export default function SetupStatusPage() {
   if (fetchError) return (
     <div className="min-h-screen">
       <Nav />
-      <div className="flex flex-col items-center justify-center h-64 gap-4">
+      <div data-testid="status-fetch-error" className="flex flex-col items-center justify-center h-64 gap-4">
         <p className="text-slate-300 text-sm">셋업 상태를 불러오지 못했어요.</p>
         <p className="text-slate-500 text-xs">네트워크·세션을 확인하고 다시 시도해주세요.</p>
         <button
+          data-testid="status-retry"
           onClick={() => setReloadKey((k) => k + 1)}
           className="px-4 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white text-sm rounded-md transition-colors"
         >
@@ -89,7 +90,7 @@ export default function SetupStatusPage() {
         </div>
 
         {/* Overall status */}
-        <div className={`rounded-lg p-4 border ${data.ready ? "bg-green-950 border-green-800" : "bg-slate-900 border-slate-700"}`}>
+        <div data-testid="status-overall" className={`rounded-lg p-4 border ${data.ready ? "bg-green-950 border-green-800" : "bg-slate-900 border-slate-700"}`}>
           <div className="flex items-center gap-2">
             <span className="text-xl">{data.ready ? "✅" : "⚙️"}</span>
             <div>
@@ -107,7 +108,7 @@ export default function SetupStatusPage() {
 
         {/* Stale warning */}
         {isStale && (
-          <div className="bg-yellow-950 border border-yellow-800 rounded-lg p-4">
+          <div data-testid="status-stale-warning" className="bg-yellow-950 border border-yellow-800 rounded-lg p-4">
             <p className="text-yellow-300 font-semibold text-sm">⚠️ 수집이 멈췄을 수 있어요</p>
             <p className="text-yellow-400 text-sm mt-1">
               마지막 수집: {syncAge! >= 60 ? `${Math.floor(syncAge! / 60)}시간` : `${syncAge}분`} 전
@@ -128,6 +129,7 @@ export default function SetupStatusPage() {
           <p className="text-sm text-slate-400 font-medium">설치 단계</p>
 
           <StepItem
+            testid="status-step-cli"
             done={data.steps.cli_installed}
             title="CLI 설치"
             desc="npx 명령어로 usage-tracker를 설치합니다"
@@ -135,6 +137,7 @@ export default function SetupStatusPage() {
             <div className="flex items-center gap-2 mt-2">
               <code className="flex-1 text-xs bg-slate-800 rounded px-3 py-2 text-indigo-300">{npxCmd}</code>
               <button
+                data-testid="status-copy-cli"
                 onClick={() => copy(npxCmd)}
                 className="text-xs px-2 py-1 bg-slate-700 hover:bg-slate-600 rounded text-slate-300 transition-colors whitespace-nowrap"
               >
@@ -144,6 +147,7 @@ export default function SetupStatusPage() {
           </StepItem>
 
           <StepItem
+            testid="status-step-hook"
             done={data.steps.hook_registered}
             title="SessionEnd Hook 등록"
             desc="CLI init이 자동으로 Claude Code 설정에 훅을 등록합니다"
@@ -157,6 +161,7 @@ export default function SetupStatusPage() {
           </StepItem>
 
           <StepItem
+            testid="status-step-first-session"
             done={data.steps.first_session}
             title="첫 번째 세션 수집"
             desc="Claude Code 세션을 시작하고 종료하면 자동으로 수집됩니다"
@@ -173,7 +178,7 @@ export default function SetupStatusPage() {
         <div className="bg-slate-900 rounded-lg p-4 space-y-3">
           <p className="text-sm text-slate-400 font-medium">문제 해결</p>
           <div className="space-y-2 text-sm">
-            <details className="group">
+            <details data-testid="status-faq-no-data" className="group">
               <summary className="cursor-pointer text-slate-300 hover:text-slate-100 list-none flex items-center gap-2">
                 <span className="text-slate-500 group-open:rotate-90 transition-transform inline-block">▶</span>
                 데이터가 보이지 않아요
@@ -185,7 +190,7 @@ export default function SetupStatusPage() {
               </div>
             </details>
 
-            <details className="group">
+            <details data-testid="status-faq-reset-key" className="group">
               <summary className="cursor-pointer text-slate-300 hover:text-slate-100 list-none flex items-center gap-2">
                 <span className="text-slate-500 group-open:rotate-90 transition-transform inline-block">▶</span>
                 API 키를 재발급하고 싶어요
@@ -196,7 +201,7 @@ export default function SetupStatusPage() {
               </div>
             </details>
 
-            <details className="group">
+            <details data-testid="status-faq-backfill" className="group">
               <summary className="cursor-pointer text-slate-300 hover:text-slate-100 list-none flex items-center gap-2">
                 <span className="text-slate-500 group-open:rotate-90 transition-transform inline-block">▶</span>
                 과거 데이터를 다시 불러오고 싶어요
@@ -208,7 +213,7 @@ export default function SetupStatusPage() {
               </div>
             </details>
 
-            <details className="group">
+            <details data-testid="status-faq-win-hook" className="group">
               <summary className="cursor-pointer text-slate-300 hover:text-slate-100 list-none flex items-center gap-2">
                 <span className="text-slate-500 group-open:rotate-90 transition-transform inline-block">▶</span>
                 Windows에서 훅이 작동하지 않아요
@@ -235,18 +240,20 @@ export default function SetupStatusPage() {
 }
 
 function StepItem({
+  testid,
   done,
   title,
   desc,
   children,
 }: {
+  testid?: string;
   done: boolean;
   title: string;
   desc: string;
   children?: React.ReactNode;
 }) {
   return (
-    <div className={`rounded p-3 border ${done ? "border-green-800 bg-green-950/30" : "border-slate-700"}`}>
+    <div data-testid={testid} className={`rounded p-3 border ${done ? "border-green-800 bg-green-950/30" : "border-slate-700"}`}>
       <div className="flex items-start gap-3">
         <span className="text-lg mt-0.5">{done ? "✅" : "⬜"}</span>
         <div className="flex-1">

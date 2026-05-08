@@ -29,6 +29,7 @@ export function Nav() {
             <Link
               key={t.href}
               href={t.href}
+              data-testid={`nav-tab-${t.href.replace(/^\//, "")}`}
               className={`text-sm px-2 sm:px-3 py-1 rounded transition-colors whitespace-nowrap inline-flex items-center gap-1 ${
                 path.startsWith(t.href)
                   ? "bg-slate-700 text-slate-100"
@@ -45,6 +46,7 @@ export function Nav() {
       </div>
       <div className="relative shrink-0">
         <button
+          data-testid="nav-user-toggle"
           onClick={() => setOpen(!open)}
           className="text-sm text-slate-400 hover:text-slate-200 flex items-center gap-1 whitespace-nowrap"
         >
@@ -53,6 +55,7 @@ export function Nav() {
         {open && (
           <div className="absolute right-0 top-8 bg-slate-800 border border-slate-700 rounded shadow-lg z-50 whitespace-nowrap">
             <button
+              data-testid="nav-logout"
               onClick={() => signOut({ callbackUrl: "/login" })}
               className="block px-4 py-2 text-sm text-slate-300 hover:bg-slate-700 w-full text-left"
             >

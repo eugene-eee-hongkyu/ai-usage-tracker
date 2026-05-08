@@ -494,7 +494,7 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
     <div className="min-h-screen bg-neutral-950">
       <Nav />
       <div className="flex items-center justify-center h-64">
-        <span className="font-mono text-neutral-500 animate-pulse">loading...</span>
+        <span data-testid="dash-loading" className="font-mono text-neutral-500 animate-pulse">loading...</span>
       </div>
     </div>
   );
@@ -502,9 +502,10 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
   if (fetchError) return (
     <div className="min-h-screen bg-neutral-950">
       <Nav />
-      <div className="flex flex-col items-center justify-center h-64 gap-4">
+      <div data-testid="dash-fetch-error" className="flex flex-col items-center justify-center h-64 gap-4">
         <p className="text-neutral-400 font-mono text-sm">데이터를 불러오지 못했습니다.</p>
         <button
+          data-testid="dash-retry"
           onClick={() => {
             setFetchError(false); setLoading(true);
             fetch(apiUrl(period, weekOffset, monthOffset, dayOffset)).then((r) => r.json()).then((d) => {
@@ -540,12 +541,13 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
           <span className="font-mono font-bold text-neutral-200">Primus Usage</span>
           <button onClick={() => signOut({ callbackUrl: "/login" })} className="text-sm text-neutral-500 hover:text-neutral-300 font-mono">logout</button>
         </header>
-        <main className="max-w-md mx-auto px-4 py-20 text-center space-y-6">
+        <main data-testid="dash-sync-needed" className="max-w-md mx-auto px-4 py-20 text-center space-y-6">
           <h1 className="text-2xl font-bold text-neutral-100 font-mono">sync needed</h1>
           <p className="text-neutral-400 text-sm font-mono">터미널에서 아래 명령어를 실행하세요.</p>
           <div className="flex items-center gap-2 bg-neutral-900 border border-neutral-800 rounded px-4 py-3 text-left">
-            <code className="flex-1 text-sm text-cyan-400 font-mono break-all">{syncCmd}</code>
+            <code data-testid="dash-sync-cmd" className="flex-1 text-sm text-cyan-400 font-mono break-all">{syncCmd}</code>
             <button
+              data-testid="dash-sync-copy"
               onClick={() => { navigator.clipboard.writeText(syncCmd); setSyncCopied(true); setTimeout(() => setSyncCopied(false), 2000); }}
               className="shrink-0 px-3 py-1 bg-indigo-600 hover:bg-indigo-500 text-white text-xs rounded font-mono"
             >{syncCopied ? "✓" : "복사"}</button>
@@ -573,6 +575,7 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
           {(["today", "month", "8days", "30days", "all"] as Period[]).map((p) => (
             <button
               key={p}
+              data-testid={`dash-period-${p}`}
               onClick={() => {
                 setPeriod(p);
                 // 어떤 period 버튼을 누르든 모든 offset 초기화 → 항상 라이브로 복귀

@@ -313,6 +313,7 @@ export default function TeamPage() {
           {(["today", "month", "8days", "30days", "all"] as Period[]).map((p) => (
             <button
               key={p}
+              data-testid={`team-period-${p}`}
               onClick={() => setPeriod(p)}
               className={`w-16 text-center py-1 rounded text-xs font-mono transition-colors ${period === p ? "bg-indigo-600 text-white" : "bg-neutral-800 text-neutral-400 hover:text-neutral-200"}`}
             >{PERIOD_LABELS[p]}</button>
@@ -321,7 +322,7 @@ export default function TeamPage() {
       </div>
 
       {/* Team Summary Bar */}
-      <div className="bg-neutral-900 border-b border-neutral-800">
+      <div data-testid="team-summary-bar" className="bg-neutral-900 border-b border-neutral-800">
         <div className="max-w-6xl mx-auto px-4 py-2.5 flex flex-wrap gap-x-5 gap-y-1 text-sm font-mono">
           <span><span className="text-cyan-400 font-bold">{fmtTokens(members.reduce((s, m) => s + m.totalTokens, 0))}</span><span className="text-neutral-500 ml-1 text-xs">총토큰</span></span>
           <span><span className="text-yellow-400 font-bold">${sum.totalCost.toFixed(2)}</span><span className="text-neutral-500 ml-1 text-xs">총비용</span></span>
@@ -335,7 +336,7 @@ export default function TeamPage() {
       <main className={`max-w-6xl mx-auto px-4 py-4 space-y-4 transition-opacity duration-150 ${loading ? "opacity-40 pointer-events-none" : "opacity-100"}`}>
 
         {members.length === 0 ? (
-          <div className="bg-neutral-900 border border-neutral-800 rounded-lg p-8 text-center text-neutral-500 text-sm font-mono">
+          <div data-testid="team-empty" className="bg-neutral-900 border border-neutral-800 rounded-lg p-8 text-center text-neutral-500 text-sm font-mono">
             해당 기간에 활동 데이터가 없어요.
           </div>
         ) : (
@@ -708,7 +709,7 @@ export default function TeamPage() {
             {/* Row 6: Last Sync + Top Sessions (admin only) */}
             {adminUser && (
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                <div className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-slate-500 rounded">
+                <div data-testid="team-card-engagement" className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-slate-500 rounded">
                   <div className="px-3 py-2 border-b border-neutral-800 flex items-center gap-2">
                     <span className="text-xs font-mono font-bold text-slate-400 uppercase tracking-wider">Engagement</span>
                     <AdminBadge />
@@ -766,7 +767,7 @@ export default function TeamPage() {
                 </div>
 
                 {/* Top Sessions (admin only) */}
-                <div className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-red-500 rounded">
+                <div data-testid="team-card-top-sessions" className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-red-500 rounded">
                   <div className="px-3 py-2 border-b border-neutral-800 flex items-center gap-2">
                     <span className="text-xs font-mono font-bold text-red-400 uppercase tracking-wider">Top Sessions</span>
                     <AdminBadge />
@@ -835,7 +836,7 @@ export default function TeamPage() {
               // "엔터 active day 평균 $13" 대비 multiplier — 가장 직접 비교
               const multiplier = ic.activeDayAvg / 13;
               return (
-                <div className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-emerald-500 rounded">
+                <div data-testid="team-card-industry" className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-emerald-500 rounded">
                   <div className="px-3 py-2 border-b border-neutral-800 flex items-center gap-2">
                     <span className="text-xs font-mono font-bold text-emerald-400 uppercase tracking-wider">
                       Primus vs 업계 (Claude Code, 최근 30일)
@@ -917,7 +918,7 @@ export default function TeamPage() {
                     </div>
                   </div>
                   <div className="px-3 py-2.5 border-t border-neutral-800 bg-emerald-950/20">
-                    <p className="text-xs font-mono text-emerald-300">
+                    <p data-testid="team-industry-punch" className="text-xs font-mono text-emerald-300">
                       ⚡ Primus 는 엔터 active day 평균 ($13) 대비 <span className="font-bold">{multiplier.toFixed(1)}배</span> — Claude Code 적극 활용 팀
                     </p>
                   </div>

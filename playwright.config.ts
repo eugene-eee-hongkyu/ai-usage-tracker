@@ -24,10 +24,11 @@ loadEnvFile(resolve(__dirname, 'web/.env.local'));
 
 export default defineConfig({
   testDir: './tests',
-  fullyParallel: true,
+  fullyParallel: false,
   forbidOnly: !!process.env.CI,
-  retries: process.env.CI ? 2 : 0,
-  workers: process.env.CI ? 1 : undefined,
+  retries: process.env.CI ? 2 : 1,
+  // 모든 spec 이 같은 로컬 DB 공유 fixture 사용 → workers=1 강제 (race condition 회피)
+  workers: 1,
   timeout: 60000,
   reporter: [
     ['html', { outputFolder: 'playwright-report/detail', open: 'never' }],

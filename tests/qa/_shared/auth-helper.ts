@@ -6,12 +6,13 @@ import { fileURLToPath } from "node:url";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const SEED_ROOT = resolve(__dirname, "../../../db/seed");
 
-export type PersonaId = "P1" | "P2" | "P3";
+export type PersonaId = "P1" | "P2" | "P3" | "P5";
 
 const EMAIL_BY_PERSONA: Record<PersonaId, string | null> = {
   P1: null,
   P2: "alice@iskra.world",
   P3: "eugene.eee@iskra.world",
+  P5: "carol@iskra.world",
 };
 
 export function seed(persona: PersonaId): void {

@@ -17,18 +17,19 @@ function LoginContent() {
       </div>
 
       {error === "domain" && (
-        <p className="text-red-400 text-sm bg-red-950 px-4 py-2 rounded">
+        <p data-testid="login-error-domain" className="text-red-400 text-sm bg-red-950 px-4 py-2 rounded">
           허용되지 않은 이메일 도메인입니다.
         </p>
       )}
       {error && error !== "domain" && (
-        <p className="text-red-400 text-sm bg-red-950 px-4 py-2 rounded">
+        <p data-testid="login-error-other" className="text-red-400 text-sm bg-red-950 px-4 py-2 rounded">
           로그인 중 오류가 발생했습니다.
         </p>
       )}
 
       <div className="flex flex-col gap-3 w-full max-w-xs">
         <button
+          data-testid="login-btn-github"
           onClick={() => signIn("github", { callbackUrl: "/dashboard" })}
           className="flex items-center justify-center gap-3 px-6 py-3 bg-slate-100 text-slate-900 rounded-lg font-semibold hover:bg-white transition-colors"
         >
@@ -39,6 +40,7 @@ function LoginContent() {
         </button>
 
         <button
+          data-testid="login-btn-google"
           onClick={() => signIn("google", { callbackUrl: "/dashboard" })}
           className="flex items-center justify-center gap-3 px-6 py-3 bg-white text-slate-800 rounded-lg font-semibold hover:bg-slate-50 transition-colors border border-slate-200"
         >
