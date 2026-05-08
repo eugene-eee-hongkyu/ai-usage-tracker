@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import { db, userSnapshots, users, periodSnapshots } from "@/lib/db";
+import { db, userSnapshots, users, periodSnapshots, dailyVisits } from "@/lib/db";
 import { and, asc, desc, eq } from "drizzle-orm";
 import { isAdmin } from "@/lib/admin";
 
@@ -316,6 +316,33 @@ export async function GET(req: NextRequest) {
     heatmapDaily.push({ date: key, cost: heatmapMap[key] ?? 0 });
   }
 
+  // Visit heatmap: target user 의 daily_visits (heatmap 과 동일한 15~26주
+  // 적응형 길이). admin 이 viewOnly 로 다른 사람 보면 그 사람의 visit count
+  // 가 노출됨 — engagement 진단 신호. POST /api/visit 는 항상 session.user
+  // 만 카운트하므로 자기 행동만 자기 row 에 누적.
+  const visitRows = await db
+    .select({ date: dailyVisits.date, count: dailyVisits.count })
+    .from(dailyVisits)
+    .where(eq(dailyVisits.userId, user[0].id));
+  const visitMap: Record<string, number> = {};
+  for (const r of visitRows) visitMap[r.date] = r.count;
+  const visitEarliest = Object.keys(visitMap).sort()[0];
+  const visitDataDays = visitEarliest
+    ? Math.floor((heatmapBase.getTime() - new Date(visitEarliest).getTime()) / 86_400_000) + 1
+    : 0;
+  const visitWeeks = Math.max(
+    HEATMAP_MIN_WEEKS,
+    Math.min(HEATMAP_MAX_WEEKS, Math.ceil(visitDataDays / 7)),
+  );
+  const visitDays = visitWeeks * 7;
+  const visitDaily: Array<{ date: string; count: number }> = [];
+  for (let i = visitDays - 1; i >= 0; i--) {
+    const d2 = new Date(heatmapBase);
+    d2.setDate(d2.getDate() - i);
+    const key = d2.toISOString().slice(0, 10);
+    visitDaily.push({ date: key, count: visitMap[key] ?? 0 });
+  }
+
   // Build path lookup for topSessions
   const projectPathMap: Record<string, string> = {};
   for (const p of d.projects ?? []) {
@@ -394,6 +421,7 @@ export async function GET(req: NextRequest) {
     daily,
     dailyTokens,
     heatmapDaily,
+    visitDaily,
     activities,
     projects,
     topSessions,

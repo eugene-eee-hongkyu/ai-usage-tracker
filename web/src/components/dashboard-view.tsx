@@ -68,6 +68,7 @@ interface DashboardData {
   daily: DailyRow[];
   dailyTokens?: DailyTokenRow[];
   heatmapDaily?: Array<{ date: string; cost: number }>;
+  visitDaily?: Array<{ date: string; count: number }>;
   activities: Activity[];
   projects: Project[];
   topSessions: TopSession[];
@@ -385,6 +386,15 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
   useEffect(() => {
     if (status === "unauthenticated") router.push("/login");
   }, [status, router]);
+
+  // Mount-time visit POST. session.user 만 카운트 (어드민이 viewOnly 로
+  // 다른 사람 보더라도 어드민 본인 row 가 +1). useEffect deps 가 [session]
+  // 이라 같은 세션에서 페이지 새로고침 시에만 1회 — period/offset 변경엔
+  // 재호출 안 됨. 실패해도 무시 (UI 영향 0).
+  useEffect(() => {
+    if (!session) return;
+    fetch("/api/visit", { method: "POST" }).catch(() => {});
+  }, [session]);
 
   useEffect(() => {
     if (!viewOnly || !session) return;
@@ -1153,7 +1163,34 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
             </div>
           </div>
 
-          <div />
+          {/* Visit Heatmap (lower bar 가설 검증 — 사용자가 자기 dashboard
+              본 일자별 횟수). Row 6 우측 placeholder 자리에 위치. amber
+              톤 + activity heatmap 과 동일한 적응형 15~26주 길이. */}
+          {(data.visitDaily ?? []).length > 0 ? (() => {
+            const visitData = (data.visitDaily ?? []).map((row) => {
+              const c = row.count;
+              const level: 0 | 1 | 2 | 3 | 4 = c === 0 ? 0 : c <= 1 ? 1 : c <= 3 ? 2 : c <= 5 ? 3 : 4;
+              return { date: row.date, count: c, level };
+            });
+            return (
+              <div className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-amber-500 rounded">
+                <div className="px-3 py-2 border-b border-neutral-800">
+                  <span className="text-xs font-mono font-bold text-amber-400 uppercase tracking-wider">방문 히트맵 ({Math.round((data.visitDaily ?? []).length / 7)}주, 일별 횟수)</span>
+                </div>
+                <div className="p-3">
+                  <ActivityCalendar
+                    data={visitData}
+                    colorScheme="dark"
+                    theme={{ dark: ["#1e293b", "#854d0e", "#a16207", "#ca8a04", "#facc15"] }}
+                    labels={{ legend: { less: "낮음", more: "높음" } }}
+                    showWeekdayLabels
+                    blockSize={11}
+                    showTotalCount={false}
+                  />
+                </div>
+              </div>
+            );
+          })() : <div />}
         </div>
 
       </main>
