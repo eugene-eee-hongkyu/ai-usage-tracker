@@ -874,7 +874,7 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
                     data={calData}
                     colorScheme="dark"
                     theme={{ dark: ["#1e293b", "#4338ca", "#6366f1", "#818cf8", "#a5b4fc"] }}
-                    labels={{ legend: { less: "낮음", more: "높음" } }}
+                    labels={{ legend: { less: "$0", more: "$5+" } }}
                     showWeekdayLabels
                     blockSize={11}
                     showTotalCount={false}
@@ -1182,7 +1182,7 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
                     data={visitData}
                     colorScheme="dark"
                     theme={{ dark: ["#1e293b", "#854d0e", "#a16207", "#ca8a04", "#facc15"] }}
-                    labels={{ legend: { less: "낮음", more: "높음" } }}
+                    labels={{ legend: { less: "0", more: "6+" } }}
                     showWeekdayLabels
                     blockSize={11}
                     showTotalCount={false}
