@@ -1,7 +1,9 @@
 import type { Page } from "@playwright/test";
 import { execSync } from "node:child_process";
-import { resolve } from "node:path";
+import { resolve, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
 
+const __dirname = dirname(fileURLToPath(import.meta.url));
 const SEED_ROOT = resolve(__dirname, "../../../db/seed");
 
 export type PersonaId = "P1" | "P2" | "P3";

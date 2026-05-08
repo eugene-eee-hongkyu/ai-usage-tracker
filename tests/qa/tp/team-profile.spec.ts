@@ -68,10 +68,8 @@ test.describe("TP-1 P2 정상-일반 fixture", () => {
   test("TP-1-06 projects 행 1~10개 (fixture 3개)", async ({ page }) => {
     await page.goto("/team/10");
     const rows = page.locator('[data-testid^="member-project-row-"]');
-    const count = await rows.count();
-    expect(count).toBeGreaterThanOrEqual(1);
-    expect(count).toBeLessThanOrEqual(10);
-    expect(count).toBe(3);
+    // toHaveCount 는 자동 retry — client-side fetch 완료 대기
+    await expect(rows).toHaveCount(3);
   });
 });
 

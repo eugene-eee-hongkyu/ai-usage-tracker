@@ -1,6 +1,9 @@
 import { defineConfig, devices } from '@playwright/test';
 import { readFileSync, existsSync } from 'fs';
-import { resolve } from 'path';
+import { resolve, dirname } from 'path';
+import { fileURLToPath } from 'url';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
 
 function loadEnvFile(filePath: string): void {
   if (!existsSync(filePath)) return;
@@ -17,6 +20,7 @@ function loadEnvFile(filePath: string): void {
 }
 
 loadEnvFile(resolve(__dirname, '.env.local'));
+loadEnvFile(resolve(__dirname, 'web/.env.local'));
 
 export default defineConfig({
   testDir: './tests',
