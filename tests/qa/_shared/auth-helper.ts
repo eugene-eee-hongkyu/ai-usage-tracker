@@ -26,6 +26,39 @@ export function seed(persona: PersonaId): void {
   execSync(`psql "${url}" -f "${SEED_ROOT}/${persona}.sql"`, { stdio: "pipe" });
 }
 
+/** P{n} 시드 후 user.last_synced_at 을 N 시간 전으로 변형 (stale boundary 검증용). */
+export function patchSync(userId: number, hoursAgo: number): void {
+  const url = process.env.DATABASE_URL;
+  if (!url) throw new Error("DATABASE_URL 미설정");
+  execSync(
+    `psql "${url}" -c "UPDATE users SET last_synced_at = NOW() - INTERVAL '${hoursAgo} hours' WHERE id = ${userId}"`,
+    { stdio: "pipe" },
+  );
+}
+
+/** raw_json.all.daily 의 특정 date 의 cost 를 변형 (heatmap boundary 검증용). */
+export function patchDailyCost(userId: number, date: string, cost: number): void {
+  const url = process.env.DATABASE_URL;
+  if (!url) throw new Error("DATABASE_URL 미설정");
+  execSync(
+    `psql "${url}" -c "UPDATE user_snapshots SET raw_json = jsonb_set(raw_json, '{all,daily}', (SELECT jsonb_agg(CASE WHEN d->>'date' = '${date}' THEN jsonb_set(d, '{cost}', '${cost}'::jsonb) ELSE d END) FROM jsonb_array_elements(raw_json->'all'->'daily') d)) WHERE user_id = ${userId}"`,
+    { stdio: "pipe" },
+  );
+}
+
+/** user_snapshots 컬럼 직접 수정 (efficiency 5단계 검증용). */
+export function patchSnapshot(userId: number, fields: Record<string, number>): void {
+  const url = process.env.DATABASE_URL;
+  if (!url) throw new Error("DATABASE_URL 미설정");
+  const setClause = Object.entries(fields)
+    .map(([k, v]) => `${k} = ${v}`)
+    .join(", ");
+  execSync(
+    `psql "${url}" -c "UPDATE user_snapshots SET ${setClause} WHERE user_id = ${userId}"`,
+    { stdio: "pipe" },
+  );
+}
+
 export async function signInAs(page: Page, persona: PersonaId): Promise<void> {
   const email = EMAIL_BY_PERSONA[persona];
   if (!email) throw new Error(`persona ${persona} 는 비로그인 — signInAs 사용 부적합`);

@@ -673,12 +673,13 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
                 마지막 수신{" "}
                 <span className="text-neutral-500">{fmtSyncedAt(data.user.lastSyncedAt, userTz)}</span>{" "}
                 <button
+                  data-testid="dash-tz-btn"
                   onClick={() => setShowTzPicker((v) => !v)}
                   className="text-neutral-600 hover:text-neutral-300 text-[10px] font-mono border border-neutral-700 hover:border-neutral-500 rounded px-1 py-0.5 transition-colors"
                   title="타임존 변경"
                 >{tzAbbr(userTz)}</button>
                 {showTzPicker && (
-                  <div className="absolute right-0 top-full mt-1 z-50 bg-neutral-900 border border-neutral-700 rounded-lg shadow-xl w-64 py-1 text-left">
+                  <div data-testid="dash-tz-list" className="absolute right-0 top-full mt-1 z-50 bg-neutral-900 border border-neutral-700 rounded-lg shadow-xl w-64 py-1 text-left">
                     {TIMEZONE_LIST.map((tz) => (
                       <button
                         key={tz.value}

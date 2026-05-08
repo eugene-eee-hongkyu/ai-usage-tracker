@@ -192,8 +192,20 @@ test.describe("SU-1 폴링 + step + 대시보드 이동", () => {
 // ─── SU-1 엣지케이스 ─────────────────────────────────────
 
 test.describe("SU-1 엣지", () => {
-  test("[SU-1-12][B] tz invalid → 400", async () => {
-    test.skip(true, "select 에 invalid value 강제 주입은 dispatchEvent 로 가능하나 select 의 option 외 값은 브라우저가 거부 — phase 2.1 직접 PATCH supertest 로 분리");
+  test("[SU-1-12] tz invalid → PATCH 400", async ({ browser }) => {
+    const ctx = await browser.newContext();
+    const page = await ctx.newPage();
+    await import("../_shared/auth-helper").then(({ seed, signInAs }) => {
+      seed("P2");
+      return signInAs(page, "P2");
+    });
+    const res = await page.request.patch("/api/user/timezone", {
+      data: { timezone: "not_a_real_tz" },
+    });
+    expect(res.status()).toBe(400);
+    const body = await res.json();
+    expect(body.error).toBe("invalid timezone");
+    await ctx.close();
   });
 
   test("[SU-1-13][M] 진짜 install.sh + launchctl", async () => {

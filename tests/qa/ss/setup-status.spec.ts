@@ -3,7 +3,7 @@
  * 입력: docs/qa/QA_SS_setup_status.md
  */
 import { test, expect } from "@playwright/test";
-import { seed, signInAs, clearSession } from "../_shared/auth-helper";
+import { seed, signInAs, clearSession, patchSync } from "../_shared/auth-helper";
 
 test.describe.configure({ mode: "serial" });
 
@@ -134,15 +134,26 @@ test.describe("SS-1 fetchError", () => {
 // ─── SS-1 boundary ─────────────────────────────────────────
 
 test.describe("SS-1 stale boundary", () => {
-  test("[SS-1-06][B] stale-warning 텍스트 정확", async () => {
-    test.skip(true, "P5 fixture 작성 후 — 위 SS-1-03 에서 텍스트 검증 통합 완료");
+  test("[SS-1-06] stale-warning 텍스트 = '⚠️ 수집이 멈췄을 수 있어요'", async ({ page }) => {
+    seed("P5");
+    await signInAs(page, "P5");
+    await page.goto("/setup-status");
+    await expect(page.getByTestId("status-stale-warning")).toContainText("⚠️ 수집이 멈췄을 수 있어요");
   });
 
-  test("[SS-1-07][B] stale 23h boundary → 미렌더", async () => {
-    test.skip(true, "lastSyncedAt 정확히 NOW-23h 시드 별도 필요. phase 2.1 fixture 확장 후 진행");
+  test("[SS-1-07] stale 23h boundary → 미렌더", async ({ page }) => {
+    seed("P5"); // base
+    patchSync(14, 23); // user 14 → last_synced_at NOW - 23h (24h 임계 미만)
+    await signInAs(page, "P5");
+    await page.goto("/setup-status");
+    await expect(page.getByTestId("status-stale-warning")).toHaveCount(0);
   });
 
-  test("[SS-1-08][B] stale 25h boundary → 렌더", async () => {
-    test.skip(true, "lastSyncedAt 정확히 NOW-25h 시드 별도 필요. phase 2.1 fixture 확장 후 진행");
+  test("[SS-1-08] stale 25h boundary → 렌더", async ({ page }) => {
+    seed("P5");
+    patchSync(14, 25); // 25h (24h 임계 초과)
+    await signInAs(page, "P5");
+    await page.goto("/setup-status");
+    await expect(page.getByTestId("status-stale-warning")).toBeVisible();
   });
 });

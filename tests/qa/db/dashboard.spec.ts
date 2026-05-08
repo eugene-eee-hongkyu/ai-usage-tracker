@@ -224,13 +224,19 @@ test.describe("DB-1 tz picker", () => {
 
   test("[DB-1-39] tz-btn 클릭 → tz-list visible", async ({ page }) => {
     await page.goto("/dashboard");
-    // tz picker 코드 — line 667 부근, 우리가 testid 안 박았음. 텍스트로 fallback
-    // [B] BLOCKED — dash-tz-btn / dash-tz-list testid 미추가. C-1 §5-2 권장이지만 phase 2.1 이후 박기.
-    test.skip(true, "dash-tz-btn / dash-tz-list testid 미추가 — phase 2.1");
+    await page.getByTestId("dash-period-all").click(); // overview 양수 시점에서 tz picker 노출
+    await page.getByTestId("dash-tz-btn").click();
+    await expect(page.getByTestId("dash-tz-list")).toBeVisible();
   });
 
-  test("[DB-1-40][B] tz 선택 → PATCH /api/user/timezone", async () => {
-    test.skip(true, "DB-1-39 와 동일 — tz picker testid 미추가");
+  test("[DB-1-40] tz 선택 → PATCH /api/user/timezone", async ({ page }) => {
+    await page.goto("/dashboard");
+    await page.getByTestId("dash-period-all").click();
+    await page.getByTestId("dash-tz-btn").click();
+    const reqPromise = page.waitForRequest((r) => r.url().includes("/api/user/timezone") && r.method() === "PATCH");
+    await page.getByTestId("dash-tz-list").locator("button", { hasText: "KST" }).click();
+    const req = await reqPromise;
+    expect(req.postDataJSON()).toMatchObject({ timezone: "Asia/Seoul" });
   });
 });
 
