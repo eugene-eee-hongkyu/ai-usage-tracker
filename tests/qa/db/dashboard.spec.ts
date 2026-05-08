@@ -3,7 +3,7 @@
  * 입력: docs/qa/QA_DB_dashboard.md
  */
 import { test, expect } from "@playwright/test";
-import { seed, signInAs, clearSession } from "../_shared/auth-helper";
+import { seed, signInAs, clearSession, patchSnapshot, patchDailyCost, patchOverview } from "../_shared/auth-helper";
 
 test.describe.configure({ mode: "serial" });
 
@@ -283,11 +283,40 @@ test.describe("DB-1 엣지케이스", () => {
   });
 });
 
-// ─── DB-1 efficiency 5단계 boundary (fixture 다양화) ──────
+// ─── DB-1 efficiency 5단계 boundary (patchSnapshot 활용) ──────
 
-test.describe("DB-1 [B] efficiency 5단계", () => {
-  test("[DB-1-15~22][B] efficiency 6 메트릭 5단계 boundary", async () => {
-    test.skip(true, "P2 변형 fixture (cache 96/91/80/59/composite 0.88/0.6/0.32 등) 별도 시드 필요 — phase 2.1 fixture 확장");
+test.describe("DB-1 efficiency cache 5단계", () => {
+  test.beforeEach(async ({ page }) => {
+    seed("P2");
+    await signInAs(page, "P2");
+  });
+
+  test("[DB-1-15] cache=96 → 탁월", async ({ page }) => {
+    patchOverview(10, "cacheHitPct", 96);
+    await page.goto("/dashboard");
+    await page.getByTestId("dash-period-all").click();
+    await expect(page.getByTestId("dash-metric-cache-grade")).toContainText("탁월");
+  });
+
+  test("[DB-1-16] cache=80 → 보통", async ({ page }) => {
+    patchOverview(10, "cacheHitPct", 80);
+    await page.goto("/dashboard");
+    await page.getByTestId("dash-period-all").click();
+    await expect(page.getByTestId("dash-metric-cache-grade")).toContainText("보통");
+  });
+
+  test("[DB-1-17] cache=59 → 경고", async ({ page }) => {
+    patchOverview(10, "cacheHitPct", 59);
+    await page.goto("/dashboard");
+    await page.getByTestId("dash-period-all").click();
+    await expect(page.getByTestId("dash-metric-cache-grade")).toContainText("경고");
+  });
+
+  test("[DB-1-18] cache=70 → 부족", async ({ page }) => {
+    patchOverview(10, "cacheHitPct", 70);
+    await page.goto("/dashboard");
+    await page.getByTestId("dash-period-all").click();
+    await expect(page.getByTestId("dash-metric-cache-grade")).toContainText("부족");
   });
 });
 

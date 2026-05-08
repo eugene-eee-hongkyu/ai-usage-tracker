@@ -59,6 +59,16 @@ export function patchSnapshot(userId: number, fields: Record<string, number>): v
   );
 }
 
+/** raw_json.all.overview.<field> 변경 — dashboard route 가 raw_json 에서 cacheHitPct/totalCost 등 우선 읽음. */
+export function patchOverview(userId: number, field: string, value: number): void {
+  const url = process.env.DATABASE_URL;
+  if (!url) throw new Error("DATABASE_URL 미설정");
+  execSync(
+    `psql "${url}" -c "UPDATE user_snapshots SET raw_json = jsonb_set(raw_json, '{all,overview,${field}}', '${value}'::jsonb) WHERE user_id = ${userId}"`,
+    { stdio: "pipe" },
+  );
+}
+
 export async function signInAs(page: Page, persona: PersonaId): Promise<void> {
   const email = EMAIL_BY_PERSONA[persona];
   if (!email) throw new Error(`persona ${persona} 는 비로그인 — signInAs 사용 부적합`);
