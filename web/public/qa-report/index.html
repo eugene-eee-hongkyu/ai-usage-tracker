@@ -1,0 +1,1545 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Primus Usage QA 결과 리포트</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Pretendard:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<style>
+  *,*::before,*::after{box-sizing:border-box}
+  :root{
+    --bg:#FAF9F6;
+    --surface:#FFFFFF;
+    --surface-2:#F5F3EE;
+    --line:rgba(20,18,12,.08);
+    --line-strong:rgba(20,18,12,.14);
+    --ink:#1A1814;
+    --ink-2:#3A362E;
+    --ink-3:#6B6657;
+    --ink-4:#9A9483;
+    --pass:#1F8A4C;
+    --pass-bg:#E8F4EC;
+    --pass-bar:linear-gradient(90deg,#22A35A 0%,#1F8A4C 100%);
+    --fail:#C13030;
+    --fail-bg:#FBEBEB;
+    --manual:#B26A00;
+    --manual-bg:#FAEFD8;
+    --skip:#5C6470;
+    --skip-bg:#ECEDF0;
+    --del:#7B5BB6;
+    --del-bg:#EFEAF8;
+    --blocked:#3B82A6;
+    --blocked-bg:#E4F0F7;
+  }
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--ink);
+    font-family:Pretendard,ui-sans-serif,-apple-system,system-ui,"Apple SD Gothic Neo","Noto Sans KR",sans-serif;
+    font-feature-settings:"ss01","tnum";-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+  .mono{font-family:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,monospace;font-variant-numeric:tabular-nums}
+  .num{font-variant-numeric:tabular-nums;font-feature-settings:"tnum"}
+  a{color:inherit}
+
+  .page{max-width:1180px;margin:0 auto;padding:48px 32px 80px}
+
+  /* Topbar */
+  .topbar{display:flex;align-items:center;justify-content:space-between;gap:24px;
+    padding-bottom:24px;border-bottom:1px solid var(--line)}
+  .brand{display:flex;align-items:center;gap:12px}
+  .brand-mark{width:28px;height:28px;border-radius:7px;background:var(--ink);
+    display:grid;place-items:center;color:var(--bg);font-weight:700;font-size:13px;letter-spacing:-.02em}
+  .brand-name{font-size:14px;font-weight:600;letter-spacing:-.01em}
+  .brand-sep{color:var(--ink-4);font-weight:400;margin:0 2px}
+  .brand-sub{font-size:13px;color:var(--ink-3);font-weight:500}
+  .top-meta{display:flex;align-items:center;gap:18px;font-size:13px;color:var(--ink-3)}
+  .top-meta b{color:var(--ink-2);font-weight:600}
+  .top-meta .dot{width:6px;height:6px;border-radius:50%;background:var(--pass);display:inline-block;
+    margin-right:8px;box-shadow:0 0 0 4px var(--pass-bg)}
+  .top-actions{display:flex;gap:8px}
+  .btn{appearance:none;border:1px solid var(--line-strong);background:var(--surface);
+    color:var(--ink-2);padding:8px 12px;border-radius:8px;font:inherit;font-size:12.5px;
+    font-weight:500;cursor:pointer;display:inline-flex;align-items:center;gap:6px;text-decoration:none;
+    transition:background .15s, border-color .15s}
+  .btn:hover{background:var(--surface-2);border-color:var(--ink-4)}
+  .btn-fail{color:var(--fail);border-color:color-mix(in oklab,var(--fail) 35%, transparent);background:var(--fail-bg)}
+  .btn-fail:hover{background:color-mix(in oklab,var(--fail) 12%, var(--fail-bg))}
+
+  /* Hero */
+  .hero{padding:36px 0 28px;display:grid;grid-template-columns:1.1fr .9fr;gap:48px;align-items:end}
+  .hero-l h1{margin:0;font-size:32px;line-height:1.18;letter-spacing:-.022em;font-weight:700}
+  .hero-l h1 em{font-style:normal;color:var(--ink-3);font-weight:600}
+  .hero-l p{margin:14px 0 0;font-size:14px;color:var(--ink-3);line-height:1.55;max-width:50ch}
+  .hero-r{display:flex;justify-content:flex-end}
+  .ring-wrap{display:flex;align-items:center;gap:24px}
+  .ring{position:relative;width:120px;height:120px;display:block}
+  .ring svg{transform:rotate(-90deg);display:block;width:120px;height:120px}
+  .ring-track{stroke:var(--line)}
+  .ring-fill{stroke:url(#ringGrad);stroke-linecap:round}
+  .ring-num{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
+    display:flex;align-items:baseline;justify-content:center;
+    font-size:28px;font-weight:700;letter-spacing:-.02em;line-height:1;
+    width:100%;text-align:center}
+  .ring-num small{font-size:13px;color:var(--ink-3);font-weight:500;margin-left:2px;line-height:1}
+  .ring-cap{font-size:12px;color:var(--ink-3);max-width:140px;line-height:1.5}
+  .ring-cap b{display:block;color:var(--ink);font-size:13px;font-weight:600;margin-bottom:4px}
+
+  /* KPI strip */
+  .kpi-row{display:grid;grid-template-columns:repeat(6,1fr);gap:1px;background:var(--line);
+    border:1px solid var(--line);border-radius:12px;overflow:hidden;margin-top:20px}
+  .kpi{background:var(--surface);padding:18px 20px;display:flex;flex-direction:column;gap:6px;position:relative;min-width:0}
+  .kpi-l{font-size:11.5px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--ink-3);
+    display:flex;align-items:center;gap:6px;white-space:nowrap;min-width:0}
+  .kpi-l .pip{width:8px;height:8px;border-radius:2px;flex:none}
+  .kpi-v{font-size:30px;font-weight:700;letter-spacing:-.02em;line-height:1;display:block}
+  .kpi-d{font-size:12px;color:var(--ink-3);margin-top:2px;line-height:1.4}
+  .kpi-bar{position:absolute;left:0;right:0;bottom:0;height:2px;background:transparent}
+  .kpi.pass   .pip{background:var(--pass)}    .kpi.pass   .kpi-bar{background:var(--pass)}
+  .kpi.fail   .pip{background:var(--fail)}    .kpi.fail   .kpi-bar{background:var(--fail)}
+  .kpi.del    .pip{background:var(--del)}     .kpi.del    .kpi-bar{background:var(--del)}
+  .kpi.manual .pip{background:var(--manual)}  .kpi.manual .kpi-bar{background:var(--manual)}
+  .kpi.skip   .pip{background:var(--skip)}    .kpi.skip   .kpi-bar{background:var(--skip)}
+  .kpi.blocked .pip{background:var(--blocked)} .kpi.blocked .kpi-bar{background:var(--blocked)}
+  /* keep all KPI values in the same ink tone for visual rhythm */
+
+  /* Section */
+  section{margin-top:56px}
+  .sec-head{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;margin-bottom:18px}
+  .sec-title{font-size:18px;font-weight:700;letter-spacing:-.012em;margin:0;display:flex;align-items:baseline;gap:10px}
+  .sec-title .idx{font-size:12px;font-weight:500;color:var(--ink-4);font-family:"JetBrains Mono",monospace;letter-spacing:0}
+  .sec-sub{font-size:13px;color:var(--ink-3);margin:6px 0 0;font-weight:400}
+  .sec-tools{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+  .chip{font-size:11.5px;color:var(--ink-3);padding:5px 9px;border-radius:6px;
+    background:var(--surface-2);border:1px solid var(--line);font-weight:500;display:inline-flex;align-items:center;gap:5px}
+  .chip .pip{width:7px;height:7px;border-radius:2px}
+  .chip.pass .pip{background:var(--pass)}
+  .chip.fail .pip{background:var(--fail)}
+  .chip.del .pip{background:var(--del)}
+  .chip.manual .pip{background:var(--manual)}
+  .chip.skip .pip{background:var(--skip)}
+  .chip.blocked .pip{background:var(--blocked)}
+
+  /* Notice */
+  .notice{display:flex;gap:12px;padding:14px 16px;border-radius:10px;
+    background:var(--manual-bg);border:1px solid color-mix(in oklab,var(--manual) 25%, transparent);
+    margin-bottom:14px;font-size:13px;line-height:1.55;color:var(--ink-2)}
+  .notice b{color:var(--ink);font-weight:600}
+  .notice-ico{flex:none;width:18px;height:18px;border-radius:50%;background:var(--manual);
+    color:#fff;display:grid;place-items:center;font-size:11px;font-weight:700;margin-top:1px}
+  .notice.info{background:var(--surface-2);border-color:var(--line)}
+  .notice.info .notice-ico{background:var(--ink-3)}
+
+  /* Card / Table shell */
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+  table{width:100%;border-collapse:separate;border-spacing:0;font-size:13.5px}
+  thead th{font-size:11.5px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;
+    color:var(--ink-3);text-align:left;padding:13px 18px;background:var(--surface-2);
+    border-bottom:1px solid var(--line);white-space:nowrap}
+  thead th.r{text-align:right} thead th.c{text-align:center}
+  tbody td{padding:14px 18px;border-bottom:1px solid var(--line);vertical-align:middle;color:var(--ink-2)}
+  tbody tr:last-child td{border-bottom:0}
+  tbody tr:hover td{background:color-mix(in oklab,var(--surface-2) 60%, transparent)}
+  td.r{text-align:right} td.c{text-align:center}
+
+  /* Module link */
+  .mod{display:inline-flex;align-items:center;gap:10px;text-decoration:none;color:var(--ink)}
+  .mod-tag{font-family:"JetBrains Mono",monospace;font-size:12px;font-weight:600;
+    color:var(--ink);background:var(--surface-2);border:1px solid var(--line);padding:3px 7px;border-radius:5px}
+  .mod-name{font-size:13px;color:var(--ink-3);font-weight:500}
+  .mod:hover .mod-tag{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+
+  /* Coverage bar */
+  .cov{display:flex;align-items:center;gap:14px;justify-content:flex-end}
+  .cov-track{flex:1;max-width:240px;height:6px;background:var(--line);border-radius:99px;overflow:hidden}
+  .cov-fill{height:100%;background:var(--pass-bar);border-radius:99px;transition:width .6s cubic-bezier(.2,.8,.2,1)}
+  .cov.warn .cov-fill{background:linear-gradient(90deg,#E2A33A 0%,#B26A00 100%)}
+  .cov.bad .cov-fill{background:linear-gradient(90deg,#E26B6B 0%,#C13030 100%)}
+  .cov-val{font-weight:600;font-size:13px;min-width:40px;text-align:right;color:var(--ink)}
+  .cov.warn .cov-val{color:var(--manual)}
+  .cov.bad  .cov-val{color:var(--fail)}
+
+  /* Numbers — body cells: neutral; only colored pip in row-name communicates kind. */
+  .n-pass{color:var(--ink);font-weight:600}
+  .n-fail{color:var(--ink);font-weight:600}
+  .n-manual{color:var(--ink);font-weight:600}
+  .n-skip{color:var(--ink);font-weight:600}
+  .n-del{color:var(--ink);font-weight:600}
+  .n-blocked{color:var(--ink);font-weight:600}
+  /* footer accents — gentle, even across all kinds */
+  tfoot td.n-pass{color:var(--pass)}
+  tfoot td.n-fail{color:var(--fail)}
+  tfoot td.n-manual{color:var(--manual)}
+  tfoot td.n-skip{color:var(--skip)}
+  tfoot td.n-del{color:var(--del)}
+  tfoot td.n-blocked{color:var(--blocked)}
+  .dash{color:var(--ink-4)}
+
+  tfoot td{padding:14px 18px;background:var(--surface-2);font-weight:600;color:var(--ink);
+    border-top:1px solid var(--line-strong)}
+  tfoot td.r{text-align:right}
+
+  /* Distribution micro-bar */
+  .row-name{display:flex;flex-direction:column;gap:6px}
+  .dist{display:flex;height:4px;border-radius:99px;overflow:hidden;background:var(--line);width:200px;max-width:100%}
+  .dist span{display:block;height:100%}
+  .dist .p{background:var(--pass)}
+  .dist .f{background:var(--fail)}
+  .dist .d{background:var(--del)}
+  .dist .m{background:var(--manual)}
+  .dist .s{background:var(--skip)}
+  .dist .b{background:var(--blocked)}
+
+  /* Status pill */
+  .pill{display:inline-flex;align-items:center;gap:6px;padding:3px 9px;border-radius:99px;
+    font-size:11.5px;font-weight:600;letter-spacing:.01em;line-height:1}
+  .pill .pip{width:6px;height:6px;border-radius:50%}
+  .pill.pass{background:var(--pass-bg);color:var(--pass)} .pill.pass .pip{background:var(--pass)}
+  .pill.fail{background:var(--fail-bg);color:var(--fail)} .pill.fail .pip{background:var(--fail)}
+  .pill.manual{background:var(--manual-bg);color:var(--manual)} .pill.manual .pip{background:var(--manual)}
+  .pill.skip{background:var(--skip-bg);color:var(--skip)} .pill.skip .pip{background:var(--skip)}
+  .pill.del{background:var(--del-bg);color:var(--del)} .pill.del .pip{background:var(--del)}
+  .pill.blocked{background:var(--blocked-bg);color:var(--blocked)} .pill.blocked .pip{background:var(--blocked)}
+
+  /* Fail cards — scoped to .fails to avoid colliding with .kpi.fail */
+  .fails{display:flex;flex-direction:column;gap:8px}
+  .fails > .fail{display:grid;grid-template-columns:auto 1fr auto;gap:16px;align-items:start;
+    padding:16px 18px;background:var(--surface);border:1px solid var(--line);border-radius:10px;
+    border-left:3px solid var(--fail)}
+  .fail-id{font-family:"JetBrains Mono",monospace;font-size:12px;font-weight:600;
+    color:var(--fail);background:var(--fail-bg);padding:4px 8px;border-radius:5px;white-space:nowrap}
+  .fail-body{display:flex;flex-direction:column;gap:6px;min-width:0}
+  .fail-title{font-size:13.5px;font-weight:500;color:var(--ink)}
+  .fail-msg{font-family:"JetBrains Mono",monospace;font-size:11.5px;line-height:1.5;color:var(--ink-3);
+    background:var(--surface-2);padding:8px 10px;border-radius:6px;border:1px solid var(--line);
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .fail-link{font-size:12px;color:var(--ink-3);text-decoration:none;padding:4px 8px;border-radius:6px;
+    border:1px solid var(--line);white-space:nowrap;align-self:start}
+  .fail-link:hover{border-color:var(--ink-4);color:var(--ink)}
+
+  /* List tables */
+  .lt thead th{padding:11px 18px;font-size:11px}
+  .lt tbody td{padding:12px 18px}
+  .tc-id{font-family:"JetBrains Mono",monospace;font-size:12px;color:var(--ink);font-weight:500}
+  .reason{color:var(--ink-3);font-size:12.5px}
+  .group-row td{background:var(--surface-2);border-bottom:1px solid var(--line)!important;
+    font-size:11px;font-weight:600;color:var(--ink-3);text-transform:uppercase;letter-spacing:.05em;padding:10px 18px}
+  .group-row td .grp-num{color:var(--ink-4);margin-left:6px;font-weight:500;text-transform:none;letter-spacing:0}
+
+  /* Module section header */
+  .mod-head{display:flex;align-items:center;justify-content:space-between;gap:16px;
+    padding:16px 20px;background:var(--surface-2);border-bottom:1px solid var(--line)}
+  .mod-head-l{display:flex;align-items:center;gap:12px}
+  .mod-head-l .mod-tag{font-size:13px;padding:5px 10px}
+  .mod-head-l .mod-name{font-size:14px;color:var(--ink-2);font-weight:500}
+  .mod-head-r{display:flex;gap:8px;flex-wrap:wrap}
+
+  /* Module navigation */
+  .modnav{display:flex;gap:6px;flex-wrap:wrap;margin-top:12px}
+  .modnav a{font-family:"JetBrains Mono",monospace;font-size:12px;font-weight:600;
+    text-decoration:none;color:var(--ink-3);background:var(--surface);border:1px solid var(--line);
+    padding:5px 9px;border-radius:6px;transition:.15s}
+  .modnav a:hover{color:var(--ink);border-color:var(--ink-4);background:var(--surface-2)}
+
+  footer{margin-top:64px;padding-top:24px;border-top:1px solid var(--line);
+    display:flex;justify-content:space-between;font-size:12px;color:var(--ink-4)}
+  footer a{color:var(--ink-3);text-decoration:none}
+  footer a:hover{color:var(--ink)}
+
+  :target{scroll-margin-top:24px}
+
+  @media (max-width:880px){
+    .page{padding:32px 20px}
+    .hero{grid-template-columns:1fr;gap:24px}
+    .hero-r{justify-content:flex-start}
+    .kpi-row{grid-template-columns:repeat(2,1fr)}
+    .top-actions{display:none}
+    .fails > .fail{grid-template-columns:auto 1fr}
+    .fail-link{grid-column:1/-1;justify-self:end}
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <div class="topbar">
+    <div class="brand">
+      <div class="brand-mark">P</div>
+      <div class="brand-name">Primus Usage <span class="brand-sep">/</span> <span class="brand-sub">QA Report</span></div>
+    </div>
+    <div class="top-meta">
+      <div><span class="dot"></span>실행 <b>2026. 05. 08. PM 05:17</b></div>
+      <div>자동화 <b>140</b> · 대기 <b>0</b> · 수동 <b>3</b> · 스킵 <b>0</b></div>
+    </div>
+    <div class="top-actions">
+      
+      <a class="btn" href="./index.html">📋 E2E</a>
+      <a class="btn" href="./detail/index.html">🔍 Playwright</a>
+    </div>
+  </div>
+
+  <div class="hero">
+    <div class="hero-l">
+      <h1>이번 빌드는 <em>140건 통과</em>,<br/>실패 없이 모두 안정적입니다.</h1>
+      <p>docs/qa에 정의된 149건이 자동화 스펙 파일에 143건 구현되어 커버리지는 96%입니다. 이 중 0건은 요구사항 변경으로 삭제, 0건은 UI 출시 대기, 3건은 수동 검증 영역입니다.</p>
+      <div class="modnav">
+        <a href="#module-LO">LO</a><a href="#module-SU">SU</a><a href="#module-DB">DB</a><a href="#module-TM">TM</a><a href="#module-TP">TP</a><a href="#module-SS">SS</a>
+        
+        <a href="#manual-checks">수동</a>
+        
+        
+        
+        
+      </div>
+    </div>
+    <div class="hero-r">
+      <div class="ring-wrap">
+        <div class="ring">
+          <svg width="120" height="120">
+            <defs>
+              <linearGradient id="ringGrad" x1="0" y1="0" x2="1" y2="1">
+                <stop offset="0%" stop-color="#22A35A"/>
+                <stop offset="100%" stop-color="#1F8A4C"/>
+              </linearGradient>
+            </defs>
+            <circle class="ring-track" cx="60" cy="60" r="50" fill="none" stroke-width="8"/>
+            <circle class="ring-fill"  cx="60" cy="60" r="50" fill="none" stroke-width="8"
+                    stroke-dasharray="314.1592653589793" stroke-dashoffset="12.566370614359187"/>
+          </svg>
+          <div class="ring-num num">96<small>%</small></div>
+        </div>
+        <div class="ring-cap">
+          <b>자동화 커버리지</b>
+          143 / 149 구현
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="kpi-row">
+    <div class="kpi pass">
+      <div class="kpi-l"><span class="pip"></span>PASS</div>
+      <div class="kpi-v num">140</div>
+      <div class="kpi-d">자동화 140건 중 100%</div>
+      <div class="kpi-bar"></div>
+    </div>
+    <div class="kpi fail">
+      <div class="kpi-l"><span class="pip"></span>FAIL</div>
+      <div class="kpi-v num">0</div>
+      <div class="kpi-d">안정</div>
+      <div class="kpi-bar"></div>
+    </div>
+    <div class="kpi del">
+      <div class="kpi-l"><span class="pip"></span>요구기능 삭제</div>
+      <div class="kpi-v num">0</div>
+      <div class="kpi-d">테스트 대상 제외</div>
+      <div class="kpi-bar"></div>
+    </div>
+    <div class="kpi blocked">
+      <div class="kpi-l"><span class="pip"></span>출시 대기</div>
+      <div class="kpi-v num">0</div>
+      <div class="kpi-d">UI 출시 후 자동화</div>
+      <div class="kpi-bar"></div>
+    </div>
+    <div class="kpi manual">
+      <div class="kpi-l"><span class="pip"></span>수동 검증</div>
+      <div class="kpi-v num">3</div>
+      <div class="kpi-d">자동화 불가 항목</div>
+      <div class="kpi-bar"></div>
+    </div>
+    <div class="kpi skip">
+      <div class="kpi-l"><span class="pip"></span>스킵</div>
+      <div class="kpi-v num">0</div>
+      <div class="kpi-d">정책상 제외</div>
+      <div class="kpi-bar"></div>
+    </div>
+  </div>
+
+  <section id="coverage">
+    <div class="sec-head">
+      <div>
+        <h2 class="sec-title"><span class="idx">01</span>자동화 커버리지</h2>
+        <p class="sec-sub">docs/qa 기준 모듈별 자동화 스펙 구현 진행률 — 이번 빌드 기준 96% 달성</p>
+      </div>
+      <div class="sec-tools">
+        <span class="chip">기준 docs/qa</span>
+        <span class="chip">6 modules</span>
+      </div>
+    </div>
+    <div class="card">
+      <table>
+        <thead>
+          <tr>
+            <th style="width:32%">모듈</th>
+            <th class="r">DOCS 총계</th>
+            <th class="r">구현</th>
+            <th class="r">미구현</th>
+            <th style="width:32%" class="r">커버리지</th>
+          </tr>
+        </thead>
+        <tbody><tr>
+      <td><a class="mod" href="#module-LO"><span class="mod-tag">LO</span><span class="mod-name">로그인</span></a></td>
+      <td class="r num">15</td>
+      <td class="r num n-pass">20</td>
+      <td class="r num"><span class="dash">—</span></td>
+      <td class="r"><div class="cov "><div class="cov-track"><div class="cov-fill" style="width:100%"></div></div><div class="cov-val num">100%</div></div></td>
+    </tr>
+<tr>
+      <td><a class="mod" href="#module-SU"><span class="mod-tag">SU</span><span class="mod-name">셋업</span></a></td>
+      <td class="r num">14</td>
+      <td class="r num n-pass">15</td>
+      <td class="r num"><span class="dash">—</span></td>
+      <td class="r"><div class="cov "><div class="cov-track"><div class="cov-fill" style="width:100%"></div></div><div class="cov-val num">100%</div></div></td>
+    </tr>
+<tr>
+      <td><a class="mod" href="#module-DB"><span class="mod-tag">DB</span><span class="mod-name">대시보드 (공유 — #3·#6·#7)</span></a></td>
+      <td class="r num">54</td>
+      <td class="r num n-pass">46</td>
+      <td class="r num">8</td>
+      <td class="r"><div class="cov warn"><div class="cov-track"><div class="cov-fill" style="width:85%"></div></div><div class="cov-val num">85%</div></div></td>
+    </tr>
+<tr>
+      <td><a class="mod" href="#module-TM"><span class="mod-tag">TM</span><span class="mod-name">팀 랭킹</span></a></td>
+      <td class="r num">34</td>
+      <td class="r num n-pass">31</td>
+      <td class="r num">3</td>
+      <td class="r"><div class="cov "><div class="cov-track"><div class="cov-fill" style="width:91%"></div></div><div class="cov-val num">91%</div></div></td>
+    </tr>
+<tr>
+      <td><a class="mod" href="#module-TP"><span class="mod-tag">TP</span><span class="mod-name">멤버 프로필</span></a></td>
+      <td class="r num">17</td>
+      <td class="r num n-pass">16</td>
+      <td class="r num">1</td>
+      <td class="r"><div class="cov "><div class="cov-track"><div class="cov-fill" style="width:94%"></div></div><div class="cov-val num">94%</div></div></td>
+    </tr>
+<tr>
+      <td><a class="mod" href="#module-SS"><span class="mod-tag">SS</span><span class="mod-name">셋업 상태</span></a></td>
+      <td class="r num">15</td>
+      <td class="r num n-pass">15</td>
+      <td class="r num"><span class="dash">—</span></td>
+      <td class="r"><div class="cov "><div class="cov-track"><div class="cov-fill" style="width:100%"></div></div><div class="cov-val num">100%</div></div></td>
+    </tr></tbody>
+        <tfoot>
+          <tr>
+            <td>합계</td>
+            <td class="r num">149</td>
+            <td class="r num n-pass">143</td>
+            <td class="r num">6</td>
+            <td class="r"><div class="cov "><div class="cov-track"><div class="cov-fill" style="width:96%"></div></div><div class="cov-val num">96%</div></div></td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+  </section>
+
+  <section id="results">
+    <div class="sec-head">
+      <div>
+        <h2 class="sec-title"><span class="idx">02</span>실행 결과</h2>
+        <p class="sec-sub">docs/qa 143건의 모듈별 PASS · FAIL · 삭제 · 대기 · 수동 · 스킵 분포</p>
+      </div>
+      <div class="sec-tools">
+        <span class="chip pass"><span class="pip"></span>PASS</span>
+        <span class="chip fail"><span class="pip"></span>FAIL</span>
+        <span class="chip del"><span class="pip"></span>삭제</span>
+        <span class="chip blocked"><span class="pip"></span>대기</span>
+        <span class="chip manual"><span class="pip"></span>수동</span>
+        <span class="chip skip"><span class="pip"></span>스킵</span>
+      </div>
+    </div>
+    <div class="card">
+      <table>
+        <thead>
+          <tr>
+            <th style="width:26%">모듈</th>
+            <th class="r">전체</th>
+            <th class="r">PASS</th>
+            <th class="r">FAIL</th>
+            <th class="r">삭제</th>
+            <th class="r">대기</th>
+            <th class="r">수동</th>
+            <th class="r">스킵</th>
+          </tr>
+        </thead>
+        <tbody><tr>
+      <td>
+        <div class="row-name">
+          <a class="mod" href="#module-LO"><span class="mod-tag">LO</span></a>
+          <div class="dist" aria-hidden>
+            <span class="p" style="width:90%"></span>
+            <span class="f" style="width:0%"></span>
+            <span class="d" style="width:0%"></span>
+            <span class="b" style="width:0%"></span>
+            <span class="m" style="width:10%"></span>
+            <span class="s" style="width:0%"></span>
+          </div>
+        </div>
+      </td>
+      <td class="r num">20</td>
+      <td class="r num"><span class="n-pass">18</span></td>
+      <td class="r num"><span class="dash">—</span></td>
+      <td class="r num"><span class="dash">—</span></td>
+      <td class="r num"><span class="dash">—</span></td>
+      <td class="r num"><span class="n-manual">2</span></td>
+      <td class="r num"><span class="dash">—</span></td>
+    </tr>
+<tr>
+      <td>
+        <div class="row-name">
+          <a class="mod" href="#module-SU"><span class="mod-tag">SU</span></a>
+          <div class="dist" aria-hidden>
+            <span class="p" style="width:93.33333333333333%"></span>
+            <span class="f" style="width:0%"></span>
+            <span class="d" style="width:0%"></span>
+            <span class="b" style="width:0%"></span>
+            <span class="m" style="width:6.666666666666667%"></span>
+            <span class="s" style="width:0%"></span>
+          </div>
+        </div>
+      </td>
+      <td class="r num">15</td>
+      <td class="r num"><span class="n-pass">14</span></td>
+      <td class="r num"><span class="dash">—</span></td>
+      <td class="r num"><span class="dash">—</span></td>
+      <td class="r num"><span class="dash">—</span></td>
+      <td class="r num"><span class="n-manual">1</span></td>
+      <td class="r num"><span class="dash">—</span></td>
+    </tr>
+<tr>
+      <td>
+        <div class="row-name">
+          <a class="mod" href="#module-DB"><span class="mod-tag">DB</span></a>
+          <div class="dist" aria-hidden>
+            <span class="p" style="width:100%"></span>
+            <span class="f" style="width:0%"></span>
+            <span class="d" style="width:0%"></span>
+            <span class="b" style="width:0%"></span>
+            <span class="m" style="width:0%"></span>
+            <span class="s" style="width:0%"></span>
+          </div>
+        </div>
+      </td>
+      <td class="r num">46</td>
+      <td class="r num"><span class="n-pass">46</span></td>
+      <td class="r num"><span class="dash">—</span></td>
+      <td class="r num"><span class="dash">—</span></td>
+      <td class="r num"><span class="dash">—</span></td>
+      <td class="r num"><span class="dash">—</span></td>
+      <td class="r num"><span class="dash">—</span></td>
+    </tr>
+<tr>
+      <td>
+        <div class="row-name">
+          <a class="mod" href="#module-TM"><span class="mod-tag">TM</span></a>
+          <div class="dist" aria-hidden>
+            <span class="p" style="width:100%"></span>
+            <span class="f" style="width:0%"></span>
+            <span class="d" style="width:0%"></span>
+            <span class="b" style="width:0%"></span>
+            <span class="m" style="width:0%"></span>
+            <span class="s" style="width:0%"></span>
+          </div>
+        </div>
+      </td>
+      <td class="r num">31</td>
+      <td class="r num"><span class="n-pass">31</span></td>
+      <td class="r num"><span class="dash">—</span></td>
+      <td class="r num"><span class="dash">—</span></td>
+      <td class="r num"><span class="dash">—</span></td>
+      <td class="r num"><span class="dash">—</span></td>
+      <td class="r num"><span class="dash">—</span></td>
+    </tr>
+<tr>
+      <td>
+        <div class="row-name">
+          <a class="mod" href="#module-TP"><span class="mod-tag">TP</span></a>
+          <div class="dist" aria-hidden>
+            <span class="p" style="width:100%"></span>
+            <span class="f" style="width:0%"></span>
+            <span class="d" style="width:0%"></span>
+            <span class="b" style="width:0%"></span>
+            <span class="m" style="width:0%"></span>
+            <span class="s" style="width:0%"></span>
+          </div>
+        </div>
+      </td>
+      <td class="r num">16</td>
+      <td class="r num"><span class="n-pass">16</span></td>
+      <td class="r num"><span class="dash">—</span></td>
+      <td class="r num"><span class="dash">—</span></td>
+      <td class="r num"><span class="dash">—</span></td>
+      <td class="r num"><span class="dash">—</span></td>
+      <td class="r num"><span class="dash">—</span></td>
+    </tr>
+<tr>
+      <td>
+        <div class="row-name">
+          <a class="mod" href="#module-SS"><span class="mod-tag">SS</span></a>
+          <div class="dist" aria-hidden>
+            <span class="p" style="width:100%"></span>
+            <span class="f" style="width:0%"></span>
+            <span class="d" style="width:0%"></span>
+            <span class="b" style="width:0%"></span>
+            <span class="m" style="width:0%"></span>
+            <span class="s" style="width:0%"></span>
+          </div>
+        </div>
+      </td>
+      <td class="r num">15</td>
+      <td class="r num"><span class="n-pass">15</span></td>
+      <td class="r num"><span class="dash">—</span></td>
+      <td class="r num"><span class="dash">—</span></td>
+      <td class="r num"><span class="dash">—</span></td>
+      <td class="r num"><span class="dash">—</span></td>
+      <td class="r num"><span class="dash">—</span></td>
+    </tr></tbody>
+        <tfoot>
+          <tr>
+            <td>합계</td>
+            <td class="r num">143</td>
+            <td class="r num n-pass">140</td>
+            <td class="r num n-fail"><span class="dash">—</span></td>
+            <td class="r num n-del"><span class="dash">—</span></td>
+            <td class="r num n-blocked"><span class="dash">—</span></td>
+            <td class="r num n-manual">3</td>
+            <td class="r num n-skip"><span class="dash">—</span></td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+  </section>
+
+  
+
+  
+
+  <section id="manual-checks">
+    <div class="sec-head">
+      <div>
+        <h2 class="sec-title"><span class="idx">05</span>수동 검증 필요 <span class="chip" style="margin-left:6px">3건</span></h2>
+        <p class="sec-sub">OAuth · 이메일 인증 · SMS · PG 결제 · PDF 내용 등 자동화가 불가하거나 권장되지 않는 케이스</p>
+      </div>
+    </div>
+    <div class="notice info">
+      <div class="notice-ico">i</div>
+      <div>아래 항목은 자동화가 불가하거나 권장되지 않는 케이스입니다. 사람이 직접 확인해야 합니다.</div>
+    </div>
+    <div class="card">
+      <table class="lt">
+        <thead>
+          <tr>
+            <th style="width:18%">TC-ID</th>
+            <th>설명</th>
+            <th style="width:34%">수동 검증 이유</th>
+          </tr>
+        </thead>
+        <tbody>
+    <tr>
+      <td><span class="tc-id">LO-1-07</span></td>
+      <td>진짜 GitHub OAuth</td>
+      <td class="reason">수동 검증 필요 — 자동화 불가 영역</td>
+    </tr>
+
+    <tr>
+      <td><span class="tc-id">LO-1-08</span></td>
+      <td>진짜 Google OAuth</td>
+      <td class="reason">수동 검증 필요 — 자동화 불가 영역</td>
+    </tr>
+
+    <tr>
+      <td><span class="tc-id">SU-1-13</span></td>
+      <td>진짜 install.sh + launchctl</td>
+      <td class="reason">수동 검증 필요 — 자동화 불가 영역</td>
+    </tr></tbody>
+      </table>
+    </div>
+  </section>
+
+  
+
+  
+
+  
+
+  <section id="module-LO">
+    <div class="sec-head">
+      <div>
+        <h2 class="sec-title"><span class="idx">09</span>LO 모듈 상세</h2>
+        <p class="sec-sub">로그인 — TC-ID · 결과 · 설명</p>
+      </div>
+    </div>
+    <div class="card">
+      <div class="mod-head">
+        <div class="mod-head-l">
+          <span class="mod-tag">LO</span>
+          <span class="mod-name">로그인</span>
+        </div>
+        <div class="mod-head-r"><span class="chip pass"><span class="pip"></span>PASS 18</span><span class="chip manual"><span class="pip"></span>수동 2</span></div>
+      </div>
+      <table class="lt">
+        <thead>
+          <tr>
+            <th style="width:18%">TC-ID</th>
+            <th style="width:14%">결과</th>
+            <th>설명</th>
+          </tr>
+        </thead>
+        <tbody><tr id="tc-LO-0-01">
+      <td><span class="tc-id">LO-0-01</span></td>
+      <td><span class="pill pass"><span class="pip"></span>PASS</span></td>
+      <td>비로그인 /dashboard → /login</td>
+    </tr>
+<tr id="tc-LO-0-02">
+      <td><span class="tc-id">LO-0-02</span></td>
+      <td><span class="pill pass"><span class="pip"></span>PASS</span></td>
+      <td>비로그인 /team → /login</td>
+    </tr>
+<tr id="tc-LO-0-03">
+      <td><span class="tc-id">LO-0-03</span></td>
+      <td><span class="pill pass"><span class="pip"></span>PASS</span></td>
+      <td>비로그인 /setup-status → /login</td>
+    </tr>
+<tr id="tc-LO-0-04">
+      <td><span class="tc-id">LO-0-04</span></td>
+      <td><span class="pill pass"><span class="pip"></span>PASS</span></td>
+      <td>비로그인 /api/cli-auth → /login?callbackUrl=...</td>
+    </tr>
+<tr id="tc-LO-0-05">
+      <td><span class="tc-id">LO-0-05</span></td>
+      <td><span class="pill pass"><span class="pip"></span>PASS</span></td>
+      <td>비로그인 /member → /login</td>
+    </tr>
+<tr id="tc-LO-1-01">
+      <td><span class="tc-id">LO-1-01</span></td>
+      <td><span class="pill pass"><span class="pip"></span>PASS</span></td>
+      <td>GitHub 버튼 visible + 텍스트</td>
+    </tr>
+<tr id="tc-LO-1-02">
+      <td><span class="tc-id">LO-1-02</span></td>
+      <td><span class="pill pass"><span class="pip"></span>PASS</span></td>
+      <td>Google 버튼 visible + 텍스트</td>
+    </tr>
+<tr id="tc-LO-1-03">
+      <td><span class="tc-id">LO-1-03</span></td>
+      <td><span class="pill pass"><span class="pip"></span>PASS</span></td>
+      <td>query string 없음 → 에러 박스 미렌더</td>
+    </tr>
+<tr id="tc-LO-1-04">
+      <td><span class="tc-id">LO-1-04</span></td>
+      <td><span class="pill pass"><span class="pip"></span>PASS</span></td>
+      <td>?error=domain → 도메인 에러 박스 + 정확 텍스트</td>
+    </tr>
+<tr id="tc-LO-1-05">
+      <td><span class="tc-id">LO-1-05</span></td>
+      <td><span class="pill pass"><span class="pip"></span>PASS</span></td>
+      <td>?error=db → 기타 에러 박스 + 정확 텍스트</td>
+    </tr>
+<tr id="tc-LO-1-06">
+      <td><span class="tc-id">LO-1-06</span></td>
+      <td><span class="pill pass"><span class="pip"></span>PASS</span></td>
+      <td>?error=other → 기타 에러 박스 (default 분기)</td>
+    </tr>
+<tr id="tc-LO-1-07">
+      <td><span class="tc-id">LO-1-07</span></td>
+      <td><span class="pill manual"><span class="pip"></span>수동</span></td>
+      <td>진짜 GitHub OAuth</td>
+    </tr>
+<tr id="tc-LO-1-08">
+      <td><span class="tc-id">LO-1-08</span></td>
+      <td><span class="pill manual"><span class="pip"></span>수동</span></td>
+      <td>진짜 Google OAuth</td>
+    </tr>
+<tr id="tc-LO-1-09">
+      <td><span class="tc-id">LO-1-09</span></td>
+      <td><span class="pill pass"><span class="pip"></span>PASS</span></td>
+      <td>mock 도메인 통과 → 세션 발급</td>
+    </tr>
+<tr id="tc-LO-1-10">
+      <td><span class="tc-id">LO-1-10</span></td>
+      <td><span class="pill pass"><span class="pip"></span>PASS</span></td>
+      <td>mock 도메인 미일치 → ?error=domain 리다이렉트</td>
+    </tr>
+<tr id="tc-LO-1-11">
+      <td><span class="tc-id">LO-1-11</span></td>
+      <td><span class="pill pass"><span class="pip"></span>PASS</span></td>
+      <td>auth.ts DB insert 실패 → ?error=db (route stub 으로 대체)</td>
+    </tr>
+<tr id="tc-LO-1-12">
+      <td><span class="tc-id">LO-1-12</span></td>
+      <td><span class="pill pass"><span class="pip"></span>PASS</span></td>
+      <td>이미 로그인 + /login 자체 접근 가능</td>
+    </tr>
+<tr id="tc-LO-1-13">
+      <td><span class="tc-id">LO-1-13</span></td>
+      <td><span class="pill pass"><span class="pip"></span>PASS</span></td>
+      <td>non-admin Nav 탭 3종 visible (개인/팀/셋업)</td>
+    </tr>
+<tr id="tc-LO-1-14">
+      <td><span class="tc-id">LO-1-14</span></td>
+      <td><span class="pill pass"><span class="pip"></span>PASS</span></td>
+      <td>nav-user-toggle 클릭 → nav-logout visible</td>
+    </tr>
+<tr id="tc-LO-1-15">
+      <td><span class="tc-id">LO-1-15</span></td>
+      <td><span class="pill pass"><span class="pip"></span>PASS</span></td>
+      <td>admin Nav 4탭 (개인/팀/팀원/셋업)</td>
+    </tr></tbody>
+      </table>
+    </div>
+  </section>
+<section id="module-SU">
+    <div class="sec-head">
+      <div>
+        <h2 class="sec-title"><span class="idx">10</span>SU 모듈 상세</h2>
+        <p class="sec-sub">셋업 — TC-ID · 결과 · 설명</p>
+      </div>
+    </div>
+    <div class="card">
+      <div class="mod-head">
+        <div class="mod-head-l">
+          <span class="mod-tag">SU</span>
+          <span class="mod-name">셋업</span>
+        </div>
+        <div class="mod-head-r"><span class="chip pass"><span class="pip"></span>PASS 14</span><span class="chip manual"><span class="pip"></span>수동 1</span></div>
+      </div>
+      <table class="lt">
+        <thead>
+          <tr>
+            <th style="width:18%">TC-ID</th>
+            <th style="width:14%">결과</th>
+            <th>설명</th>
+          </tr>
+        </thead>
+        <tbody><tr id="tc-SU-0-01">
+      <td><span class="tc-id">SU-0-01</span></td>
+      <td><span class="pill pass"><span class="pip"></span>PASS</span></td>
+      <td>비로그인 /setup → /login</td>
+    </tr>
+<tr id="tc-SU-1-01">
+      <td><span class="tc-id">SU-1-01</span></td>
+      <td><span class="pill pass"><span class="pip"></span>PASS</span></td>
+      <td>UA Macintosh → 'macOS' + curl install</td>
+    </tr>
+<tr id="tc-SU-1-02">
+      <td><span class="tc-id">SU-1-02</span></td>
+      <td><span class="pill pass"><span class="pip"></span>PASS</span></td>
+      <td>UA Windows → 'Windows' + irm install</td>
+    </tr>
+<tr id="tc-SU-1-03">
+      <td><span class="tc-id">SU-1-03</span></td>
+      <td><span class="pill pass"><span class="pip"></span>PASS</span></td>
+      <td>UA Linux → 'Linux' (코드 fallback) + npx-cmd visible</td>
+    </tr>
+<tr id="tc-SU-1-04">
+      <td><span class="tc-id">SU-1-04</span></td>
+      <td><span class="pill pass"><span class="pip"></span>PASS</span></td>
+      <td>setup-npx-cmd 정확 텍스트</td>
+    </tr>
+<tr id="tc-SU-1-05">
+      <td><span class="tc-id">SU-1-05</span></td>
+      <td><span class="pill pass"><span class="pip"></span>PASS</span></td>
+      <td>install 복사 → 클립보드 = setup-install-cmd 텍스트</td>
+    </tr>
+<tr id="tc-SU-1-06">
+      <td><span class="tc-id">SU-1-06</span></td>
+      <td><span class="pill pass"><span class="pip"></span>PASS</span></td>
+      <td>tz=Asia/Seoul context → setup-tz-select value 'Asia/Seoul'</td>
+    </tr>
+<tr id="tc-SU-1-07">
+      <td><span class="tc-id">SU-1-07</span></td>
+      <td><span class="pill pass"><span class="pip"></span>PASS</span></td>
+      <td>tz 변경 → PATCH /api/user/timezone 발생</td>
+    </tr>
+<tr id="tc-SU-1-08">
+      <td><span class="tc-id">SU-1-08</span></td>
+      <td><span class="pill pass"><span class="pip"></span>PASS</span></td>
+      <td>not ready → step-hook visible (진행중)</td>
+    </tr>
+<tr id="tc-SU-1-09">
+      <td><span class="tc-id">SU-1-09</span></td>
+      <td><span class="pill pass"><span class="pip"></span>PASS</span></td>
+      <td>ready → setup-go-dashboard visible + 텍스트</td>
+    </tr>
+<tr id="tc-SU-1-10">
+      <td><span class="tc-id">SU-1-10</span></td>
+      <td><span class="pill pass"><span class="pip"></span>PASS</span></td>
+      <td>setup-go-dashboard 클릭 → /dashboard URL</td>
+    </tr>
+<tr id="tc-SU-1-11">
+      <td><span class="tc-id">SU-1-11</span></td>
+      <td><span class="pill pass"><span class="pip"></span>PASS</span></td>
+      <td>폴링 2s — /api/setup/status 5.5초간 ≥2회 호출</td>
+    </tr>
+<tr id="tc-SU-1-12">
+      <td><span class="tc-id">SU-1-12</span></td>
+      <td><span class="pill pass"><span class="pip"></span>PASS</span></td>
+      <td>tz invalid → PATCH 400</td>
+    </tr>
+<tr id="tc-SU-1-13">
+      <td><span class="tc-id">SU-1-13</span></td>
+      <td><span class="pill manual"><span class="pip"></span>수동</span></td>
+      <td>진짜 install.sh + launchctl</td>
+    </tr>
+<tr id="tc-SU-1-14">
+      <td><span class="tc-id">SU-1-14</span></td>
+      <td><span class="pill pass"><span class="pip"></span>PASS</span></td>
+      <td>/api/setup/status 500 → setup-fetch-error + retry visible</td>
+    </tr></tbody>
+      </table>
+    </div>
+  </section>
+<section id="module-DB">
+    <div class="sec-head">
+      <div>
+        <h2 class="sec-title"><span class="idx">11</span>DB 모듈 상세</h2>
+        <p class="sec-sub">대시보드 (공유 — #3·#6·#7) — TC-ID · 결과 · 설명</p>
+      </div>
+    </div>
+    <div class="card">
+      <div class="mod-head">
+        <div class="mod-head-l">
+          <span class="mod-tag">DB</span>
+          <span class="mod-name">대시보드 (공유 — #3·#6·#7)</span>
+        </div>
+        <div class="mod-head-r"><span class="chip pass"><span class="pip"></span>PASS 46</span></div>
+      </div>
+      <table class="lt">
+        <thead>
+          <tr>
+            <th style="width:18%">TC-ID</th>
+            <th style="width:14%">결과</th>
+            <th>설명</th>
+          </tr>
+        </thead>
+        <tbody><tr id="tc-DB-0-01">
+      <td><span class="tc-id">DB-0-01</span></td>
+      <td><span class="pill pass"><span class="pip"></span>PASS</span></td>
+      <td>비로그인 /dashboard → /login</td>
+    </tr>
+<tr id="tc-DB-0-02">
+      <td><span class="tc-id">DB-0-02</span></td>
+      <td><span class="pill pass"><span class="pip"></span>PASS</span></td>
+      <td>P1 lastSyncedAt=null + 로그인 → /setup 리다이렉트</td>
+    </tr>
+<tr id="tc-DB-0-03">
+      <td><span class="tc-id">DB-0-03</span></td>
+      <td><span class="pill pass"><span class="pip"></span>PASS</span></td>
+      <td>non-admin /team/[userId]/dashboard → /team/[userId]</td>
+    </tr>
+<tr id="tc-DB-0-04">
+      <td><span class="tc-id">DB-0-04</span></td>
+      <td><span class="pill pass"><span class="pip"></span>PASS</span></td>
+      <td>admin viewOnly 진입 + dash-overview-bar visible</td>
+    </tr>
+<tr id="tc-DB-0-05">
+      <td><span class="tc-id">DB-0-05</span></td>
+      <td><span class="pill pass"><span class="pip"></span>PASS</span></td>
+      <td>non-admin /member → /dashboard 리다이렉트</td>
+    </tr>
+<tr id="tc-DB-0-06">
+      <td><span class="tc-id">DB-0-06</span></td>
+      <td><span class="pill pass"><span class="pip"></span>PASS</span></td>
+      <td>localStorage 셀렉터 복구 (admin)</td>
+    </tr>
+<tr id="tc-DB-1-01">
+      <td><span class="tc-id">DB-1-01</span></td>
+      <td><span class="pill pass"><span class="pip"></span>PASS</span></td>
+      <td>loading visible (route delay)</td>
+    </tr>
+<tr id="tc-DB-1-02">
+      <td><span class="tc-id">DB-1-02</span></td>
+      <td><span class="pill pass"><span class="pip"></span>PASS</span></td>
+      <td>/api/dashboard 500 → fetch-error + retry visible</td>
+    </tr>
+<tr id="tc-DB-1-03">
+      <td><span class="tc-id">DB-1-03</span></td>
+      <td><span class="pill pass"><span class="pip"></span>PASS</span></td>
+      <td>retry 클릭 → 회복</td>
+    </tr>
+<tr id="tc-DB-1-04">
+      <td><span class="tc-id">DB-1-04</span></td>
+      <td><span class="pill pass"><span class="pip"></span>PASS</span></td>
+      <td>P7 sync-needed 박스 visible + sync-cmd 정확 텍스트</td>
+    </tr>
+<tr id="tc-DB-1-05">
+      <td><span class="tc-id">DB-1-05</span></td>
+      <td><span class="pill pass"><span class="pip"></span>PASS</span></td>
+      <td>sync 복사 → 클립보드</td>
+    </tr>
+<tr id="tc-DB-1-07">
+      <td><span class="tc-id">DB-1-07</span></td>
+      <td><span class="pill pass"><span class="pip"></span>PASS</span></td>
+      <td>period tab 5종 visible</td>
+    </tr>
+<tr id="tc-DB-1-08">
+      <td><span class="tc-id">DB-1-08</span></td>
+      <td><span class="pill pass"><span class="pip"></span>PASS</span></td>
+      <td>period today 클릭 → /api/dashboard?period=today 요청</td>
+    </tr>
+<tr id="tc-DB-1-11">
+      <td><span class="tc-id">DB-1-11</span></td>
+      <td><span class="pill pass"><span class="pip"></span>PASS</span></td>
+      <td>카드 12종 visible</td>
+    </tr>
+<tr id="tc-DB-1-12">
+      <td><span class="tc-id">DB-1-12</span></td>
+      <td><span class="pill pass"><span class="pip"></span>PASS</span></td>
+      <td>overview-bar 비용 텍스트 양수 (period=all)</td>
+    </tr>
+<tr id="tc-DB-1-14">
+      <td><span class="tc-id">DB-1-14</span></td>
+      <td><span class="pill pass"><span class="pip"></span>PASS</span></td>
+      <td>efficiency cache 91% → 양호</td>
+    </tr>
+<tr id="tc-DB-1-15">
+      <td><span class="tc-id">DB-1-15</span></td>
+      <td><span class="pill pass"><span class="pip"></span>PASS</span></td>
+      <td>cache=96 → 탁월</td>
+    </tr>
+<tr id="tc-DB-1-16">
+      <td><span class="tc-id">DB-1-16</span></td>
+      <td><span class="pill pass"><span class="pip"></span>PASS</span></td>
+      <td>cache=80 → 보통</td>
+    </tr>
+<tr id="tc-DB-1-17">
+      <td><span class="tc-id">DB-1-17</span></td>
+      <td><span class="pill pass"><span class="pip"></span>PASS</span></td>
+      <td>cache=59 → 경고</td>
+    </tr>
+<tr id="tc-DB-1-18">
+      <td><span class="tc-id">DB-1-18</span></td>
+      <td><span class="pill pass"><span class="pip"></span>PASS</span></td>
+      <td>cache=70 → 부족</td>
+    </tr>
+<tr id="tc-DB-1-19">
+      <td><span class="tc-id">DB-1-19</span></td>
+      <td><span class="pill pass"><span class="pip"></span>PASS</span></td>
+      <td>oneshot=0.95 → 탁월</td>
+    </tr>
+<tr id="tc-DB-1-23">
+      <td><span class="tc-id">DB-1-23</span></td>
+      <td><span class="pill pass"><span class="pip"></span>PASS</span></td>
+      <td>메트릭 modal — 설명 버튼 클릭</td>
+    </tr>
+<tr id="tc-DB-1-25">
+      <td><span class="tc-id">DB-1-25</span></td>
+      <td><span class="pill pass"><span class="pip"></span>PASS</span></td>
+      <td>cost=0 → level 0 + fill #1e293b</td>
+    </tr>
+<tr id="tc-DB-1-26">
+      <td><span class="tc-id">DB-1-26</span></td>
+      <td><span class="pill pass"><span class="pip"></span>PASS</span></td>
+      <td>cost=4.99 → level 1 + fill #4338ca</td>
+    </tr>
+<tr id="tc-DB-1-27">
+      <td><span class="tc-id">DB-1-27</span></td>
+      <td><span class="pill pass"><span class="pip"></span>PASS</span></td>
+      <td>cost=24.99 → level 2 + fill #6366f1</td>
+    </tr>
+<tr id="tc-DB-1-28">
+      <td><span class="tc-id">DB-1-28</span></td>
+      <td><span class="pill pass"><span class="pip"></span>PASS</span></td>
+      <td>cost=99.99 → level 3 + fill #818cf8</td>
+    </tr>
+<tr id="tc-DB-1-29">
+      <td><span class="tc-id">DB-1-29</span></td>
+      <td><span class="pill pass"><span class="pip"></span>PASS</span></td>
+      <td>cost=100 → level 4 + fill #a5b4fc</td>
+    </tr>
+<tr id="tc-DB-1-30">
+      <td><span class="tc-id">DB-1-30</span></td>
+      <td><span class="pill pass"><span class="pip"></span>PASS</span></td>
+      <td>dwell=0 → level 0 + fill #1e293b</td>
+    </tr>
+<tr id="tc-DB-1-31">
+      <td><span class="tc-id">DB-1-31</span></td>
+      <td><span class="pill pass"><span class="pip"></span>PASS</span></td>
+      <td>dwell=119 → level 1 + fill #854d0e</td>
+    </tr>
+<tr id="tc-DB-1-32">
+      <td><span class="tc-id">DB-1-32</span></td>
+      <td><span class="pill pass"><span class="pip"></span>PASS</span></td>
+      <td>dwell=299 → level 2 + fill #a16207</td>
+    </tr>
+<tr id="tc-DB-1-33">
+      <td><span class="tc-id">DB-1-33</span></td>
+      <td><span class="pill pass"><span class="pip"></span>PASS</span></td>
+      <td>dwell=899 → level 3 + fill #ca8a04</td>
+    </tr>
+<tr id="tc-DB-1-34">
+      <td><span class="tc-id">DB-1-34</span></td>
+      <td><span class="pill pass"><span class="pip"></span>PASS</span></td>
+      <td>dwell=900 → level 4 + fill #facc15</td>
+    </tr>
+<tr id="tc-DB-1-35">
+      <td><span class="tc-id">DB-1-35</span></td>
+      <td><span class="pill pass"><span class="pip"></span>PASS</span></td>
+      <td>mount 시 /api/visit POST</td>
+    </tr>
+<tr id="tc-DB-1-36">
+      <td><span class="tc-id">DB-1-36</span></td>
+      <td><span class="pill pass"><span class="pip"></span>PASS</span></td>
+      <td>visibility hidden → visit-end POST</td>
+    </tr>
+<tr id="tc-DB-1-37">
+      <td><span class="tc-id">DB-1-37</span></td>
+      <td><span class="pill pass"><span class="pip"></span>PASS</span></td>
+      <td>visit-end sec=-5 무시 (응답 200)</td>
+    </tr>
+<tr id="tc-DB-1-38">
+      <td><span class="tc-id">DB-1-38</span></td>
+      <td><span class="pill pass"><span class="pip"></span>PASS</span></td>
+      <td>visit-end sec=20000 → 14400 cap 적용 (응답 200)</td>
+    </tr>
+<tr id="tc-DB-1-39">
+      <td><span class="tc-id">DB-1-39</span></td>
+      <td><span class="pill pass"><span class="pip"></span>PASS</span></td>
+      <td>tz-btn 클릭 → tz-list visible</td>
+    </tr>
+<tr id="tc-DB-1-40">
+      <td><span class="tc-id">DB-1-40</span></td>
+      <td><span class="pill pass"><span class="pip"></span>PASS</span></td>
+      <td>tz 선택 → PATCH /api/user/timezone</td>
+    </tr>
+<tr id="tc-DB-1-41">
+      <td><span class="tc-id">DB-1-41</span></td>
+      <td><span class="pill pass"><span class="pip"></span>PASS</span></td>
+      <td>/member 셀렉터 멤버 목록 ≥ 3</td>
+    </tr>
+<tr id="tc-DB-1-42">
+      <td><span class="tc-id">DB-1-42</span></td>
+      <td><span class="pill pass"><span class="pip"></span>PASS</span></td>
+      <td>셀렉터 선택 → localStorage 저장</td>
+    </tr>
+<tr id="tc-DB-1-43">
+      <td><span class="tc-id">DB-1-43</span></td>
+      <td><span class="pill pass"><span class="pip"></span>PASS</span></td>
+      <td>P8 admin + 본인 no snapshot → /setup 리다이렉트</td>
+    </tr>
+<tr id="tc-DB-1-44">
+      <td><span class="tc-id">DB-1-44</span></td>
+      <td><span class="pill pass"><span class="pip"></span>PASS</span></td>
+      <td>daily-cost length=46 → scroll 영역 (overflow-y-auto class)</td>
+    </tr>
+<tr id="tc-DB-1-45">
+      <td><span class="tc-id">DB-1-45</span></td>
+      <td><span class="pill pass"><span class="pip"></span>PASS</span></td>
+      <td>top-sessions 6개 → 5 cap (5개만 렌더)</td>
+    </tr>
+<tr id="tc-DB-1-46">
+      <td><span class="tc-id">DB-1-46</span></td>
+      <td><span class="pill pass"><span class="pip"></span>PASS</span></td>
+      <td>activity heatmap 26주 max (heatmapDaily 200개 → 26주 cap)</td>
+    </tr>
+<tr id="tc-DB-1-47">
+      <td><span class="tc-id">DB-1-47</span></td>
+      <td><span class="pill pass"><span class="pip"></span>PASS</span></td>
+      <td>dailyTokens=[] no data 텍스트</td>
+    </tr>
+<tr id="tc-DB-1-48">
+      <td><span class="tc-id">DB-1-48</span></td>
+      <td><span class="pill pass"><span class="pip"></span>PASS</span></td>
+      <td>overview-missing → 4s 폴링 (&gt;=2회 호출 in 9초)</td>
+    </tr></tbody>
+      </table>
+    </div>
+  </section>
+<section id="module-TM">
+    <div class="sec-head">
+      <div>
+        <h2 class="sec-title"><span class="idx">12</span>TM 모듈 상세</h2>
+        <p class="sec-sub">팀 랭킹 — TC-ID · 결과 · 설명</p>
+      </div>
+    </div>
+    <div class="card">
+      <div class="mod-head">
+        <div class="mod-head-l">
+          <span class="mod-tag">TM</span>
+          <span class="mod-name">팀 랭킹</span>
+        </div>
+        <div class="mod-head-r"><span class="chip pass"><span class="pip"></span>PASS 31</span></div>
+      </div>
+      <table class="lt">
+        <thead>
+          <tr>
+            <th style="width:18%">TC-ID</th>
+            <th style="width:14%">결과</th>
+            <th>설명</th>
+          </tr>
+        </thead>
+        <tbody><tr id="tc-TM-0-01">
+      <td><span class="tc-id">TM-0-01</span></td>
+      <td><span class="pill pass"><span class="pip"></span>PASS</span></td>
+      <td>비로그인 /team → /login</td>
+    </tr>
+<tr id="tc-TM-0-02">
+      <td><span class="tc-id">TM-0-02</span></td>
+      <td><span class="pill pass"><span class="pip"></span>PASS</span></td>
+      <td>P2 non-admin → engagement / top-sessions 미렌더</td>
+    </tr>
+<tr id="tc-TM-0-03">
+      <td><span class="tc-id">TM-0-03</span></td>
+      <td><span class="pill pass"><span class="pip"></span>PASS</span></td>
+      <td>P3 admin → engagement / top-sessions visible</td>
+    </tr>
+<tr id="tc-TM-1-01">
+      <td><span class="tc-id">TM-1-01</span></td>
+      <td><span class="pill pass"><span class="pip"></span>PASS</span></td>
+      <td>period tab 5종 visible</td>
+    </tr>
+<tr id="tc-TM-1-02">
+      <td><span class="tc-id">TM-1-02</span></td>
+      <td><span class="pill pass"><span class="pip"></span>PASS</span></td>
+      <td>period 8days 클릭 → /api/team?period=8days 요청</td>
+    </tr>
+<tr id="tc-TM-1-03">
+      <td><span class="tc-id">TM-1-03</span></td>
+      <td><span class="pill pass"><span class="pip"></span>PASS</span></td>
+      <td>summary-bar visible</td>
+    </tr>
+<tr id="tc-TM-1-04">
+      <td><span class="tc-id">TM-1-04</span></td>
+      <td><span class="pill pass"><span class="pip"></span>PASS</span></td>
+      <td>byEfficiency 빈 응답 (route stub) → team-empty 메시지</td>
+    </tr>
+<tr id="tc-TM-1-06">
+      <td><span class="tc-id">TM-1-06</span></td>
+      <td><span class="pill pass"><span class="pip"></span>PASS</span></td>
+      <td>P2 alice cache 91 → efficiency 행 visible (양호)</td>
+    </tr>
+<tr id="tc-TM-1-07">
+      <td><span class="tc-id">TM-1-07</span></td>
+      <td><span class="pill pass"><span class="pip"></span>PASS</span></td>
+      <td>bob cache=91 → cell title='양호'</td>
+    </tr>
+<tr id="tc-TM-1-08">
+      <td><span class="tc-id">TM-1-08</span></td>
+      <td><span class="pill pass"><span class="pip"></span>PASS</span></td>
+      <td>carol cache=80 → cell title='보통'</td>
+    </tr>
+<tr id="tc-TM-1-09">
+      <td><span class="tc-id">TM-1-09</span></td>
+      <td><span class="pill pass"><span class="pip"></span>PASS</span></td>
+      <td>dave cache=70 → cell title='부족'</td>
+    </tr>
+<tr id="tc-TM-1-10">
+      <td><span class="tc-id">TM-1-10</span></td>
+      <td><span class="pill pass"><span class="pip"></span>PASS</span></td>
+      <td>eugene cache=50 → cell title='경고'</td>
+    </tr>
+<tr id="tc-TM-1-11">
+      <td><span class="tc-id">TM-1-11</span></td>
+      <td><span class="pill pass"><span class="pip"></span>PASS</span></td>
+      <td>P4 bob (60h stale) → sync-badge yellow + '2일전'</td>
+    </tr>
+<tr id="tc-TM-1-12">
+      <td><span class="tc-id">TM-1-12</span></td>
+      <td><span class="pill pass"><span class="pip"></span>PASS</span></td>
+      <td>P5 carol (8d stale) → sync-badge red + '⚠'</td>
+    </tr>
+<tr id="tc-TM-1-14">
+      <td><span class="tc-id">TM-1-14</span></td>
+      <td><span class="pill pass"><span class="pip"></span>PASS</span></td>
+      <td>P6 dave (ccusage missing) → ccusage❌ 배지 + tooltip</td>
+    </tr>
+<tr id="tc-TM-1-15">
+      <td><span class="tc-id">TM-1-15</span></td>
+      <td><span class="pill pass"><span class="pip"></span>PASS</span></td>
+      <td>admin 진입 → engagement 카드 헤더 'ADMIN' 배지</td>
+    </tr>
+<tr id="tc-TM-1-16">
+      <td><span class="tc-id">TM-1-16</span></td>
+      <td><span class="pill pass"><span class="pip"></span>PASS</span></td>
+      <td>engagement row + visits cell — P2 alice 양수</td>
+    </tr>
+<tr id="tc-TM-1-17">
+      <td><span class="tc-id">TM-1-17</span></td>
+      <td><span class="pill pass"><span class="pip"></span>PASS</span></td>
+      <td>P5 carol visits 0 → red class</td>
+    </tr>
+<tr id="tc-TM-1-18">
+      <td><span class="tc-id">TM-1-18</span></td>
+      <td><span class="pill pass"><span class="pip"></span>PASS</span></td>
+      <td>P4 bob visits 2 → yellow class</td>
+    </tr>
+<tr id="tc-TM-1-19">
+      <td><span class="tc-id">TM-1-19</span></td>
+      <td><span class="pill pass"><span class="pip"></span>PASS</span></td>
+      <td>P2 alice visits 5 → normal class (red/yellow 모두 아님)</td>
+    </tr>
+<tr id="tc-TM-1-21">
+      <td><span class="tc-id">TM-1-21</span></td>
+      <td><span class="pill pass"><span class="pip"></span>PASS</span></td>
+      <td>P2 fixture 30일 daily → industry card visible</td>
+    </tr>
+<tr id="tc-TM-1-22">
+      <td><span class="tc-id">TM-1-22</span></td>
+      <td><span class="pill pass"><span class="pip"></span>PASS</span></td>
+      <td>industry-external — 외부 6 출처 텍스트 포함</td>
+    </tr>
+<tr id="tc-TM-1-23">
+      <td><span class="tc-id">TM-1-23</span></td>
+      <td><span class="pill pass"><span class="pip"></span>PASS</span></td>
+      <td>industry-ours — 5 percentile + active day 평균</td>
+    </tr>
+<tr id="tc-TM-1-24">
+      <td><span class="tc-id">TM-1-24</span></td>
+      <td><span class="pill pass"><span class="pip"></span>PASS</span></td>
+      <td>industry punch — multiplier 텍스트 (활용 팀)</td>
+    </tr>
+<tr id="tc-TM-1-25">
+      <td><span class="tc-id">TM-1-25</span></td>
+      <td><span class="pill pass"><span class="pip"></span>PASS</span></td>
+      <td>industryComparison undefined → 카드 미렌더</td>
+    </tr>
+<tr id="tc-TM-1-26">
+      <td><span class="tc-id">TM-1-26</span></td>
+      <td><span class="pill pass"><span class="pip"></span>PASS</span></td>
+      <td>activeDayCount=0 → 카드 미렌더</td>
+    </tr>
+<tr id="tc-TM-1-27">
+      <td><span class="tc-id">TM-1-27</span></td>
+      <td><span class="pill pass"><span class="pip"></span>PASS</span></td>
+      <td>multiplier 3.0 정확 (activeDayAvg=39 stub)</td>
+    </tr>
+<tr id="tc-TM-1-28">
+      <td><span class="tc-id">TM-1-28</span></td>
+      <td><span class="pill pass"><span class="pip"></span>PASS</span></td>
+      <td>by-member 차트 visible — dailyByMember stub</td>
+    </tr>
+<tr id="tc-TM-1-29">
+      <td><span class="tc-id">TM-1-29</span></td>
+      <td><span class="pill pass"><span class="pip"></span>PASS</span></td>
+      <td>/api/team 500 → team-fetch-error + retry visible</td>
+    </tr>
+<tr id="tc-TM-1-30">
+      <td><span class="tc-id">TM-1-30</span></td>
+      <td><span class="pill pass"><span class="pip"></span>PASS</span></td>
+      <td>engagement 정렬 — stale (P5) 우선 (lastSyncedAt 오래된 순)</td>
+    </tr>
+<tr id="tc-TM-1-31">
+      <td><span class="tc-id">TM-1-31</span></td>
+      <td><span class="pill pass"><span class="pip"></span>PASS</span></td>
+      <td>stale 멤버 (P5 carol) cost 0 처리</td>
+    </tr></tbody>
+      </table>
+    </div>
+  </section>
+<section id="module-TP">
+    <div class="sec-head">
+      <div>
+        <h2 class="sec-title"><span class="idx">13</span>TP 모듈 상세</h2>
+        <p class="sec-sub">멤버 프로필 — TC-ID · 결과 · 설명</p>
+      </div>
+    </div>
+    <div class="card">
+      <div class="mod-head">
+        <div class="mod-head-l">
+          <span class="mod-tag">TP</span>
+          <span class="mod-name">멤버 프로필</span>
+        </div>
+        <div class="mod-head-r"><span class="chip pass"><span class="pip"></span>PASS 16</span></div>
+      </div>
+      <table class="lt">
+        <thead>
+          <tr>
+            <th style="width:18%">TC-ID</th>
+            <th style="width:14%">결과</th>
+            <th>설명</th>
+          </tr>
+        </thead>
+        <tbody><tr id="tc-TP-0-01">
+      <td><span class="tc-id">TP-0-01</span></td>
+      <td><span class="pill pass"><span class="pip"></span>PASS</span></td>
+      <td>비로그인 /team/10 → /login 리다이렉트</td>
+    </tr>
+<tr id="tc-TP-0-02">
+      <td><span class="tc-id">TP-0-02</span></td>
+      <td><span class="pill pass"><span class="pip"></span>PASS</span></td>
+      <td>존재하지 않는 userId → API 404 + 화면 not-found 메시지</td>
+    </tr>
+<tr id="tc-TP-1-01">
+      <td><span class="tc-id">TP-1-01</span></td>
+      <td><span class="pill pass"><span class="pip"></span>PASS</span></td>
+      <td>summary-cost 텍스트 = $423.78</td>
+    </tr>
+<tr id="tc-TP-1-02">
+      <td><span class="tc-id">TP-1-02</span></td>
+      <td><span class="pill pass"><span class="pip"></span>PASS</span></td>
+      <td>summary-sessions 텍스트 = 92회</td>
+    </tr>
+<tr id="tc-TP-1-03">
+      <td><span class="tc-id">TP-1-03</span></td>
+      <td><span class="pill pass"><span class="pip"></span>PASS</span></td>
+      <td>summary-cache 텍스트 = 91% (정수 반올림)</td>
+    </tr>
+<tr id="tc-TP-1-04">
+      <td><span class="tc-id">TP-1-04</span></td>
+      <td><span class="pill pass"><span class="pip"></span>PASS</span></td>
+      <td>summary-streak 양수 (30일 daily 전부 cost&gt;0)</td>
+    </tr>
+<tr id="tc-TP-1-05">
+      <td><span class="tc-id">TP-1-05</span></td>
+      <td><span class="pill pass"><span class="pip"></span>PASS</span></td>
+      <td>4주 heatmap 카드 visible</td>
+    </tr>
+<tr id="tc-TP-1-06">
+      <td><span class="tc-id">TP-1-06</span></td>
+      <td><span class="pill pass"><span class="pip"></span>PASS</span></td>
+      <td>projects 행 1~10개 (fixture 3개)</td>
+    </tr>
+<tr id="tc-TP-1-07">
+      <td><span class="tc-id">TP-1-07</span></td>
+      <td><span class="pill pass"><span class="pip"></span>PASS</span></td>
+      <td>cost=0 → level 0 fill #1e293b</td>
+    </tr>
+<tr id="tc-TP-1-08">
+      <td><span class="tc-id">TP-1-08</span></td>
+      <td><span class="pill pass"><span class="pip"></span>PASS</span></td>
+      <td>cost=4 → level 1 fill #4338ca</td>
+    </tr>
+<tr id="tc-TP-1-09">
+      <td><span class="tc-id">TP-1-09</span></td>
+      <td><span class="pill pass"><span class="pip"></span>PASS</span></td>
+      <td>cost=24 → level 2 fill #6366f1</td>
+    </tr>
+<tr id="tc-TP-1-10">
+      <td><span class="tc-id">TP-1-10</span></td>
+      <td><span class="pill pass"><span class="pip"></span>PASS</span></td>
+      <td>cost=99 → level 3 fill #818cf8</td>
+    </tr>
+<tr id="tc-TP-1-11">
+      <td><span class="tc-id">TP-1-11</span></td>
+      <td><span class="pill pass"><span class="pip"></span>PASS</span></td>
+      <td>cost=100 → level 4 fill #a5b4fc</td>
+    </tr>
+<tr id="tc-TP-1-13">
+      <td><span class="tc-id">TP-1-13</span></td>
+      <td><span class="pill pass"><span class="pip"></span>PASS</span></td>
+      <td>P2 시드 + 본인 (id=10) — snapshots 있으나 /team/10 정상 렌더 (P1 정의 자체는 sign-in 모순으로 대체 검증)</td>
+    </tr>
+<tr id="tc-TP-1-14">
+      <td><span class="tc-id">TP-1-14</span></td>
+      <td><span class="pill pass"><span class="pip"></span>PASS</span></td>
+      <td>admin (id=12) 자기 프로필 — non-admin 과 동일 렌더 (#5 admin 분기 없음)</td>
+    </tr>
+<tr id="tc-TP-1-15">
+      <td><span class="tc-id">TP-1-15</span></td>
+      <td><span class="pill pass"><span class="pip"></span>PASS</span></td>
+      <td>daily 모두 0 → streak=0</td>
+    </tr></tbody>
+      </table>
+    </div>
+  </section>
+<section id="module-SS">
+    <div class="sec-head">
+      <div>
+        <h2 class="sec-title"><span class="idx">14</span>SS 모듈 상세</h2>
+        <p class="sec-sub">셋업 상태 — TC-ID · 결과 · 설명</p>
+      </div>
+    </div>
+    <div class="card">
+      <div class="mod-head">
+        <div class="mod-head-l">
+          <span class="mod-tag">SS</span>
+          <span class="mod-name">셋업 상태</span>
+        </div>
+        <div class="mod-head-r"><span class="chip pass"><span class="pip"></span>PASS 15</span></div>
+      </div>
+      <table class="lt">
+        <thead>
+          <tr>
+            <th style="width:18%">TC-ID</th>
+            <th style="width:14%">결과</th>
+            <th>설명</th>
+          </tr>
+        </thead>
+        <tbody><tr id="tc-SS-0-01">
+      <td><span class="tc-id">SS-0-01</span></td>
+      <td><span class="pill pass"><span class="pip"></span>PASS</span></td>
+      <td>비로그인 /setup-status → /login</td>
+    </tr>
+<tr id="tc-SS-1-01">
+      <td><span class="tc-id">SS-1-01</span></td>
+      <td><span class="pill pass"><span class="pip"></span>PASS</span></td>
+      <td>P2 lastSyncedAt 신선 → status-overall '정상 작동 중'</td>
+    </tr>
+<tr id="tc-SS-1-02">
+      <td><span class="tc-id">SS-1-02</span></td>
+      <td><span class="pill pass"><span class="pip"></span>PASS</span></td>
+      <td>P1 lastSyncedAt=null → '셋업 진행 중'</td>
+    </tr>
+<tr id="tc-SS-1-03">
+      <td><span class="tc-id">SS-1-03</span></td>
+      <td><span class="pill pass"><span class="pip"></span>PASS</span></td>
+      <td>P5 lastSyncedAt 8일 → ⚠ 박스 visible</td>
+    </tr>
+<tr id="tc-SS-1-04">
+      <td><span class="tc-id">SS-1-04</span></td>
+      <td><span class="pill pass"><span class="pip"></span>PASS</span></td>
+      <td>step 3종 visible</td>
+    </tr>
+<tr id="tc-SS-1-05">
+      <td><span class="tc-id">SS-1-05</span></td>
+      <td><span class="pill pass"><span class="pip"></span>PASS</span></td>
+      <td>cli 명령 클립보드 복사</td>
+    </tr>
+<tr id="tc-SS-1-06">
+      <td><span class="tc-id">SS-1-06</span></td>
+      <td><span class="pill pass"><span class="pip"></span>PASS</span></td>
+      <td>stale-warning 텍스트 = '⚠️ 수집이 멈췄을 수 있어요'</td>
+    </tr>
+<tr id="tc-SS-1-07">
+      <td><span class="tc-id">SS-1-07</span></td>
+      <td><span class="pill pass"><span class="pip"></span>PASS</span></td>
+      <td>stale 23h boundary → 미렌더</td>
+    </tr>
+<tr id="tc-SS-1-08">
+      <td><span class="tc-id">SS-1-08</span></td>
+      <td><span class="pill pass"><span class="pip"></span>PASS</span></td>
+      <td>stale 25h boundary → 렌더</td>
+    </tr>
+<tr id="tc-SS-1-09">
+      <td><span class="tc-id">SS-1-09</span></td>
+      <td><span class="pill pass"><span class="pip"></span>PASS</span></td>
+      <td>/api/setup/status 500 → fetch-error + retry visible</td>
+    </tr>
+<tr id="tc-SS-1-10">
+      <td><span class="tc-id">SS-1-10</span></td>
+      <td><span class="pill pass"><span class="pip"></span>PASS</span></td>
+      <td>retry 클릭 → 회복</td>
+    </tr>
+<tr id="tc-SS-1-11">
+      <td><span class="tc-id">SS-1-11</span></td>
+      <td><span class="pill pass"><span class="pip"></span>PASS</span></td>
+      <td>status-faq-no-data 토글</td>
+    </tr>
+<tr id="tc-SS-1-12">
+      <td><span class="tc-id">SS-1-12</span></td>
+      <td><span class="pill pass"><span class="pip"></span>PASS</span></td>
+      <td>status-faq-reset-key 토글</td>
+    </tr>
+<tr id="tc-SS-1-13">
+      <td><span class="tc-id">SS-1-13</span></td>
+      <td><span class="pill pass"><span class="pip"></span>PASS</span></td>
+      <td>status-faq-backfill 토글</td>
+    </tr>
+<tr id="tc-SS-1-14">
+      <td><span class="tc-id">SS-1-14</span></td>
+      <td><span class="pill pass"><span class="pip"></span>PASS</span></td>
+      <td>status-faq-win-hook 토글</td>
+    </tr></tbody>
+      </table>
+    </div>
+  </section>
+
+  <footer>
+    <div>Primus Usage QA · 자동 생성 리포트 · 2026. 05. 08. PM 05:17</div>
+    <div>
+      <a href="./index.html">E2E</a>
+      <span style="margin:0 8px;color:var(--ink-4)">·</span>
+      <a href="./detail/index.html">Playwright</a>
+    </div>
+  </footer>
+
+</div>
+</body>
+</html>
