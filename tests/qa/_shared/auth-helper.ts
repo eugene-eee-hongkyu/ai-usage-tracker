@@ -6,13 +6,18 @@ import { fileURLToPath } from "node:url";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const SEED_ROOT = resolve(__dirname, "../../../db/seed");
 
-export type PersonaId = "P1" | "P2" | "P3" | "P5";
+export type PersonaId = "P1" | "P2" | "P3" | "P4" | "P5" | "P6" | "P7" | "P8" | "team-mixed";
 
 const EMAIL_BY_PERSONA: Record<PersonaId, string | null> = {
   P1: null,
   P2: "alice@iskra.world",
   P3: "eugene.eee@iskra.world",
+  P4: "bob@iskra.world",
   P5: "carol@iskra.world",
+  P6: "dave@iskra.world",
+  P7: "bob@iskra.world",
+  P8: "eugene.eee@iskra.world", // admin 본인
+  "team-mixed": "eugene.eee@iskra.world", // P3 admin 으로 진입
 };
 
 export function seed(persona: PersonaId): void {
