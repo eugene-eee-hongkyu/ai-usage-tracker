@@ -189,13 +189,8 @@ function registerLaunchd(submitPath: string): void {
     <key>PATH</key>
     <string>${envPath}</string>
   </dict>
-  <key>StartCalendarInterval</key>
-  <array>
-    <dict><key>Hour</key><integer>0</integer><key>Minute</key><integer>0</integer></dict>
-    <dict><key>Hour</key><integer>6</integer><key>Minute</key><integer>0</integer></dict>
-    <dict><key>Hour</key><integer>12</integer><key>Minute</key><integer>0</integer></dict>
-    <dict><key>Hour</key><integer>18</integer><key>Minute</key><integer>0</integer></dict>
-  </array>
+  <key>StartInterval</key>
+  <integer>7200</integer>
   <key>StandardOutPath</key>
   <string>${path.join(STABLE_DIR, "daily.log")}</string>
   <key>StandardErrorPath</key>
@@ -211,7 +206,7 @@ function registerLaunchd(submitPath: string): void {
     try { execSync(`launchctl bootout ${gui}/${label}`, { stdio: "ignore" }); } catch {}
     fs.writeFileSync(plistPath, plist);
     execSync(`launchctl bootstrap ${gui} "${plistPath}"`, { stdio: "ignore" });
-    console.log("✅ 자동 동기화 등록 완료 (0/6/12/18시, launchd)");
+    console.log("✅ 자동 동기화 등록 완료 (2시간마다, launchd. sleep 시 wake 즉시 catch-up)");
   } catch {
     console.log("⚠️  일간 자동 동기화 등록 실패 (선택 사항, 수동으로 등록 가능)");
   }
@@ -420,7 +415,7 @@ export async function runRepair() {
   runImmediateSync(apiKey);
 
   console.log("\n✨ 복구 완료!");
-  console.log("   0/6/12/18시마다 자동으로 사용량이 수집됩니다.");
+  console.log("   백그라운드에서 자동으로 사용량이 수집됩니다.");
   console.log(`   대시보드: ${SERVER_URL}/dashboard\n`);
   if (!ccusageOk) {
     console.log("⚠️  주의: ccusage 미설치 상태로 저장되어 토큰/비용은 비어 있습니다.\n");
@@ -489,7 +484,7 @@ export async function runInit() {
   runBackfill(apiKey);
 
   console.log("\n✨ 설치 완료!");
-  console.log("   0/6/12/18시마다 자동으로 사용량이 수집됩니다.");
+  console.log("   백그라운드에서 자동으로 사용량이 수집됩니다.");
   console.log(`   대시보드: ${SERVER_URL}/dashboard\n`);
   if (!ccusageOk) {
     console.log("⚠️  주의: ccusage 미설치 상태로 저장되어 토큰/비용은 비어 있습니다.\n");
