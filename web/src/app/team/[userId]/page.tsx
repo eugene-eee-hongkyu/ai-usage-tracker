@@ -50,7 +50,13 @@ export default function MemberProfilePage() {
     const found = data.daily.find((r) => r.date === key);
     const cost = found?.cost ?? 0;
     // levels: 0=$0, 1=<$0.5, 2=<$2, 3=<$5, 4>=$5
-    const level: 0 | 1 | 2 | 3 | 4 = cost === 0 ? 0 : cost < 0.5 ? 1 : cost < 2 ? 2 : cost < 5 ? 3 : 4;
+    // 임계: 외부 (Anthropic 평균 $6, 엔터 90th $30) + 내부 (p50 $21, p90 $154) 결합
+    const level: 0 | 1 | 2 | 3 | 4 =
+      cost === 0 ? 0 :
+      cost < 5 ? 1 :
+      cost < 25 ? 2 :
+      cost < 100 ? 3 :
+      4;
     calData.push({ date: key, count: Math.round(cost * 100), level });
   }
 
@@ -92,7 +98,7 @@ export default function MemberProfilePage() {
             data={calData}
             colorScheme="dark"
             theme={{ dark: ["#1e293b", "#4338ca", "#6366f1", "#818cf8", "#a5b4fc"] }}
-            labels={{ legend: { less: "$0", more: "$5+" }, totalCount: "" }}
+            labels={{ legend: { less: "$0", more: "$100+" }, totalCount: "" }}
             showWeekdayLabels
             blockSize={14}
           />

@@ -901,7 +901,17 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
           {(data.heatmapDaily ?? []).length > 0 ? (() => {
             const calData = (data.heatmapDaily ?? []).map((row) => {
               const cost = row.cost;
-              const level: 0 | 1 | 2 | 3 | 4 = cost === 0 ? 0 : cost < 0.5 ? 1 : cost < 2 ? 2 : cost < 5 ? 3 : 4;
+              // 임계 근거 (외부 + 내부 데이터):
+              //  - level 1 <$5: Anthropic 평균 사용자 ($6) 의 절반 이하
+              //  - level 2 $5~25: Anthropic 평균 ~ 엔터 평균 ($6~$13) 포함
+              //  - level 3 $25~100: 엔터 90th ($30) 이상 ~ 우리 p75 ($89) 위
+              //  - level 4 $100+: 외부 99th + 우리 p90 ($154) + "엄청 했음"
+              const level: 0 | 1 | 2 | 3 | 4 =
+                cost === 0 ? 0 :
+                cost < 5 ? 1 :
+                cost < 25 ? 2 :
+                cost < 100 ? 3 :
+                4;
               return { date: row.date, count: Math.round(cost * 100), level };
             });
             return (
@@ -914,7 +924,7 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
                     data={calData}
                     colorScheme="dark"
                     theme={{ dark: ["#1e293b", "#4338ca", "#6366f1", "#818cf8", "#a5b4fc"] }}
-                    labels={{ legend: { less: "$0", more: "$5+" } }}
+                    labels={{ legend: { less: "$0", more: "$100+" } }}
                     showWeekdayLabels
                     blockSize={11}
                     showTotalCount={false}
