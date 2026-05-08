@@ -44,3 +44,9 @@ verify-*.png
 
 # ── docs 작업 중 산출물 ────────────────────────────
 docs/drift-report.md
+
+# e2e-framework
+playwright-report/
+test-results/
+.env.local
+.framework-backup-*/
