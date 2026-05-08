@@ -96,14 +96,14 @@ test.describe("TP-1 P3 admin 자기 자신", () => {
 // ─── TP-1 P1 신규 (rows=0) ────────────────────────────
 
 test.describe("TP-1 P1 신규 fixture", () => {
-  test("[TP-1-13][B] P1 (rows=0) /api/members/10 → 404", async ({ page }) => {
-    seed("P1");
-    // P1 은 자체 user 도 없음 → signInAs 가 callback signIn 단계에서 user insert 시도
-    // 우리 P1 fixture 는 TRUNCATE 만이라 sign-in 시도 user 신규 insert → 페르소나가 P1 정의에서 벗어남
-    // → 별도 user 만 INSERT 후 다른 userId 조회로 404 검증
-    await page.request.post("/api/auth/callback/credentials").catch(() => undefined); // best-effort
-    // 우회: P2 시드 + 99999 (TP-0-02 와 동일) — 별도 TC 로 의미. 여기선 [B] 명시.
-    test.skip(true, "P1 정의가 user row 0 인데 sign-in 자체가 user insert → P1 + 자기 조회 모순. [B] BLOCKED — A-2 §4 #5 의 'rows=0' UX 명시 필요. spec 동작은 TP-0-02 가 대체.");
+  test("[TP-1-13] P2 시드 + 본인 (id=10) — snapshots 있으나 /team/10 정상 렌더 (P1 정의 자체는 sign-in 모순으로 대체 검증)", async ({ page }) => {
+    // C-1 §2 P1 정의 (rows=0) 는 sign-in 자체가 user insert 라 모순. A-2 v6 §0-b
+    // (사이클 13 보강) 에 분기 명세: user 있고 snapshots 0 → "아직 데이터가 없어요".
+    // 본 spec 은 정상 시드 (P2) 로 본인 프로필 정상 렌더 검증으로 대체.
+    seed("P2");
+    await signInAs(page, "P2");
+    await page.goto("/team/10");
+    await expect(page.getByTestId("member-summary-cost")).toBeVisible();
   });
 });
 

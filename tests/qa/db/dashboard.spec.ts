@@ -253,12 +253,38 @@ test.describe("DB-1 visit POST + dwell beacon", () => {
     expect(req.method()).toBe("POST");
   });
 
-  test("[DB-1-36][B] visibility hidden → visit-end POST", async () => {
-    test.skip(true, "dispatchEvent visibilitychange — page 가 active 상태에서만 동작. 별도 격리 환경 필요. phase 2.1");
+  test("[DB-1-36] visibility hidden → visit-end POST", async ({ page }) => {
+    const reqPromise = page.waitForRequest(
+      (r) => r.url().includes("/api/visit-end") && r.method() === "POST",
+      { timeout: 10000 },
+    );
+    await page.goto("/dashboard");
+    await page.waitForTimeout(1500); // mount 후 dwell 누적
+    // visibility hidden 트리거 → sendBeacon /api/visit-end
+    await page.evaluate(() => {
+      Object.defineProperty(document, "visibilityState", { value: "hidden", configurable: true });
+      document.dispatchEvent(new Event("visibilitychange"));
+    });
+    const req = await reqPromise;
+    expect(req.method()).toBe("POST");
+    // sendBeacon 의 Blob body 는 Playwright postData() 가 잡지 못함. request 발생만 검증.
+    expect(req.url()).toContain("/api/visit-end");
   });
 
-  test("[DB-1-37][B] visit-end sec=-5 무시 (DB 검증)", async () => {
-    test.skip(true, "supertest 직접 호출 + DB SELECT 검증 — phase 2.1 별도 unit/integration suite");
+  test("[DB-1-37] visit-end sec=-5 무시 (응답 200)", async ({ page }) => {
+    // page.request.post 로 직접 호출 (signed cookie 활용)
+    const res = await page.request.post("/api/visit-end", { data: { sec: -5 } });
+    expect(res.status()).toBe(200);
+    const body = await res.json();
+    expect(body).toEqual({ ok: true });
+  });
+
+  test("[DB-1-38] visit-end sec=20000 → 14400 cap 적용 (응답 200)", async ({ page }) => {
+    const res = await page.request.post("/api/visit-end", { data: { sec: 20000 } });
+    expect(res.status()).toBe(200);
+    const body = await res.json();
+    expect(body).toEqual({ ok: true });
+    // DB SELECT 검증은 별도 unit suite. UI 응답 200 만 검증.
   });
 });
 

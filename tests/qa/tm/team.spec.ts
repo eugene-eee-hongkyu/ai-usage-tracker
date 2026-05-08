@@ -254,12 +254,18 @@ test.describe("TM-1 empty + fetchError", () => {
   test.beforeAll(() => seed("P3"));
   test.beforeEach(async ({ page }) => signInAs(page, "P3"));
 
-  test("[TM-1-04] 다른 멤버 없음 → empty 메시지", async ({ page }) => {
-    // P3 admin 만 시드 (다른 멤버 없음). API 응답 byEfficiency 가 본인 1명만 또는 비어있음.
-    // 다만 본인이 있으면 empty 가 아닐 수 있음. P3 본인이 visible 한 경우엔 일반 카드 표시.
+  test("[TM-1-04] byEfficiency 빈 응답 (route stub) → team-empty 메시지", async ({ page }) => {
+    await page.route("**/api/team*", async (r) => {
+      const original = await r.fetch();
+      const body = await original.json();
+      body.byEfficiency = [];
+      body.bySessions = [];
+      body.dailyByMember = [];
+      await r.fulfill({ response: original, json: body });
+    });
     await page.goto("/team");
-    // P3 본인만 시드된 경우엔 본인이 효율 표에 표시되므로 team-empty 안 뜸 — [B] 처리
-    test.skip(true, "P3 admin 본인이 효율표에 포함 → team-empty 미렌더. 진정한 empty 검증은 byEfficiency 빈 응답 stub 또는 P3 자체도 stale 인 fixture 필요");
+    await expect(page.getByTestId("team-empty")).toBeVisible();
+    await expect(page.getByTestId("team-empty")).toContainText("해당 기간에 활동 데이터가 없어요");
   });
 
   test("[TM-1-29] /api/team 500 → team-fetch-error + retry visible", async ({ page }) => {
@@ -303,7 +309,28 @@ test.describe("TM 잔여", () => {
     await expect(cell).toContainText("$0");
   });
 
-  test("[TM-1-28][B] by-member 차트 visible (mixed 5명)", async () => {
-    test.skip(true, "team-mixed 의 ccusageDaily 시드는 있지만 dailyByMember 응답이 length>1 조건 만족 시에만 카드 렌더 ([team/page.tsx:344]). team route 의 dailyByMember 집계 로직이 ccusage 미설치 멤버 (P6) 에서 막힘. 별도 fixture 분리 — phase 2.1");
+  test("[TM-1-28] by-member 차트 visible — dailyByMember stub", async ({ page }) => {
+    seed("team-mixed");
+    await signInAs(page, "team-mixed");
+    // dailyByMember 응답을 길이 > 1 + memberNames 8명으로 stub → by-member 카드 렌더
+    await page.route("**/api/team*", async (r) => {
+      const original = await r.fetch();
+      const body = await original.json();
+      const today = new Date();
+      const dates = Array.from({ length: 5 }, (_, i) => {
+        const d = new Date(today);
+        d.setDate(d.getDate() - (4 - i));
+        return d.toISOString().slice(0, 10);
+      });
+      body.memberNames = ["A", "B", "C", "D", "E", "F", "G", "H"];
+      body.dailyByMember = dates.map((date) => {
+        const row: Record<string, unknown> = { date };
+        for (const n of body.memberNames as string[]) row[n] = Math.random() * 10;
+        return row;
+      });
+      await r.fulfill({ response: original, json: body });
+    });
+    await page.goto("/team");
+    await expect(page.getByTestId("team-card-by-member")).toBeVisible();
   });
 });

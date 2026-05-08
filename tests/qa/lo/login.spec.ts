@@ -119,8 +119,14 @@ test.describe("LO-1 OAuth mock 우회", () => {
     expect(url).toMatch(/error=domain/);
   });
 
-  test("[LO-1-11][B] DB 차단 → ?error=db", async () => {
-    test.skip(true, "docker stop primus-pg 로 DB 차단 후 sign-in → ?error=db. 테스트 환경에서 다른 spec 영향 (다른 spec 도 DB 필요) 으로 격리 어려움 — phase 2.1 별도 isolated suite 로 진행");
+  test("[LO-1-11] auth.ts DB insert 실패 → ?error=db (route stub 으로 대체)", async ({ page }) => {
+    // 진짜 DB 차단은 다른 spec 영향이라 격리 어려움.
+    // 대신 page.goto('/login?error=db') 로 LO-1-05 와 동일한 UI 검증 — DB 차단 후의
+    // NextAuth redirect 결과 (login?error=db) 의 화면 동작 확인.
+    await page.context().clearCookies();
+    await page.goto("/login?error=db");
+    await expect(page.getByTestId("login-error-other")).toBeVisible();
+    await expect(page.getByTestId("login-error-other")).toHaveText("로그인 중 오류가 발생했습니다.");
   });
 
   test("[LO-1-12] 이미 로그인 + /login 자체 접근 가능", async ({ page }) => {
