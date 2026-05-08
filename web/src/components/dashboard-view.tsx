@@ -68,7 +68,7 @@ interface DashboardData {
   daily: DailyRow[];
   dailyTokens?: DailyTokenRow[];
   heatmapDaily?: Array<{ date: string; cost: number }>;
-  visitDaily?: Array<{ date: string; count: number }>;
+  visitDaily?: Array<{ date: string; visitCount: number; dwellSec: number }>;
   activities: Activity[];
   projects: Project[];
   topSessions: TopSession[];
@@ -394,6 +394,46 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
   useEffect(() => {
     if (!session) return;
     fetch("/api/visit", { method: "POST" }).catch(() => {});
+  }, [session]);
+
+  // Dwell time 추적: visibility-API 로 활성 시간 누적, hide / unload 시
+  // sendBeacon 으로 /api/visit-end 에 누적초 전송. 백그라운드 탭은 자연
+  // 정지. 같은 페이지에서 visible↔hidden 전환 가능 — 매 visible 마다 새
+  // segment 시작. 4시간 cap 은 서버측에서 적용.
+  useEffect(() => {
+    if (!session) return;
+    let visibleSince: number | null = document.visibilityState === "visible" ? Date.now() : null;
+    let accumulated = 0;
+    const flush = () => {
+      if (visibleSince) {
+        accumulated += Date.now() - visibleSince;
+        visibleSince = null;
+      }
+      const sec = Math.floor(accumulated / 1000);
+      if (sec <= 0) return;
+      accumulated = 0;
+      try {
+        const blob = new Blob([JSON.stringify({ sec })], { type: "application/json" });
+        navigator.sendBeacon("/api/visit-end", blob);
+      } catch {
+        // ignore
+      }
+    };
+    const onVis = () => {
+      if (document.visibilityState === "visible") {
+        visibleSince = Date.now();
+      } else {
+        flush();
+      }
+    };
+    const onUnload = () => flush();
+    document.addEventListener("visibilitychange", onVis);
+    window.addEventListener("pagehide", onUnload);
+    return () => {
+      flush(); // unmount 시에도 누적분 전송
+      document.removeEventListener("visibilitychange", onVis);
+      window.removeEventListener("pagehide", onUnload);
+    };
   }, [session]);
 
   useEffect(() => {
@@ -1163,26 +1203,46 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
             </div>
           </div>
 
-          {/* Visit Heatmap (lower bar 가설 검증 — 사용자가 자기 dashboard
-              본 일자별 횟수). Row 6 우측 placeholder 자리에 위치. amber
-              톤 + activity heatmap 과 동일한 적응형 15~26주 길이. */}
+          {/* Engagement heatmap (lower bar 가설 검증 + 깊이 측정).
+              일자별 총 머문 시간 (분) 으로 색 인코딩.
+              level: 0 / <2min / 2-5 / 5-15 / 15+ min.
+              tooltip 의 count 는 "분" 으로 입력 (사용자 hover 시 자연
+              해석). 카드 라벨에 이번달 visit 횟수도 같이 표시 → "12회
+              방문 · 평균 3:40" 통계 한 줄 inline. */}
           {(data.visitDaily ?? []).length > 0 ? (() => {
-            const visitData = (data.visitDaily ?? []).map((row) => {
-              const c = row.count;
-              const level: 0 | 1 | 2 | 3 | 4 = c === 0 ? 0 : c <= 1 ? 1 : c <= 3 ? 2 : c <= 5 ? 3 : 4;
-              return { date: row.date, count: c, level };
+            const rows = data.visitDaily ?? [];
+            const calData = rows.map((row) => {
+              const min = Math.round(row.dwellSec / 60);
+              const sec = row.dwellSec;
+              const level: 0 | 1 | 2 | 3 | 4 =
+                sec === 0 ? 0 :
+                sec < 120 ? 1 :
+                sec < 300 ? 2 :
+                sec < 900 ? 3 :
+                4;
+              return { date: row.date, count: min, level };
             });
+            // 이번달 (UTC YYYY-MM) 합계 — 카드 라벨용
+            const monthKey = new Date().toISOString().slice(0, 7);
+            const monthRows = rows.filter((r) => r.date.startsWith(monthKey));
+            const monthVisitsTotal = monthRows.reduce((s, r) => s + r.visitCount, 0);
+            const monthDwellTotal = monthRows.reduce((s, r) => s + r.dwellSec, 0);
+            const avgDwellSec = monthVisitsTotal > 0 ? Math.round(monthDwellTotal / monthVisitsTotal) : 0;
+            const avgMinSec = `${Math.floor(avgDwellSec / 60)}:${String(avgDwellSec % 60).padStart(2, "0")}`;
             return (
               <div className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-amber-500 rounded">
                 <div className="px-3 py-2 border-b border-neutral-800">
-                  <span className="text-xs font-mono font-bold text-amber-400 uppercase tracking-wider">방문 히트맵 ({Math.round((data.visitDaily ?? []).length / 7)}주, 일별 횟수)</span>
+                  <span className="text-xs font-mono font-bold text-amber-400 uppercase tracking-wider">
+                    체류 히트맵 ({Math.round(rows.length / 7)}주, 일별 총 분
+                    {monthVisitsTotal > 0 && ` · 이번달 ${monthVisitsTotal}회 방문 · 평균 ${avgMinSec}`})
+                  </span>
                 </div>
                 <div className="p-3">
                   <ActivityCalendar
-                    data={visitData}
+                    data={calData}
                     colorScheme="dark"
                     theme={{ dark: ["#1e293b", "#854d0e", "#a16207", "#ca8a04", "#facc15"] }}
-                    labels={{ legend: { less: "0", more: "6+" } }}
+                    labels={{ legend: { less: "0", more: "15+" } }}
                     showWeekdayLabels
                     blockSize={11}
                     showTotalCount={false}

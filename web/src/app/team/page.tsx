@@ -59,6 +59,8 @@ interface MemberStat {
   callsCount: number;
   outputInputRatio: number;
   ccusageMissing?: boolean;
+  monthVisits: number;        // 이번달 (UTC) 방문 횟수
+  avgDwellSec: number;        // 이번달 평균 체류 (초)
 }
 
 interface TeamActivity {
@@ -695,7 +697,7 @@ export default function TeamPage() {
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                 <div className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-slate-500 rounded">
                   <div className="px-3 py-2 border-b border-neutral-800 flex items-center gap-2">
-                    <span className="text-xs font-mono font-bold text-slate-400 uppercase tracking-wider">Last Sync</span>
+                    <span className="text-xs font-mono font-bold text-slate-400 uppercase tracking-wider">Engagement</span>
                     <AdminBadge />
                   </div>
                   <div className="p-3">
@@ -703,7 +705,9 @@ export default function TeamPage() {
                       <thead>
                         <tr className="border-b border-neutral-800">
                           <th className="text-left text-neutral-500 pb-2 font-normal">멤버</th>
-                          <th className="text-right text-neutral-500 pb-2 font-normal">마지막 수신</th>
+                          <th className="text-right text-neutral-500 pb-2 px-3 font-normal">마지막 수신</th>
+                          <th className="text-right text-neutral-500 pb-2 px-3 font-normal" title="이번달 (UTC) 본 횟수">방문/달</th>
+                          <th className="text-right text-neutral-500 pb-2 px-3 font-normal" title="이번달 평균 체류">평균체류</th>
                           <th className="w-12 text-right text-neutral-500 pb-2 pl-3 font-normal" />
                         </tr>
                       </thead>
@@ -717,11 +721,27 @@ export default function TeamPage() {
                           })
                           .map((m) => {
                             const { timeClass, badge } = syncStyle(m.lastSyncedAt);
+                            const dwellMin = Math.floor(m.avgDwellSec / 60);
+                            const dwellSec = m.avgDwellSec % 60;
+                            const dwellLabel = m.monthVisits > 0
+                              ? `${dwellMin}:${String(dwellSec).padStart(2, "0")}`
+                              : "—";
+                            const visitsClass = m.monthVisits === 0
+                              ? "text-red-400"
+                              : m.monthVisits < 4
+                                ? "text-yellow-500"
+                                : "text-neutral-300";
                             return (
                               <tr key={m.userId} className="border-b border-neutral-800/40 hover:bg-neutral-800/20 transition-colors">
                                 <td className="py-2 text-neutral-300">{m.name}</td>
-                                <td className={`py-2 text-right tabular-nums ${timeClass}`}>
+                                <td className={`py-2 px-3 text-right tabular-nums ${timeClass}`}>
                                   {m.lastSyncedAt ? fmtSyncTime(m.lastSyncedAt) : "—"}
+                                </td>
+                                <td className={`py-2 px-3 text-right tabular-nums ${visitsClass}`}>
+                                  {m.monthVisits}
+                                </td>
+                                <td className="py-2 px-3 text-right tabular-nums text-neutral-400">
+                                  {dwellLabel}
                                 </td>
                                 <td className="py-2 pl-3 text-right">{badge}</td>
                               </tr>

@@ -78,6 +78,7 @@ export const dailyVisits = pgTable(
       .references(() => users.id),
     date: date("date").notNull(),
     count: integer("count").notNull().default(0),
+    totalDwellSeconds: integer("total_dwell_seconds").notNull().default(0),
   },
   (t) => ({
     userDateUniq: uniqueIndex("daily_visits_user_date_uniq").on(t.userId, t.date),

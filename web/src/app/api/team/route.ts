@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import { db, userSnapshots, users } from "@/lib/db";
+import { db, userSnapshots, users, dailyVisits } from "@/lib/db";
 import { computeEfficiencyScore } from "@/lib/rules";
 import { isAdmin } from "@/lib/admin";
+import { gte } from "drizzle-orm";
 
 type Period = "today" | "month" | "8days" | "30days" | "all";
 
@@ -115,6 +116,25 @@ export async function GET(req: NextRequest) {
 
   const snapMap = new Map(allSnaps.map((s) => [s.userId, s]));
 
+  // 이번 달 visit/dwell 집계 (UTC 기준 YYYY-MM-01 부터). engagement 카드의
+  // monthVisits/avgDwellSec 표시용.
+  const monthStart = `${new Date().toISOString().slice(0, 7)}-01`;
+  const visitsThisMonth = await db
+    .select({
+      userId: dailyVisits.userId,
+      count: dailyVisits.count,
+      dwell: dailyVisits.totalDwellSeconds,
+    })
+    .from(dailyVisits)
+    .where(gte(dailyVisits.date, monthStart));
+  const visitAgg = new Map<number, { count: number; dwell: number }>();
+  for (const r of visitsThisMonth) {
+    const cur = visitAgg.get(r.userId) ?? { count: 0, dwell: 0 };
+    cur.count += r.count;
+    cur.dwell += r.dwell;
+    visitAgg.set(r.userId, cur);
+  }
+
   // Accumulators for team-level aggregations
   const activityAgg = new Map<string, { totalCost: number; totalTurns: number; members: Set<number> }>();
   const dailyMemberMap = new Map<string, Record<string, number>>();
@@ -156,6 +176,10 @@ export async function GET(req: NextRequest) {
       const ccusageMissing =
         (snap.rawJson as Record<string, unknown> | null)?.ccusageMissing === true;
 
+      const v = visitAgg.get(u.id) ?? { count: 0, dwell: 0 };
+      const monthVisits = v.count;
+      const avgDwellSec = v.count > 0 ? Math.round(v.dwell / v.count) : 0;
+
       if (isStale) {
         return {
           userId: u.id,
@@ -173,6 +197,8 @@ export async function GET(req: NextRequest) {
           outputInputRatio: 0,
           prevCostPerSession: null,
           ccusageMissing,
+          monthVisits,
+          avgDwellSec,
         };
       }
 
@@ -296,6 +322,8 @@ export async function GET(req: NextRequest) {
         prevCostPerSession,
         totalTokens,
         ccusageMissing,
+        monthVisits,
+        avgDwellSec,
       };
     })
     .filter((m): m is NonNullable<typeof m> => m !== null);

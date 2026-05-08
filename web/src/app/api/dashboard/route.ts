@@ -316,16 +316,20 @@ export async function GET(req: NextRequest) {
     heatmapDaily.push({ date: key, cost: heatmapMap[key] ?? 0 });
   }
 
-  // Visit heatmap: target user 의 daily_visits (heatmap 과 동일한 15~26주
-  // 적응형 길이). admin 이 viewOnly 로 다른 사람 보면 그 사람의 visit count
-  // 가 노출됨 — engagement 진단 신호. POST /api/visit 는 항상 session.user
-  // 만 카운트하므로 자기 행동만 자기 row 에 누적.
+  // Visit/Dwell heatmap: target user 의 daily_visits (heatmap 과 동일한
+  // 15~26주 적응형). 색은 dwell 기준 (실제 머문 시간), tooltip 의 count 는
+  // 분 단위. visit count 는 별도 visitCount 필드로 함께 노출 (팀 페이지
+  // engagement 컬럼 등에서도 사용 가능).
   const visitRows = await db
-    .select({ date: dailyVisits.date, count: dailyVisits.count })
+    .select({
+      date: dailyVisits.date,
+      count: dailyVisits.count,
+      dwell: dailyVisits.totalDwellSeconds,
+    })
     .from(dailyVisits)
     .where(eq(dailyVisits.userId, user[0].id));
-  const visitMap: Record<string, number> = {};
-  for (const r of visitRows) visitMap[r.date] = r.count;
+  const visitMap: Record<string, { count: number; dwell: number }> = {};
+  for (const r of visitRows) visitMap[r.date] = { count: r.count, dwell: r.dwell };
   const visitEarliest = Object.keys(visitMap).sort()[0];
   const visitDataDays = visitEarliest
     ? Math.floor((heatmapBase.getTime() - new Date(visitEarliest).getTime()) / 86_400_000) + 1
@@ -335,12 +339,13 @@ export async function GET(req: NextRequest) {
     Math.min(HEATMAP_MAX_WEEKS, Math.ceil(visitDataDays / 7)),
   );
   const visitDays = visitWeeks * 7;
-  const visitDaily: Array<{ date: string; count: number }> = [];
+  const visitDaily: Array<{ date: string; visitCount: number; dwellSec: number }> = [];
   for (let i = visitDays - 1; i >= 0; i--) {
     const d2 = new Date(heatmapBase);
     d2.setDate(d2.getDate() - i);
     const key = d2.toISOString().slice(0, 10);
-    visitDaily.push({ date: key, count: visitMap[key] ?? 0 });
+    const m = visitMap[key];
+    visitDaily.push({ date: key, visitCount: m?.count ?? 0, dwellSec: m?.dwell ?? 0 });
   }
 
   // Build path lookup for topSessions
