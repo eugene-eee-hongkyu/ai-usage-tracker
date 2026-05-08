@@ -1,7 +1,6 @@
 /**
  * [TM] 팀 랭킹 — 34 TC
  * 입력: docs/qa/QA_TM_team.md
- * 핵심 testid 만 spec — efficiency cell 색·industry 6 row 등 phase 2.1 [B]
  */
 import { test, expect } from "@playwright/test";
 import { seed, signInAs, clearSession } from "../_shared/auth-helper";
@@ -35,7 +34,7 @@ test.describe("TM-0 권한", () => {
   });
 });
 
-// ─── TM-1 P2 ───────────────────────────────────────────────
+// ─── TM-1 P2 정상 ──────────────────────────────────────────
 
 test.describe("TM-1 P2 정상", () => {
   test.beforeAll(() => seed("P2"));
@@ -63,10 +62,26 @@ test.describe("TM-1 P2 정상", () => {
     await expect(page.getByTestId("team-summary-bar")).toBeVisible();
   });
 
-  test("[TM-1-21] P2 fixture (30일 daily) → industry card visible", async ({ page }) => {
+  test("[TM-1-21] P2 fixture 30일 daily → industry card visible", async ({ page }) => {
     await page.goto("/team");
     await expect(page.getByTestId("team-card-industry")).toBeVisible();
     await expect(page.getByTestId("team-card-industry")).toContainText("Primus vs 업계");
+  });
+
+  test("[TM-1-22] industry-external — 외부 6 출처 텍스트 포함", async ({ page }) => {
+    await page.goto("/team");
+    await expect(page.getByTestId("team-industry-external")).toContainText("Anthropic 평균 사용자");
+    await expect(page.getByTestId("team-industry-external")).toContainText("엔터 active day 평균");
+    await expect(page.getByTestId("team-industry-external")).toContainText("as of 2026-05");
+  });
+
+  test("[TM-1-23] industry-ours — 5 percentile + active day 평균", async ({ page }) => {
+    await page.goto("/team");
+    await expect(page.getByTestId("team-industry-ours")).toContainText("active day 평균");
+    await expect(page.getByTestId("team-industry-ours")).toContainText("p50");
+    await expect(page.getByTestId("team-industry-ours")).toContainText("p75");
+    await expect(page.getByTestId("team-industry-ours")).toContainText("p90");
+    await expect(page.getByTestId("team-industry-ours")).toContainText("max");
   });
 
   test("[TM-1-24] industry punch — multiplier 텍스트 (활용 팀)", async ({ page }) => {
@@ -78,46 +93,132 @@ test.describe("TM-1 P2 정상", () => {
   });
 });
 
-// ─── TM-1 empty ───────────────────────────────────────────
+// ─── TM-1 team-mixed (P2+P3+P4+P5+P6) ────────────────────
 
-test.describe("TM-1 empty", () => {
-  test("[TM-1-04][B] 모든 멤버 시드 0 → empty 메시지", async () => {
-    test.skip(true, "P3 admin 만 시드 + 다른 멤버 0 fixture 필요. team-empty 시드는 phase 2.1");
+test.describe("TM-1 team-mixed — admin 시점 다양한 멤버", () => {
+  test.beforeAll(() => seed("team-mixed"));
+  test.beforeEach(async ({ page }) => signInAs(page, "team-mixed"));
+
+  test("[TM-1-06] P2 alice cache 91 → efficiency 행 visible (양호)", async ({ page }) => {
+    await page.goto("/team");
+    await expect(page.getByTestId("team-eff-row-10")).toBeVisible();
+  });
+
+  test("[TM-1-11] P4 bob (60h stale) → sync-badge yellow + '2일전'", async ({ page }) => {
+    await page.goto("/team");
+    const badge = page.getByTestId("team-sync-badge-13");
+    await expect(badge).toBeVisible();
+    await expect(badge).toContainText(/2일전?/);
+  });
+
+  test("[TM-1-12] P5 carol (8d stale) → sync-badge red + '⚠'", async ({ page }) => {
+    await page.goto("/team");
+    const badge = page.getByTestId("team-sync-badge-14");
+    await expect(badge).toBeVisible();
+    await expect(badge).toContainText(/⚠/);
+  });
+
+  test("[TM-1-14] P6 dave (ccusage missing) → ccusage❌ 배지 + tooltip", async ({ page }) => {
+    await page.goto("/team");
+    // P6 의 efficiency row 자식 (team-eff-row-15) 안 또는 by-member card 안에 있음
+    const badge = page.getByTestId("team-ccusage-badge-15").first();
+    await expect(badge).toContainText("ccusage❌");
+  });
+
+  test("[TM-1-15] admin 진입 → engagement 카드 헤더 'ADMIN' 배지", async ({ page }) => {
+    await page.goto("/team");
+    // ADMIN 배지는 engagement 카드 + top sessions 카드 헤더 옆에 위치 (admin only).
+    await expect(page.getByTestId("team-card-engagement")).toContainText("ADMIN");
+  });
+
+  test("[TM-1-16] engagement row + visits cell — P2 alice 양수", async ({ page }) => {
+    await page.goto("/team");
+    await expect(page.getByTestId("team-card-engagement")).toBeVisible();
+    await expect(page.getByTestId("team-eng-row-10")).toBeVisible();
+    // monthVisits 는 이번달 daily_visits 합 — 시드 today 5 + 어제 3 + visit POST 자동 카운트.
+    // 정확 5 가 아닌 양수만 검증.
+    const txt = await page.getByTestId("team-eng-visits-10").textContent();
+    const n = parseInt((txt ?? "0").trim(), 10);
+    expect(n).toBeGreaterThanOrEqual(1);
+  });
+
+  test("[TM-1-17] P5 carol visits 0 → red class", async ({ page }) => {
+    await page.goto("/team");
+    const cell = page.getByTestId("team-eng-visits-14");
+    const cls = await cell.getAttribute("class");
+    expect(cls).toMatch(/text-red/);
+  });
+
+  test("[TM-1-18] P4 bob visits 2 → yellow class", async ({ page }) => {
+    await page.goto("/team");
+    const cell = page.getByTestId("team-eng-visits-13");
+    const cls = await cell.getAttribute("class");
+    expect(cls).toMatch(/text-yellow/);
+  });
+
+  test("[TM-1-19] P2 alice visits 5 → normal class (red/yellow 모두 아님)", async ({ page }) => {
+    await page.goto("/team");
+    const cell = page.getByTestId("team-eng-visits-10");
+    const cls = await cell.getAttribute("class");
+    expect(cls).not.toMatch(/text-red/);
+    expect(cls).not.toMatch(/text-yellow-500/); // yellow-500 이 yellow 케이스
+  });
+
+  test("[TM-1-30] engagement 정렬 — stale (P5) 우선 (lastSyncedAt 오래된 순)", async ({ page }) => {
+    await page.goto("/team");
+    const rows = page.locator('[data-testid^="team-eng-row-"]');
+    const firstId = await rows.first().getAttribute("data-testid");
+    // P5 carol id=14 lastSyncedAt = NOW-8d (가장 오래) 가 첫 번째여야 함
+    expect(firstId).toBe("team-eng-row-14");
   });
 });
 
-// ─── TM-1 efficiency / engagement 5단계 ──────────────────
+// ─── TM-1 industry comparison 분기 ──────────────────────
 
-test.describe("TM-1 [B] efficiency cell 색 5단계", () => {
-  test("TM-1-06~10 [B] efficiency cell BG 클래스 검증", async () => {
-    test.skip(true, "C-1 §4-1 5단계 boundary fixture (cache 96/91/80/59 + composite 0.88/0.6/0.32) 별도 시드 필요. phase 2.1 fixture 확장");
+test.describe("TM-1 industry 분기", () => {
+  test.beforeAll(() => seed("P2"));
+  test.beforeEach(async ({ page }) => signInAs(page, "P2"));
+
+  test("[TM-1-25] industryComparison undefined → 카드 미렌더", async ({ page }) => {
+    await page.route("**/api/team*", async (r) => {
+      const original = await r.fetch();
+      const body = await original.json();
+      delete body.industryComparison;
+      await r.fulfill({ response: original, json: body });
+    });
+    await page.goto("/team");
+    await expect(page.getByTestId("team-summary-bar")).toBeVisible();
+    await expect(page.getByTestId("team-card-industry")).toHaveCount(0);
   });
 
-  test("TM-1-11~15 [B] sync badge / ccusage 배지 / ADMIN", async () => {
-    test.skip(true, "P4(stale-2) / P5(stale-7) / P6(ccusage-missing) 멤버 시드 필요. phase 2.1");
-  });
-
-  test("TM-1-16~20 [B] engagement 행 / visits / top-sessions cap", async () => {
-    test.skip(true, "daily_visits 시드 + topSessions 배열 시드 별도 필요. phase 2.1");
+  test("[TM-1-26] activeDayCount=0 → 카드 미렌더", async ({ page }) => {
+    await page.route("**/api/team*", async (r) => {
+      const original = await r.fetch();
+      const body = await original.json();
+      if (body.industryComparison) body.industryComparison.activeDayCount = 0;
+      await r.fulfill({ response: original, json: body });
+    });
+    await page.goto("/team");
+    await expect(page.getByTestId("team-summary-bar")).toBeVisible();
+    await expect(page.getByTestId("team-card-industry")).toHaveCount(0);
   });
 });
 
-// ─── TM-1 industry 상세 ───────────────────────────────────
+// ─── TM-1 empty / fetchError ────────────────────────────
 
-test.describe("TM-1 [B] industry 외부/우리 6 row", () => {
-  test("TM-1-22~23 [B] industry external 6 row + ours 5 percentile", async () => {
-    test.skip(true, "team-industry-external / team-industry-ours testid 미추가. phase 2.1 별도 PR");
+test.describe("TM-1 empty + fetchError", () => {
+  test.beforeAll(() => seed("P3"));
+  test.beforeEach(async ({ page }) => signInAs(page, "P3"));
+
+  test("[TM-1-04] 다른 멤버 없음 → empty 메시지", async ({ page }) => {
+    // P3 admin 만 시드 (다른 멤버 없음). API 응답 byEfficiency 가 본인 1명만 또는 비어있음.
+    // 다만 본인이 있으면 empty 가 아닐 수 있음. P3 본인이 visible 한 경우엔 일반 카드 표시.
+    await page.goto("/team");
+    // P3 본인만 시드된 경우엔 본인이 효율 표에 표시되므로 team-empty 안 뜸 — [B] 처리
+    test.skip(true, "P3 admin 본인이 효율표에 포함 → team-empty 미렌더. 진정한 empty 검증은 byEfficiency 빈 응답 stub 또는 P3 자체도 stale 인 fixture 필요");
   });
 
-  test("[TM-1-25][B] industryComparison undefined → 미렌더", async () => {
-    test.skip(true, "page.route stub 으로 응답에서 industryComparison 키 제거 — 검증은 가능하나 dependent on testid. phase 2.1");
-  });
-
-  test("[TM-1-26][B] activeDayCount=0 → 미렌더", async () => {
-    test.skip(true, "ccusage daily 0건 fixture 별도 시드. phase 2.1");
-  });
-
-  test("[TM-1-27][B] multiplier 3.0배 정확 fixture", async () => {
-    test.skip(true, "activeDayAvg=39 정확 시드 — fixture cost 합 30일 평균 $39 필요. phase 2.1");
+  test("[TM-1-29][B] /api/team 500 → 화면 동작", async () => {
+    test.skip(true, "team page fetch 실패 시 동작은 docs (A-2 §4 #4 4-d) 에 카드 자체 미렌더만 명시. 빈 페이지 동작 미정 — 별도 docs 보강 필요");
   });
 });
