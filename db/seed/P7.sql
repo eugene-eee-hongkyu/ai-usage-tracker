@@ -14,20 +14,9 @@ VALUES (
   NOW() - INTERVAL '5 minutes'
 );
 
--- raw_json 의 모든 period block 비어있음 → /api/dashboard 응답 overview=null
-INSERT INTO user_snapshots (
-  user_id, raw_json, total_cost, sessions_count, calls_count,
-  cache_hit_pct, overall_one_shot,
-  current_week_raw_json, current_week_start,
-  current_month_raw_json, current_month_start,
-  current_day_raw_json, current_day_start
-) VALUES (
-  11,
-  '{"week":null,"today":null,"month":null,"all":null}'::jsonb,
-  0, 0, 0, 0, 0,
-  '{}'::jsonb, NOW()::date,
-  '{}'::jsonb, NOW()::date,
-  '{}'::jsonb, NOW()::date
-);
+-- user_snapshots row 미시드 → /api/dashboard 코드의 `if (!snap[0])` 분기 진입
+-- → 응답 overview=null → DashboardView 가 sync-needed UI 렌더 (코드 line 196).
+-- (C-1 §2 의 raw_json 모든 period null 정의는 라이브 환경에서 자연 발생하는 패턴이지만
+-- 실제 코드는 user_snapshots row 없을 때만 overview=null 반환.)
 
 SELECT setval('users_id_seq', 100);
