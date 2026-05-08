@@ -212,7 +212,14 @@ test.describe("SU-1 엣지", () => {
     test.skip(true, "C-1 §3 #2 다섯째 — OS 권한 밖 (launchctl bootstrap). 친구 1명 수동 검증 (CONTEXT.md Hold 플래그 패턴)");
   });
 
-  test("[SU-1-14][B] /api/setup/status 500 → 페이지 동작", async () => {
-    test.skip(true, "A-2 §4 #2 docs 부족 — fetch 실패 UX 미정. spec 시도 후 docs 보강 필요");
+  test("[SU-1-14] /api/setup/status 500 → setup-fetch-error + retry visible", async ({ page }) => {
+    seed("P2");
+    await signInAs(page, "P2");
+    await page.route("**/api/setup/status", (r) =>
+      r.fulfill({ status: 500, contentType: "application/json", body: "{}" }),
+    );
+    await page.goto("/setup");
+    await expect(page.getByTestId("setup-fetch-error")).toBeVisible();
+    await expect(page.getByTestId("setup-retry")).toBeVisible();
   });
 });

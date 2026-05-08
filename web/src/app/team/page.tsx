@@ -253,6 +253,8 @@ export default function TeamPage() {
   }, [period]);
   const [data, setData] = useState<TeamData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
     if (status === "unauthenticated") router.push("/login");
@@ -261,10 +263,33 @@ export default function TeamPage() {
   useEffect(() => {
     if (!session) return;
     setLoading(true);
+    setFetchError(false);
     fetch(`/api/team?period=${period}`)
-      .then((r) => r.json())
-      .then((d) => { setData(d); setLoading(false); });
-  }, [session, period]);
+      .then((r) => {
+        if (!r.ok) throw new Error(String(r.status));
+        return r.json();
+      })
+      .then((d) => {
+        if (d?.error) { setFetchError(true); setLoading(false); return; }
+        setData(d);
+        setLoading(false);
+      })
+      .catch(() => { setFetchError(true); setLoading(false); });
+  }, [session, period, reloadKey]);
+
+  if (fetchError) return (
+    <div className="min-h-screen bg-neutral-950">
+      <Nav />
+      <div data-testid="team-fetch-error" className="flex flex-col items-center justify-center h-64 gap-4">
+        <p className="text-neutral-400 font-mono text-sm">팀 데이터를 불러오지 못했습니다.</p>
+        <button
+          data-testid="team-retry"
+          onClick={() => setReloadKey((k) => k + 1)}
+          className="px-4 py-1.5 bg-neutral-800 rounded text-sm text-neutral-200 hover:bg-neutral-700 font-mono"
+        >다시 시도</button>
+      </div>
+    </div>
+  );
 
   if (!data) return (
     <div className="min-h-screen bg-neutral-950">

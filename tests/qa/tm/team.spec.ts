@@ -262,8 +262,15 @@ test.describe("TM-1 empty + fetchError", () => {
     test.skip(true, "P3 admin 본인이 효율표에 포함 → team-empty 미렌더. 진정한 empty 검증은 byEfficiency 빈 응답 stub 또는 P3 자체도 stale 인 fixture 필요");
   });
 
-  test("[TM-1-29][B] /api/team 500 → 화면 동작", async () => {
-    test.skip(true, "team page fetch 실패 시 동작은 docs (A-2 §4 #4 4-d) 에 카드 자체 미렌더만 명시. 빈 페이지 동작 미정 — 별도 docs 보강 필요");
+  test("[TM-1-29] /api/team 500 → team-fetch-error + retry visible", async ({ page }) => {
+    seed("P2");
+    await signInAs(page, "P2");
+    await page.route("**/api/team*", (r) =>
+      r.fulfill({ status: 500, contentType: "application/json", body: "{}" }),
+    );
+    await page.goto("/team");
+    await expect(page.getByTestId("team-fetch-error")).toBeVisible();
+    await expect(page.getByTestId("team-retry")).toBeVisible();
   });
 });
 

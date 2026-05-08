@@ -32,6 +32,8 @@ export default function SetupPage() {
   const [timezone, setTimezone] = useState<string>("");
   const [tzSaved, setTzSaved] = useState(false);
   const [os, setOs] = useState<"mac" | "windows" | "other">("other");
+  const [fetchError, setFetchError] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
     const ua = navigator.userAgent.toLowerCase();
@@ -61,24 +63,27 @@ export default function SetupPage() {
 
   useEffect(() => {
     if (!session) return;
+    setFetchError(false);
 
     const poll = async () => {
       try {
         const res = await fetch("/api/setup/status");
+        if (!res.ok) throw new Error(String(res.status));
         const data = await res.json();
+        setFetchError(false);
         if (data.steps) setSteps([
           { label: "hook 등록", done: !!data.steps.hook_registered },
           { label: "첫 데이터 수신", done: !!data.steps.first_session },
         ]);
       } catch {
-        // ignore
+        setFetchError(true);
       }
     };
 
     poll();
     const interval = setInterval(poll, 2000);
     return () => clearInterval(interval);
-  }, [session]);
+  }, [session, reloadKey]);
 
   const origin = typeof window !== "undefined" ? window.location.origin : "https://ai-usage-tracker-web-psi.vercel.app";
   const npxCmd = `npx --yes --ignore-cache github:${process.env.NEXT_PUBLIC_GITHUB_ORG ?? "eugene-eee-hongkyu"}/ai-usage-tracker init`;
@@ -107,6 +112,20 @@ export default function SetupPage() {
         </h1>
         <p className="text-slate-400 mt-2">딱 한 번만 설치하면 자동 수집 시작됩니다</p>
       </div>
+
+      {fetchError && (
+        <div data-testid="setup-fetch-error" className="w-full max-w-md bg-red-950 border border-red-800 rounded-xl p-4 space-y-2">
+          <p className="text-red-300 text-sm font-semibold">⚠ 셋업 상태 확인 실패</p>
+          <p className="text-red-400 text-xs">네트워크·세션을 확인하고 다시 시도해주세요.</p>
+          <button
+            data-testid="setup-retry"
+            onClick={() => setReloadKey((k) => k + 1)}
+            className="px-3 py-1 bg-red-600 hover:bg-red-500 text-white text-xs rounded transition-colors"
+          >
+            다시 시도
+          </button>
+        </div>
+      )}
 
 
       {/* 타임존 설정 */}

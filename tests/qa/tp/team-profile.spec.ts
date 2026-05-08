@@ -19,13 +19,17 @@ test.describe("TP-0 권한", () => {
     await expect(page).toHaveURL(/\/login/);
   });
 
-  test("[TP-0-02][B] 존재하지 않는 userId → 404 응답", async ({ page }) => {
+  test("[TP-0-02] 존재하지 않는 userId → API 404 + 화면 not-found 메시지", async ({ page }) => {
     seed("P2");
     await signInAs(page, "P2");
     const res = await page.request.get("/api/members/99999");
     expect(res.status()).toBe(404);
     const body = await res.json();
     expect(body).toHaveProperty("error", "not found");
+    // 화면 검증: /team/99999 진입 시 not-found 메시지
+    await page.goto("/team/99999");
+    await expect(page.getByTestId("member-not-found")).toBeVisible();
+    await expect(page.getByTestId("member-not-found")).toContainText("멤버를 찾을 수 없어요");
   });
 });
 

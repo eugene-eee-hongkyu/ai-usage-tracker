@@ -14,12 +14,15 @@ interface MemberData {
   projects: Array<{ name: string; cost: number; sessions: number; avgCost: number }>;
 }
 
+interface NotFoundResp { error: string }
+
 export default function MemberProfilePage() {
   const { data: session, status } = useSession();
   const router = useRouter();
   const params = useParams();
   const userId = params.userId as string;
   const [data, setData] = useState<MemberData | null>(null);
+  const [notFound, setNotFound] = useState(false);
 
   useEffect(() => {
     if (status === "unauthenticated") router.push("/login");
@@ -29,8 +32,28 @@ export default function MemberProfilePage() {
     if (!session) return;
     fetch(`/api/members/${userId}`)
       .then((r) => r.json())
-      .then(setData);
+      .then((j: MemberData | NotFoundResp) => {
+        if ("error" in j) {
+          setNotFound(true);
+        } else {
+          setData(j);
+        }
+      });
   }, [session, userId]);
+
+  if (notFound) return (
+    <div className="min-h-screen">
+      <Nav />
+      <main className="max-w-3xl mx-auto px-4 py-12 text-center space-y-4" data-testid="member-not-found">
+        <Link href="/team" className="text-slate-400 hover:text-slate-200 text-sm inline-block">← 팀랭킹</Link>
+        <p className="text-slate-300 text-lg">⚠ 멤버를 찾을 수 없어요</p>
+        <p className="text-slate-500 text-sm">잘못된 ID 일 수 있어요.</p>
+        <Link href="/team" className="inline-block px-4 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white text-sm rounded transition-colors">
+          팀랭킹으로 돌아가기
+        </Link>
+      </main>
+    </div>
+  );
 
   if (!data) return (
     <div className="min-h-screen">
@@ -40,6 +63,21 @@ export default function MemberProfilePage() {
       </div>
     </div>
   );
+
+  // user 있고 snapshots 없음 → 빈 데이터 메시지 (sessionsCount=0 + daily 0)
+  if (data.summary.sessionsCount === 0 && data.daily.length === 0) {
+    return (
+      <div className="min-h-screen">
+        <Nav />
+        <main className="max-w-3xl mx-auto px-4 py-12 text-center space-y-4" data-testid="member-empty">
+          <Link href="/team" className="text-slate-400 hover:text-slate-200 text-sm inline-block">← 팀랭킹</Link>
+          <h1 className="font-semibold text-slate-200">{data.user.name} 프로필</h1>
+          <p className="text-slate-500 text-sm">아직 데이터가 없어요</p>
+          <p className="text-slate-600 text-xs">사용자가 첫 Claude Code 세션을 종료하면 자동으로 수집됩니다.</p>
+        </main>
+      </div>
+    );
+  }
 
   const today = new Date();
   const calData = [];
