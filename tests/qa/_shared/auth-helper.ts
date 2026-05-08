@@ -1,4 +1,4 @@
-import type { Page } from "@playwright/test";
+import type { Page, Route } from "@playwright/test";
 import { execSync } from "node:child_process";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -87,4 +87,14 @@ export async function signInAs(page: Page, persona: PersonaId): Promise<void> {
 
 export async function clearSession(page: Page): Promise<void> {
   await page.context().clearCookies();
+}
+
+/** page.route stub — /api/dashboard 응답 overview 필드 변형 (efficiency 5단계 검증용). */
+export async function stubOverview(page: Page, fields: Record<string, number>): Promise<void> {
+  await page.route("**/api/dashboard*", async (r: Route) => {
+    const original = await r.fetch();
+    const body = await original.json();
+    if (body.overview) Object.assign(body.overview, fields);
+    await r.fulfill({ response: original, json: body });
+  });
 }

@@ -3,7 +3,7 @@
  * 입력: docs/qa/QA_DB_dashboard.md
  */
 import { test, expect } from "@playwright/test";
-import { seed, signInAs, clearSession, patchSnapshot, patchDailyCost, patchOverview } from "../_shared/auth-helper";
+import { seed, signInAs, clearSession, patchSnapshot, patchDailyCost, patchOverview, stubOverview } from "../_shared/auth-helper";
 
 test.describe.configure({ mode: "serial" });
 
@@ -320,26 +320,195 @@ test.describe("DB-1 efficiency cache 5단계", () => {
   });
 });
 
-// ─── DB-1 heatmap 5단계 색 ───────────────────────────────
+// ─── DB-1 efficiency oneshot/cost-session/cost-call/calls-session/out-in 5단계 ─
 
-test.describe("DB-1 [B] heatmap 5단계 색", () => {
-  test("[DB-1-25~29][B] activity heatmap 5단계 fill", async () => {
-    test.skip(true, "P2 변형 (daily cost 0/4/24/99/100) fixture + react-activity-calendar fill 셀 selector 확정 — phase 2.1");
+test.describe("DB-1 efficiency oneshot 5단계", () => {
+  test.beforeEach(async ({ page }) => {
+    seed("P2");
+    await signInAs(page, "P2");
   });
-
-  test("[DB-1-30~34][B] dwell heatmap 5단계", async () => {
-    test.skip(true, "visitDaily fixture 별도 + dwellSec 119/299/899/900 boundary — phase 2.1");
+  test("[DB-1-19] oneshot=0.95 → 탁월", async ({ page }) => {
+    await stubOverview(page, { oneShotRate: 0.95 });
+    await page.goto("/dashboard");
+    await expect(page.getByTestId("dash-metric-oneshot-grade")).toContainText("탁월");
+  });
+  test("[DB-1-19a] oneshot=0.85 → 양호", async ({ page }) => {
+    await stubOverview(page, { oneShotRate: 0.85 });
+    await page.goto("/dashboard");
+    await expect(page.getByTestId("dash-metric-oneshot-grade")).toContainText("양호");
+  });
+  test("[DB-1-19b] oneshot=0.75 → 보통", async ({ page }) => {
+    await stubOverview(page, { oneShotRate: 0.75 });
+    await page.goto("/dashboard");
+    await expect(page.getByTestId("dash-metric-oneshot-grade")).toContainText("보통");
+  });
+  test("[DB-1-19c] oneshot=0.65 → 부족", async ({ page }) => {
+    await stubOverview(page, { oneShotRate: 0.65 });
+    await page.goto("/dashboard");
+    await expect(page.getByTestId("dash-metric-oneshot-grade")).toContainText("부족");
+  });
+  test("[DB-1-19d] oneshot=0.5 → 경고", async ({ page }) => {
+    await stubOverview(page, { oneShotRate: 0.5 });
+    await page.goto("/dashboard");
+    await expect(page.getByTestId("dash-metric-oneshot-grade")).toContainText("경고");
   });
 });
 
-// ─── DB-1 modal 6종 ───────────────────────────────────────
+test.describe("DB-1 efficiency cost-session 5단계", () => {
+  test.beforeEach(async ({ page }) => {
+    seed("P2");
+    await signInAs(page, "P2");
+  });
+  test("[DB-1-20a] cost/session=5 → 탁월", async ({ page }) => {
+    await stubOverview(page, { cost: 5, sessions: 1 });
+    await page.goto("/dashboard");
+    await expect(page.getByTestId("dash-metric-cost-session-grade")).toContainText("탁월");
+  });
+  test("[DB-1-20b] cost/session=15 → 양호", async ({ page }) => {
+    await stubOverview(page, { cost: 15, sessions: 1 });
+    await page.goto("/dashboard");
+    await expect(page.getByTestId("dash-metric-cost-session-grade")).toContainText("양호");
+  });
+  test("[DB-1-20c] cost/session=30 → 보통", async ({ page }) => {
+    await stubOverview(page, { cost: 30, sessions: 1 });
+    await page.goto("/dashboard");
+    await expect(page.getByTestId("dash-metric-cost-session-grade")).toContainText("보통");
+  });
+  test("[DB-1-20d] cost/session=70 → 부족", async ({ page }) => {
+    await stubOverview(page, { cost: 70, sessions: 1 });
+    await page.goto("/dashboard");
+    await expect(page.getByTestId("dash-metric-cost-session-grade")).toContainText("부족");
+  });
+  test("[DB-1-20e] cost/session=150 → 경고", async ({ page }) => {
+    await stubOverview(page, { cost: 150, sessions: 1 });
+    await page.goto("/dashboard");
+    await expect(page.getByTestId("dash-metric-cost-session-grade")).toContainText("경고");
+  });
+});
 
-test.describe("DB-1 modal 6종 (메트릭 설명/늘리는법)", () => {
+test.describe("DB-1 efficiency cost-call 5단계", () => {
+  test.beforeEach(async ({ page }) => {
+    seed("P2");
+    await signInAs(page, "P2");
+  });
+  test("[DB-1-21a] costPerCall=0.03 → 탁월", async ({ page }) => {
+    await stubOverview(page, { costPerCall: 0.03, calls: 1 });
+    await page.goto("/dashboard");
+    await expect(page.getByTestId("dash-metric-cost-call-grade")).toContainText("탁월");
+  });
+  test("[DB-1-21b] costPerCall=0.05 → 양호", async ({ page }) => {
+    await stubOverview(page, { costPerCall: 0.05, calls: 1 });
+    await page.goto("/dashboard");
+    await expect(page.getByTestId("dash-metric-cost-call-grade")).toContainText("양호");
+  });
+  test("[DB-1-21c] costPerCall=0.08 → 보통", async ({ page }) => {
+    await stubOverview(page, { costPerCall: 0.08, calls: 1 });
+    await page.goto("/dashboard");
+    await expect(page.getByTestId("dash-metric-cost-call-grade")).toContainText("보통");
+  });
+  test("[DB-1-21d] costPerCall=0.15 → 부족", async ({ page }) => {
+    await stubOverview(page, { costPerCall: 0.15, calls: 1 });
+    await page.goto("/dashboard");
+    await expect(page.getByTestId("dash-metric-cost-call-grade")).toContainText("부족");
+  });
+  test("[DB-1-21e] costPerCall=0.25 → 경고", async ({ page }) => {
+    await stubOverview(page, { costPerCall: 0.25, calls: 1 });
+    await page.goto("/dashboard");
+    await expect(page.getByTestId("dash-metric-cost-call-grade")).toContainText("경고");
+  });
+});
+
+test.describe("DB-1 efficiency out-in 5단계", () => {
+  test.beforeEach(async ({ page }) => {
+    seed("P2");
+    await signInAs(page, "P2");
+  });
+  test("[DB-1-22a] out-in=35 → 탁월", async ({ page }) => {
+    await stubOverview(page, { outputInputRatio: 35 });
+    await page.goto("/dashboard");
+    await expect(page.getByTestId("dash-metric-out-in-grade")).toContainText("탁월");
+  });
+  test("[DB-1-22b] out-in=20 → 양호", async ({ page }) => {
+    await stubOverview(page, { outputInputRatio: 20 });
+    await page.goto("/dashboard");
+    await expect(page.getByTestId("dash-metric-out-in-grade")).toContainText("양호");
+  });
+  test("[DB-1-22c] out-in=10 → 보통", async ({ page }) => {
+    await stubOverview(page, { outputInputRatio: 10 });
+    await page.goto("/dashboard");
+    await expect(page.getByTestId("dash-metric-out-in-grade")).toContainText("보통");
+  });
+  test("[DB-1-22d] out-in=5 → 부족", async ({ page }) => {
+    await stubOverview(page, { outputInputRatio: 5 });
+    await page.goto("/dashboard");
+    await expect(page.getByTestId("dash-metric-out-in-grade")).toContainText("부족");
+  });
+  test("[DB-1-22e] out-in=2 → 경고", async ({ page }) => {
+    await stubOverview(page, { outputInputRatio: 2 });
+    await page.goto("/dashboard");
+    await expect(page.getByTestId("dash-metric-out-in-grade")).toContainText("경고");
+  });
+});
+
+test.describe("DB-1 efficiency calls-session 5단계", () => {
+  test.beforeEach(async ({ page }) => {
+    seed("P2");
+    await signInAs(page, "P2");
+  });
+  test("[DB-1-22f] calls/session=45 → 탁월 (30~60)", async ({ page }) => {
+    await stubOverview(page, { calls: 45, sessions: 1 });
+    await page.goto("/dashboard");
+    await expect(page.getByTestId("dash-metric-calls-session-grade")).toContainText("탁월");
+  });
+  test("[DB-1-22g] calls/session=25 → 양호 (20~29)", async ({ page }) => {
+    await stubOverview(page, { calls: 25, sessions: 1 });
+    await page.goto("/dashboard");
+    await expect(page.getByTestId("dash-metric-calls-session-grade")).toContainText("양호");
+  });
+  test("[DB-1-22h] calls/session=15 → 보통 (10~19)", async ({ page }) => {
+    await stubOverview(page, { calls: 15, sessions: 1 });
+    await page.goto("/dashboard");
+    await expect(page.getByTestId("dash-metric-calls-session-grade")).toContainText("보통");
+  });
+  test("[DB-1-22i] calls/session=7 → 부족 (5~9)", async ({ page }) => {
+    await stubOverview(page, { calls: 7, sessions: 1 });
+    await page.goto("/dashboard");
+    await expect(page.getByTestId("dash-metric-calls-session-grade")).toContainText("부족");
+  });
+  test("[DB-1-22j] calls/session=300 → 경고 (>200)", async ({ page }) => {
+    await stubOverview(page, { calls: 300, sessions: 1 });
+    await page.goto("/dashboard");
+    await expect(page.getByTestId("dash-metric-calls-session-grade")).toContainText("경고");
+  });
+});
+
+// ─── DB-1 modal 6종 ─────────────────────────────────────
+
+test.describe("DB-1 modal 6종 — 메트릭 설명/늘리는법", () => {
   test.beforeAll(() => seed("P2"));
   test.beforeEach(async ({ page }) => signInAs(page, "P2"));
 
-  test("[DB-1-24] 메트릭 늘리는법 modal — One-shot rate (낮음)", async ({ page }) => {
-    // P2 oneshot=0.83 → 양호 → tip act 버튼 미렌더 ([B] 표시 위해 fixture 변형 필요)
-    test.skip(true, "P2 oneshot 양호 → '늘리는법' 버튼 미노출. P2 변형 fixture 필요 — phase 2.1");
+  // 설명 modal × 6 (모두 desc 버튼 항상 노출)
+  for (const id of ["cache", "oneshot", "cost-session", "calls-session", "cost-call", "out-in"]) {
+    test(`[DB-1-23-${id}] dash-tip-${id}-desc 클릭 → modal 텍스트 노출`, async ({ page }) => {
+      await page.goto("/dashboard");
+      await page.getByTestId(`dash-tip-${id}-desc`).click();
+      // modal 안에 메트릭 라벨 일치하는 텍스트
+      await expect(page.locator("body")).toContainText(/설명|기준|왜/);
+    });
+  }
+});
+
+// ─── DB-1 heatmap 5단계 색 ──────────────────────────────
+
+test.describe("DB-1 [B] heatmap 5단계 색", () => {
+  test("[DB-1-25~29][B] activity heatmap 5단계 fill", async () => {
+    // react-activity-calendar 가 fill 을 inline style 로 주입 — playwright 의 fill attribute
+    // 매칭이 직접 안 됨. 별도 selector 로직 필요. phase 2.1 fixture + selector 확정 이후.
+    test.skip(true, "react-activity-calendar 라이브러리 fill style 매칭 — phase 2.1");
+  });
+
+  test("[DB-1-30~34][B] dwell heatmap 5단계", async () => {
+    test.skip(true, "DB-1-25~29 와 동일 — 라이브러리 selector phase 2.1");
   });
 });
