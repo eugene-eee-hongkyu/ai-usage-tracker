@@ -7,6 +7,7 @@ import { Nav } from "@/components/nav";
 import {
   AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
 } from "recharts";
+import { ScoreGauge, scoreLabel } from "@/components/score-gauge";
 
 type Period = "today" | "month" | "8days" | "30days" | "all";
 type GradeLevel = "탁월" | "양호" | "보통" | "부족" | "경고";
@@ -113,6 +114,13 @@ interface TeamData {
   teamTools?: Array<{ name: string; calls: number }>;
   teamShellCommands?: Array<{ name: string; calls: number }>;
   industryComparison?: IndustryComparison;
+  teamScore?: {
+    score: number | null;
+    cacheHitPct: number;
+    costPerCall: number;
+    memberCount: number;
+    windowDays: number;
+  } | null;
 }
 
 function AdminBadge() {
@@ -363,6 +371,99 @@ export default function TeamPage() {
       </div>
 
       <main className={`max-w-6xl mx-auto px-4 py-4 space-y-4 transition-opacity duration-150 ${loading ? "opacity-40 pointer-events-none" : "opacity-100"}`}>
+
+        {/* Team Headline — 팀 정체성·외부 비교 헤드라인.
+            연구: F-pattern + inverted pyramid → 핵심 narrative 카드는 위.
+            게이지 (Q3) + multiplier hero (Q1) + bullet graph (Q1).
+            기존 "Primus vs 업계" 카드 (page bottom) 흡수, 위치 상단으로 이동. */}
+        {data.teamScore && data.industryComparison && data.industryComparison.activeDayCount > 0 && (() => {
+          const ts = data.teamScore;
+          const ic = data.industryComparison;
+          const fmt = (n: number) => `$${n < 10 ? n.toFixed(2) : Math.round(n)}`;
+          const enterpriseAvg = 13;
+          const multiplier = ic.activeDayAvg / enterpriseAvg;
+          // bullet graph 행의 max 값 — Primus 가 가장 크면 그 값 +20% 헤드룸.
+          const bulletMax = Math.max(102, ic.activeDayAvg * 1.2);
+          const bulletRows: Array<{ label: string; value: number; star?: boolean; benchmark?: boolean }> = [
+            { label: "Anthropic 평균", value: 6 },
+            { label: "Anthropic 90th", value: 12 },
+            { label: "엔터 active 평균", value: 13, benchmark: true },
+            { label: "엔터 90th", value: 30 },
+            { label: "ccusage 헤비", value: 92 },
+            { label: "PRIMUS 팀", value: ic.activeDayAvg, star: true },
+          ];
+          return (
+            <div data-testid="team-card-headline" className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-emerald-500 rounded">
+              <div className="px-3 py-2 border-b border-neutral-800">
+                <span className="text-xs font-mono font-bold text-emerald-400 uppercase tracking-wider">
+                  Primus 팀 헤드라인 — 효율 점수 + 업계 비교 (최근 30일)
+                </span>
+              </div>
+              <div className="p-4 grid grid-cols-12 gap-x-6 gap-y-4 items-center">
+                {/* 좌: 팀 효율 점수 게이지 (3 cols) */}
+                <div data-testid="team-headline-score" className="col-span-12 sm:col-span-3 flex flex-col items-center">
+                  <ScoreGauge score={ts.score} />
+                  <div className="mt-1.5 text-[11px] font-mono">
+                    <span className={`font-bold ${
+                      ts.score === null ? "text-neutral-500" :
+                      ts.score >= 90 ? "text-emerald-400" :
+                      ts.score >= 70 ? "text-lime-400" :
+                      ts.score >= 40 ? "text-orange-400" : "text-rose-400"
+                    }`}>{scoreLabel(ts.score)}</span>
+                    <span className="text-neutral-500"> · 팀 평균 (10명)</span>
+                  </div>
+                  <span className="text-[10px] font-mono text-neutral-600 mt-0.5">
+                    cache {ts.cacheHitPct.toFixed(1)}% · ${ts.costPerCall.toFixed(3)}/call
+                  </span>
+                </div>
+
+                {/* 중: Hero multiplier (3 cols) */}
+                <div data-testid="team-headline-multiplier" className="col-span-12 sm:col-span-3 flex flex-col items-center">
+                  <div className="flex items-baseline gap-1">
+                    <span className="text-5xl font-mono font-bold text-emerald-400">
+                      {multiplier.toFixed(1)}
+                    </span>
+                    <span className="text-2xl font-mono text-emerald-400">x</span>
+                  </div>
+                  <span className="text-[11px] font-mono text-neutral-400 mt-1.5 text-center">
+                    엔터 active day 평균 (${enterpriseAvg}) 대비
+                  </span>
+                  <span className="text-[10px] font-mono text-emerald-300 mt-0.5">
+                    Claude Code 적극 활용 팀
+                  </span>
+                </div>
+
+                {/* 우: bullet graph (6 cols) — Stephen Few 정석 */}
+                <div data-testid="team-headline-bullet" className="col-span-12 sm:col-span-6">
+                  <div className="text-[10px] font-mono text-neutral-500 mb-1.5 uppercase tracking-wider">
+                    $/active day 비교
+                  </div>
+                  <div className="space-y-1 text-[11px] font-mono">
+                    {bulletRows.map((row) => (
+                      <div key={row.label} className="flex items-center gap-2">
+                        <span className={`w-32 shrink-0 ${row.star ? "text-emerald-300 font-bold" : row.benchmark ? "text-yellow-300" : "text-neutral-400"}`}>
+                          {row.star && "★ "}{row.label}
+                        </span>
+                        <div className="flex-1 h-2.5 bg-neutral-800 rounded overflow-hidden relative">
+                          <div
+                            className={`h-full rounded ${row.star ? "bg-emerald-500" : row.benchmark ? "bg-yellow-500/70" : "bg-neutral-600"}`}
+                            style={{ width: `${Math.min(100, (row.value / bulletMax) * 100)}%` }}
+                          />
+                        </div>
+                        <span className={`w-14 text-right tabular-nums ${row.star ? "text-emerald-300 font-bold" : "text-neutral-400"}`}>
+                          {fmt(row.value)}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                  <p className="text-[9px] font-mono text-neutral-700 mt-2">
+                    as of 2026-05 · 외부 출처 : Anthropic / 엔터 / ccusage 사용자 보고
+                  </p>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
 
         {members.length === 0 ? (
           <div data-testid="team-empty" className="bg-neutral-900 border border-neutral-800 rounded-lg p-8 text-center text-neutral-500 text-sm font-mono">
@@ -861,105 +962,8 @@ export default function TeamPage() {
               </div>
             )}
 
-            {/* Row 7: Industry Comparison — 외부 (Anthropic / 엔터 / ccusage)
-                 vs 우리 팀 (최근 30일). 모든 멤버 노출. 팀 정체성/모럴 부스트.
-                 외부 출처는 hardcoded (as of 2026-05), 우리 팀 통계는
-                 /api/team 의 industryComparison 라이브 응답. */}
-            {data.industryComparison && data.industryComparison.activeDayCount > 0 && (() => {
-              const ic = data.industryComparison;
-              const fmt = (n: number) => `$${n < 10 ? n.toFixed(2) : Math.round(n)}`;
-              // "엔터 active day 평균 $13" 대비 multiplier — 가장 직접 비교
-              const multiplier = ic.activeDayAvg / 13;
-              return (
-                <div data-testid="team-card-industry" className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-emerald-500 rounded">
-                  <div className="px-3 py-2 border-b border-neutral-800 flex items-center gap-2">
-                    <span className="text-xs font-mono font-bold text-emerald-400 uppercase tracking-wider">
-                      Primus vs 업계 (Claude Code, 최근 30일)
-                    </span>
-                  </div>
-                  <div className="p-3 grid grid-cols-1 lg:grid-cols-2 gap-4">
-                    {/* 외부 기준 (hardcoded) */}
-                    <div data-testid="team-industry-external">
-                      <div className="text-[10px] font-mono text-neutral-500 mb-2 uppercase">외부 기준</div>
-                      <table className="w-full text-xs font-mono border-collapse">
-                        <tbody>
-                          <tr className="border-b border-neutral-800/50">
-                            <td className="py-1.5 text-neutral-400">Anthropic 평균 사용자</td>
-                            <td className="py-1.5 text-right text-neutral-300 tabular-nums">$6 / day</td>
-                            <td className="py-1.5 text-right text-neutral-600 pl-2">Anth.</td>
-                          </tr>
-                          <tr className="border-b border-neutral-800/50">
-                            <td className="py-1.5 text-neutral-400">Anthropic 90th</td>
-                            <td className="py-1.5 text-right text-neutral-300 tabular-nums">&lt;$12 / day</td>
-                            <td className="py-1.5 text-right text-neutral-600 pl-2">Anth.</td>
-                          </tr>
-                          <tr className="border-b border-neutral-800/50">
-                            <td className="py-1.5 text-neutral-400">엔터 active day 평균</td>
-                            <td className="py-1.5 text-right text-neutral-300 tabular-nums">$13 / day</td>
-                            <td className="py-1.5 text-right text-neutral-600 pl-2">엔터</td>
-                          </tr>
-                          <tr className="border-b border-neutral-800/50">
-                            <td className="py-1.5 text-neutral-400">엔터 90th</td>
-                            <td className="py-1.5 text-right text-neutral-300 tabular-nums">&lt;$30 / day</td>
-                            <td className="py-1.5 text-right text-neutral-600 pl-2">엔터</td>
-                          </tr>
-                          <tr className="border-b border-neutral-800/50">
-                            <td className="py-1.5 text-neutral-400">엔터 월간 / dev</td>
-                            <td className="py-1.5 text-right text-neutral-300 tabular-nums">$150-250</td>
-                            <td className="py-1.5 text-right text-neutral-600 pl-2">엔터</td>
-                          </tr>
-                          <tr>
-                            <td className="py-1.5 text-neutral-400">ccusage 헤비 유저 예시</td>
-                            <td className="py-1.5 text-right text-neutral-300 tabular-nums">$83-102 / day</td>
-                            <td className="py-1.5 text-right text-neutral-600 pl-2">ccus.</td>
-                          </tr>
-                        </tbody>
-                      </table>
-                      <p className="text-[10px] font-mono text-neutral-700 mt-2">as of 2026-05</p>
-                    </div>
-                    {/* 우리 팀 (라이브, 최근 30일) */}
-                    <div data-testid="team-industry-ours">
-                      <div className="text-[10px] font-mono text-emerald-500 mb-2 uppercase">
-                        우리 팀 (최근 {ic.windowDays}일, active day {ic.activeDayCount}개)
-                      </div>
-                      <table className="w-full text-xs font-mono border-collapse">
-                        <tbody>
-                          <tr className="border-b border-neutral-800/50">
-                            <td className="py-1.5 text-neutral-400">active day 평균</td>
-                            <td className="py-1.5 text-right text-emerald-300 tabular-nums font-bold">{fmt(ic.activeDayAvg)} / day</td>
-                          </tr>
-                          <tr className="border-b border-neutral-800/50">
-                            <td className="py-1.5 text-neutral-400">p50 (median)</td>
-                            <td className="py-1.5 text-right text-neutral-300 tabular-nums">{fmt(ic.activeDayP50)} / day</td>
-                          </tr>
-                          <tr className="border-b border-neutral-800/50">
-                            <td className="py-1.5 text-neutral-400">p75</td>
-                            <td className="py-1.5 text-right text-neutral-300 tabular-nums">{fmt(ic.activeDayP75)} / day</td>
-                          </tr>
-                          <tr className="border-b border-neutral-800/50">
-                            <td className="py-1.5 text-neutral-400">p90</td>
-                            <td className="py-1.5 text-right text-neutral-300 tabular-nums">{fmt(ic.activeDayP90)} / day</td>
-                          </tr>
-                          <tr className="border-b border-neutral-800/50">
-                            <td className="py-1.5 text-neutral-400">max</td>
-                            <td className="py-1.5 text-right text-neutral-300 tabular-nums">{fmt(ic.activeDayMax)} / day</td>
-                          </tr>
-                          <tr>
-                            <td className="py-1.5 text-neutral-400">월간 평균 / dev</td>
-                            <td className="py-1.5 text-right text-emerald-300 tabular-nums font-bold">{fmt(ic.perDevMonthAvg)} / 30일</td>
-                          </tr>
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                  <div className="px-3 py-2.5 border-t border-neutral-800 bg-emerald-950/20">
-                    <p data-testid="team-industry-punch" className="text-xs font-mono text-emerald-300">
-                      ⚡ Primus 는 엔터 active day 평균 ($13) 대비 <span className="font-bold">{multiplier.toFixed(1)}배</span> — Claude Code 적극 활용 팀
-                    </p>
-                  </div>
-                </div>
-              );
-            })()}
+            {/* (Row 7 Industry Comparison 카드는 page top "team-card-headline"
+                 으로 흡수·이동 — Q1/Q2/Q3 일괄 해결) */}
           </>
         )}
       </main>

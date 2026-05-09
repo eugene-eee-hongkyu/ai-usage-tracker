@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { Nav } from "@/components/nav";
 import { CacheHitModal, OneShotRateModal, CostPerSessionModal, CallsPerSessionModal, CostPerCallModal, OutputInputRatioModal } from "@/components/metric-modal";
 import { ActivityCalendar } from "react-activity-calendar";
+import { ScoreGauge, scoreLabel } from "@/components/score-gauge";
 
 type Period = "today" | "month" | "8days" | "30days" | "all";
 
@@ -143,21 +144,13 @@ function TrendArrow({ pct }: { pct: number | null }) {
   return <span className="text-rose-400">↓ {pct}%</span>;
 }
 
-// 점수 → 색 (잔디 셀 + 큰 숫자 양쪽에서 사용).
+// 점수 → 색 (잔디 셀 + 큰 숫자 양쪽에서 사용). ScoreGauge 와 동일 팔레트.
 function scoreColor(score: number | null): string {
   if (score === null) return "text-neutral-500";
   if (score >= 90) return "text-emerald-400";
   if (score >= 70) return "text-lime-400";
   if (score >= 40) return "text-orange-400";
   return "text-rose-400";
-}
-
-function scoreLabel(score: number | null): string {
-  if (score === null) return "활동 없음";
-  if (score >= 90) return "탁월";
-  if (score >= 70) return "양호";
-  if (score >= 40) return "개선 필요";
-  return "경고";
 }
 
 // ActivityCalendar level (0=비활성, 1~4=점수 구간). 5단 색상.
@@ -167,59 +160,6 @@ function scoreToLevel(score: number | null): 0 | 1 | 2 | 3 | 4 {
   if (score >= 70) return 3;
   if (score >= 40) return 2;
   return 1;
-}
-
-function scoreHexColor(score: number | null): string {
-  if (score === null) return "#525252";
-  if (score >= 90) return "#10b981";
-  if (score >= 70) return "#84cc16";
-  if (score >= 40) return "#f97316";
-  return "#ef4444";
-}
-
-// Whoop / Apple Watch 패턴의 원형 게이지. 5초 테스트 — 색·각도만으로 즉시 판단.
-function ScoreGauge({ score }: { score: number | null }) {
-  const size = 132;
-  const stroke = 10;
-  const r = (size - stroke) / 2;
-  const cx = size / 2;
-  const cy = size / 2;
-  const C = 2 * Math.PI * r;
-  const value = score ?? 0;
-  const dash = (value / 100) * C;
-  const color = scoreHexColor(score);
-  return (
-    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} aria-label={`효율 점수 ${score ?? "데이터 없음"}`}>
-      <g transform={`rotate(-90 ${cx} ${cy})`}>
-        <circle cx={cx} cy={cy} r={r} fill="none" stroke="#1e293b" strokeWidth={stroke} />
-        {score !== null && (
-          <circle
-            cx={cx} cy={cy} r={r}
-            fill="none"
-            stroke={color}
-            strokeWidth={stroke}
-            strokeDasharray={`${dash} ${C}`}
-            strokeLinecap="round"
-          />
-        )}
-      </g>
-      <text
-        x={cx} y={cy - 2}
-        textAnchor="middle" dominantBaseline="middle"
-        fill={color}
-        fontSize={size * 0.34}
-        fontWeight={700}
-        fontFamily="ui-monospace, SFMono-Regular, Menlo, monospace"
-      >{score ?? "─"}</text>
-      <text
-        x={cx} y={cy + size * 0.22}
-        textAnchor="middle" dominantBaseline="middle"
-        fill="#737373"
-        fontSize={size * 0.09}
-        fontFamily="ui-monospace, SFMono-Regular, Menlo, monospace"
-      >/ 100</text>
-    </svg>
-  );
 }
 
 function rankMedal(position: number): string {

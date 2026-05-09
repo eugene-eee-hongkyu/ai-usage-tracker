@@ -489,6 +489,46 @@ export async function GET(req: NextRequest) {
     perDevMonthMax: perDevMonthly.length > 0 ? Math.max(...perDevMonthly) : 0,
   };
 
+  // ─── 팀 효율 점수 (개인 점수 시스템과 동일 공식, 30일 풀링 집계) ───
+  // 모든 멤버의 ccusage 토큰 + codeburn cost/calls 를 합쳐 단일 cache hit /
+  // cost-per-call 산출 → computeDailyEfficiencyScore 적용.
+  // 개인 점수는 self-motivation, 팀 점수는 team identity. 같은 공식 다른 의미.
+  let teamCacheRead = 0, teamCacheWrite = 0, teamInput = 0;
+  let teamCost30 = 0, teamCalls30 = 0;
+  for (const u of allUsers) {
+    const snap = snapMap.get(u.id);
+    if (!snap) continue;
+    const raw = snap.rawJson as Record<string, unknown>;
+    const ccu = (raw.ccusageDaily as { daily?: Array<{ date?: string; inputTokens?: number; cacheReadTokens?: number; cacheCreationTokens?: number }> } | undefined)?.daily ?? [];
+    const cb = ((raw.all as { daily?: Array<{ date?: string; cost?: number; calls?: number }> } | undefined)?.daily) ?? [];
+    for (const r of ccu) {
+      if (!r.date || r.date < thirtyAgoYmd) continue;
+      teamCacheRead += r.cacheReadTokens ?? 0;
+      teamCacheWrite += r.cacheCreationTokens ?? 0;
+      teamInput += r.inputTokens ?? 0;
+    }
+    for (const r of cb) {
+      if (!r.date || r.date < thirtyAgoYmd) continue;
+      teamCost30 += r.cost ?? 0;
+      teamCalls30 += r.calls ?? 0;
+    }
+  }
+  const teamCacheDenom = teamCacheRead + teamCacheWrite + teamInput;
+  const teamCacheHitPct = teamCacheDenom > 0 ? (teamCacheRead / teamCacheDenom) * 100 : 0;
+  const teamCostPerCall = teamCalls30 > 0 ? teamCost30 / teamCalls30 : 0;
+  // 동일 공식 (cache 85 + cost 15, $0.40/$0.06 임계값)
+  const teamCachePts = Math.max(0, Math.min(85, ((teamCacheHitPct - 60) / (96 - 60)) * 85));
+  const teamCostPts = Math.max(0, Math.min(15, ((0.40 - teamCostPerCall) / (0.40 - 0.06)) * 15));
+  const teamScoreValue = teamCacheDenom > 0 ? Math.round(teamCachePts + teamCostPts) : null;
+
+  const teamScore = {
+    score: teamScoreValue,
+    cacheHitPct: teamCacheHitPct,
+    costPerCall: teamCostPerCall,
+    memberCount: byEfficiency.length,
+    windowDays: 30,
+  };
+
   return NextResponse.json({
     byEfficiency,
     bySessions,
@@ -502,6 +542,7 @@ export async function GET(req: NextRequest) {
     teamTools,
     teamShellCommands,
     industryComparison,
+    teamScore,
     isAdminUser: isAdmin(session.user.email),
   });
 }
