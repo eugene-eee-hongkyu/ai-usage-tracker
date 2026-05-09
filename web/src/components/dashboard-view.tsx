@@ -188,12 +188,19 @@ function EfficiencyScoreSection({ score }: EfficiencyScoreSectionProps) {
     : score.delta < 0 ? <span className="text-rose-400">↓ {score.delta}</span>
     : <span className="text-neutral-500">─ 0</span>;
 
+  // 오늘 날짜 (브라우저 timezone 기준). 게이지가 항상 "오늘" 점수임을 명시 —
+  // period 필터(오늘/이번달/8일/30일/전체) 변경해도 이 섹션은 안 바뀜.
+  const todayLabel = new Intl.DateTimeFormat("ko-KR", { month: "numeric", day: "numeric" }).format(new Date());
+
   return (
     <div data-testid="dash-efficiency-score" className="bg-neutral-950 border-b border-neutral-800">
       <div className="max-w-6xl mx-auto px-4 py-4">
-        <div className="grid grid-cols-12 gap-x-6 items-center">
+        <div className="grid grid-cols-12 gap-x-6 items-start">
           {/* Hero: 원형 게이지 (3 cols) — 5초 테스트 통과용 단일 focal point */}
           <div data-testid="score-today" className="col-span-12 sm:col-span-3 flex flex-col items-center">
+            <span className="text-[10px] font-mono text-neutral-500 uppercase tracking-wider mb-1">
+              오늘 효율 ({todayLabel}) <span className="text-neutral-700 normal-case tracking-normal">· period 필터 무관</span>
+            </span>
             <ScoreGauge score={score.today} />
             <div className="mt-1.5 flex items-center gap-1.5 text-[11px] font-mono">
               <span className={`font-bold ${scoreColor(score.today)}`}>{scoreLabel(score.today)}</span>
@@ -204,35 +211,45 @@ function EfficiencyScoreSection({ score }: EfficiencyScoreSectionProps) {
           </div>
 
           {/* 보조: streak + team rank 세로 stack (3 cols) */}
-          <div className="col-span-12 sm:col-span-3 flex flex-col gap-3 py-2">
+          <div className="col-span-12 sm:col-span-3 flex flex-col gap-3 py-1">
             {/* Streak */}
-            <div data-testid="score-streak" className="flex items-center gap-3">
-              <span className="text-3xl leading-none">🔥</span>
-              <div className="flex flex-col">
-                <div className="flex items-baseline gap-1.5">
-                  <span className={`text-2xl font-mono font-bold leading-none ${score.streak >= 7 ? "text-orange-400" : score.streak >= 1 ? "text-neutral-200" : "text-neutral-600"}`}>
-                    {score.streak}
-                  </span>
-                  <span className="text-xs font-mono text-neutral-500">일</span>
+            <div data-testid="score-streak">
+              <span className="text-[10px] font-mono text-neutral-500 uppercase tracking-wider block mb-1">
+                현재 cache hit ≥ 90% Streak
+              </span>
+              <div className="flex items-center gap-3">
+                <span className="text-3xl leading-none">🔥</span>
+                <div className="flex flex-col">
+                  <div className="flex items-baseline gap-1.5">
+                    <span className={`text-2xl font-mono font-bold leading-none ${score.streak >= 7 ? "text-orange-400" : score.streak >= 1 ? "text-neutral-200" : "text-neutral-600"}`}>
+                      {score.streak}
+                    </span>
+                    <span className="text-xs font-mono text-neutral-500">일</span>
+                  </div>
+                  <span className="text-[10px] font-mono text-neutral-500 mt-0.5">활동 없는 날 자동 보류</span>
                 </div>
-                <span className="text-[10px] font-mono text-neutral-500 mt-0.5">cache 90%+ streak</span>
               </div>
             </div>
 
             {/* 팀 랭크 */}
             {score.teamRank ? (
-              <div data-testid="score-team-rank" className="flex items-center gap-3">
-                <span className="text-3xl leading-none">{rankMedal(score.teamRank.position) || "🏅"}</span>
-                <div className="flex flex-col">
-                  <div className="flex items-baseline gap-1.5">
-                    <span className="text-2xl font-mono font-bold leading-none text-sky-300">
-                      {score.teamRank.position}
+              <div data-testid="score-team-rank">
+                <span className="text-[10px] font-mono text-neutral-500 uppercase tracking-wider block mb-1">
+                  이번주 팀 cache hit 랭크
+                </span>
+                <div className="flex items-center gap-3">
+                  <span className="text-3xl leading-none">{rankMedal(score.teamRank.position) || "🏅"}</span>
+                  <div className="flex flex-col">
+                    <div className="flex items-baseline gap-1.5">
+                      <span className="text-2xl font-mono font-bold leading-none text-sky-300">
+                        {score.teamRank.position}
+                      </span>
+                      <span className="text-xs font-mono text-neutral-500">/ {score.teamRank.total}명</span>
+                    </div>
+                    <span className="text-[10px] font-mono text-neutral-500 mt-0.5">
+                      나 {score.teamRank.selfCacheHitPct.toFixed(1)}% · 팀 {score.teamRank.teamAvgCacheHitPct.toFixed(1)}%
                     </span>
-                    <span className="text-xs font-mono text-neutral-500">/ {score.teamRank.total}명</span>
                   </div>
-                  <span className="text-[10px] font-mono text-neutral-500 mt-0.5">
-                    나 {score.teamRank.selfCacheHitPct.toFixed(1)}% · 팀 {score.teamRank.teamAvgCacheHitPct.toFixed(1)}%
-                  </span>
                 </div>
               </div>
             ) : (
