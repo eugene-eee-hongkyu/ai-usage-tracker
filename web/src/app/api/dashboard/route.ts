@@ -532,7 +532,9 @@ export async function GET(req: NextRequest) {
       }
     : null;
 
-  const efficiencyScore = {
+  // snapshot 모드 (지난주/지난달 등) 면 점수 섹션 숨김 — historical 분석 모드와
+  // self-motivation 모드 분리. UI 의 conditional 이 null 받으면 자동 hide.
+  const efficiencyScore = snapshotRow ? null : {
     today: todayScore,
     yesterday: yesterdayScore,
     delta: scoreDelta,

@@ -42,6 +42,13 @@ export async function POST(req: NextRequest) {
     if (it.type !== "weekly" && it.type !== "monthly") { skipped++; continue; }
     if (!/^\d{4}-\d{2}-\d{2}$/.test(it.periodStart)) { skipped++; continue; }
 
+    // 빈 period 방어 — cost=0 && calls=0 이면 활동 없는 슬롯, INSERT 안 함.
+    // 클라이언트(historical.mjs) 도 같은 룰 적용하지만 서버 측에서 한 번 더 가드.
+    const ov = (it.rawJson as { overview?: { cost?: number; calls?: number } })?.overview;
+    const cost = Number(ov?.cost ?? 0);
+    const calls = Number(ov?.calls ?? 0);
+    if (cost === 0 && calls === 0) { skipped++; continue; }
+
     try {
       const result = await db
         .insert(periodSnapshots)

@@ -104,6 +104,57 @@ function spawnCodeburnRange(fromYmd, toYmd) {
   });
 }
 
+// ccusage daily 일별 토큰 분해 (--since / --until 은 YYYYMMDD 형식).
+// historical snapshot 의 DAILY ACTIVITY 토큰 차트가 비지 않게 임베드.
+function spawnCcusageRange(fromYmd, toYmd) {
+  return new Promise((resolve) => {
+    const since = fromYmd.replace(/-/g, "");
+    const until = toYmd.replace(/-/g, "");
+    const chunks = [];
+    const proc = spawn(
+      "ccusage",
+      ["daily", "--since", since, "--until", until, "--json"],
+      { stdio: ["ignore", "pipe", "pipe"], shell: true, env: childEnv }
+    );
+    proc.stdout.on("data", (d) => chunks.push(d));
+    proc.on("close", (code) => {
+      if (code !== 0) return resolve(null);
+      try {
+        resolve(JSON.parse(Buffer.concat(chunks).toString("utf8").trim()));
+      } catch { resolve(null); }
+    });
+    proc.on("error", () => resolve(null));
+    setTimeout(() => { proc.kill(); resolve(null); }, 600_000);
+  });
+}
+
+// 빈 period 판정. cost=0 && calls=0 이면 그 기간엔 활동 없음 — drop.
+function isEmpty(json) {
+  const cost = Number(json?.overview?.cost ?? 0);
+  const calls = Number(json?.overview?.calls ?? 0);
+  return cost === 0 && calls === 0;
+}
+
+async function fetchOnePeriod(start, end, label) {
+  const json = await spawnCodeburnRange(start, end);
+  if (!json || !json.overview) {
+    log(`${label}: codeburn fetch failed`);
+    return null;
+  }
+  if (isEmpty(json)) {
+    log(`${label}: empty period (cost=0/calls=0) — skip`);
+    return null;
+  }
+  // ccusage 일별 토큰 분해 동시 추출, rawJson 에 임베드.
+  const ccu = await spawnCcusageRange(start, end);
+  if (ccu) {
+    json.ccusageDaily = ccu;
+  } else {
+    log(`${label}: ccusage fetch failed (codeburn 만 임베드)`);
+  }
+  return json;
+}
+
 async function generateSnapshots() {
   const today = ymdInTz(new Date(), SYSTEM_TZ);
   const thisWeekStart = isoMondayOf(today);
@@ -115,22 +166,20 @@ async function generateSnapshots() {
   for (let i = 1; i <= 8; i++) {
     const start = shiftDays(thisWeekStart, -7 * i);
     const end = shiftDays(start, 6);
-    log(`weekly window: ${start} ~ ${end}`);
-    const json = await spawnCodeburnRange(start, end);
-    if (json && json.overview) {
-      snapshots.push({ type: "weekly", periodStart: start, rawJson: json });
-    }
+    const label = `weekly ${start}~${end}`;
+    log(label);
+    const json = await fetchOnePeriod(start, end, label);
+    if (json) snapshots.push({ type: "weekly", periodStart: start, rawJson: json });
   }
 
   // 지난 12개월 (이번 달 제외)
   for (let i = 1; i <= 12; i++) {
     const start = shiftMonths(thisMonthStart, -i);
     const end = lastDayOfMonth(start);
-    log(`monthly window: ${start} ~ ${end}`);
-    const json = await spawnCodeburnRange(start, end);
-    if (json && json.overview) {
-      snapshots.push({ type: "monthly", periodStart: start, rawJson: json });
-    }
+    const label = `monthly ${start}~${end}`;
+    log(label);
+    const json = await fetchOnePeriod(start, end, label);
+    if (json) snapshots.push({ type: "monthly", periodStart: start, rawJson: json });
   }
 
   return snapshots;
