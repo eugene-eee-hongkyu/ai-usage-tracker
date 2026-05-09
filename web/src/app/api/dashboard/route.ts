@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { db, userSnapshots, users, periodSnapshots, dailyVisits, userBlocks } from "@/lib/db";
-import { and, asc, desc, eq, gte } from "drizzle-orm";
+import { and, asc, desc, eq, gte, lt } from "drizzle-orm";
 import { isAdmin } from "@/lib/admin";
 
 type Period = "today" | "month" | "8days" | "30days" | "all";
@@ -476,6 +476,55 @@ export async function GET(req: NextRequest) {
     blockRows.map((b) => b.startedAt.toISOString().slice(0, 10))
   ).size;
 
+  // 직전 동일 길이 윈도우 트렌드 비교용 (period === "all" 은 retention 한계로
+  // prev 없음). prev 윈도우 = [start - length, start).
+  let prevTrend: {
+    countDeltaPct: number | null;
+    avgMinutesDeltaPct: number | null;
+    tokensPerMinuteDeltaPct: number | null;
+    hasPrevData: boolean;
+  } | null = null;
+  if (blocksWindowStart && period !== "all") {
+    const windowMs = Date.now() - blocksWindowStart.getTime();
+    const prevStart = new Date(blocksWindowStart.getTime() - windowMs);
+    const prevEnd = blocksWindowStart;
+    const prevRows = await db
+      .select({ minutes: userBlocks.minutes, totalTokens: userBlocks.totalTokens })
+      .from(userBlocks)
+      .where(and(
+        eq(userBlocks.userId, user[0].id),
+        gte(userBlocks.startedAt, prevStart),
+        lt(userBlocks.startedAt, prevEnd),
+      ));
+    const prevCount = prevRows.length;
+    const prevTotalMin = prevRows.reduce((s, r) => s + r.minutes, 0);
+    const prevTotalTok = prevRows.reduce((s, r) => s + Number(r.totalTokens ?? 0), 0);
+    const prevAvgMin = prevCount ? prevTotalMin / prevCount : 0;
+    const prevTokPerMin = prevTotalMin > 0 ? prevTotalTok / prevTotalMin : 0;
+    const pct = (cur: number, prev: number): number | null => {
+      if (prev === 0) return cur === 0 ? null : null; // "new" 케이스 — UI 에서 다르게 표기 가능하나 단순화
+      return Math.round(((cur - prev) / prev) * 100);
+    };
+    prevTrend = {
+      countDeltaPct: pct(blockRows.length, prevCount),
+      avgMinutesDeltaPct: pct(blockRows.length ? totalBlockMinutes / blockRows.length : 0, prevAvgMin),
+      tokensPerMinuteDeltaPct: pct(tokensPerMinute, prevTokPerMin),
+      hasPrevData: prevCount > 0,
+    };
+  }
+
+  // 패턴 분류. median 우선, 그 다음 분포 비율로 보정.
+  // 5개 미만이면 단발형 (tooFewData 와 별개로 5~9 도 신호 약함).
+  const totalBlocks = blockRows.length;
+  let pattern: "몰입형" | "분산형" | "균형형" | "단발형" = "균형형";
+  if (totalBlocks < 10) {
+    pattern = "단발형";
+  } else if (medianMinutes >= 240 || distribution.h4plus / totalBlocks >= 0.5) {
+    pattern = "몰입형";
+  } else if (medianMinutes < 60 || (distribution.lt30 + distribution.m30to60) / totalBlocks >= 0.5) {
+    pattern = "분산형";
+  }
+
   // period === "today" 면 카드 자체 미표시 (blocks=null).
   // 그 외 기간에서 블록 5개 미만이면 tooFewData=true 로 카드는 보이되 안내 문구.
   const blocks = period === "today"
@@ -492,6 +541,8 @@ export async function GET(req: NextRequest) {
         totalTokens: totalBlockTokens,
         distribution,
         tooFewData: blockRows.length < 5,
+        pattern,
+        trend: prevTrend,
       };
 
   return NextResponse.json({

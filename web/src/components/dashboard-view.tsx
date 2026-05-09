@@ -93,6 +93,39 @@ interface BlocksSummary {
   totalTokens: number;
   distribution: { lt30: number; m30to60: number; h1to2: number; h2to4: number; h4plus: number };
   tooFewData: boolean;
+  pattern: "몰입형" | "분산형" | "균형형" | "단발형";
+  trend: {
+    countDeltaPct: number | null;
+    avgMinutesDeltaPct: number | null;
+    tokensPerMinuteDeltaPct: number | null;
+    hasPrevData: boolean;
+  } | null;
+}
+
+const PATTERN_DESCRIPTIONS: Record<BlocksSummary["pattern"], { color: string; tooltip: string }> = {
+  "몰입형": {
+    color: "bg-violet-500/15 text-violet-300 border-violet-500/40",
+    tooltip: "median 4h+ 또는 4h+ 블록 비율 50% 이상. 한 번 시작하면 5h 빌링 블록을 거의 꽉 채우는 깊은 집중 패턴.",
+  },
+  "분산형": {
+    color: "bg-emerald-500/15 text-emerald-300 border-emerald-500/40",
+    tooltip: "median 1h 미만 또는 1h 미만 블록 비율 50% 이상. 짧게 자주 사용하는 패턴. 작업 단위가 작거나 분산적.",
+  },
+  "균형형": {
+    color: "bg-sky-500/15 text-sky-300 border-sky-500/40",
+    tooltip: "median 1~4h, 짧은 블록과 긴 블록이 섞인 패턴. 작업 종류에 따라 깊이 조절.",
+  },
+  "단발형": {
+    color: "bg-neutral-500/15 text-neutral-400 border-neutral-500/40",
+    tooltip: "활성 블록 10개 미만. 가끔만 사용하는 패턴. 표본이 적어 다른 지표 신뢰도 낮음.",
+  },
+};
+
+function TrendArrow({ pct }: { pct: number | null }) {
+  if (pct === null) return <span className="text-neutral-700">─</span>;
+  if (pct === 0) return <span className="text-neutral-600">─ 0%</span>;
+  if (pct > 0) return <span className="text-emerald-400">↑ +{pct}%</span>;
+  return <span className="text-rose-400">↓ {pct}%</span>;
 }
 
 const PERIOD_LABELS: Record<Period, string> = {
@@ -1227,8 +1260,25 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
               count < 5 면 tooFewData=true → 안내 문구만 표시. */}
           {period !== "today" && data.blocks ? (
             <div data-testid="dash-card-active-blocks" className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-sky-500 rounded">
-              <div className="px-3 py-2 border-b border-neutral-800">
+              <div className="px-3 py-2 border-b border-neutral-800 flex items-center justify-between">
                 <span className="text-xs font-mono font-bold text-sky-400 uppercase tracking-wider">Active Blocks</span>
+                {!data.blocks.tooFewData && (
+                  <div className="relative group/pattern">
+                    <span
+                      data-testid="dash-active-blocks-pattern"
+                      className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded border cursor-help ${PATTERN_DESCRIPTIONS[data.blocks.pattern].color}`}
+                    >
+                      {data.blocks.pattern} <span className="opacity-60">ⓘ</span>
+                    </span>
+                    <div className="absolute right-0 top-full mt-1 z-50 opacity-0 invisible group-hover/pattern:opacity-100 group-hover/pattern:visible transition-all duration-100 bg-slate-900 border border-slate-700 rounded-lg shadow-2xl p-3 w-72 text-left">
+                      <p className="text-[10px] font-mono text-slate-500 mb-1.5 uppercase tracking-wider">{data.blocks.pattern} 기준</p>
+                      <p className="text-xs font-mono text-slate-300 leading-relaxed">{PATTERN_DESCRIPTIONS[data.blocks.pattern].tooltip}</p>
+                      <p className="text-[10px] font-mono text-slate-500 mt-2 pt-2 border-t border-slate-800">
+                        패턴 분류는 자기 인식 용도. 좋고 나쁨이 아닙니다.
+                      </p>
+                    </div>
+                  </div>
+                )}
               </div>
               <div className="p-3">
                 {data.blocks.tooFewData ? (
@@ -1236,32 +1286,48 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
                 ) : (
                   <>
                     <div className="space-y-1.5 text-xs font-mono">
-                      <div className="flex justify-between items-center">
-                        <span className="text-neutral-400">활성 블록</span>
-                        <span>
+                      <div className="flex justify-between items-center gap-2">
+                        <span className="text-neutral-400 shrink-0">활성 블록</span>
+                        <span className="flex-1 text-right">
                           <span className="text-neutral-200">{data.blocks.count}</span>
                           <span className="text-neutral-500"> ({data.blocks.activeDays}일)</span>
                         </span>
+                        <span className="w-20 text-right text-[10px]" title="직전 동일 길이 윈도우 대비">
+                          {data.blocks.trend?.hasPrevData
+                            ? <TrendArrow pct={data.blocks.trend.countDeltaPct} />
+                            : <span className="text-neutral-700">─</span>}
+                        </span>
                       </div>
-                      <div className="flex justify-between items-center">
-                        <span className="text-neutral-400">평균 길이</span>
-                        <span>
+                      <div className="flex justify-between items-center gap-2">
+                        <span className="text-neutral-400 shrink-0">평균 길이</span>
+                        <span className="flex-1 text-right">
                           <span className="text-neutral-200">{fmtMinutes(data.blocks.avgMinutes)}</span>
                           <span className="text-neutral-500"> (median {fmtMinutes(data.blocks.medianMinutes)})</span>
                         </span>
+                        <span className="w-20 text-right text-[10px]" title="직전 동일 길이 윈도우 대비">
+                          {data.blocks.trend?.hasPrevData
+                            ? <TrendArrow pct={data.blocks.trend.avgMinutesDeltaPct} />
+                            : <span className="text-neutral-700">─</span>}
+                        </span>
                       </div>
-                      <div className="flex justify-between items-center">
-                        <span className="text-neutral-400">분당 토큰</span>
-                        <span className="text-sky-400">{fmtTokens(data.blocks.tokensPerMinute)}</span>
+                      <div className="flex justify-between items-center gap-2">
+                        <span className="text-neutral-400 shrink-0">분당 토큰</span>
+                        <span className="flex-1 text-right text-sky-400">{fmtTokens(data.blocks.tokensPerMinute)}</span>
+                        <span className="w-20 text-right text-[10px]" title="직전 동일 길이 윈도우 대비">
+                          {data.blocks.trend?.hasPrevData
+                            ? <TrendArrow pct={data.blocks.trend.tokensPerMinuteDeltaPct} />
+                            : <span className="text-neutral-700">─</span>}
+                        </span>
                       </div>
-                      <div className="flex justify-between items-center">
-                        <span className="text-neutral-400">최장 블록</span>
-                        <span>
+                      <div className="flex justify-between items-center gap-2">
+                        <span className="text-neutral-400 shrink-0">최장 블록</span>
+                        <span className="flex-1 text-right">
                           <span className="text-neutral-200">{fmtMinutes(data.blocks.maxMinutes)}</span>
                           {data.blocks.longestStartedAt && (
                             <span className="text-neutral-500"> ({fmtBlockDate(data.blocks.longestStartedAt)})</span>
                           )}
                         </span>
+                        <span className="w-20 text-right text-neutral-700 text-[10px]">─</span>
                       </div>
                     </div>
                     <div className="mt-3 pt-3 border-t border-neutral-800">
