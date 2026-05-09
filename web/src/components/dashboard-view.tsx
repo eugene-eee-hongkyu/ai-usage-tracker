@@ -79,6 +79,21 @@ interface DashboardData {
   availableSnapshots?: { weekly: SnapshotMeta[]; monthly: SnapshotMeta[]; daily?: SnapshotMeta[] };
   snapshot?: SnapshotInfo | null;
   blocks?: BlocksSummary | null;
+  efficiencyScore?: EfficiencyScoreSummary | null;
+}
+
+interface EfficiencyScoreSummary {
+  today: number | null;
+  yesterday: number | null;
+  delta: number | null;
+  streak: number;
+  daily: Array<{ date: string; score: number | null; cacheHitPct: number | null }>;
+  teamRank: {
+    position: number;
+    total: number;
+    selfCacheHitPct: number;
+    teamAvgCacheHitPct: number;
+  } | null;
 }
 
 interface BlocksSummary {
@@ -126,6 +141,138 @@ function TrendArrow({ pct }: { pct: number | null }) {
   if (pct === 0) return <span className="text-neutral-600">─ 0%</span>;
   if (pct > 0) return <span className="text-emerald-400">↑ +{pct}%</span>;
   return <span className="text-rose-400">↓ {pct}%</span>;
+}
+
+// 점수 → 색 (잔디 셀 + 큰 숫자 양쪽에서 사용).
+function scoreColor(score: number | null): string {
+  if (score === null) return "text-neutral-500";
+  if (score >= 90) return "text-emerald-400";
+  if (score >= 70) return "text-lime-400";
+  if (score >= 40) return "text-orange-400";
+  return "text-rose-400";
+}
+
+function scoreLabel(score: number | null): string {
+  if (score === null) return "활동 없음";
+  if (score >= 90) return "탁월";
+  if (score >= 70) return "양호";
+  if (score >= 40) return "개선 필요";
+  return "경고";
+}
+
+// ActivityCalendar level (0=비활성, 1~4=점수 구간). 5단 색상.
+function scoreToLevel(score: number | null): 0 | 1 | 2 | 3 | 4 {
+  if (score === null) return 0;
+  if (score >= 90) return 4;
+  if (score >= 70) return 3;
+  if (score >= 40) return 2;
+  return 1;
+}
+
+interface EfficiencyScoreSectionProps {
+  score: EfficiencyScoreSummary;
+}
+
+function EfficiencyScoreSection({ score }: EfficiencyScoreSectionProps) {
+  const calData = score.daily.map((d) => ({
+    date: d.date,
+    count: d.score ?? 0,
+    level: scoreToLevel(d.score),
+  }));
+  // 점수 구간별 색 — 빨강(경고) / 주황(개선) / 라임(양호) / 에메랄드(탁월).
+  // level 0 = 회색 (활동 없음). 동일 색상 시스템을 잔디·라벨에 일관 사용.
+  const theme = { dark: ["#1e293b", "#7f1d1d", "#9a3412", "#65a30d", "#10b981"] as [string, string, string, string, string] };
+
+  const todayDisplay = score.today === null
+    ? <span className="text-neutral-600 text-5xl font-mono font-bold">─</span>
+    : <span className={`text-5xl font-mono font-bold ${scoreColor(score.today)}`}>{score.today}</span>;
+
+  return (
+    <div data-testid="dash-efficiency-score" className="bg-neutral-950 border-b border-neutral-800">
+      <div className="max-w-6xl mx-auto px-4 py-5">
+        {/* Top row: 점수 / streak / 팀 랭크 */}
+        <div className="flex flex-wrap items-end gap-x-8 gap-y-3 mb-4">
+          {/* 오늘 점수 */}
+          <div data-testid="score-today" className="flex flex-col">
+            <span className="text-[10px] font-mono text-neutral-500 uppercase tracking-wider mb-1">오늘 효율 점수</span>
+            <div className="flex items-baseline gap-2">
+              {todayDisplay}
+              {score.today !== null && (
+                <>
+                  <span className="text-sm font-mono text-neutral-500">/ 100</span>
+                  {score.delta !== null && score.delta !== 0 && (
+                    <span className={`text-xs font-mono ${score.delta > 0 ? "text-emerald-400" : "text-rose-400"}`}>
+                      {score.delta > 0 ? "↑" : "↓"} 어제 {score.delta > 0 ? "+" : ""}{score.delta}
+                    </span>
+                  )}
+                  {score.delta === 0 && (
+                    <span className="text-xs font-mono text-neutral-500">─ 어제와 동일</span>
+                  )}
+                </>
+              )}
+            </div>
+            <span className={`text-[10px] font-mono mt-0.5 ${scoreColor(score.today)}`}>
+              {scoreLabel(score.today)} · cache hit + cost/call 가중
+            </span>
+          </div>
+
+          {/* Streak */}
+          <div data-testid="score-streak" className="flex flex-col">
+            <span className="text-[10px] font-mono text-neutral-500 uppercase tracking-wider mb-1">cache hit ≥ 90% Streak</span>
+            <div className="flex items-baseline gap-2">
+              <span className="text-3xl">🔥</span>
+              <span className={`text-3xl font-mono font-bold ${score.streak >= 7 ? "text-orange-400" : score.streak >= 1 ? "text-neutral-200" : "text-neutral-600"}`}>
+                {score.streak}
+              </span>
+              <span className="text-sm font-mono text-neutral-500">일</span>
+            </div>
+            <span className="text-[10px] font-mono text-neutral-600 mt-0.5">
+              {score.streak === 0 ? "오늘 cache 90%+ 달성하면 시작" : "활동 없는 날은 자동 보류"}
+            </span>
+          </div>
+
+          {/* 팀 랭크 */}
+          {score.teamRank && (
+            <div data-testid="score-team-rank" className="flex flex-col">
+              <span className="text-[10px] font-mono text-neutral-500 uppercase tracking-wider mb-1">이번주 팀 cache hit 랭크</span>
+              <div className="flex items-baseline gap-2">
+                <span className="text-3xl font-mono font-bold text-sky-400">
+                  {score.teamRank.position}
+                </span>
+                <span className="text-sm font-mono text-neutral-500">/ {score.teamRank.total}명</span>
+              </div>
+              <span className="text-[10px] font-mono text-neutral-600 mt-0.5">
+                나 {score.teamRank.selfCacheHitPct.toFixed(1)}% · 팀평균 {score.teamRank.teamAvgCacheHitPct.toFixed(1)}%
+              </span>
+            </div>
+          )}
+        </div>
+
+        {/* 90일 잔디 */}
+        <div data-testid="score-grass" className="mt-2">
+          <div className="flex items-center justify-between mb-1.5">
+            <span className="text-[10px] font-mono text-neutral-500 uppercase tracking-wider">최근 90일 효율 잔디</span>
+            <div className="flex items-center gap-3 text-[10px] font-mono text-neutral-500">
+              <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm" style={{ background: theme.dark[1] }} />경고</span>
+              <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm" style={{ background: theme.dark[2] }} />개선</span>
+              <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm" style={{ background: theme.dark[3] }} />양호</span>
+              <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm" style={{ background: theme.dark[4] }} />탁월</span>
+            </div>
+          </div>
+          <ActivityCalendar
+            data={calData}
+            colorScheme="dark"
+            theme={theme}
+            labels={{ legend: { less: "낮음", more: "탁월" } }}
+            showWeekdayLabels
+            blockSize={11}
+            showTotalCount={false}
+            renderColorLegend={() => <></>}
+          />
+        </div>
+      </div>
+    </div>
+  );
 }
 
 const PERIOD_LABELS: Record<Period, string> = {
@@ -708,6 +855,12 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
           )}
         </div>
       </div>
+
+      {/* Daily Efficiency Score + Streak + 90일 잔디 + 팀 랭크.
+          period 필터 무관 — 항상 "현재 / 오늘". 자기 인식 / 셀프 중독 섹션. */}
+      {data.efficiencyScore && (
+        <EfficiencyScoreSection score={data.efficiencyScore} />
+      )}
 
       {/* Overview Bar */}
       <div data-testid="dash-overview-bar" className="bg-neutral-900 border-b border-neutral-800">

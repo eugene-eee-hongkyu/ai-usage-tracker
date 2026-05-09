@@ -86,6 +86,19 @@ function getCcusageDaily(raw: unknown): CcusageDailyRow[] {
   return cu?.daily ?? [];
 }
 
+// 일일 효율 점수 (0-100). cache hit 50점 + cost/call 50점.
+// 임계값은 EFFICIENCY 카드의 grade rule 과 정렬 (Anthropic 본사 96%+ 기준 등).
+// linear interpolation 으로 cliff 없이 점수가 부드럽게 변하도록.
+function computeDailyEfficiencyScore(cacheHitPct: number, costPerCall: number): number {
+  // Cache: 60% → 0, 96% → 50, linear
+  const cacheRaw = ((cacheHitPct - 60) / (96 - 60)) * 50;
+  const cachePts = Math.max(0, Math.min(50, cacheRaw));
+  // Cost/call: $0.20 → 0, $0.04 → 50, linear (낮을수록 좋음)
+  const costRaw = ((0.20 - costPerCall) / (0.20 - 0.04)) * 50;
+  const costPts = Math.max(0, Math.min(50, costRaw));
+  return Math.round(cachePts + costPts);
+}
+
 function getPeriodData(raw: unknown, period: string): RawPeriodData {
   if (typeof raw !== "object" || raw === null) return {};
   const r = raw as Record<string, unknown>;
@@ -416,6 +429,117 @@ export async function GET(req: NextRequest) {
     };
   }
 
+  // ─── 일일 효율 점수 + 90일 잔디 + cache 90% streak (period 무관, 항상 현재) ───
+  // ccusage daily 의 토큰 분해 + codeburn "all".daily 의 cost/calls 를 일별로 결합.
+  const codeburnAllDaily = ((snap[0].rawJson as Record<string, unknown>).all as
+    | { daily?: Array<{ date?: string; cost?: number; calls?: number }> }
+    | undefined)?.daily ?? [];
+  const cbDailyMap: Record<string, { cost: number; calls: number }> = {};
+  for (const r of codeburnAllDaily) {
+    if (r.date) cbDailyMap[r.date] = { cost: r.cost ?? 0, calls: r.calls ?? 0 };
+  }
+  const cuDailyMap: Record<string, { input: number; cacheRead: number; cacheWrite: number }> = {};
+  for (const r of ccusageRows) {
+    if (r.date) {
+      cuDailyMap[r.date] = {
+        input: r.inputTokens ?? 0,
+        cacheRead: r.cacheReadTokens ?? 0,
+        cacheWrite: r.cacheCreationTokens ?? 0,
+      };
+    }
+  }
+
+  const SCORE_DAYS = 90;
+  const scoreSeries: Array<{ date: string; score: number | null; cacheHitPct: number | null }> = [];
+  const scoreBase = new Date();
+  for (let i = SCORE_DAYS - 1; i >= 0; i--) {
+    const d2 = new Date(scoreBase);
+    d2.setDate(d2.getDate() - i);
+    const key = d2.toISOString().slice(0, 10);
+    const cu = cuDailyMap[key];
+    const cb = cbDailyMap[key];
+    if (!cu || !cb || cb.calls === 0) {
+      scoreSeries.push({ date: key, score: null, cacheHitPct: null });
+      continue;
+    }
+    const totalDenom = cu.input + cu.cacheRead + cu.cacheWrite;
+    const dayCacheHitPct = totalDenom > 0 ? (cu.cacheRead / totalDenom) * 100 : 0;
+    const dayCostPerCall = cb.calls > 0 ? cb.cost / cb.calls : 0;
+    const dayScore = computeDailyEfficiencyScore(dayCacheHitPct, dayCostPerCall);
+    scoreSeries.push({ date: key, score: dayScore, cacheHitPct: dayCacheHitPct });
+  }
+
+  const todayKey = new Date().toISOString().slice(0, 10);
+  const yesterdayKey = (() => {
+    const d2 = new Date();
+    d2.setDate(d2.getDate() - 1);
+    return d2.toISOString().slice(0, 10);
+  })();
+  const todayEntry = scoreSeries.find((s) => s.date === todayKey);
+  const yesterdayEntry = scoreSeries.find((s) => s.date === yesterdayKey);
+  const todayScore = todayEntry?.score ?? null;
+  const yesterdayScore = yesterdayEntry?.score ?? null;
+  const scoreDelta = todayScore !== null && yesterdayScore !== null
+    ? todayScore - yesterdayScore
+    : null;
+
+  // cache hit ≥ 90% streak. 활동 없는 날은 스킵 (보류), 활동 + cache<90 = 리셋.
+  let cacheStreak = 0;
+  for (let i = scoreSeries.length - 1; i >= 0; i--) {
+    const s2 = scoreSeries[i];
+    if (s2.cacheHitPct === null) continue;
+    if (s2.cacheHitPct >= 90) cacheStreak += 1;
+    else break;
+  }
+
+  // 팀 랭킹 (이번 주 cache hit 기준). period 무관, 본인 화면에서만 노출 (sneer 방지).
+  const sevenDaysAgoKey = (() => {
+    const d2 = new Date();
+    d2.setDate(d2.getDate() - 7);
+    return d2.toISOString().slice(0, 10);
+  })();
+  const allUsersForRank = await db.select().from(users);
+  const allSnapsForRank = await db.select().from(userSnapshots);
+  const snapMapAll = new Map(allSnapsForRank.map((s2) => [s2.userId, s2]));
+  const memberCacheHits: Array<{ userId: number; cacheHitPct: number }> = [];
+  for (const u of allUsersForRank) {
+    const s2 = snapMapAll.get(u.id);
+    if (!s2) continue;
+    const ccu = (s2.rawJson as Record<string, unknown>).ccusageDaily as
+      | { daily?: Array<{ date?: string; inputTokens?: number; cacheReadTokens?: number; cacheCreationTokens?: number }> }
+      | undefined;
+    const recent = (ccu?.daily ?? []).filter((d) => d.date && d.date >= sevenDaysAgoKey);
+    const tRead = recent.reduce((s3, d) => s3 + (d.cacheReadTokens ?? 0), 0);
+    const tIn = recent.reduce((s3, d) => s3 + (d.inputTokens ?? 0), 0);
+    const tWrite = recent.reduce((s3, d) => s3 + (d.cacheCreationTokens ?? 0), 0);
+    const denom = tRead + tIn + tWrite;
+    if (denom === 0) continue;
+    memberCacheHits.push({ userId: u.id, cacheHitPct: (tRead / denom) * 100 });
+  }
+  memberCacheHits.sort((a, b) => b.cacheHitPct - a.cacheHitPct);
+  const myRankIdx = memberCacheHits.findIndex((m) => m.userId === user[0].id);
+  const myCacheHitWeek = myRankIdx >= 0 ? memberCacheHits[myRankIdx].cacheHitPct : null;
+  const teamAvgCacheHitWeek = memberCacheHits.length > 0
+    ? memberCacheHits.reduce((s2, m) => s2 + m.cacheHitPct, 0) / memberCacheHits.length
+    : 0;
+  const teamRank = myRankIdx >= 0 && myCacheHitWeek !== null
+    ? {
+        position: myRankIdx + 1,
+        total: memberCacheHits.length,
+        selfCacheHitPct: myCacheHitWeek,
+        teamAvgCacheHitPct: teamAvgCacheHitWeek,
+      }
+    : null;
+
+  const efficiencyScore = {
+    today: todayScore,
+    yesterday: yesterdayScore,
+    delta: scoreDelta,
+    streak: cacheStreak,
+    daily: scoreSeries,
+    teamRank,
+  };
+
   // Apply ccusage-corrected cost to overview-derived metrics
   const finalCost = correctedTotalCost ?? cost;
   const finalCostPerCall = calls > 0 ? finalCost / calls : 0;
@@ -562,5 +686,6 @@ export async function GET(req: NextRequest) {
     availableSnapshots,
     snapshot: snapshotInfo,
     blocks,
+    efficiencyScore,
   });
 }
