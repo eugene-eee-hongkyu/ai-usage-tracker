@@ -169,6 +169,66 @@ function scoreToLevel(score: number | null): 0 | 1 | 2 | 3 | 4 {
   return 1;
 }
 
+function scoreHexColor(score: number | null): string {
+  if (score === null) return "#525252";
+  if (score >= 90) return "#10b981";
+  if (score >= 70) return "#84cc16";
+  if (score >= 40) return "#f97316";
+  return "#ef4444";
+}
+
+// Whoop / Apple Watch 패턴의 원형 게이지. 5초 테스트 — 색·각도만으로 즉시 판단.
+function ScoreGauge({ score }: { score: number | null }) {
+  const size = 132;
+  const stroke = 10;
+  const r = (size - stroke) / 2;
+  const cx = size / 2;
+  const cy = size / 2;
+  const C = 2 * Math.PI * r;
+  const value = score ?? 0;
+  const dash = (value / 100) * C;
+  const color = scoreHexColor(score);
+  return (
+    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} aria-label={`효율 점수 ${score ?? "데이터 없음"}`}>
+      <g transform={`rotate(-90 ${cx} ${cy})`}>
+        <circle cx={cx} cy={cy} r={r} fill="none" stroke="#1e293b" strokeWidth={stroke} />
+        {score !== null && (
+          <circle
+            cx={cx} cy={cy} r={r}
+            fill="none"
+            stroke={color}
+            strokeWidth={stroke}
+            strokeDasharray={`${dash} ${C}`}
+            strokeLinecap="round"
+          />
+        )}
+      </g>
+      <text
+        x={cx} y={cy - 2}
+        textAnchor="middle" dominantBaseline="middle"
+        fill={color}
+        fontSize={size * 0.34}
+        fontWeight={700}
+        fontFamily="ui-monospace, SFMono-Regular, Menlo, monospace"
+      >{score ?? "─"}</text>
+      <text
+        x={cx} y={cy + size * 0.22}
+        textAnchor="middle" dominantBaseline="middle"
+        fill="#737373"
+        fontSize={size * 0.09}
+        fontFamily="ui-monospace, SFMono-Regular, Menlo, monospace"
+      >/ 100</text>
+    </svg>
+  );
+}
+
+function rankMedal(position: number): string {
+  if (position === 1) return "🥇";
+  if (position === 2) return "🥈";
+  if (position === 3) return "🥉";
+  return "";
+}
+
 interface EfficiencyScoreSectionProps {
   score: EfficiencyScoreSummary;
 }
@@ -180,95 +240,92 @@ function EfficiencyScoreSection({ score }: EfficiencyScoreSectionProps) {
     level: scoreToLevel(d.score),
   }));
   // 점수 구간별 색 — 빨강(경고) / 주황(개선) / 라임(양호) / 에메랄드(탁월).
-  // level 0 = 회색 (활동 없음). 동일 색상 시스템을 잔디·라벨에 일관 사용.
+  // level 0 = 회색 (활동 없음). scoreHexColor() 와 동일 팔레트.
   const theme = { dark: ["#1e293b", "#7f1d1d", "#9a3412", "#65a30d", "#10b981"] as [string, string, string, string, string] };
 
-  const todayDisplay = score.today === null
-    ? <span className="text-neutral-600 text-5xl font-mono font-bold">─</span>
-    : <span className={`text-5xl font-mono font-bold ${scoreColor(score.today)}`}>{score.today}</span>;
+  const deltaNode = score.delta === null ? null
+    : score.delta > 0 ? <span className="text-emerald-400">↑ +{score.delta}</span>
+    : score.delta < 0 ? <span className="text-rose-400">↓ {score.delta}</span>
+    : <span className="text-neutral-500">─ 0</span>;
 
   return (
     <div data-testid="dash-efficiency-score" className="bg-neutral-950 border-b border-neutral-800">
-      <div className="max-w-6xl mx-auto px-4 py-5">
-        {/* Top row: 점수 / streak / 팀 랭크 */}
-        <div className="flex flex-wrap items-end gap-x-8 gap-y-3 mb-4">
-          {/* 오늘 점수 */}
-          <div data-testid="score-today" className="flex flex-col">
-            <span className="text-[10px] font-mono text-neutral-500 uppercase tracking-wider mb-1">오늘 효율 점수</span>
-            <div className="flex items-baseline gap-2">
-              {todayDisplay}
-              {score.today !== null && (
-                <>
-                  <span className="text-sm font-mono text-neutral-500">/ 100</span>
-                  {score.delta !== null && score.delta !== 0 && (
-                    <span className={`text-xs font-mono ${score.delta > 0 ? "text-emerald-400" : "text-rose-400"}`}>
-                      {score.delta > 0 ? "↑" : "↓"} 어제 {score.delta > 0 ? "+" : ""}{score.delta}
-                    </span>
-                  )}
-                  {score.delta === 0 && (
-                    <span className="text-xs font-mono text-neutral-500">─ 어제와 동일</span>
-                  )}
-                </>
-              )}
+      <div className="max-w-6xl mx-auto px-4 py-4">
+        <div className="grid grid-cols-12 gap-x-6 items-center">
+          {/* Hero: 원형 게이지 (3 cols) — 5초 테스트 통과용 단일 focal point */}
+          <div data-testid="score-today" className="col-span-12 sm:col-span-3 flex flex-col items-center">
+            <ScoreGauge score={score.today} />
+            <div className="mt-1.5 flex items-center gap-1.5 text-[11px] font-mono">
+              <span className={`font-bold ${scoreColor(score.today)}`}>{scoreLabel(score.today)}</span>
+              {deltaNode && <span className="text-neutral-500">·</span>}
+              {deltaNode}
             </div>
-            <span className={`text-[10px] font-mono mt-0.5 ${scoreColor(score.today)}`}>
-              {scoreLabel(score.today)} · cache 70 + cost 30 (Opus 친화)
-            </span>
+            <span className="text-[10px] font-mono text-neutral-600 mt-0.5">cache 70 + cost 30 · Opus 친화</span>
           </div>
 
-          {/* Streak */}
-          <div data-testid="score-streak" className="flex flex-col">
-            <span className="text-[10px] font-mono text-neutral-500 uppercase tracking-wider mb-1">cache hit ≥ 90% Streak</span>
-            <div className="flex items-baseline gap-2">
-              <span className="text-3xl">🔥</span>
-              <span className={`text-3xl font-mono font-bold ${score.streak >= 7 ? "text-orange-400" : score.streak >= 1 ? "text-neutral-200" : "text-neutral-600"}`}>
-                {score.streak}
-              </span>
-              <span className="text-sm font-mono text-neutral-500">일</span>
-            </div>
-            <span className="text-[10px] font-mono text-neutral-600 mt-0.5">
-              {score.streak === 0 ? "오늘 cache 90%+ 달성하면 시작" : "활동 없는 날은 자동 보류"}
-            </span>
-          </div>
-
-          {/* 팀 랭크 */}
-          {score.teamRank && (
-            <div data-testid="score-team-rank" className="flex flex-col">
-              <span className="text-[10px] font-mono text-neutral-500 uppercase tracking-wider mb-1">이번주 팀 cache hit 랭크</span>
-              <div className="flex items-baseline gap-2">
-                <span className="text-3xl font-mono font-bold text-sky-400">
-                  {score.teamRank.position}
-                </span>
-                <span className="text-sm font-mono text-neutral-500">/ {score.teamRank.total}명</span>
+          {/* 보조: streak + team rank 세로 stack (3 cols) */}
+          <div className="col-span-12 sm:col-span-3 flex flex-col gap-3 py-2">
+            {/* Streak */}
+            <div data-testid="score-streak" className="flex items-center gap-3">
+              <span className="text-3xl leading-none">🔥</span>
+              <div className="flex flex-col">
+                <div className="flex items-baseline gap-1.5">
+                  <span className={`text-2xl font-mono font-bold leading-none ${score.streak >= 7 ? "text-orange-400" : score.streak >= 1 ? "text-neutral-200" : "text-neutral-600"}`}>
+                    {score.streak}
+                  </span>
+                  <span className="text-xs font-mono text-neutral-500">일</span>
+                </div>
+                <span className="text-[10px] font-mono text-neutral-500 mt-0.5">cache 90%+ streak</span>
               </div>
-              <span className="text-[10px] font-mono text-neutral-600 mt-0.5">
-                나 {score.teamRank.selfCacheHitPct.toFixed(1)}% · 팀평균 {score.teamRank.teamAvgCacheHitPct.toFixed(1)}%
-              </span>
             </div>
-          )}
-        </div>
 
-        {/* 90일 잔디 */}
-        <div data-testid="score-grass" className="mt-2">
-          <div className="flex items-center justify-between mb-1.5">
-            <span className="text-[10px] font-mono text-neutral-500 uppercase tracking-wider">최근 90일 효율 잔디</span>
-            <div className="flex items-center gap-3 text-[10px] font-mono text-neutral-500">
-              <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm" style={{ background: theme.dark[1] }} />경고</span>
-              <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm" style={{ background: theme.dark[2] }} />개선</span>
-              <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm" style={{ background: theme.dark[3] }} />양호</span>
-              <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm" style={{ background: theme.dark[4] }} />탁월</span>
-            </div>
+            {/* 팀 랭크 */}
+            {score.teamRank ? (
+              <div data-testid="score-team-rank" className="flex items-center gap-3">
+                <span className="text-3xl leading-none">{rankMedal(score.teamRank.position) || "🏅"}</span>
+                <div className="flex flex-col">
+                  <div className="flex items-baseline gap-1.5">
+                    <span className="text-2xl font-mono font-bold leading-none text-sky-300">
+                      {score.teamRank.position}
+                    </span>
+                    <span className="text-xs font-mono text-neutral-500">/ {score.teamRank.total}명</span>
+                  </div>
+                  <span className="text-[10px] font-mono text-neutral-500 mt-0.5">
+                    나 {score.teamRank.selfCacheHitPct.toFixed(1)}% · 팀 {score.teamRank.teamAvgCacheHitPct.toFixed(1)}%
+                  </span>
+                </div>
+              </div>
+            ) : (
+              <div className="flex items-center gap-3 opacity-60">
+                <span className="text-3xl leading-none">🏅</span>
+                <span className="text-[11px] font-mono text-neutral-600">팀 랭크 데이터 없음</span>
+              </div>
+            )}
           </div>
-          <ActivityCalendar
-            data={calData}
-            colorScheme="dark"
-            theme={theme}
-            labels={{ legend: { less: "낮음", more: "탁월" } }}
-            showWeekdayLabels
-            blockSize={11}
-            showTotalCount={false}
-            renderColorLegend={() => <></>}
-          />
+
+          {/* 잔디 (6 cols) — F-pattern 우측, 데이터로 dead space 채움 */}
+          <div data-testid="score-grass" className="col-span-12 sm:col-span-6 flex flex-col gap-1">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-mono text-neutral-500 uppercase tracking-wider">최근 90일 효율</span>
+              <div className="flex items-center gap-2.5 text-[10px] font-mono text-neutral-500">
+                <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm" style={{ background: theme.dark[1] }} />경고</span>
+                <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm" style={{ background: theme.dark[2] }} />개선</span>
+                <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm" style={{ background: theme.dark[3] }} />양호</span>
+                <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm" style={{ background: theme.dark[4] }} />탁월</span>
+              </div>
+            </div>
+            <ActivityCalendar
+              data={calData}
+              colorScheme="dark"
+              theme={theme}
+              labels={{ legend: { less: "낮음", more: "탁월" } }}
+              showWeekdayLabels
+              blockSize={10}
+              blockMargin={2}
+              showTotalCount={false}
+              renderColorLegend={() => <></>}
+            />
+          </div>
         </div>
       </div>
     </div>
