@@ -3,12 +3,15 @@ import {
   serial,
   text,
   integer,
+  bigint,
   real,
   timestamp,
   jsonb,
   date,
   uniqueIndex,
+  index,
 } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 
 export const users = pgTable("users", {
   id: serial("id").primaryKey(),
@@ -62,6 +65,33 @@ export const periodSnapshots = pgTable(
   },
   (t) => ({
     uniq: uniqueIndex("period_snapshots_uniq").on(t.userId, t.periodType, t.periodStart),
+  })
+);
+
+// ccusage blocks --json 을 5h 빌링 블록 단위로 누적. wall-clock 분 단위 분석을
+// 위한 유일한 데이터 원천 (ccusage daily 는 날짜 기준이라 분 단위 정보 없음).
+// gap 블록(isGap=true)·actualEndTime null 인 미종료 active 는 저장하지 않음.
+// 동일 block_id 가 재수집되면 ended_at/minutes/totals 를 갱신.
+export const userBlocks = pgTable(
+  "user_blocks",
+  {
+    id: serial("id").primaryKey(),
+    userId: integer("user_id")
+      .notNull()
+      .references(() => users.id),
+    blockId: text("block_id").notNull(),
+    startedAt: timestamp("started_at", { withTimezone: true }).notNull(),
+    endedAt: timestamp("ended_at", { withTimezone: true }).notNull(),
+    minutes: integer("minutes").notNull(),
+    entries: integer("entries").notNull().default(0),
+    totalTokens: bigint("total_tokens", { mode: "number" }).notNull().default(0),
+    costUsd: real("cost_usd").notNull().default(0),
+    models: jsonb("models").notNull().default(sql`'[]'::jsonb`),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (t) => ({
+    userBlockUniq: uniqueIndex("user_blocks_user_block_uniq").on(t.userId, t.blockId),
+    userStartedIdx: index("user_blocks_user_started_idx").on(t.userId, t.startedAt),
   })
 );
 

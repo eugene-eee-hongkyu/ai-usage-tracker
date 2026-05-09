@@ -1,7 +1,28 @@
 import { NextRequest, NextResponse } from "next/server";
-import { db, userSnapshots, users, periodSnapshots } from "@/lib/db";
+import { db, userSnapshots, users, periodSnapshots, userBlocks } from "@/lib/db";
 import { and, eq, lt, sql } from "drizzle-orm";
 import crypto from "crypto";
+
+interface CcusageBlockRow {
+  id?: string;
+  startTime?: string;
+  endTime?: string;
+  actualEndTime?: string | null;
+  isActive?: boolean;
+  isGap?: boolean;
+  entries?: number;
+  totalTokens?: number;
+  costUSD?: number;
+  models?: string[];
+}
+
+function extractBlocks(body: unknown): CcusageBlockRow[] {
+  if (typeof body !== "object" || body === null) return [];
+  const b = body as Record<string, unknown>;
+  const cb = b.ccusageBlocks as { blocks?: unknown[] } | undefined;
+  if (!cb || !Array.isArray(cb.blocks)) return [];
+  return cb.blocks.filter((x): x is CcusageBlockRow => typeof x === "object" && x !== null);
+}
 
 interface CodeburnActivity {
   name?: string;
@@ -328,6 +349,55 @@ export async function POST(req: NextRequest) {
         eq(periodSnapshots.userId, userRow[0].id),
         eq(periodSnapshots.periodType, "daily"),
         lt(periodSnapshots.periodStart, retentionDayStart),
+      )
+    );
+
+  // ccusage blocks upsert. gap 블록 + actualEndTime null 인 active 는 스킵.
+  // 동일 block_id 재수집 시 ended_at/minutes/totals 를 갱신 (active 블록이
+  // 시간이 지나며 자라는 케이스 대응).
+  const blocks = extractBlocks(body);
+  for (const blk of blocks) {
+    if (blk.isGap) continue;
+    if (!blk.id || !blk.startTime || !blk.actualEndTime) continue;
+    const startedAt = new Date(blk.startTime);
+    const endedAt = new Date(blk.actualEndTime);
+    if (isNaN(startedAt.getTime()) || isNaN(endedAt.getTime())) continue;
+    const minutes = Math.max(0, Math.floor((endedAt.getTime() - startedAt.getTime()) / 60_000));
+    await db
+      .insert(userBlocks)
+      .values({
+        userId: userRow[0].id,
+        blockId: blk.id,
+        startedAt,
+        endedAt,
+        minutes,
+        entries: blk.entries ?? 0,
+        totalTokens: blk.totalTokens ?? 0,
+        costUsd: blk.costUSD ?? 0,
+        models: blk.models ?? [],
+        updatedAt: now,
+      })
+      .onConflictDoUpdate({
+        target: [userBlocks.userId, userBlocks.blockId],
+        set: {
+          endedAt: sql`excluded.ended_at`,
+          minutes: sql`excluded.minutes`,
+          entries: sql`excluded.entries`,
+          totalTokens: sql`excluded.total_tokens`,
+          costUsd: sql`excluded.cost_usd`,
+          models: sql`excluded.models`,
+          updatedAt: sql`excluded.updated_at`,
+        },
+      });
+  }
+
+  // 90일 이전 블록은 정리 (대시보드는 30일 윈도우, 여유 있게 90일 보존)
+  await db
+    .delete(userBlocks)
+    .where(
+      and(
+        eq(userBlocks.userId, userRow[0].id),
+        lt(userBlocks.startedAt, new Date(Date.now() - 90 * 86_400_000)),
       )
     );
 

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import { db, userSnapshots, users, dailyVisits } from "@/lib/db";
+import { db, userSnapshots, users, dailyVisits, userBlocks } from "@/lib/db";
 import { computeEfficiencyScore } from "@/lib/rules";
 import { isAdmin } from "@/lib/admin";
 import { gte } from "drizzle-orm";
@@ -135,6 +135,38 @@ export async function GET(req: NextRequest) {
     visitAgg.set(r.userId, cur);
   }
 
+  // user_blocks 기반 멤버별 분당 토큰 집계. period 별 윈도우는 dashboard 와 동일.
+  // today 면 빈 Map (효율성 테이블에 0 표시되거나 ─ 으로 표기).
+  const blocksWindowStart = (() => {
+    const now = new Date();
+    switch (period) {
+      case "today": return null;
+      case "month": return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+      case "8days": return new Date(now.getTime() - 8 * 86_400_000);
+      case "30days": return new Date(now.getTime() - 30 * 86_400_000);
+      case "all": return new Date(now.getTime() - 90 * 86_400_000);
+      default: return new Date(now.getTime() - 30 * 86_400_000);
+    }
+  })();
+  const blockRows = blocksWindowStart
+    ? await db
+        .select({
+          userId: userBlocks.userId,
+          minutes: userBlocks.minutes,
+          totalTokens: userBlocks.totalTokens,
+        })
+        .from(userBlocks)
+        .where(gte(userBlocks.startedAt, blocksWindowStart))
+    : [];
+  const blocksAgg = new Map<number, { totalMinutes: number; totalTokens: number; count: number }>();
+  for (const r of blockRows) {
+    const cur = blocksAgg.get(r.userId) ?? { totalMinutes: 0, totalTokens: 0, count: 0 };
+    cur.totalMinutes += r.minutes;
+    cur.totalTokens += Number(r.totalTokens ?? 0);
+    cur.count += 1;
+    blocksAgg.set(r.userId, cur);
+  }
+
   // Accumulators for team-level aggregations
   const activityAgg = new Map<string, { totalCost: number; totalTurns: number; members: Set<number> }>();
   const dailyMemberMap = new Map<string, Record<string, number>>();
@@ -199,6 +231,7 @@ export async function GET(req: NextRequest) {
           ccusageMissing,
           monthVisits,
           avgDwellSec,
+          tokensPerMinute: null,
         };
       }
 
@@ -306,6 +339,11 @@ export async function GET(req: NextRequest) {
         });
       }
 
+      const blocksOfUser = blocksAgg.get(u.id);
+      const tokensPerMinute = blocksOfUser && blocksOfUser.totalMinutes > 0
+        ? Math.round(blocksOfUser.totalTokens / blocksOfUser.totalMinutes)
+        : null;
+
       return {
         userId: u.id,
         name: u.name,
@@ -324,6 +362,7 @@ export async function GET(req: NextRequest) {
         ccusageMissing,
         monthVisits,
         avgDwellSec,
+        tokensPerMinute,
       };
     })
     .filter((m): m is NonNullable<typeof m> => m !== null);

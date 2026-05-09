@@ -78,6 +78,21 @@ interface DashboardData {
   mcpServers: NameCalls[];
   availableSnapshots?: { weekly: SnapshotMeta[]; monthly: SnapshotMeta[]; daily?: SnapshotMeta[] };
   snapshot?: SnapshotInfo | null;
+  blocks?: BlocksSummary | null;
+}
+
+interface BlocksSummary {
+  count: number;
+  activeDays: number;
+  avgMinutes: number;
+  medianMinutes: number;
+  maxMinutes: number;
+  longestStartedAt: string | null;
+  tokensPerMinute: number;
+  totalMinutes: number;
+  totalTokens: number;
+  distribution: { lt30: number; m30to60: number; h1to2: number; h2to4: number; h4plus: number };
+  tooFewData: boolean;
 }
 
 const PERIOD_LABELS: Record<Period, string> = {
@@ -250,6 +265,20 @@ function fmtTokens(n: number): string {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
   if (n >= 1_000) return `${(n / 1_000).toFixed(1)}k`;
   return String(n);
+}
+
+function fmtMinutes(n: number): string {
+  if (n < 60) return `${n}m`;
+  const h = Math.floor(n / 60);
+  const m = n % 60;
+  return m === 0 ? `${h}h` : `${h}h ${m}m`;
+}
+
+function fmtBlockDate(iso: string): string {
+  const dt = new Date(iso);
+  if (isNaN(dt.getTime())) return "";
+  const wd = ["일", "월", "화", "수", "목", "금", "토"][dt.getDay()];
+  return `${dt.getMonth() + 1}/${dt.getDate()} (${wd})`;
 }
 
 function formatWeekRange(periodStart: string): string {
@@ -1190,43 +1219,84 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
           </div>
         </div>
 
-        {/* Row 6: MCP Servers */}
+        {/* Row 6: Active Blocks + Dwell Heatmap */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
 
-          {/* MCP Servers */}
-          <div data-testid="dash-card-mcp" className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-cyan-500 rounded">
-            <div className="px-3 py-2 border-b border-neutral-800 flex items-center justify-between">
-              <span className="text-xs font-mono font-bold text-cyan-400 uppercase tracking-wider">MCP Servers</span>
-              {(data.mcpServers ?? []).length > 15 && (
-                <span className="flex items-center gap-1 text-[10px] font-mono bg-cyan-900/40 text-cyan-300 border border-cyan-700/60 rounded px-1.5 py-0.5">
-                  ↕ scroll · {(data.mcpServers ?? []).length}
-                </span>
-              )}
-            </div>
-            <div className="p-3">
-              <div className="flex text-xs text-neutral-600 font-mono mb-1.5">
-                <span className="flex-1">server</span>
-                <span className="w-16 text-right">calls</span>
+          {/* Active Blocks pattern. ccusage blocks --json 기반 wall-clock 집계.
+              period === "today" 면 카드 자체 렌더링 안 함 (blocks=null).
+              count < 5 면 tooFewData=true → 안내 문구만 표시. */}
+          {period !== "today" && data.blocks ? (
+            <div data-testid="dash-card-active-blocks" className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-sky-500 rounded">
+              <div className="px-3 py-2 border-b border-neutral-800">
+                <span className="text-xs font-mono font-bold text-sky-400 uppercase tracking-wider">Active Blocks</span>
               </div>
-              <div className={(data.mcpServers ?? []).length > 15 ? "overflow-y-auto max-h-[300px] no-scrollbar" : ""}>
-                <div className="space-y-1">
-                  {(data.mcpServers ?? []).map((m) => {
-                    const maxCalls = Math.max(...(data.mcpServers ?? []).map((x) => x.calls), 0.01);
-                    return (
-                      <div key={m.name} className="flex items-center gap-1.5 text-xs font-mono">
-                        <div className="w-16 h-1.5 bg-neutral-800 rounded overflow-hidden shrink-0">
-                          <div className="h-full bg-cyan-500 rounded" style={{ width: `${(m.calls / maxCalls) * 100}%` }} />
-                        </div>
-                        <span className="flex-1 text-neutral-300 truncate">{m.name}</span>
-                        <span className="w-16 text-blue-400 text-right">{m.calls.toLocaleString()}</span>
+              <div className="p-3">
+                {data.blocks.tooFewData ? (
+                  <p data-testid="dash-active-blocks-empty" className="text-neutral-500 text-xs font-mono">데이터 부족 — 블록 5개 이상 누적되면 표시됩니다.</p>
+                ) : (
+                  <>
+                    <div className="space-y-1.5 text-xs font-mono">
+                      <div className="flex justify-between items-center">
+                        <span className="text-neutral-400">활성 블록</span>
+                        <span>
+                          <span className="text-neutral-200">{data.blocks.count}</span>
+                          <span className="text-neutral-500"> ({data.blocks.activeDays}일)</span>
+                        </span>
                       </div>
-                    );
-                  })}
-                  {(data.mcpServers ?? []).length === 0 && <p className="text-neutral-600 text-xs font-mono">no data</p>}
-                </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-neutral-400">평균 길이</span>
+                        <span>
+                          <span className="text-neutral-200">{fmtMinutes(data.blocks.avgMinutes)}</span>
+                          <span className="text-neutral-500"> (median {fmtMinutes(data.blocks.medianMinutes)})</span>
+                        </span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-neutral-400">분당 토큰</span>
+                        <span className="text-sky-400">{fmtTokens(data.blocks.tokensPerMinute)}</span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-neutral-400">최장 블록</span>
+                        <span>
+                          <span className="text-neutral-200">{fmtMinutes(data.blocks.maxMinutes)}</span>
+                          {data.blocks.longestStartedAt && (
+                            <span className="text-neutral-500"> ({fmtBlockDate(data.blocks.longestStartedAt)})</span>
+                          )}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="mt-3 pt-3 border-t border-neutral-800">
+                      <p className="text-[10px] text-neutral-500 mb-2 uppercase tracking-wider">길이 분포</p>
+                      <div className="space-y-1 text-[11px] font-mono">
+                        {(() => {
+                          const dist = data.blocks.distribution;
+                          const buckets: Array<[string, number]> = [
+                            ["<30m", dist.lt30],
+                            ["30m-1h", dist.m30to60],
+                            ["1-2h", dist.h1to2],
+                            ["2-4h", dist.h2to4],
+                            ["4h+", dist.h4plus],
+                          ];
+                          const maxV = Math.max(...buckets.map(([, v]) => v), 1);
+                          const med = data.blocks!.medianMinutes;
+                          const medBucket = med < 30 ? 0 : med < 60 ? 1 : med < 120 ? 2 : med < 240 ? 3 : 4;
+                          return buckets.map(([label, v], i) => (
+                            <div key={label} className="flex items-center gap-2">
+                              <span className="w-14 text-neutral-500">{label}</span>
+                              <div className="flex-1 h-2 bg-neutral-800 rounded overflow-hidden">
+                                <div className="h-full bg-sky-500/70 rounded" style={{ width: `${(v / maxV) * 100}%` }} />
+                              </div>
+                              <span className="w-8 text-right text-neutral-400">{v}</span>
+                              <span className="w-16 text-[10px] text-sky-400">{i === medBucket ? "← median" : ""}</span>
+                            </div>
+                          ));
+                        })()}
+                      </div>
+                    </div>
+                  </>
+                )}
               </div>
             </div>
-          </div>
+          ) : <div />}
 
           {/* Engagement heatmap (lower bar 가설 검증 + 깊이 측정).
               일자별 총 머문 시간 (분) 으로 색 인코딩.
@@ -1276,6 +1346,46 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
               </div>
             );
           })() : <div />}
+        </div>
+
+        {/* Row 7: MCP Servers (반쪽만, 우측은 빈칸 — Active Blocks 추가로 한 칸 밀려남) */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+
+          {/* MCP Servers */}
+          <div data-testid="dash-card-mcp" className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-cyan-500 rounded">
+            <div className="px-3 py-2 border-b border-neutral-800 flex items-center justify-between">
+              <span className="text-xs font-mono font-bold text-cyan-400 uppercase tracking-wider">MCP Servers</span>
+              {(data.mcpServers ?? []).length > 15 && (
+                <span className="flex items-center gap-1 text-[10px] font-mono bg-cyan-900/40 text-cyan-300 border border-cyan-700/60 rounded px-1.5 py-0.5">
+                  ↕ scroll · {(data.mcpServers ?? []).length}
+                </span>
+              )}
+            </div>
+            <div className="p-3">
+              <div className="flex text-xs text-neutral-600 font-mono mb-1.5">
+                <span className="flex-1">server</span>
+                <span className="w-16 text-right">calls</span>
+              </div>
+              <div className={(data.mcpServers ?? []).length > 15 ? "overflow-y-auto max-h-[300px] no-scrollbar" : ""}>
+                <div className="space-y-1">
+                  {(data.mcpServers ?? []).map((m) => {
+                    const maxCalls = Math.max(...(data.mcpServers ?? []).map((x) => x.calls), 0.01);
+                    return (
+                      <div key={m.name} className="flex items-center gap-1.5 text-xs font-mono">
+                        <div className="w-16 h-1.5 bg-neutral-800 rounded overflow-hidden shrink-0">
+                          <div className="h-full bg-cyan-500 rounded" style={{ width: `${(m.calls / maxCalls) * 100}%` }} />
+                        </div>
+                        <span className="flex-1 text-neutral-300 truncate">{m.name}</span>
+                        <span className="w-16 text-blue-400 text-right">{m.calls.toLocaleString()}</span>
+                      </div>
+                    );
+                  })}
+                  {(data.mcpServers ?? []).length === 0 && <p className="text-neutral-600 text-xs font-mono">no data</p>}
+                </div>
+              </div>
+            </div>
+          </div>
+
         </div>
 
       </main>

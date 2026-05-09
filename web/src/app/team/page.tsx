@@ -61,6 +61,7 @@ interface MemberStat {
   ccusageMissing?: boolean;
   monthVisits: number;        // 이번달 (UTC) 방문 횟수
   avgDwellSec: number;        // 이번달 평균 체류 (초)
+  tokensPerMinute: number | null;  // user_blocks 기반 분당 토큰. 블록 없으면 null
 }
 
 interface TeamActivity {
@@ -548,6 +549,7 @@ export default function TeamPage() {
                         <th className="text-right text-neutral-500 pb-2 px-3 font-normal">1-shot</th>
                         <th className="text-right text-neutral-500 pb-2 px-3 font-normal">$/sess</th>
                         <th className="text-right text-neutral-500 pb-2 px-3 font-normal">out/in</th>
+                        <th className="text-right text-neutral-500 pb-2 px-3 font-normal" title="활성 블록 기준 분당 토큰 (ccusage blocks)">tok/min</th>
                         <th className="text-right text-neutral-500 pb-2 pl-3 font-normal">종합</th>
                       </tr>
                     </thead>
@@ -580,6 +582,11 @@ export default function TeamPage() {
                             <GradeCell testid={`team-eff-out-in-${m.userId}`} grade={outputInputGrade(m.outputInputRatio)}>
                               {m.outputInputRatio.toFixed(1)}×
                             </GradeCell>
+                            <td data-testid={`team-eff-tokmin-${m.userId}`} className="py-2.5 px-3 text-right tabular-nums">
+                              {m.tokensPerMinute != null
+                                ? <span className="text-sky-300">{fmtTokens(m.tokensPerMinute)}</span>
+                                : <span className="text-neutral-600">─</span>}
+                            </td>
                             <td data-testid={`team-eff-overall-${m.userId}`} className="py-2.5 pl-3 text-right">
                               <GradePill grade={grade} />
                             </td>

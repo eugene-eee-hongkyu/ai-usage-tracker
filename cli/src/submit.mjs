@@ -164,6 +164,29 @@ function spawnCcusageDaily() {
   });
 }
 
+// ccusage blocks — wall-clock 분 단위 분석용 5h 빌링 블록 데이터.
+// daily가 성공하면 blocks도 보통 성공함. 실패해도 daily 진단 메시지가 이미
+// 있으니 blocks 별도 로깅은 최소화 (성공/실패만 한 줄).
+function spawnCcusageBlocks() {
+  return new Promise((resolve) => {
+    const stdoutChunks = [];
+    const proc = spawn("ccusage", ["blocks", "--json"], {
+      stdio: ["ignore", "pipe", "pipe"],
+      shell: true,
+      env: childEnv,
+    });
+    proc.stdout.on("data", (d) => stdoutChunks.push(d));
+    proc.on("close", (code) => {
+      if (code !== 0) return resolve(null);
+      try {
+        resolve(JSON.parse(Buffer.concat(stdoutChunks).toString("utf8").trim()));
+      } catch { resolve(null); }
+    });
+    proc.on("error", () => resolve(null));
+    setTimeout(() => { proc.kill(); resolve(null); }, 600_000);
+  });
+}
+
 async function main() {
   if (!acquireLock()) {
     log("lock skip — another instance running");
@@ -181,13 +204,15 @@ async function main() {
 
     let report = {};
     try {
-      log(`spawning codeburn x${PERIODS.length} + ccusage...`);
+      log(`spawning codeburn x${PERIODS.length} + ccusage daily + ccusage blocks...`);
       const settled = await Promise.allSettled([
         ...PERIODS.map((p) => spawnCodeburn(p)),
         spawnCcusageDaily(),
+        spawnCcusageBlocks(),
       ]);
       const cbResults = settled.slice(0, PERIODS.length);
       const ccResult = settled[PERIODS.length];
+      const blocksResult = settled[PERIODS.length + 1];
 
       const okPeriods = [];
       const failPeriods = [];
@@ -203,6 +228,12 @@ async function main() {
       const ccusageDaily = ccResult.status === "fulfilled" ? ccResult.value : null;
       if (ccusageDaily) report.ccusageDaily = ccusageDaily;
       if (ccusageStatus === "missing") report.ccusageMissing = true;
+      const ccusageBlocks = blocksResult.status === "fulfilled" ? blocksResult.value : null;
+      if (ccusageBlocks) {
+        report.ccusageBlocks = ccusageBlocks;
+        const cnt = Array.isArray(ccusageBlocks?.blocks) ? ccusageBlocks.blocks.length : 0;
+        log(`ccusage blocks ok — ${cnt} blocks`);
+      }
 
       if (okPeriods.length === 0 && !ccusageDaily) {
         log(`ERROR: all spawns failed — ${failPeriods.join(", ")}`);

@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import { db, userSnapshots, users, periodSnapshots, dailyVisits } from "@/lib/db";
-import { and, asc, desc, eq } from "drizzle-orm";
+import { db, userSnapshots, users, periodSnapshots, dailyVisits, userBlocks } from "@/lib/db";
+import { and, asc, desc, eq, gte } from "drizzle-orm";
 import { isAdmin } from "@/lib/admin";
 
 type Period = "today" | "month" | "8days" | "30days" | "all";
@@ -420,6 +420,80 @@ export async function GET(req: NextRequest) {
   const finalCost = correctedTotalCost ?? cost;
   const finalCostPerCall = calls > 0 ? finalCost / calls : 0;
 
+  // Active blocks — ccusage blocks 기반 wall-clock 집계.
+  // gap/active-without-end 는 ingest 단계에서 이미 필터됨.
+  // period 따라 윈도우 변경: today=null(미표시), month=달 시작, 8days/30days=상대,
+  // all=90일(retention 한계).
+  const blocksWindowStart = (() => {
+    const now = new Date();
+    switch (period) {
+      case "today": return null;
+      case "month": return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+      case "8days": return new Date(now.getTime() - 8 * 86_400_000);
+      case "30days": return new Date(now.getTime() - 30 * 86_400_000);
+      case "all": return new Date(now.getTime() - 90 * 86_400_000);
+      default: return new Date(now.getTime() - 30 * 86_400_000);
+    }
+  })();
+  const blockRows = blocksWindowStart
+    ? await db
+        .select()
+        .from(userBlocks)
+        .where(and(
+          eq(userBlocks.userId, user[0].id),
+          gte(userBlocks.startedAt, blocksWindowStart),
+        ))
+        .orderBy(asc(userBlocks.startedAt))
+    : [];
+
+  const minutesArr = blockRows.map((b) => b.minutes);
+  const sortedMinutes = [...minutesArr].sort((a, b) => a - b);
+  const medianMinutes = sortedMinutes.length === 0
+    ? 0
+    : sortedMinutes.length % 2
+      ? sortedMinutes[Math.floor(sortedMinutes.length / 2)]
+      : (sortedMinutes[sortedMinutes.length / 2 - 1] + sortedMinutes[sortedMinutes.length / 2]) / 2;
+  const totalBlockMinutes = minutesArr.reduce((s, m) => s + m, 0);
+  const totalBlockTokens = blockRows.reduce((s, b) => s + Number(b.totalTokens ?? 0), 0);
+  const tokensPerMinute = totalBlockMinutes > 0 ? totalBlockTokens / totalBlockMinutes : 0;
+
+  const distribution = { lt30: 0, m30to60: 0, h1to2: 0, h2to4: 0, h4plus: 0 };
+  for (const m of minutesArr) {
+    if (m < 30) distribution.lt30++;
+    else if (m < 60) distribution.m30to60++;
+    else if (m < 120) distribution.h1to2++;
+    else if (m < 240) distribution.h2to4++;
+    else distribution.h4plus++;
+  }
+
+  let longest: { minutes: number; startedAt: string | null } = { minutes: 0, startedAt: null };
+  for (const b of blockRows) {
+    if (b.minutes > longest.minutes) {
+      longest = { minutes: b.minutes, startedAt: b.startedAt.toISOString() };
+    }
+  }
+  const blockActiveDays = new Set(
+    blockRows.map((b) => b.startedAt.toISOString().slice(0, 10))
+  ).size;
+
+  // period === "today" 면 카드 자체 미표시 (blocks=null).
+  // 그 외 기간에서 블록 5개 미만이면 tooFewData=true 로 카드는 보이되 안내 문구.
+  const blocks = period === "today"
+    ? null
+    : {
+        count: blockRows.length,
+        activeDays: blockActiveDays,
+        avgMinutes: blockRows.length ? Math.round(totalBlockMinutes / blockRows.length) : 0,
+        medianMinutes: Math.round(medianMinutes),
+        maxMinutes: longest.minutes,
+        longestStartedAt: longest.startedAt,
+        tokensPerMinute: Math.round(tokensPerMinute),
+        totalMinutes: totalBlockMinutes,
+        totalTokens: totalBlockTokens,
+        distribution,
+        tooFewData: blockRows.length < 5,
+      };
+
   return NextResponse.json({
     user: { name: user[0].name, lastSyncedAt: user[0].lastSyncedAt, timezone: user[0].timezone ?? null },
     overview: { cost: finalCost, sessions, calls, cacheHitPct, oneShotRate, activeDays, costPerCall: finalCostPerCall, outputInputRatio },
@@ -436,5 +510,6 @@ export async function GET(req: NextRequest) {
     mcpServers: toNameCalls(d.mcpServers ?? []),
     availableSnapshots,
     snapshot: snapshotInfo,
+    blocks,
   });
 }
