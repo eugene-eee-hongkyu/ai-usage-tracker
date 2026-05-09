@@ -16,6 +16,7 @@ var KEYTAR_ACCOUNT = "api-key";
 var CLAUDE_SETTINGS_PATH = path.join(os.homedir(), ".claude", "settings.json");
 var STABLE_DIR = path.join(os.homedir(), ".primus-usage-tracker");
 var STABLE_SUBMIT = path.join(STABLE_DIR, "submit.mjs");
+var STABLE_HISTORICAL = path.join(STABLE_DIR, "historical.mjs");
 var API_KEY_FALLBACK = path.join(os.homedir(), ".primus-usage-key");
 var CLI_PORT = 9988;
 var LAUNCHD_PLIST = process.platform === "darwin" ? path.join(os.homedir(), "Library", "LaunchAgents", "com.primus.usage-tracker.daily.plist") : null;
@@ -305,6 +306,21 @@ function runImmediateSync(apiKey) {
   child.unref();
   console.log("\uD83D\uDCE4 현재 데이터 즉시 수집 시작 (백그라운드)");
 }
+function runHistoricalBackfill(apiKey) {
+  if (!fs.existsSync(STABLE_HISTORICAL))
+    return;
+  const child = spawn(process.execPath, [STABLE_HISTORICAL], {
+    detached: true,
+    stdio: "ignore",
+    env: {
+      ...process.env,
+      USAGE_TRACKER_API_KEY: apiKey,
+      USAGE_TRACKER_URL: SERVER_URL
+    }
+  });
+  child.unref();
+  console.log("\uD83D\uDCDA 과거 8주 + 12개월 historical backfill 시작 (백그라운드)");
+}
 function checkCodeburn() {
   try {
     const cmd = process.platform === "win32" ? "where codeburn" : "which codeburn";
@@ -406,9 +422,11 @@ async function runRepair() {
   fs.writeFileSync(fallbackPath, apiKey, { mode: 384 });
   fs.mkdirSync(STABLE_DIR, { recursive: true });
   fs.copyFileSync(path.join(__dirname2, "submit.mjs"), STABLE_SUBMIT);
+  fs.copyFileSync(path.join(__dirname2, "historical.mjs"), STABLE_HISTORICAL);
   removeHook();
   registerDailySchedule(STABLE_SUBMIT);
   runImmediateSync(apiKey);
+  runHistoricalBackfill(apiKey);
   console.log(`
 ✨ 복구 완료!`);
   console.log("   백그라운드에서 자동으로 사용량이 수집됩니다.");
@@ -453,9 +471,11 @@ async function runInit() {
   console.log("\uD83D\uDD11 API 키 저장 완료");
   fs.mkdirSync(STABLE_DIR, { recursive: true });
   fs.copyFileSync(path.join(__dirname2, "submit.mjs"), STABLE_SUBMIT);
+  fs.copyFileSync(path.join(__dirname2, "historical.mjs"), STABLE_HISTORICAL);
   removeHook();
   registerDailySchedule(STABLE_SUBMIT);
   runBackfill(apiKey);
+  runHistoricalBackfill(apiKey);
   console.log(`
 ✨ 설치 완료!`);
   console.log("   백그라운드에서 자동으로 사용량이 수집됩니다.");
