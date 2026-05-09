@@ -1181,9 +1181,9 @@ function checkCodeburn() {
   }
 }
 async function installCodeburn() {
-  console.log("\uD83D\uDCE6 codeburn 설치 중...");
+  console.log("\uD83D\uDCE6 codeburn 최신 버전 설치 중...");
   try {
-    execSync("npm install -g codeburn", { stdio: "inherit" });
+    execSync("npm install -g codeburn@latest", { stdio: "inherit" });
     return true;
   } catch {
     return false;
@@ -1199,24 +1199,25 @@ function checkCcusage() {
   }
 }
 async function installCcusage() {
-  console.log("\uD83D\uDCE6 ccusage 설치 중...");
+  console.log("\uD83D\uDCE6 ccusage 최신 버전 설치 중...");
   try {
-    execSync("npm install -g ccusage", { stdio: "inherit" });
+    execSync("npm install -g ccusage@latest", { stdio: "inherit" });
     return true;
   } catch {
     return false;
   }
 }
 async function ensureCcusage() {
-  if (checkCcusage()) {
-    console.log(`✅ ccusage 확인됨
+  const hadBefore = checkCcusage();
+  console.log(hadBefore ? "\uD83D\uDCE6 ccusage @latest 업그레이드 시도..." : "⚠️  ccusage 미설치 — 최신 설치 시도...");
+  const installed = await installCcusage();
+  if (installed && checkCcusage()) {
+    console.log(`✅ ccusage 최신 버전 확인됨
 `);
     return true;
   }
-  console.log("⚠️  ccusage가 설치되어 있지 않습니다. 설치 시도 중...");
-  const installed = await installCcusage();
-  if (installed && checkCcusage()) {
-    console.log(`✅ ccusage 설치 완료
+  if (hadBefore) {
+    console.log(`⚠️  ccusage 업그레이드 실패 — 기존 버전으로 계속 진행
 `);
     return true;
   }
@@ -1226,10 +1227,26 @@ async function ensureCcusage() {
   console.log("❌ ccusage 설치 실패");
   console.log("   → 토큰/비용 데이터가 수집되지 않습니다.");
   console.log("   → 수동 설치 후 repair 를 다시 실행하세요:");
-  console.log("       npm install -g ccusage");
+  console.log("       npm install -g ccusage@latest");
   console.log("       npx --yes github:eugene-eee-hongkyu/ai-usage-tracker repair");
   console.log(bar + `
 `);
+  return false;
+}
+async function ensureCodeburn() {
+  const hadBefore = checkCodeburn();
+  console.log(hadBefore ? "\uD83D\uDCE6 codeburn @latest 업그레이드 시도..." : "⚠️  codeburn 미설치 — 최신 설치 시도...");
+  const installed = await installCodeburn();
+  if (installed && checkCodeburn()) {
+    console.log(`✅ codeburn 최신 버전 확인됨
+`);
+    return true;
+  }
+  if (hadBefore) {
+    console.log(`⚠️  codeburn 업그레이드 실패 — 기존 버전으로 계속 진행
+`);
+    return true;
+  }
   return false;
 }
 async function runRepair() {
@@ -1244,6 +1261,12 @@ async function runRepair() {
   }
   console.log(`✅ API 키 확인됨
 `);
+  const codeburnOk = await ensureCodeburn();
+  if (!codeburnOk) {
+    console.error("❌ codeburn 사용 불가 상태. 수동 설치 후 다시 시도하세요:");
+    console.error("   npm install -g codeburn@latest");
+    process.exit(1);
+  }
   const ccusageOk = await ensureCcusage();
   const fallbackPath = path.join(os.homedir(), ".primus-usage-key");
   fs.writeFileSync(fallbackPath, apiKey, { mode: 384 });
@@ -1267,26 +1290,11 @@ async function runInit() {
   console.log(`\uD83D\uDE80 Usage Tracker 설치 시작
 `);
   preflightOwnership();
-  if (!checkCodeburn()) {
-    console.log("⚠️  codeburn이 설치되어 있지 않습니다.");
-    const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
-    const answer = await new Promise((res) => rl.question("지금 설치할까요? (Y/n) ", res));
-    rl.close();
-    if (answer.toLowerCase() !== "n") {
-      const ok = await installCodeburn();
-      if (!ok) {
-        console.error("❌ codeburn 설치 실패. 수동으로 설치하세요: npm install -g codeburn");
-        process.exit(1);
-      }
-      console.log(`✅ codeburn 설치 완료
-`);
-    } else {
-      console.log("⚠️  codeburn 없이는 사용량을 수집할 수 없습니다.");
-      console.log("   나중에: npm install -g codeburn");
-    }
-  } else {
-    console.log(`✅ codeburn 확인됨
-`);
+  const codeburnOk = await ensureCodeburn();
+  if (!codeburnOk) {
+    console.error("❌ codeburn 설치 실패. 수동으로 설치 후 다시 시도하세요:");
+    console.error("   npm install -g codeburn@latest");
+    process.exit(1);
   }
   const ccusageOk = await ensureCcusage();
   const existingKey = await loadApiKey();
@@ -1395,6 +1403,31 @@ function spawnCcusageDaily() {
     }, 600000);
   });
 }
+function spawnCcusageBlocks() {
+  return new Promise((resolve) => {
+    const chunks = [];
+    const proc = spawn2("ccusage", ["blocks", "--json"], {
+      stdio: ["ignore", "pipe", "pipe"],
+      shell: true,
+      env: childEnv
+    });
+    proc.stdout.on("data", (d) => chunks.push(d));
+    proc.on("close", (code) => {
+      if (code !== 0)
+        return resolve(null);
+      try {
+        resolve(JSON.parse(Buffer.concat(chunks).toString("utf8").trim()));
+      } catch {
+        resolve(null);
+      }
+    });
+    proc.on("error", () => resolve(null));
+    setTimeout(() => {
+      proc.kill();
+      resolve(null);
+    }, 600000);
+  });
+}
 async function runSync(_days) {
   const apiKey = process.env.USAGE_TRACKER_API_KEY ?? await loadApiKey();
   if (!apiKey) {
@@ -1403,13 +1436,16 @@ async function runSync(_days) {
   }
   console.log("codeburn + ccusage 데이터 수집 중...");
   try {
-    const [results, ccusageDaily] = await Promise.all([
+    const [results, ccusageDaily, ccusageBlocks] = await Promise.all([
       Promise.all(PERIODS.map((p) => spawnCodeburn(p))),
-      spawnCcusageDaily()
+      spawnCcusageDaily(),
+      spawnCcusageBlocks()
     ]);
     const report = Object.fromEntries(PERIODS.map((p, i) => [p, results[i]]));
     if (ccusageDaily)
       report.ccusageDaily = ccusageDaily;
+    if (ccusageBlocks)
+      report.ccusageBlocks = ccusageBlocks;
     const resp = await fetch(`${SERVER_URL2}/api/ingest`, {
       method: "POST",
       headers: { "Content-Type": "application/json", "x-api-key": apiKey },
