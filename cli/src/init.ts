@@ -337,10 +337,13 @@ function checkCodeburn(): boolean {
   }
 }
 
+// codeburn @latest 강제 설치/업그레이드.
+// 이미 설치돼 있어도 매번 latest 로 교체 — repair/init 시점에 항상 최신.
+// (#184 같은 fix 가 사용자 PC 에 자동 반영되도록.)
 async function installCodeburn(): Promise<boolean> {
-  console.log("📦 codeburn 설치 중...");
+  console.log("📦 codeburn 최신 버전 설치 중...");
   try {
-    execSync("npm install -g codeburn", { stdio: "inherit" });
+    execSync("npm install -g codeburn@latest", { stdio: "inherit" });
     return true;
   } catch {
     return false;
@@ -358,25 +361,30 @@ function checkCcusage(): boolean {
 }
 
 async function installCcusage(): Promise<boolean> {
-  console.log("📦 ccusage 설치 중...");
+  console.log("📦 ccusage 최신 버전 설치 중...");
   try {
-    execSync("npm install -g ccusage", { stdio: "inherit" });
+    execSync("npm install -g ccusage@latest", { stdio: "inherit" });
     return true;
   } catch {
     return false;
   }
 }
 
+// repair/init 마다 항상 @latest 강제. 이미 설치돼 있어도 재설치 → 항상 최신
+// (codeburn fix 가 사용자 PC 에 자동 반영). 업그레이드 실패해도 기존 설치 있으면 진행.
 async function ensureCcusage(): Promise<boolean> {
-  if (checkCcusage()) {
-    console.log("✅ ccusage 확인됨\n");
+  const hadBefore = checkCcusage();
+  console.log(hadBefore
+    ? "📦 ccusage @latest 업그레이드 시도..."
+    : "⚠️  ccusage 미설치 — 최신 설치 시도..."
+  );
+  const installed = await installCcusage();
+  if (installed && checkCcusage()) {
+    console.log("✅ ccusage 최신 버전 확인됨\n");
     return true;
   }
-  console.log("⚠️  ccusage가 설치되어 있지 않습니다. 설치 시도 중...");
-  const installed = await installCcusage();
-  // npm exit 0 이어도 PATH 갱신 지연/권한 문제로 실제 호출이 실패할 수 있으니 재확인.
-  if (installed && checkCcusage()) {
-    console.log("✅ ccusage 설치 완료\n");
+  if (hadBefore) {
+    console.log("⚠️  ccusage 업그레이드 실패 — 기존 버전으로 계속 진행\n");
     return true;
   }
   const bar = "═".repeat(60);
@@ -384,9 +392,28 @@ async function ensureCcusage(): Promise<boolean> {
   console.log("❌ ccusage 설치 실패");
   console.log("   → 토큰/비용 데이터가 수집되지 않습니다.");
   console.log("   → 수동 설치 후 repair 를 다시 실행하세요:");
-  console.log("       npm install -g ccusage");
+  console.log("       npm install -g ccusage@latest");
   console.log("       npx --yes github:eugene-eee-hongkyu/ai-usage-tracker repair");
   console.log(bar + "\n");
+  return false;
+}
+
+// codeburn 도 동일 패턴. 기존 설치 있어도 @latest 시도.
+async function ensureCodeburn(): Promise<boolean> {
+  const hadBefore = checkCodeburn();
+  console.log(hadBefore
+    ? "📦 codeburn @latest 업그레이드 시도..."
+    : "⚠️  codeburn 미설치 — 최신 설치 시도..."
+  );
+  const installed = await installCodeburn();
+  if (installed && checkCodeburn()) {
+    console.log("✅ codeburn 최신 버전 확인됨\n");
+    return true;
+  }
+  if (hadBefore) {
+    console.log("⚠️  codeburn 업그레이드 실패 — 기존 버전으로 계속 진행\n");
+    return true;
+  }
   return false;
 }
 
@@ -402,6 +429,14 @@ export async function runRepair() {
   }
   console.log("✅ API 키 확인됨\n");
 
+  // repair 시 codeburn / ccusage 항상 @latest 로 강제 업그레이드.
+  // codeburn fix (#184 timezone 등) 가 사용자 PC 에 자동 반영되도록.
+  const codeburnOk = await ensureCodeburn();
+  if (!codeburnOk) {
+    console.error("❌ codeburn 사용 불가 상태. 수동 설치 후 다시 시도하세요:");
+    console.error("   npm install -g codeburn@latest");
+    process.exit(1);
+  }
   const ccusageOk = await ensureCcusage();
 
   // submit.mjs는 standalone 실행이라 keytar 없음 → 항상 파일에도 보장
@@ -427,28 +462,14 @@ export async function runInit() {
   console.log("🚀 Usage Tracker 설치 시작\n");
   preflightOwnership();
 
-  if (!checkCodeburn()) {
-    console.log("⚠️  codeburn이 설치되어 있지 않습니다.");
-    const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
-    const answer = await new Promise<string>((res) =>
-      rl.question("지금 설치할까요? (Y/n) ", res)
-    );
-    rl.close();
-    if (answer.toLowerCase() !== "n") {
-      const ok = await installCodeburn();
-      if (!ok) {
-        console.error("❌ codeburn 설치 실패. 수동으로 설치하세요: npm install -g codeburn");
-        process.exit(1);
-      }
-      console.log("✅ codeburn 설치 완료\n");
-    } else {
-      console.log("⚠️  codeburn 없이는 사용량을 수집할 수 없습니다.");
-      console.log("   나중에: npm install -g codeburn");
-    }
-  } else {
-    console.log("✅ codeburn 확인됨\n");
+  // init 시에도 항상 @latest 시도. 기존 사용자도 install.sh 재실행만으로
+  // codeburn/ccusage 최신 fix 자동 반영.
+  const codeburnOk = await ensureCodeburn();
+  if (!codeburnOk) {
+    console.error("❌ codeburn 설치 실패. 수동으로 설치 후 다시 시도하세요:");
+    console.error("   npm install -g codeburn@latest");
+    process.exit(1);
   }
-
   const ccusageOk = await ensureCcusage();
 
   const existingKey = await loadApiKey();
