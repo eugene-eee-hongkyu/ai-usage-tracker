@@ -86,16 +86,17 @@ function getCcusageDaily(raw: unknown): CcusageDailyRow[] {
   return cu?.daily ?? [];
 }
 
-// 일일 효율 점수 (0-100). cache hit 50점 + cost/call 50점.
-// 임계값은 EFFICIENCY 카드의 grade rule 과 정렬 (Anthropic 본사 96%+ 기준 등).
+// 일일 효율 점수 (0-100). cache hit 70점 + cost/call 30점.
+// Opus 시대 반영: 코딩 작업에 Opus 사용은 합리적 선택이므로 cost 페널티
+// 완화. cache 가중을 70% 로 올려 "cache 잘 쓰면서 적정 모델 선택" 을 보상.
 // linear interpolation 으로 cliff 없이 점수가 부드럽게 변하도록.
 function computeDailyEfficiencyScore(cacheHitPct: number, costPerCall: number): number {
-  // Cache: 60% → 0, 96% → 50, linear
-  const cacheRaw = ((cacheHitPct - 60) / (96 - 60)) * 50;
-  const cachePts = Math.max(0, Math.min(50, cacheRaw));
-  // Cost/call: $0.20 → 0, $0.04 → 50, linear (낮을수록 좋음)
-  const costRaw = ((0.20 - costPerCall) / (0.20 - 0.04)) * 50;
-  const costPts = Math.max(0, Math.min(50, costRaw));
+  // Cache: 60% → 0, 96% → 70, linear (Anthropic 본사 96%+ 기준)
+  const cacheRaw = ((cacheHitPct - 60) / (96 - 60)) * 70;
+  const cachePts = Math.max(0, Math.min(70, cacheRaw));
+  // Cost/call: $0.40 → 0, $0.06 → 30, linear (Opus 친화적 임계값)
+  const costRaw = ((0.40 - costPerCall) / (0.40 - 0.06)) * 30;
+  const costPts = Math.max(0, Math.min(30, costRaw));
   return Math.round(cachePts + costPts);
 }
 

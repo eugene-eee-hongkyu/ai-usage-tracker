@@ -212,7 +212,7 @@ function EfficiencyScoreSection({ score }: EfficiencyScoreSectionProps) {
               )}
             </div>
             <span className={`text-[10px] font-mono mt-0.5 ${scoreColor(score.today)}`}>
-              {scoreLabel(score.today)} · cache hit + cost/call 가중
+              {scoreLabel(score.today)} · cache 70 + cost 30 (Opus 친화)
             </span>
           </div>
 
