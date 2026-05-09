@@ -168,6 +168,31 @@ else
   echo "✅ Node.js 확인됨 ($(node -v))"
 fi
 
+# ============================================================
+# Pass 4 — Node 버전 가드 (codeburn ≥ 0.9.7 은 Node 22+ 권장)
+# ============================================================
+# 현재는 codeburn 0.9.7 이 Node 20 에서 advisory 로만 경고하고 실제 동작은
+# 함. 다만 다음 codeburn major 가 진짜로 Node 22+ 기능 쓰면 break 가능.
+# 명시적으로 안내해서 사용자가 미리 인지하도록.
+
+NODE_MAJOR=$(node -v 2>/dev/null | sed -E 's/^v([0-9]+).*$/\1/')
+if [ -n "$NODE_MAJOR" ] && [ "$NODE_MAJOR" -lt 22 ]; then
+  echo ""
+  echo "$BAR"
+  echo "⚠️  Node $NODE_MAJOR 감지 — codeburn 0.9.7+ 는 Node 22 이상 권장"
+  echo ""
+  echo "    현재는 동작하지만 다음 codeburn major 에서 break 될 수 있습니다."
+  echo "    여유 있을 때 Node 22 로 업그레이드 권장:"
+  echo ""
+  echo "       nvm install 22"
+  echo "       nvm alias default 22"
+  echo ""
+  echo "    (자동 업그레이드는 의도적으로 안 함 — 다른 프로젝트의 Node 의존성"
+  echo "     영향 줄 수 있어 사용자 판단으로 진행)"
+  echo "$BAR"
+  echo ""
+fi
+
 echo ""
 echo "📥 Usage Tracker init 실행..."
 echo ""
