@@ -86,17 +86,17 @@ function getCcusageDaily(raw: unknown): CcusageDailyRow[] {
   return cu?.daily ?? [];
 }
 
-// 일일 효율 점수 (0-100). cache hit 70점 + cost/call 30점.
-// Opus 시대 반영: 코딩 작업에 Opus 사용은 합리적 선택이므로 cost 페널티
-// 완화. cache 가중을 70% 로 올려 "cache 잘 쓰면서 적정 모델 선택" 을 보상.
-// linear interpolation 으로 cliff 없이 점수가 부드럽게 변하도록.
+// 일일 효율 점수 (0-100). cache hit 85점 + cost/call 15점.
+// 근거: Anthropic 이 cache hit 을 uptime 처럼 모니터링하는 최우선 메트릭으로
+// 공언 (cache 90% → 비용 81% 자동 감소). cost 효율은 cache 로 거의 다 잡혀
+// 별도 평가가 redundant. cost 15% 는 "정말 망가진 패턴 ($0.40+/call)" 가드레일.
 function computeDailyEfficiencyScore(cacheHitPct: number, costPerCall: number): number {
-  // Cache: 60% → 0, 96% → 70, linear (Anthropic 본사 96%+ 기준)
-  const cacheRaw = ((cacheHitPct - 60) / (96 - 60)) * 70;
-  const cachePts = Math.max(0, Math.min(70, cacheRaw));
-  // Cost/call: $0.40 → 0, $0.06 → 30, linear (Opus 친화적 임계값)
-  const costRaw = ((0.40 - costPerCall) / (0.40 - 0.06)) * 30;
-  const costPts = Math.max(0, Math.min(30, costRaw));
+  // Cache: 60% → 0, 96% → 85, linear (Anthropic 본사 SEV 기준 96%+)
+  const cacheRaw = ((cacheHitPct - 60) / (96 - 60)) * 85;
+  const cachePts = Math.max(0, Math.min(85, cacheRaw));
+  // Cost/call: $0.40 → 0, $0.06 → 15, linear (가드레일 가중)
+  const costRaw = ((0.40 - costPerCall) / (0.40 - 0.06)) * 15;
+  const costPts = Math.max(0, Math.min(15, costRaw));
   return Math.round(cachePts + costPts);
 }
 

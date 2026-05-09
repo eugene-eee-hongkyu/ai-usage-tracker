@@ -260,7 +260,7 @@ function EfficiencyScoreSection({ score }: EfficiencyScoreSectionProps) {
               {deltaNode && <span className="text-neutral-500">·</span>}
               {deltaNode}
             </div>
-            <span className="text-[10px] font-mono text-neutral-600 mt-0.5">cache 70 + cost 30 · Opus 친화</span>
+            <span className="text-[10px] font-mono text-neutral-600 mt-0.5">cache 85 + cost 15 · Anthropic SEV 기준</span>
           </div>
 
           {/* 보조: streak + team rank 세로 stack (3 cols) */}
