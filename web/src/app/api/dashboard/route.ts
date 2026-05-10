@@ -4,6 +4,7 @@ import { authOptions } from "@/lib/auth";
 import { db, userSnapshots, users, periodSnapshots, dailyVisits, userBlocks } from "@/lib/db";
 import { and, asc, desc, eq, gte, lt } from "drizzle-orm";
 import { isAdmin } from "@/lib/admin";
+import { computeDailyEfficiencyScore } from "@/lib/rules";
 
 type Period = "today" | "month" | "8days" | "30days" | "all";
 
@@ -84,20 +85,6 @@ function getCcusageDaily(raw: unknown): CcusageDailyRow[] {
   const r = raw as Record<string, unknown>;
   const cu = r.ccusageDaily as { daily?: CcusageDailyRow[] } | undefined;
   return cu?.daily ?? [];
-}
-
-// 일일 효율 점수 (0-100). cache hit 85점 + cost/call 15점.
-// 근거: Anthropic 이 cache hit 을 uptime 처럼 모니터링하는 최우선 메트릭으로
-// 공언 (cache 90% → 비용 81% 자동 감소). cost 효율은 cache 로 거의 다 잡혀
-// 별도 평가가 redundant. cost 15% 는 "정말 망가진 패턴 ($0.40+/call)" 가드레일.
-function computeDailyEfficiencyScore(cacheHitPct: number, costPerCall: number): number {
-  // Cache: 60% → 0, 96% → 85, linear (Anthropic 본사 SEV 기준 96%+)
-  const cacheRaw = ((cacheHitPct - 60) / (96 - 60)) * 85;
-  const cachePts = Math.max(0, Math.min(85, cacheRaw));
-  // Cost/call: $0.40 → 0, $0.06 → 15, linear (가드레일 가중)
-  const costRaw = ((0.40 - costPerCall) / (0.40 - 0.06)) * 15;
-  const costPts = Math.max(0, Math.min(15, costRaw));
-  return Math.round(cachePts + costPts);
 }
 
 function getPeriodData(raw: unknown, period: string): RawPeriodData {
@@ -431,13 +418,21 @@ export async function GET(req: NextRequest) {
   }
 
   // ─── 일일 효율 점수 + 90일 잔디 + cache 90% streak (period 무관, 항상 현재) ───
-  // ccusage daily 의 토큰 분해 + codeburn "all".daily 의 cost/calls 를 일별로 결합.
+  // ccusage daily 의 토큰 분해 + codeburn "all".daily 의 cost/calls/oneShotRate 결합.
+  // oneShotRate: codeburn 0.9.8+ 만 노출. 0.9.7 이하 또는 chat-only day 는 null →
+  // computeDailyEfficiencyScore 가 cache 85 + cost 15 fallback 으로 자동 처리.
   const codeburnAllDaily = ((snap[0].rawJson as Record<string, unknown>).all as
-    | { daily?: Array<{ date?: string; cost?: number; calls?: number }> }
+    | { daily?: Array<{ date?: string; cost?: number; calls?: number; oneShotRate?: number | null }> }
     | undefined)?.daily ?? [];
-  const cbDailyMap: Record<string, { cost: number; calls: number }> = {};
+  const cbDailyMap: Record<string, { cost: number; calls: number; oneShotRate: number | null }> = {};
   for (const r of codeburnAllDaily) {
-    if (r.date) cbDailyMap[r.date] = { cost: r.cost ?? 0, calls: r.calls ?? 0 };
+    if (r.date) {
+      cbDailyMap[r.date] = {
+        cost: r.cost ?? 0,
+        calls: r.calls ?? 0,
+        oneShotRate: r.oneShotRate ?? null,
+      };
+    }
   }
   const cuDailyMap: Record<string, { input: number; cacheRead: number; cacheWrite: number }> = {};
   for (const r of ccusageRows) {
@@ -466,7 +461,7 @@ export async function GET(req: NextRequest) {
     const totalDenom = cu.input + cu.cacheRead + cu.cacheWrite;
     const dayCacheHitPct = totalDenom > 0 ? (cu.cacheRead / totalDenom) * 100 : 0;
     const dayCostPerCall = cb.calls > 0 ? cb.cost / cb.calls : 0;
-    const dayScore = computeDailyEfficiencyScore(dayCacheHitPct, dayCostPerCall);
+    const dayScore = computeDailyEfficiencyScore(dayCacheHitPct, dayCostPerCall, cb.oneShotRate);
     scoreSeries.push({ date: key, score: dayScore, cacheHitPct: dayCacheHitPct });
   }
 
