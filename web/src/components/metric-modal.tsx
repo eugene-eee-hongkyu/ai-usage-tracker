@@ -451,6 +451,63 @@ export function CostPerCallModal({
 
 // OutputInputRatioModal 제거 — 메트릭 자체를 카드에서 빼서 사용처 없음.
 
+export function TokenVolumeModal({
+  level,
+  avgDailyTokens,
+  onClose,
+}: {
+  level: number;
+  avgDailyTokens: number;
+  onClose: () => void;
+}) {
+  const tokensFmt = avgDailyTokens >= 1_000_000
+    ? `${(avgDailyTokens / 1_000_000).toFixed(1)}M`
+    : `${(avgDailyTokens / 1_000).toFixed(1)}K`;
+  return (
+    <ModalShell title={`사용량 ${level}/10 · 일평균 ${tokensFmt} tokens`} onClose={onClose}>
+      <Section title="사용량이란">
+        <p className="text-slate-400 leading-relaxed text-xs">
+          Claude Code 가 처리한 <strong className="text-slate-300">일평균 총 토큰 수</strong> (cache reads 포함).
+          Claude Code 는 토큰의 90%+ 가 cache reads 라 cache 잘 활용하면 자동으로 큰 숫자.
+        </p>
+        <p className="text-slate-400 leading-relaxed text-xs">
+          <strong className="text-slate-300">왜 효율 점수에 들어있나</strong> — 효율 (cache·one-shot·cost) 만 보면
+          &ldquo;안 쓰는 사람이 가장 효율적&rdquo; 이 됨. 사용량 30% 가중치로 실제 활용도도 점수에 반영. 같은
+          효율이라도 적게 쓰면 점수 낮음 → 쓰도록 유도.
+        </p>
+      </Section>
+      <Section title="10단계 (글로벌 anchor 기반)">
+        <p className="text-xs text-slate-500 mb-2">
+          Anthropic 공식 + Verdent + Power user 케이스 데이터로 calibrated.
+          기준값은 Sonnet 4.6 + 평균 cache 활용 가정 (~$1 ≈ 1.3M total tokens).
+        </p>
+        <div className="space-y-0.5 text-xs font-mono">
+          {[
+            { lvl: 10, range: "> 300M",   note: "극한 (~$240+/day)" },
+            { lvl: 9,  range: "≤ 300M",   note: "Power user 영역" },
+            { lvl: 8,  range: "≤ 150M",   note: "매우 헤비 (~$120/day)" },
+            { lvl: 7,  range: "≤  80M",   note: "Verdent heavy 상단 (~$60/day)" },
+            { lvl: 6,  range: "≤  40M",   note: "★ Anthropic enterprise P90 (~$30/day)" },
+            { lvl: 5,  range: "≤  25M",   note: "Verdent medium 상단 (~$20/day)" },
+            { lvl: 4,  range: "≤  15M",   note: "★ Anthropic P90 (개인) (~$12/day)" },
+            { lvl: 3,  range: "≤   8M",   note: "★ Anthropic 평균 (~$6/day)" },
+            { lvl: 2,  range: "≤   3M",   note: "라이트 시작 (~$2/day)" },
+            { lvl: 1,  range: "≤   1M",   note: "거의 안 씀" },
+            { lvl: 0,  range: "0",        note: "안 씀" },
+          ].map((r) => (
+            <div key={r.lvl} className={`flex gap-2 px-2 py-1 rounded ${r.lvl === level ? "bg-cyan-950/60 text-cyan-200 font-bold" : "text-slate-500"}`}>
+              <span className="w-12 shrink-0">{r.lvl}/10</span>
+              <span className="w-20 shrink-0">{r.range}</span>
+              <span className="opacity-80">{r.note}</span>
+            </div>
+          ))}
+        </div>
+        <p className="text-xs text-slate-600 mt-2">★ = 외부 검증 anchor. 나머지는 보간.</p>
+      </Section>
+    </ModalShell>
+  );
+}
+
 export function CallsPerSessionModal({
   value,
   callsTotal,

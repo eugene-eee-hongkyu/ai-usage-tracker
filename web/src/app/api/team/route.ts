@@ -493,20 +493,24 @@ export async function GET(req: NextRequest) {
   // 모든 멤버의 ccusage 토큰 + codeburn cost/calls/edit·oneShotTurns 를 합쳐
   // 단일 cache hit / cost-per-call / oneShotRate 산출 → computeDailyEfficiencyScore.
   // 개인 점수는 self-motivation, 팀 점수는 team identity. 같은 공식 다른 의미.
-  let teamCacheRead = 0, teamCacheWrite = 0, teamInput = 0;
+  let teamCacheRead = 0, teamCacheWrite = 0, teamInput = 0, teamOutput = 0;
   let teamCost30 = 0, teamCalls30 = 0;
   let teamEditTurns = 0, teamOneShotTurns = 0;
+  const teamActiveMembers = new Set<number>();
   for (const u of allUsers) {
     const snap = snapMap.get(u.id);
     if (!snap) continue;
     const raw = snap.rawJson as Record<string, unknown>;
-    const ccu = (raw.ccusageDaily as { daily?: Array<{ date?: string; inputTokens?: number; cacheReadTokens?: number; cacheCreationTokens?: number }> } | undefined)?.daily ?? [];
+    const ccu = (raw.ccusageDaily as { daily?: Array<{ date?: string; inputTokens?: number; outputTokens?: number; cacheReadTokens?: number; cacheCreationTokens?: number }> } | undefined)?.daily ?? [];
     const cb = ((raw.all as { daily?: Array<{ date?: string; cost?: number; calls?: number; editTurns?: number; oneShotTurns?: number }> } | undefined)?.daily) ?? [];
+    let userHadActivity = false;
     for (const r of ccu) {
       if (!r.date || r.date < thirtyAgoYmd) continue;
       teamCacheRead += r.cacheReadTokens ?? 0;
       teamCacheWrite += r.cacheCreationTokens ?? 0;
       teamInput += r.inputTokens ?? 0;
+      teamOutput += r.outputTokens ?? 0;
+      userHadActivity = true;
     }
     for (const r of cb) {
       if (!r.date || r.date < thirtyAgoYmd) continue;
@@ -515,6 +519,7 @@ export async function GET(req: NextRequest) {
       teamEditTurns += r.editTurns ?? 0;
       teamOneShotTurns += r.oneShotTurns ?? 0;
     }
+    if (userHadActivity) teamActiveMembers.add(u.id);
   }
   const teamCacheDenom = teamCacheRead + teamCacheWrite + teamInput;
   const teamCacheHitPct = teamCacheDenom > 0 ? (teamCacheRead / teamCacheDenom) * 100 : 0;
@@ -522,8 +527,14 @@ export async function GET(req: NextRequest) {
   // codeburn 0.9.7 ↓ 또는 모든 멤버가 chat-only → null. computeDailyEfficiencyScore
   // 가 cache 85 + cost 15 fallback 으로 자동 처리.
   const teamOneShotRate = teamEditTurns > 0 ? (teamOneShotTurns / teamEditTurns) * 100 : null;
+  // 팀 토큰 평균 — 활성 멤버당 일평균 (활성 멤버 × 30일 윈도우 기준).
+  // 개인 점수와 동일 scale 로 비교 가능. 0 = 팀 전체 안 씀, 10/10 = 평균 멤버가 heavy day.
+  const teamTokensTotal = teamCacheRead + teamCacheWrite + teamInput + teamOutput;
+  const teamAvgDailyTokens = teamActiveMembers.size > 0
+    ? teamTokensTotal / (teamActiveMembers.size * 30)
+    : 0;
   const teamScoreValue = teamCacheDenom > 0
-    ? computeDailyEfficiencyScore(teamCacheHitPct, teamCostPerCall, teamOneShotRate)
+    ? computeDailyEfficiencyScore(teamCacheHitPct, teamCostPerCall, teamOneShotRate, teamAvgDailyTokens)
     : null;
 
   const teamScore = {

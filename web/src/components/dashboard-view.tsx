@@ -4,7 +4,8 @@ import { useEffect, useState } from "react";
 import { useSession, signOut } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { Nav } from "@/components/nav";
-import { CacheHitModal, OneShotRateModal, CostPerSessionModal, CallsPerSessionModal, CostPerCallModal } from "@/components/metric-modal";
+import { CacheHitModal, OneShotRateModal, CostPerSessionModal, CallsPerSessionModal, CostPerCallModal, TokenVolumeModal } from "@/components/metric-modal";
+import { computeDailyEfficiencyScore, computeTokenLevel } from "@/lib/rules";
 import { ActivityCalendar } from "react-activity-calendar";
 import { ScoreGauge, scoreLabel } from "@/components/score-gauge";
 
@@ -19,6 +20,7 @@ interface Overview {
   activeDays: number;
   costPerCall: number;
   outputInputRatio: number;
+  avgDailyTokens: number;
 }
 
 interface Activity {
@@ -207,7 +209,7 @@ function EfficiencyScoreSection({ score }: EfficiencyScoreSectionProps) {
               {deltaNode && <span className="text-neutral-500">·</span>}
               {deltaNode}
             </div>
-            <span className="text-[10px] font-mono text-neutral-600 mt-0.5">cache 60 + one-shot 25 + cost 15 · Anthropic SEV 기준</span>
+            <span className="text-[10px] font-mono text-neutral-600 mt-0.5">cache 42 + one-shot 18 + cost 10 + 사용량 30</span>
           </div>
 
           {/* 보조: streak + team rank 세로 stack (3 cols) */}
@@ -345,6 +347,16 @@ const COST_ROWS: [GradeLevel, string, string][] = [
   ["보통", "$25~100",  "큰 작업 세션. 정상 범위"],
   ["경고", "$100+",    "거대 세션. 분리 또는 효율 점검"],
 ];
+// 사용량 (total tokens/day): 외부 anchor 3개 (Anthropic median/P90/enterprise P90) 로
+// 10단계 calibrated. Verdent + power user 데이터로 보간 검증.
+// 점수 환산: level × 3 (max 30, daily score 의 30% 비중).
+const TOKEN_ROWS: [GradeLevel, string, string][] = [
+  ["탁월", "8/10+ (≥150M/day)",  "Heavy 사용자. Power user 영역"],
+  ["양호", "6~7/10 (40~150M)",   "Anthropic enterprise P90 (~$30/day) 이상"],
+  ["보통", "3~5/10 (8~40M)",     "Anthropic 평균~P90 사이. 정상 활성"],
+  ["부족", "1~2/10 (≤8M)",       "라이트 사용 또는 거의 안 씀"],
+  ["경고", "0/10 (0 tokens)",    "오늘 안 씀"],
+];
 
 function MiniGradeTable({ title, rows, current }: { title: string; rows: [GradeLevel, string, string][]; current: GradeLevel }) {
   return (
@@ -385,15 +397,41 @@ function costGrade(v: number): GradeLevel {
 // calls/session, cost/call, output/input — 외부 anchor 없음. 등급 미표시.
 // 값만 노출. 추세 (후속 PR) 로 변화 인지.
 
-function computeGrade(cacheHitPct: number, oneShotRate: number, costPerSession: number): GradeLevel {
-  const cacheScore = cacheHitPct / 100;
-  const oneShotScore = oneShotRate;
-  const costScore = costPerSession <= 1 ? 1 : costPerSession <= 3 ? 0.8 : costPerSession <= 7 ? 0.6 : costPerSession <= 15 ? 0.4 : 0.2;
-  const composite = cacheScore * 0.4 + oneShotScore * 0.4 + costScore * 0.2;
-  if (composite >= 0.88) return "탁월";
-  if (composite >= 0.72) return "양호";
-  if (composite >= 0.52) return "보통";
-  if (composite >= 0.32) return "부족";
+// Token level (0-10) → 5-level grade 매핑 (배지 색깔용).
+// 8-10: 탁월 / 6-7: 양호 / 3-5: 보통 / 1-2: 부족 / 0: 경고
+function tokenLevelToGrade(level: number): GradeLevel {
+  if (level >= 8) return "탁월";
+  if (level >= 6) return "양호";
+  if (level >= 3) return "보통";
+  if (level >= 1) return "부족";
+  return "경고";
+}
+function fmtTokensShort(n: number): string {
+  if (n >= 1_000_000_000) return `${(n / 1_000_000_000).toFixed(1)}B`;
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
+  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
+  return n.toString();
+}
+
+// EFFICIENCY 배지: 게이지와 동일한 공식으로 period 평균 적용.
+// 이전에는 별도 computeGrade (40/40/20) 가 있어 게이지 (60/25/15) 와 라벨 불일치 버그
+// 발생 (89점/양호 vs 보통). 두 곳을 같은 점수+라벨로 통합.
+function computeEfficiencyBadgeScore(ov: Overview): number | null {
+  if (ov.sessions === 0 || ov.calls === 0) return null;
+  return computeDailyEfficiencyScore(
+    ov.cacheHitPct,
+    ov.costPerCall,
+    ov.oneShotRate,
+    ov.avgDailyTokens,
+  );
+}
+function badgeGradeFromScore(score: number | null): GradeLevel {
+  // scoreLabel 의 5단계 와 일치 (90/75/55/35).
+  if (score === null) return "경고";
+  if (score >= 90) return "탁월";
+  if (score >= 75) return "양호";
+  if (score >= 55) return "보통";
+  if (score >= 35) return "부족";
   return "경고";
 }
 
@@ -544,6 +582,7 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
   const [showCallsMethodsModal, setShowCallsMethodsModal] = useState(false);
   const [showCostCallModal, setShowCostCallModal] = useState(false);
   const [showCostCallMethodsModal, setShowCostCallMethodsModal] = useState(false);
+  const [showTokenModal, setShowTokenModal] = useState(false);
   const [showTzPicker, setShowTzPicker] = useState(false);
   const [userTz, setUserTz] = useState<string>(() =>
     typeof window !== "undefined"
@@ -968,7 +1007,7 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
               <span className="text-xs font-mono font-bold text-fuchsia-400 uppercase tracking-wider">Efficiency</span>
               {(() => {
                 const costPs = ov.sessions > 0 ? ov.cost / ov.sessions : 0;
-                const grade = computeGrade(ov.cacheHitPct, ov.oneShotRate, costPs);
+                const grade = badgeGradeFromScore(computeEfficiencyBadgeScore(ov));
                 return (
                   <div className="relative group/grade">
                     <span data-testid="dash-grade-overall" className={`text-xs font-mono font-bold px-2 py-0.5 rounded border cursor-default ${GRADE_STYLES[grade]}`}>
@@ -981,6 +1020,7 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
                           <MiniGradeTable title="Cache hit" rows={CACHE_ROWS} current={cacheHitGrade(ov.cacheHitPct)} />
                           <MiniGradeTable title="One-shot rate" rows={ONESHOT_ROWS} current={oneShotGrade(Math.round(ov.oneShotRate * 100))} />
                           <MiniGradeTable title="Cost / session" rows={COST_ROWS} current={costGrade(costPs)} />
+                          <MiniGradeTable title={`사용량 (${computeTokenLevel(ov.avgDailyTokens)}/10)`} rows={TOKEN_ROWS} current={tokenLevelToGrade(computeTokenLevel(ov.avgDailyTokens))} />
                         </div>
                       </div>
                     )}
@@ -1035,6 +1075,21 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
                     onAct: () => setShowCostMethodsModal(true),
                     actLabel: "줄이는법",
                   },
+                  (() => {
+                    const lvl = computeTokenLevel(ov.avgDailyTokens);
+                    return {
+                      tid: "tokens",
+                      label: "사용량",
+                      value: ov.avgDailyTokens > 0 ? `${fmtTokensShort(ov.avgDailyTokens)}/day` : "0",
+                      color: "text-cyan-400",
+                      grade: tokenLevelToGrade(lvl),
+                      gradeRows: TOKEN_ROWS,
+                      gradeTitle: `사용량 (${lvl}/10)`,
+                      onDesc: () => setShowTokenModal(true),
+                      onAct: () => setShowTokenModal(true),
+                      actLabel: "더 쓰는법",
+                    };
+                  })(),
                   {
                     tid: "calls-session",
                     label: "Calls / session",
@@ -1076,7 +1131,7 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
                           </div>
                         </div>
                       ) : (
-                        <span className="w-14" />
+                        <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded border border-transparent w-14 text-center block" aria-hidden>&nbsp;</span>
                       )}
                     </div>
                   </div>
@@ -1618,6 +1673,13 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
       )}
       {showCostCallMethodsModal && (
         <CostPerCallModal value={ov.costPerCall ?? 0} totalCost={ov.cost} totalCalls={ov.calls} onClose={() => setShowCostCallMethodsModal(false)} methodsOnly />
+      )}
+      {showTokenModal && (
+        <TokenVolumeModal
+          level={computeTokenLevel(ov.avgDailyTokens)}
+          avgDailyTokens={ov.avgDailyTokens}
+          onClose={() => setShowTokenModal(false)}
+        />
       )}
     </div>
   );

@@ -4,19 +4,23 @@
 // 색·각도만으로 5초 안 판단 — 단일 focal point. 외부 라이브러리 0.
 // 개인 dashboard 와 팀 헤드라인 양쪽에서 공유.
 
+// 5단계 라벨 — 게이지 점수와 EFFICIENCY 카드 배지에서 공유.
+// 두 위치 영원히 동기화 (이전 computeGrade 별도 공식 폐기 후 통합).
 export function scoreHexColor(score: number | null): string {
   if (score === null) return "#525252";
-  if (score >= 90) return "#10b981";
-  if (score >= 70) return "#84cc16";
-  if (score >= 40) return "#f97316";
-  return "#ef4444";
+  if (score >= 90) return "#10b981";   // emerald — 탁월
+  if (score >= 75) return "#84cc16";   // lime — 양호
+  if (score >= 55) return "#eab308";   // yellow — 보통
+  if (score >= 35) return "#f97316";   // orange — 개선 필요
+  return "#ef4444";                    // red — 경고
 }
 
 export function scoreLabel(score: number | null): string {
   if (score === null) return "활동 없음";
   if (score >= 90) return "탁월";
-  if (score >= 70) return "양호";
-  if (score >= 40) return "개선 필요";
+  if (score >= 75) return "양호";
+  if (score >= 55) return "보통";
+  if (score >= 35) return "개선 필요";
   return "경고";
 }
 

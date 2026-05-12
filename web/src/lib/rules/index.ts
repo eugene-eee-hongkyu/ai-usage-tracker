@@ -15,31 +15,53 @@ export function computeEfficiencyScore(
   return Math.round((overallOneShot * (cacheHitPct / 100) * oiRatio) / costPerCall);
 }
 
-// 일일 효율 점수 (0-100). 세 signal: cache hit, one-shot rate, cost/call.
-// 정상: cache 60 + one-shot 25 + cost 15.
-//   - cache: infrastructure (Anthropic SEV 기준 96%+ → 만점)
-//   - one-shot: skill (clear instructions → 첫 시도 성공)
-//   - cost: cost guardrail ($0.40+/call = 망가진 패턴)
-// oneShotRate=null fallback (codeburn 0.9.7 또는 chat-only day): cache 85 + cost 15
-// — 이전 공식 그대로 보존, regression 0.
+// Token volume 10단계 (0-30 점). 외부 anchor 3개 정렬:
+//   - 단계 3 (≤8M, ~$6/day) = Anthropic 평균 사용자
+//   - 단계 4 (≤15M, ~$12/day) = Anthropic P90 (개인)
+//   - 단계 6 (≤40M, ~$30/day) = Anthropic enterprise active P90
+// Verdent (light/medium/heavy 범위) + Power user 8개월 케이스 (10B/8mo ≈ 41M/day) 로
+// 보간/검증. Total tokens 기준 (cache reads 포함) — Claude Code 특성상 90%+ 가 cache.
+export function computeTokenLevel(totalTokensPerDay: number): number {
+  if (totalTokensPerDay <= 0) return 0;
+  if (totalTokensPerDay <= 1_000_000) return 1;
+  if (totalTokensPerDay <= 3_000_000) return 2;
+  if (totalTokensPerDay <= 8_000_000) return 3;      // Anthropic median anchor
+  if (totalTokensPerDay <= 15_000_000) return 4;     // Anthropic P90 (light) anchor
+  if (totalTokensPerDay <= 25_000_000) return 5;
+  if (totalTokensPerDay <= 40_000_000) return 6;     // Anthropic enterprise P90 anchor
+  if (totalTokensPerDay <= 80_000_000) return 7;
+  if (totalTokensPerDay <= 150_000_000) return 8;
+  if (totalTokensPerDay <= 300_000_000) return 9;
+  return 10;
+}
+
+// 일일 효율 점수 (0-100). 4 signal: cache, one-shot, cost, token volume.
+// cache 42 + one-shot 18 + cost 10 + token 30 = 100
+//   - 효율 70%: cache (infra) + one-shot (skill) + cost (guardrail)
+//   - 사용량 30%: token volume — Claude 사용 자체 격려 (안 쓰면 점수 낮음)
+// 이전 비율 (60:25:15 = 4:1.67:1) 유지하면서 70% 로 압축 후 token 30% 추가.
 export function computeDailyEfficiencyScore(
-  cacheHitPct: number,       // 0..100
-  costPerCall: number,       // USD
-  oneShotRate: number | null // 0..100 (codeburn) or null
+  cacheHitPct: number,         // 0..100
+  costPerCall: number,         // USD
+  oneShotRate: number | null,  // 0..100 (codeburn) or null
+  totalTokensPerDay: number    // 총 토큰 (cache reads 포함)
 ): number {
-  // Cache: 60% → 0, 96% → 1, linear
+  // Cache: 60% → 0, 96% → 1, linear (Anthropic 본사 SEV 기준 96%+)
   const cacheNorm = Math.max(0, Math.min(1, (cacheHitPct - 60) / (96 - 60)));
   // Cost: $0.40 → 0, $0.06 → 1, linear (역방향 — 낮을수록 좋음)
   const costNorm = Math.max(0, Math.min(1, (0.40 - costPerCall) / (0.40 - 0.06)));
+  // Token: 10단계 → 0..1
+  const tokenNorm = computeTokenLevel(totalTokensPerDay) / 10;
 
   if (oneShotRate == null) {
-    // Fallback: 기존 공식 정확히 보존 (cache 85 + cost 15)
-    return Math.round(cacheNorm * 85 + costNorm * 15);
+    // Fallback: oneShot 비율을 cache 와 cost 에 비례 분배.
+    // cache: 42 + 18 * (42/(42+10)) ≈ 56.5
+    // cost:  10 + 18 * (10/(42+10)) ≈ 13.5
+    return Math.round(cacheNorm * 56.5 + costNorm * 13.5 + tokenNorm * 30);
   }
 
-  // One-shot: 0% → 0, 100% → 1
   const oneShotNorm = Math.max(0, Math.min(1, oneShotRate / 100));
-  return Math.round(cacheNorm * 60 + oneShotNorm * 25 + costNorm * 15);
+  return Math.round(cacheNorm * 42 + oneShotNorm * 18 + costNorm * 10 + tokenNorm * 30);
 }
 
 export function generateMvpBlurb(

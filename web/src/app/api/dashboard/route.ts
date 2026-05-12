@@ -434,13 +434,20 @@ export async function GET(req: NextRequest) {
       };
     }
   }
-  const cuDailyMap: Record<string, { input: number; cacheRead: number; cacheWrite: number }> = {};
+  const cuDailyMap: Record<string, { input: number; cacheRead: number; cacheWrite: number; output: number; total: number }> = {};
   for (const r of ccusageRows) {
     if (r.date) {
+      const input = r.inputTokens ?? 0;
+      const cacheRead = r.cacheReadTokens ?? 0;
+      const cacheWrite = r.cacheCreationTokens ?? 0;
+      const output = r.outputTokens ?? 0;
       cuDailyMap[r.date] = {
-        input: r.inputTokens ?? 0,
-        cacheRead: r.cacheReadTokens ?? 0,
-        cacheWrite: r.cacheCreationTokens ?? 0,
+        input,
+        cacheRead,
+        cacheWrite,
+        output,
+        // ccusage 의 totalTokens 가 있으면 그대로, 없으면 합산
+        total: r.totalTokens ?? (input + cacheRead + cacheWrite + output),
       };
     }
   }
@@ -461,7 +468,7 @@ export async function GET(req: NextRequest) {
     const totalDenom = cu.input + cu.cacheRead + cu.cacheWrite;
     const dayCacheHitPct = totalDenom > 0 ? (cu.cacheRead / totalDenom) * 100 : 0;
     const dayCostPerCall = cb.calls > 0 ? cb.cost / cb.calls : 0;
-    const dayScore = computeDailyEfficiencyScore(dayCacheHitPct, dayCostPerCall, cb.oneShotRate);
+    const dayScore = computeDailyEfficiencyScore(dayCacheHitPct, dayCostPerCall, cb.oneShotRate, cu.total);
     scoreSeries.push({ date: key, score: dayScore, cacheHitPct: dayCacheHitPct });
   }
 
@@ -669,7 +676,18 @@ export async function GET(req: NextRequest) {
 
   return NextResponse.json({
     user: { name: user[0].name, lastSyncedAt: user[0].lastSyncedAt, timezone: user[0].timezone ?? null },
-    overview: { cost: finalCost, sessions, calls, cacheHitPct, oneShotRate, activeDays, costPerCall: finalCostPerCall, outputInputRatio },
+    overview: {
+      cost: finalCost,
+      sessions,
+      calls,
+      cacheHitPct,
+      oneShotRate,
+      activeDays,
+      costPerCall: finalCostPerCall,
+      outputInputRatio,
+      // 기간 평균 일별 total tokens (cache reads 포함). EFFICIENCY 배지의 token 신호용.
+      avgDailyTokens: activeDays > 0 ? (tRead + tWrite + tInput + tOutput) / activeDays : 0,
+    },
     daily,
     dailyTokens,
     heatmapDaily,
