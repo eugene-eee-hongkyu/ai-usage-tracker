@@ -122,7 +122,7 @@ function oneShotGrade(v: number): GradeLevel {
 }
 
 function costPerSessionGrade(v: number): GradeLevel {
-  if (v < 25) return "양호";
+  if (v < 25) return "탁월";
   if (v < 100) return "보통";
   return "경고";
 }
@@ -275,14 +275,13 @@ export function OneShotRateModal({ value, onClose, methodsOnly = false }: { valu
         <Section title="등급">
           <GradeTable
             rows={[
-              { grade: "탁월", range: "90%+",     label: "명확한 지시 + 좋은 컨텍스트. 본보기 패턴" },
-              { grade: "양호", range: "80~89%",   label: "좋은 상태" },
-              { grade: "보통", range: "70~79%",   label: "지시 명확도 점검 필요" },
-              { grade: "부족", range: "60~69%",   label: "자주 retry 발생. 컨텍스트 부족 가능성" },
-              { grade: "경고", range: "60% 미만", label: "비효율 패턴. 토큰 낭비가 큼" },
+              { grade: "탁월", range: "80%+",     label: "코드 retry 거의 없음. 명확한 컨텍스트" },
+              { grade: "보통", range: "40~79%",   label: "messy 코딩의 정상 범위" },
+              { grade: "경고", range: "40% 미만", label: "Edit→Build→Edit 루프 자주 발생" },
             ]}
             currentGrade={grade}
           />
+          <p className="text-xs text-slate-600 mt-2">codeburn 공식 anchor (90% / 30%) 기반 3단계.</p>
         </Section>
       )}
     </ModalShell>
@@ -364,7 +363,7 @@ export function CostPerSessionModal({
         <Section title="등급 (Sonnet 기준)">
           <GradeTable
             rows={[
-              { grade: "양호", range: "$25 미만",  label: "일상적 세션 크기" },
+              { grade: "탁월", range: "$25 미만",  label: "일상적 세션 크기" },
               { grade: "보통", range: "$25~100",   label: "큰 작업 세션. 정상 범위" },
               { grade: "경고", range: "$100+",     label: "거대 세션. 분리 또는 효율 점검" },
             ]}

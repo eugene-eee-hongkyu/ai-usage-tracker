@@ -167,7 +167,7 @@ function oneShotGrade(v: number): GradeLevel {
   if (v >= 80) return "탁월"; if (v >= 40) return "보통"; return "경고";
 }
 function costGrade(v: number): GradeLevel {
-  if (v < 25) return "양호"; if (v < 100) return "보통"; return "경고";
+  if (v < 25) return "탁월"; if (v < 100) return "보통"; return "경고";
 }
 // outputInputGrade 제거 — 외부 anchor 없음, cache 와 multi-collinear.
 function overallGrade(cacheHitPct: number, oneShotRate: number, costPerSession: number): GradeLevel {

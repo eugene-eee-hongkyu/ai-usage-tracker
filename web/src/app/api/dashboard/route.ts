@@ -486,6 +486,42 @@ export async function GET(req: NextRequest) {
     ? todayScore - yesterdayScore
     : null;
 
+  // Period 별 efficiency score = scoreSeries (daily) 를 period window 로 필터 후
+  // 평균. EFFICIENCY 카드 배지에서 사용. period=today 면 단일 entry → 게이지와 동일값.
+  // 다른 period 는 "이 기간 평균 일효율".
+  const periodWindow = (() => {
+    const today = new Date();
+    const todayY = today.toISOString().slice(0, 10);
+    switch (period) {
+      case "today":
+        return { start: todayY, end: todayY };
+      case "month": {
+        const monthStart = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), 1))
+          .toISOString().slice(0, 10);
+        return { start: monthStart, end: todayY };
+      }
+      case "8days": {
+        const start = new Date(today);
+        start.setDate(start.getDate() - 7);
+        return { start: start.toISOString().slice(0, 10), end: todayY };
+      }
+      case "30days": {
+        const start = new Date(today);
+        start.setDate(start.getDate() - 29);
+        return { start: start.toISOString().slice(0, 10), end: todayY };
+      }
+      case "all":
+      default:
+        return { start: "0000-01-01", end: todayY };
+    }
+  })();
+  const periodScoreEntries = scoreSeries.filter(
+    (s) => s.date >= periodWindow.start && s.date <= periodWindow.end && s.score !== null,
+  );
+  const periodScore = periodScoreEntries.length > 0
+    ? Math.round(periodScoreEntries.reduce((acc, s) => acc + (s.score ?? 0), 0) / periodScoreEntries.length)
+    : null;
+
   // cache hit ≥ 90% streak. 활동 없는 날은 스킵 (보류), 활동 + cache<90 = 리셋.
   let cacheStreak = 0;
   for (let i = scoreSeries.length - 1; i >= 0; i--) {
@@ -687,6 +723,9 @@ export async function GET(req: NextRequest) {
       outputInputRatio,
       // 기간 평균 일별 total tokens (cache reads 포함). EFFICIENCY 배지의 token 신호용.
       avgDailyTokens: activeDays > 0 ? (tRead + tWrite + tInput + tOutput) / activeDays : 0,
+      // period scoreSeries 평균 (period=today 면 단일 entry = 게이지 값과 일치).
+      // 배지가 사용 — 게이지와 영원히 동기화.
+      periodScore,
     },
     daily,
     dailyTokens,

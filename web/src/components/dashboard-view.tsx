@@ -5,7 +5,7 @@ import { useSession, signOut } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { Nav } from "@/components/nav";
 import { CacheHitModal, OneShotRateModal, CostPerSessionModal, CallsPerSessionModal, CostPerCallModal, TokenVolumeModal } from "@/components/metric-modal";
-import { computeDailyEfficiencyScore, computeTokenLevel } from "@/lib/rules";
+import { computeTokenLevel } from "@/lib/rules";
 import { ActivityCalendar } from "react-activity-calendar";
 import { ScoreGauge, scoreLabel } from "@/components/score-gauge";
 
@@ -21,6 +21,7 @@ interface Overview {
   costPerCall: number;
   outputInputRatio: number;
   avgDailyTokens: number;
+  periodScore: number | null;
 }
 
 interface Activity {
@@ -343,7 +344,7 @@ const ONESHOT_ROWS: [GradeLevel, string, string][] = [
 // cost/session: 외부 anchor 약함 (Anthropic baseline $6-8/세션 + $13/active day).
 // 5단계는 거짓 정밀. 3단계로 단순화 — one-shot 과 동일한 정책 (anchor 약하면 coarse).
 const COST_ROWS: [GradeLevel, string, string][] = [
-  ["양호", "<$25",     "일상적 세션 크기"],
+  ["탁월", "<$25",     "일상적 세션 크기"],
   ["보통", "$25~100",  "큰 작업 세션. 정상 범위"],
   ["경고", "$100+",    "거대 세션. 분리 또는 효율 점검"],
 ];
@@ -390,7 +391,7 @@ function oneShotGrade(v: number): GradeLevel {
   return "경고";
 }
 function costGrade(v: number): GradeLevel {
-  if (v < 25) return "양호";
+  if (v < 25) return "탁월";
   if (v < 100) return "보통";
   return "경고";
 }
@@ -413,18 +414,10 @@ function fmtTokensShort(n: number): string {
   return n.toString();
 }
 
-// EFFICIENCY 배지: 게이지와 동일한 공식으로 period 평균 적용.
-// 이전에는 별도 computeGrade (40/40/20) 가 있어 게이지 (60/25/15) 와 라벨 불일치 버그
-// 발생 (89점/양호 vs 보통). 두 곳을 같은 점수+라벨로 통합.
-function computeEfficiencyBadgeScore(ov: Overview): number | null {
-  if (ov.sessions === 0 || ov.calls === 0) return null;
-  return computeDailyEfficiencyScore(
-    ov.cacheHitPct,
-    ov.costPerCall,
-    ov.oneShotRate,
-    ov.avgDailyTokens,
-  );
-}
+// EFFICIENCY 배지: API 가 반환한 periodScore 사용 (period 별 daily score 평균).
+// period=today 면 단일 entry = 게이지 값 정확히 일치 → 게이지·배지 영원히 동기화.
+// 이전엔 period overview 에서 별도 계산 (cross-source: ccusage vs codeburn 토큰/oneshot)
+// 했는데 source 불일치로 ~5점 차이 발생 (91/탁월 vs 양호 버그). periodScore 사용으로 해결.
 function badgeGradeFromScore(score: number | null): GradeLevel {
   // scoreLabel 의 5단계 와 일치 (90/75/55/35).
   if (score === null) return "경고";
@@ -1007,7 +1000,7 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
               <span className="text-xs font-mono font-bold text-fuchsia-400 uppercase tracking-wider">Efficiency</span>
               {(() => {
                 const costPs = ov.sessions > 0 ? ov.cost / ov.sessions : 0;
-                const grade = badgeGradeFromScore(computeEfficiencyBadgeScore(ov));
+                const grade = badgeGradeFromScore(ov.periodScore);
                 return (
                   <div className="relative group/grade">
                     <span data-testid="dash-grade-overall" className={`text-xs font-mono font-bold px-2 py-0.5 rounded border cursor-default ${GRADE_STYLES[grade]}`}>
