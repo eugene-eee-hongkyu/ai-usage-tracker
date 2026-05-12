@@ -122,36 +122,13 @@ function oneShotGrade(v: number): GradeLevel {
 }
 
 function costPerSessionGrade(v: number): GradeLevel {
-  if (v < 10) return "탁월";
   if (v < 25) return "양호";
-  if (v < 50) return "보통";
-  if (v < 100) return "부족";
+  if (v < 100) return "보통";
   return "경고";
 }
 
-function callsPerSessionGrade(v: number): GradeLevel {
-  if (v >= 30 && v <= 60) return "탁월";
-  if ((v >= 20 && v < 30) || (v > 60 && v <= 80)) return "양호";
-  if ((v >= 10 && v < 20) || (v > 80 && v <= 120)) return "보통";
-  if ((v >= 5 && v < 10) || (v > 120 && v <= 200)) return "부족";
-  return "경고";
-}
-
-function costPerCallGrade(v: number): GradeLevel {
-  if (v < 0.04) return "탁월";
-  if (v < 0.06) return "양호";
-  if (v < 0.10) return "보통";
-  if (v < 0.20) return "부족";
-  return "경고";
-}
-
-function outputInputGrade(v: number): GradeLevel {
-  if (v >= 30) return "탁월";
-  if (v >= 15) return "양호";
-  if (v >= 8) return "보통";
-  if (v >= 3) return "부족";
-  return "경고";
-}
+// calls/session, cost/call, output/input — 외부 anchor 없음 → 등급 미부착.
+// 모달은 "설명" 만 노출 (등급 섹션 제거).
 
 export function CacheHitModal({ value, onClose, methodsOnly = false }: { value: number; onClose: () => void; methodsOnly?: boolean }) {
   const grade = cacheHitGrade(value);
@@ -387,15 +364,13 @@ export function CostPerSessionModal({
         <Section title="등급 (Sonnet 기준)">
           <GradeTable
             rows={[
-              { grade: "탁월", range: "$10 미만",  label: "짧은 작업 단위로 잘 분리됨. 본보기 패턴" },
-              { grade: "양호", range: "$10~25",    label: "적당한 규모 작업. 정상" },
-              { grade: "보통", range: "$25~50",    label: "큰 작업 또는 여러 작업 혼재" },
-              { grade: "부족", range: "$50~100",   label: "세션이 너무 큼. 분리 필요" },
-              { grade: "경고", range: "$100+",     label: "auto-compact 트리거되는 거대 세션. 비효율" },
+              { grade: "양호", range: "$25 미만",  label: "일상적 세션 크기" },
+              { grade: "보통", range: "$25~100",   label: "큰 작업 세션. 정상 범위" },
+              { grade: "경고", range: "$100+",     label: "거대 세션. 분리 또는 효율 점검" },
             ]}
             currentGrade={grade}
           />
-          <p className="text-xs text-slate-600 mt-2">Opus는 약 5배로 환산.</p>
+          <p className="text-xs text-slate-600 mt-2">Opus는 약 5배로 환산. 외부 anchor가 약해 3단계로 단순화.</p>
         </Section>
       )}
     </ModalShell>
@@ -415,7 +390,6 @@ export function CostPerCallModal({
   onClose: () => void;
   methodsOnly?: boolean;
 }) {
-  const grade = costPerCallGrade(value);
   return (
     <ModalShell title={methodsOnly ? "Cost / call 줄이는 방법" : "Cost / call 상세"} onClose={onClose}>
       {!methodsOnly && (
@@ -464,95 +438,18 @@ export function CostPerCallModal({
         </div>
       </Section>
       {!methodsOnly && (
-        <Section title="등급 (Sonnet 기준)">
-          <GradeTable
-            rows={[
-              { grade: "탁월", range: "$0.04 미만",  label: "cache 잘 활용 + 작은 모델" },
-              { grade: "양호", range: "$0.04~0.06",  label: "정상. Sonnet 위주" },
-              { grade: "보통", range: "$0.06~0.10",  label: "Opus 사용 또는 컨텍스트 큼" },
-              { grade: "부족", range: "$0.10~0.20",  label: "Opus 남용 또는 cache miss" },
-              { grade: "경고", range: "$0.20+",      label: "Opus + 큰 컨텍스트 + cache 깨짐" },
-            ]}
-            currentGrade={grade}
-          />
-          <p className="text-xs text-slate-600 mt-2">Opus는 약 5배로 환산. 팀원 비교 시 같은 모델 기준으로 볼 것.</p>
+        <Section title="참고">
+          <p className="text-xs text-slate-500 leading-relaxed">
+            Cost / call 은 모델 선택과 컨텍스트 크기의 종합 신호. 외부 anchor 가 없어 등급은 부착하지 않으며,
+            모델 사용 분포 (BY MODEL 카드) + Cache hit 등급으로 이미 represented. 값은 진단/추세 용으로 활용.
+          </p>
         </Section>
       )}
     </ModalShell>
   );
 }
 
-export function OutputInputRatioModal({
-  value,
-  onClose,
-  methodsOnly = false,
-}: {
-  value: number;
-  onClose: () => void;
-  methodsOnly?: boolean;
-}) {
-  const grade = outputInputGrade(value);
-  return (
-    <ModalShell title={methodsOnly ? "Output / Input ratio 올리는 방법" : "Output / Input ratio 상세"} onClose={onClose}>
-      {!methodsOnly && (
-        <Section title="Output / Input ratio란">
-          <p className="text-slate-400 leading-relaxed text-xs">
-            Claude에게 보낸 새 입력 1 토큰당 Claude가 생성한 출력이 몇 토큰인지를 나타냅니다.
-            높을수록 &ldquo;적은 지시로 많은 작업을 시킨 것&rdquo;.
-          </p>
-          <div className="bg-slate-800 rounded px-3 py-2 text-xs font-mono leading-relaxed">
-            <span className="text-slate-400">Output / Input = output 토큰 ÷ input 토큰</span>
-            <br />
-            <span className="text-slate-500 text-[10px]">※ input은 새로 보낸 토큰만. cache_read는 제외 (이미 1/10 가격으로 처리됨)</span>
-          </div>
-          <p className="text-slate-400 leading-relaxed text-xs">
-            낮은 ratio = 큰 컨텍스트를 새로 보내고 짧은 답을 받음 = cache를 안 쓰거나 단순 질의응답 패턴.{" "}
-            <strong className="text-slate-300">사내 멤버 비교에서 이 수치가 낮으면 AI 활용 방식 점검이 필요합니다.</strong>
-          </p>
-        </Section>
-      )}
-      <Section title="올리는 방법">
-        <div className="space-y-2.5">
-          <Step n={1}>
-            <strong className="text-slate-300">CLAUDE.md 안정화 → cache 활용</strong> — cache_read를 쓰면
-            input 토큰이 줄고 output은 그대로라 ratio가 올라감. cache hit와 직결.
-          </Step>
-          <Step n={2}>
-            <strong className="text-slate-300">작업 위임으로 사용</strong> — &ldquo;이 부분 어떻게 하지?&rdquo; 질문 대신
-            &ldquo;이 패턴으로 전체 리팩토링해줘&rdquo; 위임. 짧은 지시로 긴 코드를 받을수록 ratio ↑.
-          </Step>
-          <Step n={3}>
-            <strong className="text-slate-300">짧고 구체적인 지시</strong> — 긴 설명 대신 명확한 동사와 범위.
-            &ldquo;X 파일의 Y 함수를 Z 방식으로 수정해줘&rdquo;가 &ldquo;이거 좀 고쳐줘&rdquo;보다 output 품질과 양이 높음.
-          </Step>
-          <Step n={4}>
-            <strong className="text-slate-300">같은 세션 안에서 이어서 작업</strong> — 세션 끊으면 cache 날아감.
-            cache 살아있는 동안 연속 작업하면 input 토큰 최소화.
-          </Step>
-          <Step n={5}>
-            <strong className="text-slate-300">Claude를 검색기로 쓰지 않기</strong> — &ldquo;X가 뭐야?&rdquo; 같은
-            단순 질문은 ratio를 낮춤. 문서 검색은 MCP 도구로, Claude는 실제 작업에.
-          </Step>
-        </div>
-      </Section>
-      {!methodsOnly && (
-        <Section title="등급">
-          <GradeTable
-            rows={[
-              { grade: "탁월", range: "30× 이상",  label: "cache 잘 활용 + 짧은 지시 + 큰 출력" },
-              { grade: "양호", range: "15~30×",    label: "잘 쓰는 편" },
-              { grade: "보통", range: "8~15×",     label: "평범. 개선 여지 있음" },
-              { grade: "부족", range: "3~8×",      label: "큰 컨텍스트 매번 새로 보냄. cache 점검" },
-              { grade: "경고", range: "3× 미만",   label: "활용 미숙. 짧은 질문만 하는 패턴" },
-            ]}
-            currentGrade={grade}
-          />
-          <p className="text-xs text-slate-600 mt-2">임계값은 사내 멤버 데이터 축적 후 조정 예정.</p>
-        </Section>
-      )}
-    </ModalShell>
-  );
-}
+// OutputInputRatioModal 제거 — 메트릭 자체를 카드에서 빼서 사용처 없음.
 
 export function CallsPerSessionModal({
   value,
@@ -567,8 +464,6 @@ export function CallsPerSessionModal({
   onClose: () => void;
   methodsOnly?: boolean;
 }) {
-  const grade = callsPerSessionGrade(value);
-
   return (
     <ModalShell title={methodsOnly ? "Calls per session 최적화 방법" : "Calls per session 상세"} onClose={onClose}>
       {!methodsOnly && (
@@ -657,17 +552,11 @@ export function CallsPerSessionModal({
       </Section>
 
       {!methodsOnly && (
-        <Section title="등급">
-          <GradeTable
-            rows={[
-              { grade: "탁월", range: "30~60",            label: "세션이 한 작업 단위에 정확히 매칭. 이상적" },
-              { grade: "양호", range: "20~30 또는 60~80",  label: "약간 짧거나 약간 김" },
-              { grade: "보통", range: "10~20 또는 80~120", label: "짧으면 활용 부족, 길면 분리 검토" },
-              { grade: "부족", range: "5~10 또는 120~200", label: "너무 짧거나 너무 김. one-shot rate 같이 점검" },
-              { grade: "경고", range: "5 미만 또는 200+",  label: "비정상. 활용 부족 또는 retry 루프 의심" },
-            ]}
-            currentGrade={grade}
-          />
+        <Section title="참고">
+          <p className="text-xs text-slate-500 leading-relaxed mb-2">
+            너무 높아도 안 좋고 너무 낮아도 안 좋아 외부 anchor 없음. 등급은 부착하지 않습니다.
+            적정 범위는 대략 세션당 30~80 calls 이지만 작업 유형에 따라 정상 범위가 크게 변동.
+          </p>
           <div className="mt-3 space-y-1 text-xs text-slate-600">
             <p className="font-semibold text-slate-500">같이 봐야 하는 지표</p>
             <p>• one-shot rate 낮으면서 calls 높음 → retry 루프. 가장 나쁜 신호</p>

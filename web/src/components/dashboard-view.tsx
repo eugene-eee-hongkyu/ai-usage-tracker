@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useSession, signOut } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { Nav } from "@/components/nav";
-import { CacheHitModal, OneShotRateModal, CostPerSessionModal, CallsPerSessionModal, CostPerCallModal, OutputInputRatioModal } from "@/components/metric-modal";
+import { CacheHitModal, OneShotRateModal, CostPerSessionModal, CallsPerSessionModal, CostPerCallModal } from "@/components/metric-modal";
 import { ActivityCalendar } from "react-activity-calendar";
 import { ScoreGauge, scoreLabel } from "@/components/score-gauge";
 
@@ -338,33 +338,12 @@ const ONESHOT_ROWS: [GradeLevel, string, string][] = [
   ["보통", "40~79%",  "messy 코딩의 정상 범위"],
   ["경고", "<40%",    "Edit→Build→Edit 루프 자주 발생"],
 ];
+// cost/session: 외부 anchor 약함 (Anthropic baseline $6-8/세션 + $13/active day).
+// 5단계는 거짓 정밀. 3단계로 단순화 — one-shot 과 동일한 정책 (anchor 약하면 coarse).
 const COST_ROWS: [GradeLevel, string, string][] = [
-  ["탁월", "<$10",    "작업 단위 잘 분리됨"],
-  ["양호", "$10~25",  "적당한 규모. 정상"],
-  ["보통", "$25~50",  "큰 작업 또는 혼재"],
-  ["부족", "$50~100", "세션이 너무 큼. 분리 필요"],
-  ["경고", "$100+",   "거대 세션. 비효율"],
-];
-const CALLS_ROWS: [GradeLevel, string, string][] = [
-  ["탁월", "30~60",      "한 작업 단위에 정확히 매칭"],
-  ["양호", "20~30|60~80","약간 짧거나 약간 김"],
-  ["보통", "10~20|80~120","활용 부족 또는 분리 검토"],
-  ["부족", "5~10|120~200","너무 짧거나 너무 김"],
-  ["경고", "<5|200+",    "활용 부족 또는 retry 루프"],
-];
-const COST_CALL_ROWS: [GradeLevel, string, string][] = [
-  ["탁월", "<$0.04",    "cache 활용 + Sonnet/Haiku 위주"],
-  ["양호", "$0.04~0.06","정상 — Sonnet 기준"],
-  ["보통", "$0.06~0.10","Opus 사용 또는 컨텍스트 큼"],
-  ["부족", "$0.10~0.20","Opus 남용 또는 cache miss"],
-  ["경고", "$0.20+",    "Opus + 큰 컨텍스트 + cache 깨짐"],
-];
-const OUTPUT_INPUT_ROWS: [GradeLevel, string, string][] = [
-  ["탁월", "30×+",    "짧은 지시 + 큰 출력. cache 잘 활용"],
-  ["양호", "15~30×",  "잘 쓰는 편"],
-  ["보통", "8~15×",   "평범. 개선 여지 있음"],
-  ["부족", "3~8×",    "큰 컨텍스트 매번 새로 보냄"],
-  ["경고", "3× 미만", "활용 미숙"],
+  ["양호", "<$25",     "일상적 세션 크기"],
+  ["보통", "$25~100",  "큰 작업 세션. 정상 범위"],
+  ["경고", "$100+",    "거대 세션. 분리 또는 효율 점검"],
 ];
 
 function MiniGradeTable({ title, rows, current }: { title: string; rows: [GradeLevel, string, string][]; current: GradeLevel }) {
@@ -399,33 +378,13 @@ function oneShotGrade(v: number): GradeLevel {
   return "경고";
 }
 function costGrade(v: number): GradeLevel {
-  if (v < 10) return "탁월";
   if (v < 25) return "양호";
-  if (v < 50) return "보통";
-  if (v < 100) return "부족";
+  if (v < 100) return "보통";
   return "경고";
 }
-function callsGrade(v: number): GradeLevel {
-  if (v >= 30 && v <= 60) return "탁월";
-  if ((v >= 20 && v < 30) || (v > 60 && v <= 80)) return "양호";
-  if ((v >= 10 && v < 20) || (v > 80 && v <= 120)) return "보통";
-  if ((v >= 5 && v < 10) || (v > 120 && v <= 200)) return "부족";
-  return "경고";
-}
-function costPerCallGrade(v: number): GradeLevel {
-  if (v < 0.04) return "탁월";
-  if (v < 0.06) return "양호";
-  if (v < 0.10) return "보통";
-  if (v < 0.20) return "부족";
-  return "경고";
-}
-function outputInputGrade(v: number): GradeLevel {
-  if (v >= 30) return "탁월";
-  if (v >= 15) return "양호";
-  if (v >= 8) return "보통";
-  if (v >= 3) return "부족";
-  return "경고";
-}
+// calls/session, cost/call, output/input — 외부 anchor 없음. 등급 미표시.
+// 값만 노출. 추세 (후속 PR) 로 변화 인지.
+
 function computeGrade(cacheHitPct: number, oneShotRate: number, costPerSession: number): GradeLevel {
   const cacheScore = cacheHitPct / 100;
   const oneShotScore = oneShotRate;
@@ -585,8 +544,6 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
   const [showCallsMethodsModal, setShowCallsMethodsModal] = useState(false);
   const [showCostCallModal, setShowCostCallModal] = useState(false);
   const [showCostCallMethodsModal, setShowCostCallMethodsModal] = useState(false);
-  const [showOutputInputModal, setShowOutputInputModal] = useState(false);
-  const [showOutputInputMethodsModal, setShowOutputInputMethodsModal] = useState(false);
   const [showTzPicker, setShowTzPicker] = useState(false);
   const [userTz, setUserTz] = useState<string>(() =>
     typeof window !== "undefined"
@@ -1010,9 +967,8 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
             <div className="px-3 py-2 border-b border-neutral-800 flex items-center justify-between">
               <span className="text-xs font-mono font-bold text-fuchsia-400 uppercase tracking-wider">Efficiency</span>
               {(() => {
-                const grade = computeGrade(ov.cacheHitPct, ov.oneShotRate, ov.sessions > 0 ? ov.cost / ov.sessions : 0);
                 const costPs = ov.sessions > 0 ? ov.cost / ov.sessions : 0;
-                const callsPs = ov.sessions > 0 ? Math.round(ov.calls / ov.sessions) : 0;
+                const grade = computeGrade(ov.cacheHitPct, ov.oneShotRate, costPs);
                 return (
                   <div className="relative group/grade">
                     <span data-testid="dash-grade-overall" className={`text-xs font-mono font-bold px-2 py-0.5 rounded border cursor-default ${GRADE_STYLES[grade]}`}>
@@ -1025,9 +981,6 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
                           <MiniGradeTable title="Cache hit" rows={CACHE_ROWS} current={cacheHitGrade(ov.cacheHitPct)} />
                           <MiniGradeTable title="One-shot rate" rows={ONESHOT_ROWS} current={oneShotGrade(Math.round(ov.oneShotRate * 100))} />
                           <MiniGradeTable title="Cost / session" rows={COST_ROWS} current={costGrade(costPs)} />
-                          <MiniGradeTable title="Calls / session" rows={CALLS_ROWS} current={callsGrade(callsPs)} />
-                          <MiniGradeTable title="Cost / call" rows={COST_CALL_ROWS} current={costPerCallGrade(ov.costPerCall ?? 0)} />
-                          <MiniGradeTable title="Output / Input" rows={OUTPUT_INPUT_ROWS} current={outputInputGrade(ov.outputInputRatio ?? 0)} />
                         </div>
                       </div>
                     )}
@@ -1087,9 +1040,9 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
                     label: "Calls / session",
                     value: callsPerSession.toString(),
                     color: "text-blue-400",
-                    grade: callsGrade(callsPerSession),
-                    gradeRows: CALLS_ROWS,
-                    gradeTitle: "Calls / session",
+                    grade: null,
+                    gradeRows: null,
+                    gradeTitle: "",
                     onDesc: () => setShowCallsModal(true),
                     onAct: () => setShowCallsMethodsModal(true),
                     actLabel: "최적화",
@@ -1099,40 +1052,32 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
                     label: "Cost / call",
                     value: ov.calls > 0 ? `$${(ov.costPerCall ?? 0).toFixed(3)}` : "$0.000",
                     color: "text-orange-400",
-                    grade: costPerCallGrade(ov.costPerCall ?? 0),
-                    gradeRows: COST_CALL_ROWS,
-                    gradeTitle: "Cost / call",
+                    grade: null,
+                    gradeRows: null,
+                    gradeTitle: "",
                     onDesc: () => setShowCostCallModal(true),
                     onAct: () => setShowCostCallMethodsModal(true),
                     actLabel: "줄이는법",
-                  },
-                  {
-                    tid: "out-in",
-                    label: "Output / Input",
-                    value: (ov.outputInputRatio ?? 0) > 0 ? `${(ov.outputInputRatio ?? 0).toFixed(1)}×` : "—",
-                    color: "text-cyan-400",
-                    grade: outputInputGrade(ov.outputInputRatio ?? 0),
-                    gradeRows: OUTPUT_INPUT_ROWS,
-                    gradeTitle: "Output / Input",
-                    onDesc: () => setShowOutputInputModal(true),
-                    onAct: () => setShowOutputInputMethodsModal(true),
-                    actLabel: "올리는법",
                   },
                 ].map(({ tid, label, value, color, grade, gradeRows, gradeTitle, onDesc, onAct, actLabel }) => (
                   <div key={label} data-testid={`dash-metric-${tid}`} className="flex items-center text-xs py-0.5 gap-2">
                     <span className="text-neutral-400 w-28 shrink-0">{label}</span>
                     <span className="flex gap-1 shrink-0 w-24">
                       <TipBtn testid={`dash-tip-${tid}-desc`} label="설명" onClick={onDesc} variant="explain" />
-                      {isBad(grade) && <TipBtn testid={`dash-tip-${tid}-act`} label={actLabel} onClick={onAct} />}
+                      {grade && isBad(grade) && <TipBtn testid={`dash-tip-${tid}-act`} label={actLabel} onClick={onAct} />}
                     </span>
                     <div className="ml-auto flex items-center gap-2">
                       <span className={`font-bold ${color}`}>{value}</span>
-                      <div className="relative group/mbadge">
-                        <span data-testid={`dash-metric-${tid}-grade`} className={`text-[10px] font-mono font-bold px-1.5 py-0.5 rounded border w-14 text-center block cursor-default ${GRADE_STYLES[grade]}`}>{grade}</span>
-                        <div className="absolute right-0 top-full mt-1 z-50 opacity-0 invisible group-hover/mbadge:opacity-100 group-hover/mbadge:visible transition-all duration-100 bg-slate-900 border border-slate-700 rounded-lg shadow-2xl p-3 w-72">
-                          <MiniGradeTable title={gradeTitle} rows={gradeRows} current={grade} />
+                      {grade && gradeRows ? (
+                        <div className="relative group/mbadge">
+                          <span data-testid={`dash-metric-${tid}-grade`} className={`text-[10px] font-mono font-bold px-1.5 py-0.5 rounded border w-14 text-center block cursor-default ${GRADE_STYLES[grade]}`}>{grade}</span>
+                          <div className="absolute right-0 top-full mt-1 z-50 opacity-0 invisible group-hover/mbadge:opacity-100 group-hover/mbadge:visible transition-all duration-100 bg-slate-900 border border-slate-700 rounded-lg shadow-2xl p-3 w-72">
+                            <MiniGradeTable title={gradeTitle} rows={gradeRows} current={grade} />
+                          </div>
                         </div>
-                      </div>
+                      ) : (
+                        <span className="w-14" />
+                      )}
                     </div>
                   </div>
                 ));
@@ -1673,12 +1618,6 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
       )}
       {showCostCallMethodsModal && (
         <CostPerCallModal value={ov.costPerCall ?? 0} totalCost={ov.cost} totalCalls={ov.calls} onClose={() => setShowCostCallMethodsModal(false)} methodsOnly />
-      )}
-      {showOutputInputModal && (
-        <OutputInputRatioModal value={ov.outputInputRatio ?? 0} onClose={() => setShowOutputInputModal(false)} />
-      )}
-      {showOutputInputMethodsModal && (
-        <OutputInputRatioModal value={ov.outputInputRatio ?? 0} onClose={() => setShowOutputInputMethodsModal(false)} methodsOnly />
       )}
     </div>
   );

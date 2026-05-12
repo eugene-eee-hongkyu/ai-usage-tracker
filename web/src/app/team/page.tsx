@@ -167,11 +167,9 @@ function oneShotGrade(v: number): GradeLevel {
   if (v >= 80) return "탁월"; if (v >= 40) return "보통"; return "경고";
 }
 function costGrade(v: number): GradeLevel {
-  if (v < 10) return "탁월"; if (v < 25) return "양호"; if (v < 50) return "보통"; if (v < 100) return "부족"; return "경고";
+  if (v < 25) return "양호"; if (v < 100) return "보통"; return "경고";
 }
-function outputInputGrade(v: number): GradeLevel {
-  if (v >= 30) return "탁월"; if (v >= 15) return "양호"; if (v >= 8) return "보통"; if (v >= 3) return "부족"; return "경고";
-}
+// outputInputGrade 제거 — 외부 anchor 없음, cache 와 multi-collinear.
 function overallGrade(cacheHitPct: number, oneShotRate: number, costPerSession: number): GradeLevel {
   const cacheScore = cacheHitPct / 100;
   const oneShotScore = oneShotRate;
@@ -649,7 +647,6 @@ export default function TeamPage() {
                         <th className="text-right text-neutral-500 pb-2 px-3 font-normal">cache</th>
                         <th className="text-right text-neutral-500 pb-2 px-3 font-normal">1-shot</th>
                         <th className="text-right text-neutral-500 pb-2 px-3 font-normal">$/sess</th>
-                        <th className="text-right text-neutral-500 pb-2 px-3 font-normal">out/in</th>
                         <th className="text-right text-neutral-500 pb-2 px-3 font-normal" title="활성 블록 기준 분당 토큰 (ccusage blocks)">tok/min</th>
                         <th className="text-right text-neutral-500 pb-2 pl-3 font-normal">종합</th>
                       </tr>
@@ -679,9 +676,6 @@ export default function TeamPage() {
                             </GradeCell>
                             <GradeCell testid={`team-eff-cost-${m.userId}`} grade={costGrade(costPerSession)}>
                               ${costPerSession.toFixed(2)}
-                            </GradeCell>
-                            <GradeCell testid={`team-eff-out-in-${m.userId}`} grade={outputInputGrade(m.outputInputRatio)}>
-                              {m.outputInputRatio.toFixed(1)}×
                             </GradeCell>
                             <td data-testid={`team-eff-tokmin-${m.userId}`} className="py-2.5 px-3 text-right tabular-nums">
                               {m.tokensPerMinute != null
