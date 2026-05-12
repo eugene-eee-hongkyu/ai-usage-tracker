@@ -116,10 +116,8 @@ function cacheHitGrade(v: number): GradeLevel {
 }
 
 function oneShotGrade(v: number): GradeLevel {
-  if (v >= 90) return "탁월";
-  if (v >= 80) return "양호";
-  if (v >= 70) return "보통";
-  if (v >= 60) return "부족";
+  if (v >= 80) return "탁월";
+  if (v >= 40) return "보통";
   return "경고";
 }
 

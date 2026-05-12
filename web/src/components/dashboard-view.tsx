@@ -330,12 +330,13 @@ const CACHE_ROWS: [GradeLevel, string, string][] = [
   ["부족", "60~79%",  "CLAUDE.md 비대 의심"],
   ["경고", "<60%",    "본사 기준 사고(SEV) 수준"],
 ];
+// one-shot rate: codeburn 공식 anchor (90% "right first try" / 30% "retry loop")
+// 기준 3단계. 80% 위 = 진짜 우수, 40~80% = messy 코딩 정상 범위 (행동 변경 권유 안 함),
+// 40% 미만 = Edit→Build→Edit 루프 신호 (codeburn 30% 명시 문제선 + 약간 margin).
 const ONESHOT_ROWS: [GradeLevel, string, string][] = [
-  ["탁월", "90%+",    "명확한 지시 + 좋은 컨텍스트"],
-  ["양호", "80~89%",  "좋은 상태"],
-  ["보통", "70~79%",  "지시 명확도 점검 필요"],
-  ["부족", "60~69%",  "자주 retry 발생"],
-  ["경고", "<60%",    "비효율 패턴. 토큰 낭비"],
+  ["탁월", "80%+",    "코드 retry 거의 없음. 명확한 컨텍스트"],
+  ["보통", "40~79%",  "messy 코딩의 정상 범위"],
+  ["경고", "<40%",    "Edit→Build→Edit 루프 자주 발생"],
 ];
 const COST_ROWS: [GradeLevel, string, string][] = [
   ["탁월", "<$10",    "작업 단위 잘 분리됨"],
@@ -393,10 +394,8 @@ function cacheHitGrade(v: number): GradeLevel {
   return "경고";
 }
 function oneShotGrade(v: number): GradeLevel {
-  if (v >= 90) return "탁월";
-  if (v >= 80) return "양호";
-  if (v >= 70) return "보통";
-  if (v >= 60) return "부족";
+  if (v >= 80) return "탁월";
+  if (v >= 40) return "보통";
   return "경고";
 }
 function costGrade(v: number): GradeLevel {
