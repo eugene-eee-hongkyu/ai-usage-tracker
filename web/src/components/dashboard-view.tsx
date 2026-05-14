@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useSession, signOut } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { Nav } from "@/components/nav";
@@ -284,6 +284,15 @@ function EfficiencyScoreSection({ score }: EfficiencyScoreSectionProps) {
               blockMargin={2}
               showTotalCount={false}
               renderColorLegend={() => <></>}
+              renderBlock={(block, activity) => {
+                // 셀 hover 시 native SVG <title> tooltip 으로 그 날 점수 + 등급.
+                // 색만 보면 "왜 이 색?" 모호한 거 해결. 별도 라이브러리 의존 0.
+                const inactive = activity.level === 0;
+                const label = inactive
+                  ? `${activity.date} · 활동 없음`
+                  : `${activity.date} · ${activity.count}점 · ${scoreLabel(activity.count)}`;
+                return React.cloneElement(block, {}, <title>{label}</title>);
+              }}
             />
           </div>
         </div>
@@ -1031,7 +1040,9 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
                 const callsPerSession = ov.sessions > 0 ? Math.round(ov.calls / ov.sessions) : 0;
                 const BAD: GradeLevel[] = ["보통", "부족", "경고"];
                 const isBad = (g: GradeLevel) => BAD.includes(g);
-                return [
+                const tokenLvl = computeTokenLevel(ov.avgDailyTokens);
+                // 등급 메트릭 (4) — 외부 anchor 기반 행동 가이드.
+                const gradedRows = [
                   {
                     tid: "cache",
                     label: "Cache hit",
@@ -1068,28 +1079,29 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
                     onAct: () => setShowCostMethodsModal(true),
                     actLabel: "줄이는법",
                   },
-                  (() => {
-                    const lvl = computeTokenLevel(ov.avgDailyTokens);
-                    return {
-                      tid: "tokens",
-                      label: "사용량",
-                      value: ov.avgDailyTokens > 0 ? `${fmtTokensShort(ov.avgDailyTokens)}/day` : "0",
-                      color: "text-cyan-400",
-                      grade: tokenLevelToGrade(lvl),
-                      gradeRows: TOKEN_ROWS,
-                      gradeTitle: `사용량 (${lvl}/10)`,
-                      onDesc: () => setShowTokenModal(true),
-                      onAct: () => setShowTokenModal(true),
-                      actLabel: "더 쓰는법",
-                    };
-                  })(),
+                  {
+                    tid: "tokens",
+                    label: "사용량",
+                    // 팀 EFFICIENCY 와 동일 포맷 — level primary, abs value secondary.
+                    value: ov.avgDailyTokens > 0 ? `${tokenLvl}/10 · ${fmtTokensShort(ov.avgDailyTokens)}` : "0",
+                    color: "text-cyan-400",
+                    grade: tokenLevelToGrade(tokenLvl),
+                    gradeRows: TOKEN_ROWS,
+                    gradeTitle: `사용량 (${tokenLvl}/10)`,
+                    onDesc: () => setShowTokenModal(true),
+                    onAct: () => setShowTokenModal(true),
+                    actLabel: "더 쓰는법",
+                  },
+                ];
+                // 참고 수치 (2) — 외부 anchor 없음, diagnostic 용.
+                const referenceRows = [
                   {
                     tid: "calls-session",
                     label: "Calls / session",
                     value: callsPerSession.toString(),
                     color: "text-blue-400",
-                    grade: null,
-                    gradeRows: null,
+                    grade: null as GradeLevel | null,
+                    gradeRows: null as [GradeLevel, string, string][] | null,
                     gradeTitle: "",
                     onDesc: () => setShowCallsModal(true),
                     onAct: () => setShowCallsMethodsModal(true),
@@ -1100,14 +1112,16 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
                     label: "Cost / call",
                     value: ov.calls > 0 ? `$${(ov.costPerCall ?? 0).toFixed(3)}` : "$0.000",
                     color: "text-orange-400",
-                    grade: null,
-                    gradeRows: null,
+                    grade: null as GradeLevel | null,
+                    gradeRows: null as [GradeLevel, string, string][] | null,
                     gradeTitle: "",
                     onDesc: () => setShowCostCallModal(true),
                     onAct: () => setShowCostCallMethodsModal(true),
                     actLabel: "줄이는법",
                   },
-                ].map(({ tid, label, value, color, grade, gradeRows, gradeTitle, onDesc, onAct, actLabel }) => (
+                ];
+                type MetricRow = (typeof gradedRows)[number] | (typeof referenceRows)[number];
+                const renderRow = ({ tid, label, value, color, grade, gradeRows, gradeTitle, onDesc, onAct, actLabel }: MetricRow) => (
                   <div key={label} data-testid={`dash-metric-${tid}`} className="flex items-center text-xs py-0.5 gap-2">
                     <span className="text-neutral-400 w-28 shrink-0">{label}</span>
                     <span className="flex gap-1 shrink-0 w-24">
@@ -1128,7 +1142,17 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
                       )}
                     </div>
                   </div>
-                ));
+                );
+                return (
+                  <>
+                    {gradedRows.map(renderRow)}
+                    {/* 시각 그룹 분리 — 등급 (행동 가이드) vs 참고 (diagnostic). */}
+                    <div className="mt-2 pt-1.5 border-t border-neutral-800/60 flex items-center">
+                      <span className="text-[9px] font-mono text-neutral-600 uppercase tracking-wider">참고 수치</span>
+                    </div>
+                    {referenceRows.map(renderRow)}
+                  </>
+                );
               })()}
             </div>
           </div>
