@@ -10,11 +10,11 @@ import {
 import { ScoreGauge, scoreLabel } from "@/components/score-gauge";
 import { computeTokenLevel, computeDailyEfficiencyScore } from "@/lib/rules";
 
-type Period = "today" | "month" | "8days" | "30days" | "all";
+type Period = "today" | "8days" | "month" | "30days" | "all";
 type GradeLevel = "탁월" | "양호" | "보통" | "부족" | "경고";
 
 const PERIOD_LABELS: Record<Period, string> = {
-  today: "오늘", month: "이번달", "8days": "8일", "30days": "30일", all: "전체",
+  today: "오늘", "8days": "8일", month: "이번달", "30days": "30일", all: "전체",
 };
 
 const GRADE_STYLES: Record<GradeLevel, string> = {
@@ -236,9 +236,9 @@ function memberLabel(key: string): string {
   return key.replace(/__\d+$/, "");
 }
 
-function GradeCell({ grade, children, testid }: { grade: GradeLevel; children: React.ReactNode; testid?: string }) {
+function GradeCell({ grade, children, testid, tooltip }: { grade: GradeLevel; children: React.ReactNode; testid?: string; tooltip?: string }) {
   return (
-    <td data-testid={testid} title={grade} className={`py-2.5 px-3 text-right whitespace-nowrap tabular-nums ${GRADE_CELL_BG[grade]}`}>
+    <td data-testid={testid} title={tooltip ?? grade} className={`py-2.5 px-3 text-right whitespace-nowrap tabular-nums ${GRADE_CELL_BG[grade]}`}>
       <span className={`font-bold ${GRADE_VALUE_COLOR[grade]}`}>{children}</span>
     </td>
   );
@@ -274,7 +274,7 @@ export default function TeamPage() {
     const saved = localStorage.getItem("team_period");
     // legacy "week" → "8days" (calendar week feature was removed)
     const upgraded = saved === "week" ? "8days" : saved;
-    if (upgraded && ["today", "month", "8days", "30days", "all"].includes(upgraded)) {
+    if (upgraded && ["today", "8days", "month", "30days", "all"].includes(upgraded)) {
       setPeriod(upgraded as Period);
     }
   }, []);
@@ -368,7 +368,7 @@ export default function TeamPage() {
       {/* Period Tabs */}
       <div className="border-b border-neutral-800">
         <div className="max-w-6xl mx-auto px-4 pt-3 pb-2 flex gap-1">
-          {(["today", "month", "8days", "30days", "all"] as Period[]).map((p) => (
+          {(["today", "8days", "month", "30days", "all"] as Period[]).map((p) => (
             <button
               key={p}
               data-testid={`team-period-${p}`}
@@ -672,7 +672,16 @@ export default function TeamPage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {members.map((m, i) => {
+                      {(() => {
+                        // 팀 평균 계산 — 각 셀 hover tooltip 에서 "내가 팀 대비 어디?"
+                        // 답하는 데 사용. 표시된 멤버 전원 단순 평균.
+                        const N = members.length || 1;
+                        const avgCache = members.reduce((s, m) => s + m.cacheHitPct, 0) / N;
+                        const avgOneShot = members.reduce((s, m) => s + m.overallOneShot, 0) / N;
+                        const avgCostPS = members.reduce((s, m) => s + (m.sessionsCount > 0 ? m.totalCost / m.sessionsCount : 0), 0) / N;
+                        const avgTokensTeam = members.reduce((s, m) => s + m.avgDailyTokens, 0) / N;
+                        const avgTokenLvl = computeTokenLevel(avgTokensTeam);
+                        return members.map((m, i) => {
                         const costPerSession = m.sessionsCount > 0 ? m.totalCost / m.sessionsCount : 0;
                         const score = computeMemberScore(m);
                         const grade = scoreToGrade(score);
@@ -680,6 +689,18 @@ export default function TeamPage() {
                         // session.user.name === m.name 매칭. 동명이인이면 둘 다 강조되는 quirk
                         // 있지만 visual nudge 로는 충분.
                         const isSelf = session?.user?.name === m.name;
+                        // vs-팀-평균 tooltip 문자열 — 임원/리더 핵심 질문 "내가 팀 대비 어디?".
+                        const cacheDelta = m.cacheHitPct - avgCache;
+                        const cacheTooltip = `팀 평균 ${avgCache.toFixed(1)}% · 내 ${m.cacheHitPct.toFixed(1)}% (${cacheDelta >= 0 ? "+" : ""}${cacheDelta.toFixed(1)}%p)`;
+                        const oneShotPct = m.overallOneShot * 100;
+                        const oneShotDelta = oneShotPct - avgOneShot * 100;
+                        const oneShotTooltip = `팀 평균 ${(avgOneShot * 100).toFixed(0)}% · 내 ${Math.round(oneShotPct)}% (${oneShotDelta >= 0 ? "+" : ""}${oneShotDelta.toFixed(0)}%p)`;
+                        const costDelta = costPerSession - avgCostPS;
+                        const costTooltip = `팀 평균 $${avgCostPS.toFixed(2)} · 내 $${costPerSession.toFixed(2)} (${costDelta >= 0 ? "+" : ""}$${costDelta.toFixed(2)})`;
+                        const myTokenLvl = computeTokenLevel(m.avgDailyTokens);
+                        const tokenTooltip = m.avgDailyTokens > 0
+                          ? `팀 평균 ${avgTokenLvl}/10 (${fmtTokens(avgTokensTeam)}) · 내 ${myTokenLvl}/10 (${fmtTokens(m.avgDailyTokens)})`
+                          : "활동 없음";
                         return (
                           <tr
                             key={m.userId}
@@ -701,28 +722,23 @@ export default function TeamPage() {
                                 <CcusageMissingBadge missing={m.ccusageMissing} userId={m.userId} />
                               </span>
                             </td>
-                            <GradeCell testid={`team-eff-cache-${m.userId}`} grade={cacheHitGrade(m.cacheHitPct)}>
+                            <GradeCell testid={`team-eff-cache-${m.userId}`} grade={cacheHitGrade(m.cacheHitPct)} tooltip={cacheTooltip}>
                               {m.cacheHitPct.toFixed(1)}%
                             </GradeCell>
-                            <GradeCell testid={`team-eff-oneshot-${m.userId}`} grade={oneShotGrade(m.overallOneShot * 100)}>
+                            <GradeCell testid={`team-eff-oneshot-${m.userId}`} grade={oneShotGrade(m.overallOneShot * 100)} tooltip={oneShotTooltip}>
                               {Math.round(m.overallOneShot * 100)}%
                             </GradeCell>
-                            <GradeCell testid={`team-eff-cost-${m.userId}`} grade={costGrade(costPerSession)}>
+                            <GradeCell testid={`team-eff-cost-${m.userId}`} grade={costGrade(costPerSession)} tooltip={costTooltip}>
                               ${costPerSession.toFixed(2)}
                             </GradeCell>
-                            {(() => {
-                              const lvl = computeTokenLevel(m.avgDailyTokens);
-                              return (
-                                <GradeCell testid={`team-eff-tokens-${m.userId}`} grade={tokenLevelGrade(lvl)}>
-                                  {m.avgDailyTokens > 0 ? (
-                                    <span className="inline-flex items-baseline gap-1 justify-end">
-                                      <span>{lvl}/10</span>
-                                      <span className="text-[10px] opacity-70 font-normal">{fmtTokens(m.avgDailyTokens)}</span>
-                                    </span>
-                                  ) : "─"}
-                                </GradeCell>
-                              );
-                            })()}
+                            <GradeCell testid={`team-eff-tokens-${m.userId}`} grade={tokenLevelGrade(myTokenLvl)} tooltip={tokenTooltip}>
+                              {m.avgDailyTokens > 0 ? (
+                                <span className="inline-flex items-baseline gap-1 justify-end">
+                                  <span>{myTokenLvl}/10</span>
+                                  <span className="text-[10px] opacity-70 font-normal">{fmtTokens(m.avgDailyTokens)}</span>
+                                </span>
+                              ) : "─"}
+                            </GradeCell>
                             <td data-testid={`team-eff-overall-${m.userId}`} className="py-2.5 pl-3 text-right">
                               <span className="inline-flex items-center gap-1.5 justify-end">
                                 <GradePill grade={grade} />
@@ -733,7 +749,8 @@ export default function TeamPage() {
                             </td>
                           </tr>
                         );
-                      })}
+                        });
+                      })()}
                     </tbody>
                   </table>
                 </div>

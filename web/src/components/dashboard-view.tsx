@@ -9,7 +9,7 @@ import { computeTokenLevel } from "@/lib/rules";
 import { ActivityCalendar } from "react-activity-calendar";
 import { ScoreGauge, scoreLabel } from "@/components/score-gauge";
 
-type Period = "today" | "month" | "8days" | "30days" | "all";
+type Period = "today" | "8days" | "month" | "30days" | "all";
 
 interface Overview {
   cost: number;
@@ -322,7 +322,7 @@ function EfficiencyScoreSection({ score, period, periodScore }: EfficiencyScoreS
 }
 
 const PERIOD_LABELS: Record<Period, string> = {
-  today: "오늘", month: "이번달", "8days": "8일", "30days": "30일", all: "전체",
+  today: "오늘", "8days": "8일", month: "이번달", "30days": "30일", all: "전체",
 };
 
 function formatPath(path: string): string {
@@ -581,7 +581,7 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
     const saved = localStorage.getItem(storageKey);
     // legacy "week" → "8days" (calendar week feature was removed)
     const upgraded = saved === "week" ? "8days" : saved;
-    if (upgraded && ["today", "month", "8days", "30days", "all"].includes(upgraded)) {
+    if (upgraded && ["today", "8days", "month", "30days", "all"].includes(upgraded)) {
       setPeriod(upgraded as Period);
     }
   }, [storageKey]);
@@ -813,7 +813,7 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
       {/* Period Tabs */}
       <div className="border-b border-neutral-800">
         <div className="max-w-6xl mx-auto px-4 pt-3 pb-2 flex gap-1 items-center">
-          {(["today", "month", "8days", "30days", "all"] as Period[]).map((p) => (
+          {(["today", "8days", "month", "30days", "all"] as Period[]).map((p) => (
             <button
               key={p}
               data-testid={`dash-period-${p}`}
@@ -1211,6 +1211,19 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
                     showWeekdayLabels
                     blockSize={11}
                     showTotalCount={false}
+                    renderBlock={(block, activity) => {
+                      // today 셀은 amber outline 으로 강조 — "오늘 어디?" 즉시 파악.
+                      // hover 시 tooltip 으로 그 날 cost 표시 (잔디 패턴과 동일).
+                      const todayKey = new Date().toISOString().slice(0, 10);
+                      const isToday = activity.date === todayKey;
+                      const cost = activity.count / 100; // calData 에서 *100 했던 거 복원
+                      const label = activity.level === 0
+                        ? `${activity.date} · 활동 없음${isToday ? " · 오늘" : ""}`
+                        : `${activity.date} · $${cost.toFixed(2)}${isToday ? " · 오늘" : ""}`;
+                      return isToday
+                        ? React.cloneElement(block, { stroke: "#fbbf24", strokeWidth: 1.5 }, <title>{label}</title>)
+                        : React.cloneElement(block, {}, <title>{label}</title>);
+                    }}
                   />
                 </div>
               </div>
