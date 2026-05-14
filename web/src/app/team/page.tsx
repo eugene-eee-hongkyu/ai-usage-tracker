@@ -182,20 +182,24 @@ function tokenLevelGrade(level: number): GradeLevel {
 }
 // outputInputGrade 제거 — 외부 anchor 없음, cache 와 multi-collinear.
 
-// 종합 등급 — 개인 EFFICIENCY 와 동일 공식 (cache 42 + one-shot 18 + cost 10 + 사용량 30).
+// 종합 점수 — 개인 EFFICIENCY 와 동일 공식 (cache 42 + one-shot 18 + cost 10 + 사용량 30).
 // 이전엔 별도 (cache 40 + one-shot 40 + cost 20) 사용했지만 개인 게이지·배지와
 // 불일치 — 같은 사람 점수가 화면마다 달라 보이는 문제. 통일.
-function overallGrade(m: MemberStat): GradeLevel {
+function computeMemberScore(m: MemberStat): number | null {
+  if (m.sessionsCount === 0) return null;
   const cpc = m.callsCount > 0 ? m.totalCost / m.callsCount : 0;
-  const score = m.sessionsCount === 0
-    ? null
-    : computeDailyEfficiencyScore(m.cacheHitPct, cpc, m.overallOneShot * 100, m.avgDailyTokens);
+  return computeDailyEfficiencyScore(m.cacheHitPct, cpc, m.overallOneShot * 100, m.avgDailyTokens);
+}
+function scoreToGrade(score: number | null): GradeLevel {
   if (score === null) return "경고";
   if (score >= 90) return "탁월";
   if (score >= 75) return "양호";
   if (score >= 55) return "보통";
   if (score >= 35) return "부족";
   return "경고";
+}
+function overallGrade(m: MemberStat): GradeLevel {
+  return scoreToGrade(computeMemberScore(m));
 }
 
 function fmtSyncTime(ts: string): string {
@@ -656,30 +660,43 @@ export default function TeamPage() {
                   )}
                 </div>
                 <div className="p-3 overflow-x-auto">
-                  <table className="w-full text-xs font-mono border-collapse">
+                  <table className="w-full text-xs font-mono border-collapse table-fixed">
                     <thead>
                       <tr className="border-b border-neutral-800">
-                        <th className="text-left text-neutral-500 pb-2 pr-4 font-normal">멤버</th>
-                        <th className="text-right text-neutral-500 pb-2 px-3 font-normal">cache</th>
-                        <th className="text-right text-neutral-500 pb-2 px-3 font-normal">1-shot</th>
-                        <th className="text-right text-neutral-500 pb-2 px-3 font-normal">$/sess</th>
-                        <th className="text-right text-neutral-500 pb-2 px-3 font-normal" title="활성일 평균 total tokens (글로벌 10단계 anchor)">사용량</th>
-                        <th className="text-right text-neutral-500 pb-2 pl-3 font-normal">종합</th>
+                        <th className="text-left text-neutral-500 pb-2 pr-4 font-normal w-[24%]">멤버</th>
+                        <th className="text-right text-neutral-500 pb-2 px-3 font-normal w-[15%]">cache</th>
+                        <th className="text-right text-neutral-500 pb-2 px-3 font-normal w-[15%]">1-shot</th>
+                        <th className="text-right text-neutral-500 pb-2 px-3 font-normal w-[15%]">$/sess</th>
+                        <th className="text-right text-neutral-500 pb-2 px-3 font-normal w-[15%]" title="활성일 평균 total tokens (글로벌 10단계 anchor)">사용량</th>
+                        <th className="text-right text-neutral-500 pb-2 pl-3 font-normal w-[16%]">종합</th>
                       </tr>
                     </thead>
                     <tbody>
                       {members.map((m, i) => {
                         const costPerSession = m.sessionsCount > 0 ? m.totalCost / m.sessionsCount : 0;
-                        const grade = overallGrade(m);
+                        const score = computeMemberScore(m);
+                        const grade = scoreToGrade(score);
+                        // 자기 row 강조 — 임원/팀 리더의 첫 시각 동선 "내 위치 어디?".
+                        // session.user.name === m.name 매칭. 동명이인이면 둘 다 강조되는 quirk
+                        // 있지만 visual nudge 로는 충분.
+                        const isSelf = session?.user?.name === m.name;
                         return (
-                          <tr key={m.userId} data-testid={`team-eff-row-${m.userId}`} className="border-b border-neutral-800/50 hover:bg-neutral-800/30 transition-colors">
+                          <tr
+                            key={m.userId}
+                            data-testid={`team-eff-row-${m.userId}`}
+                            data-self={isSelf || undefined}
+                            className={`border-b border-neutral-800/50 hover:bg-neutral-800/30 transition-colors ${
+                              isSelf ? "bg-emerald-500/5 ring-1 ring-inset ring-emerald-500/30" : ""
+                            }`}
+                          >
                             <td className="py-2.5 pr-4">
                               <span className="flex items-center gap-2 text-neutral-300">
                                 <span
                                   className="w-2 h-2 rounded-full shrink-0"
                                   style={{ background: MEMBER_COLORS[i % MEMBER_COLORS.length] }}
                                 />
-                                <span>{m.name}</span>
+                                <span className={isSelf ? "font-bold text-emerald-300" : ""}>{m.name}</span>
+                                {isSelf && <span className="text-[10px] font-mono text-emerald-400/80">(나)</span>}
                                 <SyncBadge lastSyncedAt={m.lastSyncedAt} userId={m.userId} />
                                 <CcusageMissingBadge missing={m.ccusageMissing} userId={m.userId} />
                               </span>
@@ -697,12 +714,22 @@ export default function TeamPage() {
                               const lvl = computeTokenLevel(m.avgDailyTokens);
                               return (
                                 <GradeCell testid={`team-eff-tokens-${m.userId}`} grade={tokenLevelGrade(lvl)}>
-                                  {m.avgDailyTokens > 0 ? `${fmtTokens(m.avgDailyTokens)} (${lvl}/10)` : "─"}
+                                  {m.avgDailyTokens > 0 ? (
+                                    <span className="inline-flex items-baseline gap-1 justify-end">
+                                      <span>{lvl}/10</span>
+                                      <span className="text-[10px] opacity-70 font-normal">{fmtTokens(m.avgDailyTokens)}</span>
+                                    </span>
+                                  ) : "─"}
                                 </GradeCell>
                               );
                             })()}
                             <td data-testid={`team-eff-overall-${m.userId}`} className="py-2.5 pl-3 text-right">
-                              <GradePill grade={grade} />
+                              <span className="inline-flex items-center gap-1.5 justify-end">
+                                <GradePill grade={grade} />
+                                {score !== null && (
+                                  <span className="text-[11px] font-mono text-neutral-400 tabular-nums w-7 text-right">{score}</span>
+                                )}
+                              </span>
                             </td>
                           </tr>
                         );
