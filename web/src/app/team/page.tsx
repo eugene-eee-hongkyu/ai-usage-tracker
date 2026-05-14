@@ -8,6 +8,7 @@ import {
   AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
 } from "recharts";
 import { ScoreGauge, scoreLabel } from "@/components/score-gauge";
+import { computeTokenLevel, computeDailyEfficiencyScore } from "@/lib/rules";
 
 type Period = "today" | "month" | "8days" | "30days" | "all";
 type GradeLevel = "탁월" | "양호" | "보통" | "부족" | "경고";
@@ -63,6 +64,7 @@ interface MemberStat {
   monthVisits: number;        // 이번달 (UTC) 방문 횟수
   avgDwellSec: number;        // 이번달 평균 체류 (초)
   tokensPerMinute: number | null;  // user_blocks 기반 분당 토큰. 블록 없으면 null
+  avgDailyTokens: number;     // period 활성일 평균 total tokens (사용량 신호)
 }
 
 interface TeamActivity {
@@ -169,13 +171,31 @@ function oneShotGrade(v: number): GradeLevel {
 function costGrade(v: number): GradeLevel {
   if (v < 25) return "탁월"; if (v < 100) return "보통"; return "경고";
 }
+// 사용량 (token volume) — 개인 EFFICIENCY 카드와 동일 등급 매핑.
+// computeTokenLevel 의 0~10 단계를 5-level GradeLevel 로 압축 (UI 색 컨벤션 공유).
+function tokenLevelGrade(level: number): GradeLevel {
+  if (level >= 8) return "탁월";
+  if (level >= 6) return "양호";
+  if (level >= 3) return "보통";
+  if (level >= 1) return "부족";
+  return "경고";
+}
 // outputInputGrade 제거 — 외부 anchor 없음, cache 와 multi-collinear.
-function overallGrade(cacheHitPct: number, oneShotRate: number, costPerSession: number): GradeLevel {
-  const cacheScore = cacheHitPct / 100;
-  const oneShotScore = oneShotRate;
-  const costScore = costPerSession <= 1 ? 1 : costPerSession <= 3 ? 0.8 : costPerSession <= 7 ? 0.6 : costPerSession <= 15 ? 0.4 : 0.2;
-  const composite = cacheScore * 0.4 + oneShotScore * 0.4 + costScore * 0.2;
-  if (composite >= 0.88) return "탁월"; if (composite >= 0.72) return "양호"; if (composite >= 0.52) return "보통"; if (composite >= 0.32) return "부족"; return "경고";
+
+// 종합 등급 — 개인 EFFICIENCY 와 동일 공식 (cache 42 + one-shot 18 + cost 10 + 사용량 30).
+// 이전엔 별도 (cache 40 + one-shot 40 + cost 20) 사용했지만 개인 게이지·배지와
+// 불일치 — 같은 사람 점수가 화면마다 달라 보이는 문제. 통일.
+function overallGrade(m: MemberStat): GradeLevel {
+  const cpc = m.callsCount > 0 ? m.totalCost / m.callsCount : 0;
+  const score = m.sessionsCount === 0
+    ? null
+    : computeDailyEfficiencyScore(m.cacheHitPct, cpc, m.overallOneShot * 100, m.avgDailyTokens);
+  if (score === null) return "경고";
+  if (score >= 90) return "탁월";
+  if (score >= 75) return "양호";
+  if (score >= 55) return "보통";
+  if (score >= 35) return "부족";
+  return "경고";
 }
 
 function fmtSyncTime(ts: string): string {
@@ -326,8 +346,7 @@ export default function TeamPage() {
   // Grade counts for efficiency header
   const gradeCounts = members.reduce<Record<GradeLevel, number>>(
     (acc, m) => {
-      const cps = m.sessionsCount > 0 ? m.totalCost / m.sessionsCount : 0;
-      const g = overallGrade(m.cacheHitPct, m.overallOneShot, cps);
+      const g = overallGrade(m);
       acc[g] = (acc[g] ?? 0) + 1;
       return acc;
     },
@@ -647,14 +666,14 @@ export default function TeamPage() {
                         <th className="text-right text-neutral-500 pb-2 px-3 font-normal">cache</th>
                         <th className="text-right text-neutral-500 pb-2 px-3 font-normal">1-shot</th>
                         <th className="text-right text-neutral-500 pb-2 px-3 font-normal">$/sess</th>
-                        <th className="text-right text-neutral-500 pb-2 px-3 font-normal" title="활성 블록 기준 분당 토큰 (ccusage blocks)">tok/min</th>
+                        <th className="text-right text-neutral-500 pb-2 px-3 font-normal" title="활성일 평균 total tokens (글로벌 10단계 anchor)">사용량</th>
                         <th className="text-right text-neutral-500 pb-2 pl-3 font-normal">종합</th>
                       </tr>
                     </thead>
                     <tbody>
                       {members.map((m, i) => {
                         const costPerSession = m.sessionsCount > 0 ? m.totalCost / m.sessionsCount : 0;
-                        const grade = overallGrade(m.cacheHitPct, m.overallOneShot, costPerSession);
+                        const grade = overallGrade(m);
                         return (
                           <tr key={m.userId} data-testid={`team-eff-row-${m.userId}`} className="border-b border-neutral-800/50 hover:bg-neutral-800/30 transition-colors">
                             <td className="py-2.5 pr-4">
@@ -677,11 +696,14 @@ export default function TeamPage() {
                             <GradeCell testid={`team-eff-cost-${m.userId}`} grade={costGrade(costPerSession)}>
                               ${costPerSession.toFixed(2)}
                             </GradeCell>
-                            <td data-testid={`team-eff-tokmin-${m.userId}`} className="py-2.5 px-3 text-right tabular-nums">
-                              {m.tokensPerMinute != null
-                                ? <span className="text-sky-300">{fmtTokens(m.tokensPerMinute)}</span>
-                                : <span className="text-neutral-600">─</span>}
-                            </td>
+                            {(() => {
+                              const lvl = computeTokenLevel(m.avgDailyTokens);
+                              return (
+                                <GradeCell testid={`team-eff-tokens-${m.userId}`} grade={tokenLevelGrade(lvl)}>
+                                  {m.avgDailyTokens > 0 ? `${fmtTokens(m.avgDailyTokens)} (${lvl}/10)` : "─"}
+                                </GradeCell>
+                              );
+                            })()}
                             <td data-testid={`team-eff-overall-${m.userId}`} className="py-2.5 pl-3 text-right">
                               <GradePill grade={grade} />
                             </td>

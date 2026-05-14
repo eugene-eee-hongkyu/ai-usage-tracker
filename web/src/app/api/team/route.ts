@@ -344,6 +344,11 @@ export async function GET(req: NextRequest) {
         ? Math.round(blocksOfUser.totalTokens / blocksOfUser.totalMinutes)
         : null;
 
+      // 사용량 (token volume) — 개인 EFFICIENCY 카드의 "사용량" 과 동일 정의.
+      // period 내 활성일 = d.daily 중 cost > 0 인 날. totalTokens / activeDays.
+      const memberActiveDays = (d.daily ?? []).filter((day) => (day.cost ?? 0) > 0).length;
+      const avgDailyTokens = memberActiveDays > 0 ? totalTokens / memberActiveDays : 0;
+
       return {
         userId: u.id,
         name: u.name,
@@ -359,6 +364,7 @@ export async function GET(req: NextRequest) {
         outputInputRatio,
         prevCostPerSession,
         totalTokens,
+        avgDailyTokens,
         ccusageMissing,
         monthVisits,
         avgDwellSec,
