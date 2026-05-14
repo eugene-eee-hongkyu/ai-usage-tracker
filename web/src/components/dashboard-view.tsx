@@ -174,9 +174,23 @@ function rankMedal(position: number): string {
 
 interface EfficiencyScoreSectionProps {
   score: EfficiencyScoreSummary;
+  period: Period;
+  periodScore: number | null;
 }
 
-function EfficiencyScoreSection({ score }: EfficiencyScoreSectionProps) {
+// period 별 게이지 라벨 — 다른 카드 (DAILY ACTIVITY / COST / BY MODEL ...) 가 모두
+// period-aware 로 움직이는데 이 게이지만 오늘 고정이면 인지 부조화. period 반영.
+function gaugeLabel(period: Period): string {
+  switch (period) {
+    case "today":  return "오늘 효율";
+    case "8days":  return "8일 평균 효율";
+    case "month":  return "이번달 평균 효율";
+    case "30days": return "30일 평균 효율";
+    case "all":    return "전체 평균 효율";
+  }
+}
+
+function EfficiencyScoreSection({ score, period, periodScore }: EfficiencyScoreSectionProps) {
   const calData = score.daily.map((d) => ({
     date: d.date,
     count: d.score ?? 0,
@@ -186,14 +200,20 @@ function EfficiencyScoreSection({ score }: EfficiencyScoreSectionProps) {
   // level 0 = 회색 (활동 없음). scoreHexColor() 와 동일 팔레트.
   const theme = { dark: ["#1e293b", "#7f1d1d", "#9a3412", "#65a30d", "#10b981"] as [string, string, string, string, string] };
 
-  const deltaNode = score.delta === null ? null
+  // Delta — period=today 일 때만 의미 있음 (오늘 vs 어제). 다른 period 면 hide.
+  const deltaNode = period !== "today" || score.delta === null ? null
     : score.delta > 0 ? <span className="text-emerald-400">↑ +{score.delta}</span>
     : score.delta < 0 ? <span className="text-rose-400">↓ {score.delta}</span>
     : <span className="text-neutral-500">─ 0</span>;
 
-  // 오늘 날짜 (브라우저 timezone 기준). 게이지가 항상 "오늘" 점수임을 명시 —
-  // period 필터(오늘/이번달/8일/30일/전체) 변경해도 이 섹션은 안 바뀜.
-  const todayLabel = new Intl.DateTimeFormat("ko-KR", { month: "numeric", day: "numeric" }).format(new Date());
+  // 라벨 — period=today 면 날짜 함께, 그 외는 period 이름만.
+  const todayDateLabel = new Intl.DateTimeFormat("ko-KR", { month: "numeric", day: "numeric" }).format(new Date());
+  const labelMain = gaugeLabel(period);
+  const labelSuffix = period === "today" ? ` (${todayDateLabel})` : "";
+
+  // 게이지 표시값 = period 평균. 8일 / 30일 선택하면 그 기간 평균 점수.
+  // period=today 면 단일 entry → today 점수와 동일.
+  const displayScore = periodScore;
 
   return (
     <div data-testid="dash-efficiency-score" className="bg-neutral-950 border-b border-neutral-800">
@@ -202,11 +222,11 @@ function EfficiencyScoreSection({ score }: EfficiencyScoreSectionProps) {
           {/* Hero: 원형 게이지 (3 cols) — 5초 테스트 통과용 단일 focal point */}
           <div data-testid="score-today" className="col-span-12 sm:col-span-3 flex flex-col items-center">
             <span className="text-[10px] font-mono text-neutral-500 uppercase tracking-wider mb-1">
-              오늘 효율 ({todayLabel}) <span className="text-neutral-700 normal-case tracking-normal">· period 필터 무관</span>
+              {labelMain}{labelSuffix}
             </span>
-            <ScoreGauge score={score.today} />
+            <ScoreGauge score={displayScore} />
             <div className="mt-1.5 flex items-center gap-1.5 text-[11px] font-mono">
-              <span className={`font-bold ${scoreColor(score.today)}`}>{scoreLabel(score.today)}</span>
+              <span className={`font-bold ${scoreColor(displayScore)}`}>{scoreLabel(displayScore)}</span>
               {deltaNode && <span className="text-neutral-500">·</span>}
               {deltaNode}
             </div>
@@ -868,9 +888,12 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
       </div>
 
       {/* Daily Efficiency Score + Streak + 90일 잔디 + 팀 랭크.
-          period 필터 무관 — 항상 "현재 / 오늘". 자기 인식 / 셀프 중독 섹션. */}
+          게이지 값은 period-aware (periodScore). 다른 카드 (DAILY ACTIVITY / COST /
+          BY MODEL ...) 가 모두 period 따라 변하는데 게이지만 오늘 고정이면 인지
+          부조화 발생 → period 반영. 90일 잔디는 long-term trend 의도라 항상 90일.
+          Streak / 팀 랭크는 period 무관 자체 의미 (현재까지 streak / 이번주 랭크). */}
       {data.efficiencyScore && (
-        <EfficiencyScoreSection score={data.efficiencyScore} />
+        <EfficiencyScoreSection score={data.efficiencyScore} period={period} periodScore={ov.periodScore} />
       )}
 
       {/* Overview Bar */}
