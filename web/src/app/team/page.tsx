@@ -383,11 +383,11 @@ export default function TeamPage() {
           // bullet graph 행의 max 값 — Primus 가 가장 크면 그 값 +20% 헤드룸.
           const bulletMax = Math.max(102, ic.activeDayAvg * 1.2);
           const bulletRows: Array<{ label: string; value: number; star?: boolean; benchmark?: boolean }> = [
-            { label: "Anthropic 평균", value: 6 },
-            { label: "Anthropic 90th", value: 12 },
-            { label: "엔터 active 평균", value: 13, benchmark: true },
-            { label: "엔터 90th", value: 30 },
-            { label: "ccusage 헤비", value: 92 },
+            { label: "일반 사용자 평균", value: 6 },
+            { label: "일반 사용자 상위 10%", value: 12 },
+            { label: "회사 도입 평균", value: 13, benchmark: true },
+            { label: "회사 도입 상위 10%", value: 30 },
+            { label: "헤비 사용자 사례", value: 92 },
             { label: "PRIMUS 팀", value: ic.activeDayAvg, star: true },
           ];
           return (
@@ -424,7 +424,7 @@ export default function TeamPage() {
                     <span className="text-2xl font-mono text-emerald-400">x</span>
                   </div>
                   <span className="text-[11px] font-mono text-neutral-400 mt-1.5 text-center">
-                    엔터 active day 평균 (${enterpriseAvg}) 대비
+                    회사 도입 평균 (${enterpriseAvg}) 대비
                   </span>
                   <span className="text-[10px] font-mono text-emerald-300 mt-0.5">
                     Claude Code 적극 활용 팀
@@ -455,7 +455,7 @@ export default function TeamPage() {
                     ))}
                   </div>
                   <p className="text-[9px] font-mono text-neutral-700 mt-2">
-                    as of 2026-05 · 외부 출처 : Anthropic / 엔터 / ccusage 사용자 보고
+                    as of 2026-05 · 출처 : Anthropic Claude Code 공식 통계 + 커뮤니티 헤비 사용자 보고
                   </p>
                 </div>
               </div>
