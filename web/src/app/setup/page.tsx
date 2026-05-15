@@ -3,7 +3,6 @@
 import { useSession } from "next-auth/react";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { isAdmin } from "@/lib/admin";
 
 const TIMEZONE_LIST: { label: string; value: string }[] = [
   { label: "SGT — Singapore (UTC+8)", value: "Asia/Singapore" },
@@ -233,16 +232,6 @@ export default function SetupPage() {
       <a href="/setup-status" className="text-xs text-slate-600 hover:text-slate-400 underline">
         잘 안 되면? 트러블슈팅 →
       </a>
-
-      {isAdmin(session?.user?.email ?? "") && (
-        <a
-          data-testid="setup-go-admin"
-          href="/admin/team"
-          className="mt-8 inline-flex items-center gap-2 px-4 py-2 text-sm font-mono text-amber-300 border border-amber-500/40 bg-amber-500/10 hover:bg-amber-500/20 rounded-lg transition-colors"
-        >
-          어드민으로 이동 →
-        </a>
-      )}
     </div>
   );
 }
