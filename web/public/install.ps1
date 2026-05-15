@@ -1,10 +1,10 @@
-# Primus Usage Tracker — one-shot installer (Windows)
+# AI Usage Tracker — one-shot installer (Windows)
 # Usage: irm https://ai-usage-tracker-web-psi.vercel.app/install.ps1 | iex
 
 $ErrorActionPreference = "Stop"
 
 Write-Host ""
-Write-Host "Primus Usage Tracker 설치" -ForegroundColor Cyan
+Write-Host "AI Usage Tracker 설치" -ForegroundColor Cyan
 Write-Host ""
 
 # Check Node

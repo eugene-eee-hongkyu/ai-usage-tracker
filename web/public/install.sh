@@ -1,5 +1,5 @@
 #!/bin/bash
-# Primus Usage Tracker — one-shot installer (Mac/Linux)
+# AI Usage Tracker — one-shot installer (Mac/Linux)
 # Usage: curl -fsSL https://ai-usage-tracker-web-psi.vercel.app/install.sh | bash
 
 set -e
@@ -13,7 +13,7 @@ GRP=staff
 BAR="════════════════════════════════════════════════════════════"
 
 echo ""
-echo "🚀 Primus Usage Tracker 설치"
+echo "🚀 AI Usage Tracker 설치"
 echo ""
 echo "🔍 환경 점검 중..."
 echo ""
