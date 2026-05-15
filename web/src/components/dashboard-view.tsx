@@ -4,6 +4,7 @@ import React, { useEffect, useState } from "react";
 import { useSession, signOut } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { Nav } from "@/components/nav";
+import { AdminNav } from "@/components/admin-nav";
 import { CacheHitModal, OneShotRateModal, CostPerSessionModal, CallsPerSessionModal, CostPerCallModal, TokenVolumeModal } from "@/components/metric-modal";
 import { computeTokenLevel } from "@/lib/rules";
 import { ActivityCalendar } from "react-activity-calendar";
@@ -571,8 +572,9 @@ function TipBtn({ label, onClick, variant = "action", testid }: { label: string;
 
 interface TeamMember { userId: string; name: string }
 
-export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dashboard_period" }: { targetUserId?: string; onMemberSelect?: (userId: string) => void; storageKey?: string }) {
+export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dashboard_period", adminMode = false }: { targetUserId?: string; onMemberSelect?: (userId: string) => void; storageKey?: string; adminMode?: boolean }) {
   const viewOnly = !!targetUserId;
+  const NavComponent = adminMode ? AdminNav : Nav;
   const { data: session, status } = useSession();
   const router = useRouter();
   const [period, setPeriod] = useState<Period>("8days");
@@ -733,7 +735,7 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
 
   if (status === "loading" || (!data && !fetchError)) return (
     <div className="min-h-screen bg-neutral-950">
-      <Nav />
+      <NavComponent />
       <div className="flex items-center justify-center h-64">
         <span data-testid="dash-loading" className="font-mono text-neutral-500 animate-pulse">loading...</span>
       </div>
@@ -742,7 +744,7 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
 
   if (fetchError) return (
     <div className="min-h-screen bg-neutral-950">
-      <Nav />
+      <NavComponent />
       <div data-testid="dash-fetch-error" className="flex flex-col items-center justify-center h-64 gap-4">
         <p className="text-neutral-400 font-mono text-sm">데이터를 불러오지 못했습니다.</p>
         <button
@@ -769,7 +771,7 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
   if (!data.overview) {
     if (viewOnly) return (
       <div className="min-h-screen bg-neutral-950">
-        <Nav />
+        <NavComponent />
         <div className="flex items-center justify-center h-64">
           <p className="text-neutral-500 font-mono text-sm">아직 데이터가 없습니다.</p>
         </div>
@@ -808,7 +810,7 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
 
   return (
     <div className={`min-h-screen bg-neutral-950 text-neutral-100 transition-opacity duration-150 ${loading ? "opacity-50 pointer-events-none" : ""}`}>
-      <Nav />
+      <NavComponent />
 
       {/* Period Tabs */}
       <div className="border-b border-neutral-800">

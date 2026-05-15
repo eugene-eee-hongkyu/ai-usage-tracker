@@ -5,30 +5,33 @@ import { usePathname } from "next/navigation";
 import { useSession, signOut } from "next-auth/react";
 import { useState } from "react";
 
-export function Nav() {
+export function AdminNav() {
   const path = usePathname();
   const { data: session } = useSession();
   const [open, setOpen] = useState(false);
 
   const tabs = [
-    { href: "/dashboard", label: "개인" },
-    { href: "/team", label: "팀" },
-    { href: "/setup-status", label: "셋업" },
+    { href: "/admin/team", label: "팀" },
+    { href: "/admin/members", label: "팀원" },
+    { href: "/dashboard", label: "홈페이지" },
   ];
 
   return (
-    <header className="border-b border-slate-800 px-4 py-3 flex items-center justify-between gap-2">
+    <header className="border-b border-amber-900/40 bg-amber-950/10 px-4 py-3 flex items-center justify-between gap-2">
       <div className="flex items-center gap-3 min-w-0">
-        <span className="font-bold text-slate-200 shrink-0 hidden sm:block">Primus Usage</span>
+        <span className="font-bold text-amber-200 shrink-0 hidden sm:inline-flex items-center gap-2">
+          Primus Usage
+          <span className="text-[9px] font-mono font-bold px-1 py-0.5 rounded bg-amber-500/20 text-amber-400 border border-amber-500/40 leading-none">ADMIN</span>
+        </span>
         <nav className="flex gap-1 sm:gap-3">
           {tabs.map((t) => (
             <Link
               key={t.href}
               href={t.href}
-              data-testid={`nav-tab-${t.href.replace(/^\//, "")}`}
+              data-testid={`admin-nav-tab-${t.href.replace(/^\//, "").replace(/\//g, "-")}`}
               className={`text-sm px-2 sm:px-3 py-1 rounded transition-colors whitespace-nowrap inline-flex items-center gap-1 ${
-                path.startsWith(t.href)
-                  ? "bg-slate-700 text-slate-100"
+                path === t.href || (t.href !== "/dashboard" && path.startsWith(t.href))
+                  ? "bg-amber-700/40 text-amber-100"
                   : "text-slate-400 hover:text-slate-200"
               }`}
             >
@@ -39,7 +42,7 @@ export function Nav() {
       </div>
       <div className="relative shrink-0">
         <button
-          data-testid="nav-user-toggle"
+          data-testid="admin-nav-user-toggle"
           onClick={() => setOpen(!open)}
           className="text-sm text-slate-400 hover:text-slate-200 flex items-center gap-1 whitespace-nowrap"
         >
@@ -48,7 +51,7 @@ export function Nav() {
         {open && (
           <div className="absolute right-0 top-8 bg-slate-800 border border-slate-700 rounded shadow-lg z-50 whitespace-nowrap">
             <button
-              data-testid="nav-logout"
+              data-testid="admin-nav-logout"
               onClick={() => signOut({ callbackUrl: "/login" })}
               className="block px-4 py-2 text-sm text-slate-300 hover:bg-slate-700 w-full text-left"
             >
