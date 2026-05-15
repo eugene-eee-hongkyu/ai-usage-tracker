@@ -7,10 +7,23 @@ import { Nav } from "@/components/nav";
 import Link from "next/link";
 import { isAdmin } from "@/lib/admin";
 
+interface EnvInfo {
+  platform: string | null;
+  nodeVersion: string | null;
+  nodeMajor: number | null;
+  nodeManager: string | null;
+  npmRoot: string | null;
+  npmRootWritable: boolean | null;
+  codeburnVersion: string | null;
+  ccusageVersion: string | null;
+  collectedAt: string | null;
+}
+
 interface StatusData {
   ready: boolean;
   lastSyncedAt: string | null;
   sessionsCount: number;
+  envInfo: EnvInfo | null;
   steps: {
     cli_installed: boolean;
     hook_registered: boolean;
@@ -175,6 +188,9 @@ export default function SetupStatusPage() {
           </StepItem>
         </div>
 
+        {/* 환경 진단 — CLI 가 ingest 시 보낸 envInfo 기반. 옛 cli 면 envInfo 없음. */}
+        {data.envInfo && <EnvDiagnosticCard env={data.envInfo} />}
+
         {/* Troubleshooting */}
         <div className="bg-slate-900 rounded-lg p-4 space-y-3">
           <p className="text-sm text-slate-400 font-medium">문제 해결</p>
@@ -248,6 +264,90 @@ export default function SetupStatusPage() {
           </div>
         )}
       </main>
+    </div>
+  );
+}
+
+// 사용자 Node/npm 환경 진단 카드. CLI submit.mjs 가 ingest body 에 envInfo 로 보낸 것.
+// 위험 신호(시스템 .pkg Node, npm root 쓰기 불가, codeburn/ccusage 미설치) 가 있으면
+// 본인이 안내받기 전 자가 진단 가능.
+function EnvDiagnosticCard({ env }: { env: EnvInfo }) {
+  const issues: string[] = [];
+  if (env.npmRootWritable === false) {
+    issues.push("npm 전역 디렉토리 쓰기 불가 — codeburn/ccusage 업데이트가 막힙니다");
+  }
+  if (env.nodeMajor !== null && env.nodeMajor < 22) {
+    issues.push(`Node ${env.nodeMajor} — codeburn 0.9.8+ 는 Node 22 이상 권장`);
+  }
+  if (env.nodeManager === "pkg_installer") {
+    issues.push("시스템 .pkg Node 사용 중 — nvm 전환 권장 (반복적 sudo 사고 위험)");
+  }
+  if (!env.codeburnVersion) {
+    issues.push("codeburn 미설치 — one-shot rate / cost 데이터 수집 안 됨");
+  }
+  if (!env.ccusageVersion) {
+    issues.push("ccusage 미설치 — 토큰/비용 데이터 수집 안 됨");
+  }
+  const hasIssues = issues.length > 0;
+
+  return (
+    <div
+      data-testid="status-env-card"
+      className={`rounded-lg p-4 space-y-3 ${hasIssues ? "bg-amber-950/40 border border-amber-800/60" : "bg-slate-900 border border-slate-800"}`}
+    >
+      <div className="flex items-center justify-between">
+        <p className="text-sm text-slate-300 font-medium">
+          {hasIssues ? "⚠️" : "✓"} 내 환경 진단
+        </p>
+        {env.collectedAt && (
+          <p className="text-[10px] text-slate-500 font-mono">
+            {new Date(env.collectedAt).toLocaleString("ko")}
+          </p>
+        )}
+      </div>
+
+      <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-xs font-mono">
+        <span className="text-slate-500">Node</span>
+        <span className={env.nodeMajor !== null && env.nodeMajor < 22 ? "text-amber-300" : "text-slate-300"}>
+          {env.nodeVersion ?? "—"}{env.nodeManager ? ` · ${env.nodeManager}` : ""}
+        </span>
+
+        <span className="text-slate-500">npm 전역 쓰기</span>
+        <span className={env.npmRootWritable === false ? "text-red-400" : "text-slate-300"}>
+          {env.npmRootWritable === true ? "✓" : env.npmRootWritable === false ? "❌" : "—"}
+        </span>
+
+        <span className="text-slate-500">codeburn</span>
+        <span className={env.codeburnVersion ? "text-slate-300" : "text-red-400"}>
+          {env.codeburnVersion ?? "미설치"}
+        </span>
+
+        <span className="text-slate-500">ccusage</span>
+        <span className={env.ccusageVersion ? "text-slate-300" : "text-red-400"}>
+          {env.ccusageVersion ?? "미설치"}
+        </span>
+
+        <span className="text-slate-500">platform</span>
+        <span className="text-slate-300">{env.platform ?? "—"}</span>
+      </div>
+
+      {hasIssues && (
+        <div data-testid="status-env-issues" className="pt-2 border-t border-amber-800/40 space-y-1.5">
+          <p className="text-xs text-amber-300 font-medium">발견된 문제 ({issues.length})</p>
+          <ul className="space-y-1 text-xs text-amber-200 list-disc list-inside">
+            {issues.map((s, i) => <li key={i}>{s}</li>)}
+          </ul>
+          <div className="pt-2 text-xs text-amber-300/80 leading-relaxed">
+            복구:{" "}
+            <code className="bg-slate-900/60 px-1.5 py-0.5 rounded text-amber-200">
+              npx --yes --ignore-existing github:eugene-eee-hongkyu/ai-usage-tracker repair
+            </code>
+            <p className="text-[11px] text-slate-400 mt-1">
+              repair 가 권한 문제를 감지하면 자동 복구 prompt 를 띄웁니다.
+            </p>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

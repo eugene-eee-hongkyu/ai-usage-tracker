@@ -5,8 +5,8 @@
  * Calls codeburn for all periods and POSTs to /api/ingest.
  */
 
-import { spawn } from "child_process";
-import { existsSync, readFileSync, writeFileSync, unlinkSync, appendFileSync, statSync, truncateSync, mkdirSync } from "fs";
+import { spawn, execSync } from "child_process";
+import { existsSync, readFileSync, writeFileSync, unlinkSync, appendFileSync, statSync, truncateSync, mkdirSync, accessSync, constants as fsConstants } from "fs";
 import { join } from "path";
 import { homedir } from "os";
 
@@ -167,6 +167,47 @@ function spawnCcusageDaily() {
 // ccusage blocks — wall-clock 분 단위 분석용 5h 빌링 블록 데이터.
 // daily가 성공하면 blocks도 보통 성공함. 실패해도 daily 진단 메시지가 이미
 // 있으니 blocks 별도 로깅은 최소화 (성공/실패만 한 줄).
+// 사용자 환경 진단 정보. ingest body 에 envInfo 로 포함되어 user_snapshots.rawJson
+// 에 저장됨. /setup-status 페이지가 이걸 읽어 "내 환경" 카드 렌더링.
+// 비민감 정보만 — Node 버전 / npm root 권한 / codeburn·ccusage 버전 / 매니저 종류.
+function collectEnvInfo() {
+  const safeExec = (cmd) => {
+    try {
+      return execSync(cmd, { stdio: ["ignore", "pipe", "ignore"], encoding: "utf8", timeout: 3000 }).trim();
+    } catch { return null; }
+  };
+  const detectManager = (p) => {
+    if (!p) return null;
+    if (p.includes("/.nvm/")) return "nvm";
+    if (p.includes("/.asdf/")) return "asdf";
+    if (p.includes("/.volta/")) return "volta";
+    if (p.includes("/.fnm/") || process.env.FNM_DIR) return "fnm";
+    if (p === "/usr/local/bin/node") return "pkg_installer";
+    if (p.startsWith("/opt/homebrew/") || p.includes("/Cellar/node/")) return "homebrew";
+    return "unknown";
+  };
+  const nodePath = safeExec(process.platform === "win32" ? "where node" : "which node");
+  const nodeVersion = process.version;
+  const nodeMajor = parseInt(nodeVersion.replace(/^v/, "").split(".")[0], 10) || null;
+  const npmRoot = safeExec("npm root -g");
+  let npmRootWritable = null;
+  if (npmRoot) {
+    try { accessSync(npmRoot, fsConstants.W_OK); npmRootWritable = true; }
+    catch { npmRootWritable = false; }
+  }
+  return {
+    platform: process.platform,
+    nodeVersion,
+    nodeMajor,
+    nodeManager: detectManager(nodePath),
+    npmRoot,
+    npmRootWritable,
+    codeburnVersion: safeExec("codeburn --version"),
+    ccusageVersion: safeExec("ccusage --version"),
+    collectedAt: new Date().toISOString(),
+  };
+}
+
 function spawnCcusageBlocks() {
   return new Promise((resolve) => {
     const stdoutChunks = [];
@@ -240,6 +281,13 @@ async function main() {
         return;
       }
       log(`spawn done — codeburn ok=[${okPeriods.join(",")}]${failPeriods.length ? ` fail=[${failPeriods.join(",")}]` : ""}, ccusage=${ccusageStatus}`);
+
+      try {
+        report.envInfo = collectEnvInfo();
+        log(`envInfo: node=${report.envInfo.nodeVersion} mgr=${report.envInfo.nodeManager} npm_writable=${report.envInfo.npmRootWritable}`);
+      } catch (e) {
+        log(`WARN: envInfo collect failed — ${e?.message ?? e}`);
+      }
     } catch (e) {
       log(`ERROR: spawn block — ${e?.message ?? e}`);
       return;
