@@ -2,7 +2,7 @@
 
 import { useMemo } from "react";
 import {
-  ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell,
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Cell, LabelList,
 } from "recharts";
 import { computeTokenLevel } from "@/lib/rules";
 
@@ -48,11 +48,13 @@ function startOfPeriod(period: DrilldownPeriod): string {
   }
 }
 
+// 5단계 — 게이지 라벨(탁월/양호/보통/부족/경고) 과 점수 구간 통일.
 function scoreColorHex(score: number): string {
-  if (score >= 90) return "#10b981";
-  if (score >= 70) return "#65a30d";
-  if (score >= 40) return "#9a3412";
-  return "#7f1d1d";
+  if (score >= 90) return "#10b981"; // emerald-500 — 탁월
+  if (score >= 75) return "#65a30d"; // lime-600  — 양호
+  if (score >= 55) return "#ca8a04"; // yellow-600 — 보통
+  if (score >= 35) return "#ea580c"; // orange-600 — 부족
+  return "#b91c1c";                  // red-700   — 경고
 }
 
 function fmtDate(d: string): string {
@@ -70,10 +72,12 @@ function fmtTokens(n: number): string {
 interface ChartDatum {
   label: string;     // X축 표시 (MM/DD or "Wk N")
   score: number | null;
-  ma7: number | null;
   date: string;
   bucket: "daily" | "weekly";
+  isToday: boolean;
 }
+
+const LABEL_THRESHOLD = 15; // 막대 이하면 데이터 라벨 노출, 넘으면 가독성 위해 숨김
 
 interface ChangeEvent {
   date: string;
@@ -98,21 +102,13 @@ function isoWeekKey(d: Date): string {
   return `${d.getUTCFullYear()}-W${String(week).padStart(2, "0")}`;
 }
 
-function movingAverage(values: (number | null)[], window: number): (number | null)[] {
-  return values.map((_, i) => {
-    if (i < window - 1) return null;
-    const slice = values.slice(i - window + 1, i + 1);
-    const valid = slice.filter((v): v is number => v !== null);
-    if (valid.length < Math.ceil(window / 2)) return null;
-    return Math.round(valid.reduce((a, b) => a + b, 0) / valid.length);
-  });
-}
-
-function buildChangeAnalysis(entries: DailyScoreEntry[]): ChangeEvent[] {
+function buildChangeAnalysis(entries: DailyScoreEntry[], todayKey: string): ChangeEvent[] {
   const events: ChangeEvent[] = [];
   for (let i = 1; i < entries.length; i++) {
     const cur = entries[i];
     const prev = entries[i - 1];
+    // 오늘은 진행 중이라 partial-day 점수 → 변동 이벤트로 보면 가짜 신호 가능. 제외.
+    if (cur.date === todayKey) continue;
     if (cur.score === null || prev.score === null) continue;
     const delta = cur.score - prev.score;
     if (Math.abs(delta) < CHANGE_THRESHOLD) continue;
@@ -189,10 +185,12 @@ function buildChangeAnalysis(entries: DailyScoreEntry[]): ChangeEvent[] {
 }
 
 export function ScoreDrilldown({ daily, period }: Props) {
+  const todayKey = new Date().toISOString().slice(0, 10);
+
   const { chartData, activeDays, totalDays, isWeekly, changeEvents } = useMemo(() => {
     const start = startOfPeriod(period);
     const windowEntries = daily.filter((d) => d.date >= start);
-    const allEntries = period === "all" ? daily.filter((d) => d.score !== null || d.cacheHitPct !== null || true) : windowEntries;
+    const allEntries = period === "all" ? daily.filter(() => true) : windowEntries;
 
     const span = allEntries.length;
     const weekly = period === "all" && span > DOWNSAMPLE_THRESHOLD_DAYS;
@@ -200,42 +198,36 @@ export function ScoreDrilldown({ daily, period }: Props) {
     let data: ChartDatum[];
 
     if (weekly) {
-      const buckets = new Map<string, { scores: number[]; firstDate: string }>();
+      const buckets = new Map<string, { scores: number[]; firstDate: string; hasToday: boolean }>();
       for (const e of allEntries) {
         if (e.score === null) continue;
         const key = isoWeekKey(new Date(e.date + "T00:00:00Z"));
-        const b = buckets.get(key) ?? { scores: [], firstDate: e.date };
+        const b = buckets.get(key) ?? { scores: [], firstDate: e.date, hasToday: false };
         b.scores.push(e.score);
+        if (e.date === todayKey) b.hasToday = true;
         buckets.set(key, b);
       }
-      const weekRows = [...buckets.entries()]
+      data = [...buckets.entries()]
         .sort(([a], [b]) => a.localeCompare(b))
         .map(([wk, b]) => ({
           label: wk.slice(5),
           date: b.firstDate,
           score: Math.round(b.scores.reduce((s, v) => s + v, 0) / b.scores.length),
-          ma7: null as number | null,
           bucket: "weekly" as const,
+          isToday: b.hasToday,
         }));
-      const maInput = weekRows.map((r) => r.score);
-      const ma = movingAverage(maInput, 4);
-      weekRows.forEach((r, i) => { r.ma7 = ma[i]; });
-      data = weekRows;
     } else {
-      const maInput = allEntries.map((e) => e.score);
-      const showMA = allEntries.length >= 7;
-      const ma = showMA ? movingAverage(maInput, 7) : maInput.map(() => null);
-      data = allEntries.map((e, i) => ({
+      data = allEntries.map((e) => ({
         label: fmtDate(e.date),
         date: e.date,
         score: e.score,
-        ma7: ma[i],
         bucket: "daily" as const,
+        isToday: e.date === todayKey,
       }));
     }
 
     const activeDays = allEntries.filter((e) => e.score !== null).length;
-    const events = buildChangeAnalysis(allEntries);
+    const events = buildChangeAnalysis(allEntries, todayKey);
 
     return {
       chartData: data,
@@ -244,9 +236,10 @@ export function ScoreDrilldown({ daily, period }: Props) {
       isWeekly: weekly,
       changeEvents: events,
     };
-  }, [daily, period]);
+  }, [daily, period, todayKey]);
 
   const lowActivity = totalDays > 0 && activeDays / totalDays < 0.5;
+  const showLabels = chartData.length <= LABEL_THRESHOLD;
 
   return (
     <div data-testid="score-drilldown" className="bg-neutral-950 border-t border-neutral-800/60 px-4 py-4">
@@ -264,7 +257,7 @@ export function ScoreDrilldown({ daily, period }: Props) {
 
         <div className="h-48 w-full">
           <ResponsiveContainer width="100%" height="100%">
-            <ComposedChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+            <BarChart data={chartData} margin={{ top: 18, right: 10, left: -20, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#262626" vertical={false} />
               <XAxis
                 dataKey="label"
@@ -278,59 +271,37 @@ export function ScoreDrilldown({ daily, period }: Props) {
                 tick={{ fontSize: 10, fontFamily: "monospace" }}
                 tickCount={6}
               />
-              <Tooltip
-                contentStyle={{ background: "#171717", border: "1px solid #404040", borderRadius: 6, fontSize: 11, fontFamily: "monospace" }}
-                labelStyle={{ color: "#a3a3a3" }}
-                formatter={(value, name) => {
-                  const label = name === "score" ? "점수" : "7일 평균";
-                  if (value === null || value === undefined) return ["—", label];
-                  return [value, label];
-                }}
-              />
-              <Bar dataKey="score" radius={[2, 2, 0, 0]} maxBarSize={28}>
-                {chartData.map((d, i) => (
-                  <Cell key={i} fill={d.score === null ? "transparent" : scoreColorHex(d.score)} />
-                ))}
+              <Bar dataKey="score" radius={[2, 2, 0, 0]} maxBarSize={28} isAnimationActive={false}>
+                {chartData.map((d, i) => {
+                  const fill = d.score === null ? "transparent" : scoreColorHex(d.score);
+                  // 오늘 막대: 진행 중 = partial-day data. 불투명도 낮춰 시각적으로 구분.
+                  const opacity = d.isToday && !isWeekly ? 0.55 : 1;
+                  return <Cell key={i} fill={fill} fillOpacity={opacity} />;
+                })}
+                {showLabels && (
+                  <LabelList
+                    dataKey="score"
+                    position="top"
+                    fontSize={10}
+                    fontFamily="monospace"
+                    fill="#a3a3a3"
+                    formatter={(v) => (v === null || v === undefined ? "" : String(v))}
+                  />
+                )}
               </Bar>
-              {!isWeekly && chartData.some((d) => d.ma7 !== null) && (
-                <Line
-                  type="monotone"
-                  dataKey="ma7"
-                  stroke="#60a5fa"
-                  strokeWidth={2}
-                  dot={false}
-                  isAnimationActive={false}
-                  connectNulls
-                />
-              )}
-              {isWeekly && (
-                <Line
-                  type="monotone"
-                  dataKey="ma7"
-                  stroke="#60a5fa"
-                  strokeWidth={2}
-                  dot={false}
-                  isAnimationActive={false}
-                  connectNulls
-                />
-              )}
-            </ComposedChart>
+            </BarChart>
           </ResponsiveContainer>
         </div>
 
-        <div className="flex items-center gap-3 text-[10px] font-mono text-neutral-500">
-          <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-emerald-500" />90+</span>
-          <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-lime-600" />70–89</span>
-          <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-orange-700" />40–69</span>
-          <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-red-900" />&lt;40</span>
-          {!isWeekly && chartData.some((d) => d.ma7 !== null) && (
-            <span className="flex items-center gap-1 ml-2">
-              <span className="w-3 h-0.5 bg-blue-400" /> 7일 이동평균
-            </span>
-          )}
-          {isWeekly && (
-            <span className="flex items-center gap-1 ml-2">
-              <span className="w-3 h-0.5 bg-blue-400" /> 4주 이동평균
+        <div className="flex items-center gap-2.5 text-[10px] font-mono text-neutral-500 flex-wrap">
+          <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-emerald-500" />탁월 90+</span>
+          <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-lime-600" />양호 75–89</span>
+          <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-yellow-600" />보통 55–74</span>
+          <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-orange-600" />부족 35–54</span>
+          <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-red-700" />경고 &lt;35</span>
+          {chartData.some((d) => d.isToday) && !isWeekly && (
+            <span className="flex items-center gap-1 ml-2 text-neutral-400">
+              <span className="w-2.5 h-2.5 rounded-sm bg-emerald-500 opacity-55" /> 오늘 (진행 중)
             </span>
           )}
         </div>

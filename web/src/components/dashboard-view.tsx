@@ -227,16 +227,32 @@ function EfficiencyScoreSection({ score, period, periodScore }: EfficiencyScoreS
   // level 0 = 회색 (활동 없음). scoreHexColor() 와 동일 팔레트.
   const theme = { dark: ["#1e293b", "#7f1d1d", "#9a3412", "#65a30d", "#10b981"] as [string, string, string, string, string] };
 
-  // Delta — period=today 일 때만 의미 있음 (오늘 vs 어제). 다른 period 면 hide.
-  const deltaNode = period !== "today" || score.delta === null ? null
-    : score.delta > 0 ? <span className="text-emerald-400">↑ +{score.delta}</span>
-    : score.delta < 0 ? <span className="text-rose-400">↓ {score.delta}</span>
-    : <span className="text-neutral-500">─ 0</span>;
+  // today 일 때 reference 라인 = "어제 N (▼ −4)" inline.
+  // 다른 period 면 hide — period 평균은 어제와 비교할 단일 anchor 가 아님.
+  const referenceNode = (() => {
+    if (period !== "today") return null;
+    const y = score.yesterday;
+    const d = score.delta;
+    if (y === null) return null;
+    const yLabel = <span className="text-neutral-400">어제 {y}</span>;
+    if (d === null) return yLabel;
+    const deltaLabel = d > 0
+      ? <span className="text-emerald-400">▲ +{d}</span>
+      : d < 0
+        ? <span className="text-rose-400">▼ {d}</span>
+        : <span className="text-neutral-500">─ 0</span>;
+    return <>{yLabel} <span className="text-neutral-600">(</span>{deltaLabel}<span className="text-neutral-600">)</span></>;
+  })();
 
-  // 라벨 — period=today 면 날짜 함께, 그 외는 period 이름만.
-  const todayDateLabel = new Intl.DateTimeFormat("ko-KR", { month: "numeric", day: "numeric" }).format(new Date());
+  // 라벨 — period=today 면 진행 중 시각, 그 외는 period 이름만.
   const labelMain = gaugeLabel(period);
-  const labelSuffix = period === "today" ? ` (${todayDateLabel})` : "";
+  const labelSuffix = (() => {
+    if (period !== "today") return "";
+    const now = new Date();
+    const hh = String(now.getHours()).padStart(2, "0");
+    const mm = String(now.getMinutes()).padStart(2, "0");
+    return ` (진행 중 · ${hh}:${mm})`;
+  })();
 
   // 게이지 표시값 = period 평균. 8일 / 30일 선택하면 그 기간 평균 점수.
   // period=today 면 단일 entry → today 점수와 동일.
@@ -263,8 +279,8 @@ function EfficiencyScoreSection({ score, period, periodScore }: EfficiencyScoreS
       <ScoreGauge score={displayScore} />
       <div className="mt-1.5 flex items-center gap-1.5 text-[11px] font-mono">
         <span className={`font-bold ${scoreColor(displayScore)}`}>{scoreLabel(displayScore)}</span>
-        {deltaNode && <span className="text-neutral-500">·</span>}
-        {deltaNode}
+        {referenceNode && <span className="text-neutral-500">·</span>}
+        {referenceNode}
       </div>
       <span className="text-[10px] font-mono text-neutral-600 mt-0.5">cache 42 + one-shot 18 + cost 10 + 사용량 30</span>
       {drilldownAvailable && (
