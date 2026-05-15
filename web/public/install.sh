@@ -103,13 +103,55 @@ echo "✅ 소유권 OK"
 echo ""
 
 # ============================================================
+# Pass 1.5 — 다른 Node 버전 매니저 감지 (asdf/volta/fnm)
+# ============================================================
+# 다른 매니저가 이미 깔린 사용자에게 nvm 까지 설치하면 PATH 충돌 / Node
+# 버전 우선순위 꼬임. 감지되면 nvm 자동 설치는 건너뛰고 그 매니저의
+# 절차를 안내한다.
+
+OTHER_MGR=""
+if command -v asdf >/dev/null 2>&1; then
+  OTHER_MGR="asdf"
+elif command -v volta >/dev/null 2>&1; then
+  OTHER_MGR="volta"
+elif command -v fnm >/dev/null 2>&1 || [ -n "${FNM_DIR:-}" ]; then
+  OTHER_MGR="fnm"
+fi
+
+if [ -n "$OTHER_MGR" ]; then
+  echo "$BAR"
+  echo "⚠️  $OTHER_MGR 가 감지되었습니다"
+  echo ""
+  echo "    nvm 자동 설치를 건너뜁니다 (버전 매니저 중복 충돌 방지)."
+  echo "    수동으로 Node 22 를 설치한 뒤 다시 실행해주세요:"
+  echo ""
+  case "$OTHER_MGR" in
+    asdf)
+      echo "       asdf install nodejs 22.11.0"
+      echo "       asdf global nodejs 22.11.0"
+      ;;
+    volta)
+      echo "       volta install node@22"
+      ;;
+    fnm)
+      echo "       fnm install 22"
+      echo "       fnm default 22"
+      ;;
+  esac
+  echo "       npx --yes --ignore-existing github:eugene-eee-hongkyu/ai-usage-tracker repair"
+  echo "$BAR"
+  echo ""
+  SKIP_NVM=1
+fi
+
+# ============================================================
 # Pass 2 — .pkg installer Node 감지 + nvm 전환 권유 (macOS only)
 # ============================================================
 # /usr/local/bin/node 의 .pkg installer Node 는 npm global / cache 가
 # root 소유로 자주 망가져 권한 사고가 반복된다. nvm 으로 전환하면
 # 모든 npm 작업이 ~/.nvm 안에서만 일어나 sudo 의존이 사라진다.
 
-if command -v node >/dev/null 2>&1; then
+if [ -z "${SKIP_NVM:-}" ] && command -v node >/dev/null 2>&1; then
   NODE_PATH=$(command -v node)
   if [ "$(uname)" = "Darwin" ] && [ "$NODE_PATH" = "/usr/local/bin/node" ]; then
     REAL_NODE=$(readlink "$NODE_PATH" 2>/dev/null || echo "$NODE_PATH")
@@ -123,21 +165,45 @@ if command -v node >/dev/null 2>&1; then
       echo ""
       echo "    nvm 으로 전환하면 모든 npm 작업이 ~/.nvm 안에서만 일어나"
       echo "    sudo 없이 깨끗하게 동작합니다."
+      echo ""
+      echo "    변경되는 것:"
+      echo "      - ~/.zshrc 에 nvm 활성화 라인 추가 (자동 백업본 생성)"
+      echo "      - 기본 Node: $(node -v) → v22.x.x (nvm)"
+      echo "      - 시스템 Node ($NODE_PATH) 자체는 안 건드림"
+      echo ""
+      echo "    롤백:  nvm use system  또는  nvm alias default $(node -v | tr -d v)"
       echo "$BAR"
       echo ""
       if prompt_yn "   nvm 으로 자동 전환하시겠습니까? (Y/n): "; then
+        # 백업 — shell profile + 글로벌 CLI 목록
+        TS=$(date +%s)
+        BACKUP_DIR="$HOME/.primus-usage-tracker"
+        mkdir -p "$BACKUP_DIR"
+        echo ""
+        echo "💾 백업 중..."
+        for rc in "$HOME/.zshrc" "$HOME/.bash_profile" "$HOME/.bashrc"; do
+          if [ -f "$rc" ]; then
+            cp "$rc" "$BACKUP_DIR/$(basename "$rc").bak-${TS}"
+            echo "   ✓ $rc → $BACKUP_DIR/$(basename "$rc").bak-${TS}"
+          fi
+        done
+        if command -v npm >/dev/null 2>&1; then
+          npm list -g --depth=0 > "$BACKUP_DIR/old-node-globals.txt" 2>/dev/null || true
+          echo "   ✓ 글로벌 CLI 목록 → $BACKUP_DIR/old-node-globals.txt"
+        fi
         echo ""
         echo "📦 nvm 설치 중..."
         curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.1/install.sh | bash
         export NVM_DIR="$HOME/.nvm"
         # shellcheck disable=SC1091
         [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
-        nvm install --lts
-        nvm use --lts
-        nvm alias default 'lts/*' >/dev/null 2>&1 || true
+        nvm install 22
+        nvm use 22
+        nvm alias default 22 >/dev/null 2>&1 || true
         echo ""
-        echo "✅ nvm + Node LTS 활성화 ($(node -v))"
+        echo "✅ nvm + Node 22 활성화 ($(node -v))"
         echo "   기본 Node 가 nvm 으로 설정됨 (새 쉘에서도 자동 적용)"
+        echo "   옛 글로벌 CLI 가 필요하면: cat $BACKUP_DIR/old-node-globals.txt"
       else
         echo ""
         echo "ℹ️  .pkg Node 그대로 사용합니다 (권한 사고 위험은 인지하셨습니다)"
@@ -150,18 +216,23 @@ if command -v node >/dev/null 2>&1; then
 fi
 
 # ============================================================
-# Pass 3 — Node 미설치 시 nvm 으로 자동 설치
+# Pass 3 — Node 미설치 시 nvm 으로 자동 설치 (다른 매니저 없을 때만)
 # ============================================================
 if ! command -v node >/dev/null 2>&1; then
+  if [ -n "${SKIP_NVM:-}" ]; then
+    echo "❌ Node 미설치 + 다른 버전 매니저($OTHER_MGR) 존재"
+    echo "   위 매니저 절차로 Node 22 설치 후 다시 실행하세요."
+    exit 1
+  fi
   echo "📦 Node.js 가 없습니다. nvm 으로 설치합니다..."
   echo ""
   curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.1/install.sh | bash
   export NVM_DIR="$HOME/.nvm"
   # shellcheck disable=SC1091
   [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
-  nvm install --lts
-  nvm use --lts
-  nvm alias default 'lts/*' >/dev/null 2>&1 || true
+  nvm install 22
+  nvm use 22
+  nvm alias default 22 >/dev/null 2>&1 || true
   echo ""
   echo "✅ Node.js 설치 완료 ($(node -v))"
 else

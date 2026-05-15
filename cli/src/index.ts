@@ -1,15 +1,16 @@
 #!/usr/bin/env node
 import { Command } from "commander";
-import { runInit, runRepair } from "./init.js";
+import { runInit, runRepair, CLI_VERSION } from "./init.js";
 import { runReset } from "./reset.js";
 import { runSync } from "./sync.js";
+import { runDoctor } from "./doctor.js";
 
 const program = new Command();
 
 program
   .name("usage-tracker")
   .description("Primus Labs Claude Code usage tracker")
-  .version("0.1.0");
+  .version(CLI_VERSION);
 
 program
   .command("init")
@@ -31,6 +32,12 @@ program
   .description("과거 데이터 수동 동기화")
   .option("-d, --days <number>", "동기화할 일수", "90")
   .action((opts) => runSync(parseInt(opts.days)));
+
+program
+  .command("doctor")
+  .description("환경 진단 — Node·npm·codeburn·ccusage·자동화 상태")
+  .option("--json", "JSON 으로 출력 (머신 파싱용)")
+  .action((opts) => runDoctor({ json: !!opts.json, cliVersion: CLI_VERSION }));
 
 // Default command when run as `npx ... init` (positional)
 if (process.argv[2] === "init" || process.argv.length <= 2) {

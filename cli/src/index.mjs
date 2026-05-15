@@ -877,6 +877,7 @@ import * as readline from "readline";
 import { fileURLToPath } from "url";
 var __dirname2 = path.dirname(fileURLToPath(import.meta.url));
 var SERVER_URL = process.env.USAGE_TRACKER_URL ?? "https://ai-usage-tracker-web-psi.vercel.app";
+var CLI_VERSION = "0.2.0";
 var KEYTAR_SERVICE = "primus-usage-tracker";
 var KEYTAR_ACCOUNT = "api-key";
 var CLAUDE_SETTINGS_PATH = path.join(os.homedir(), ".claude", "settings.json");
@@ -936,6 +937,37 @@ function preflightOwnership() {
 `);
   process.exit(1);
 }
+function promptYn(question) {
+  let ttyFd;
+  try {
+    ttyFd = fs.openSync("/dev/tty", "r");
+  } catch {
+    return false;
+  }
+  process.stdout.write(question);
+  const chunks = [];
+  const single = Buffer.alloc(1);
+  try {
+    while (true) {
+      const n = fs.readSync(ttyFd, single, 0, 1, null);
+      if (n === 0)
+        break;
+      const c = single[0];
+      if (c === 10)
+        break;
+      if (c === 13)
+        continue;
+      chunks.push(c);
+    }
+  } finally {
+    fs.closeSync(ttyFd);
+  }
+  const ans = Buffer.from(chunks).toString("utf8").trim();
+  if (!ans)
+    return true;
+  const lower = ans.toLowerCase();
+  return lower === "y" || lower === "yes";
+}
 function preflightGlobalPackages() {
   if (process.platform === "win32" || !process.getuid)
     return;
@@ -973,19 +1005,60 @@ function preflightGlobalPackages() {
     console.error(`   현재 막혀있는 패키지: ${installed.join(", ")}`);
   }
   console.error("");
-  console.error("   해결 (한 번만 하면 영구):");
+  console.error("   자동 복구 가능:");
+  console.error("     1. nvm 설치 (~/.nvm/ 안에만, 시스템 Node 그대로 보존)");
+  console.error("     2. Node 22 설치 + 기본값으로 설정");
+  console.error("     3. ~/.zshrc 자동 백업 후 nvm 라인 추가");
+  console.error("");
+  console.error("   변경되는 것:");
+  console.error("     - ~/.zshrc 끝에 nvm 활성화 라인 추가 (백업본 자동 생성)");
+  console.error("     - 기본 Node 가 ~/.nvm/.../v22.x.x 로 변경");
+  console.error("     - 글로벌 CLI 들이 새 Node 환경에서 안 보일 수 있음 (목록 자동 백업)");
+  console.error("");
+  console.error("   롤백 방법:");
+  console.error("     nvm use system            # 셸 1개만 옛 Node 로");
+  console.error("     nvm alias default 20      # 기본을 다시 옛 버전으로");
+  console.error("     백업: ~/.primus-usage-tracker/zshrc.bak-{timestamp}");
+  console.error(bar);
+  const accept = promptYn(`
+   지금 자동 복구를 진행할까요? [Y/n]: `);
+  if (accept) {
+    console.log("");
+    console.log("\uD83D\uDCE6 install.sh 자동 실행 중...");
+    console.log("");
+    try {
+      execSync(`curl -fsSL ${SERVER_URL}/install.sh | bash`, { stdio: "inherit" });
+    } catch {
+      console.error("");
+      console.error("❌ 자동 복구 실패. 수동 절차를 따라주세요:");
+      console.error(`   sudo npm uninstall -g codeburn ccusage`);
+      console.error(`   curl -fsSL ${SERVER_URL}/install.sh | bash`);
+      console.error(`   npx --yes --ignore-existing github:eugene-eee-hongkyu/ai-usage-tracker repair`);
+      process.exit(1);
+    }
+    console.log("");
+    console.log(bar);
+    console.log("✅ 환경 설정 완료");
+    console.log("");
+    console.log("   현재 셸은 아직 옛 PATH 를 보고 있습니다. 새 Node 적용:");
+    console.log("     1. 터미널 새 창 (⌘N) 열고 repair 재실행 — 권장");
+    console.log("     2. 현재 셸에서: exec $SHELL -l");
+    console.log("        그 다음: npx --yes --ignore-existing github:eugene-eee-hongkyu/ai-usage-tracker repair");
+    console.log(bar);
+    console.log("");
+    process.exit(0);
+  }
+  console.error("");
+  console.error("   자동 복구를 건너뜁니다. 수동 절차:");
   console.error("");
   console.error("     # 1. root 소유로 박혀있는 옛 글로벌 패키지 제거");
   console.error("     sudo npm uninstall -g codeburn ccusage");
   console.error("");
-  console.error("     # 2. nvm + Node 22 로 재설치 (시스템 Node 안 건드림)");
+  console.error("     # 2. nvm + Node 22 로 재설치");
   console.error(`     curl -fsSL ${SERVER_URL}/install.sh | bash`);
   console.error("");
   console.error("     # 3. repair 재실행");
-  console.error("     npx --yes github:eugene-eee-hongkyu/ai-usage-tracker repair");
-  console.error("");
-  console.error("   참고: sudo npm install -g … 는 단기 해결책. 다음 업데이트마다");
-  console.error("   동일 문제 재발하므로 nvm 전환을 권장합니다.");
+  console.error("     npx --yes --ignore-existing github:eugene-eee-hongkyu/ai-usage-tracker repair");
   console.error(bar + `
 `);
   process.exit(1);
@@ -1320,7 +1393,8 @@ async function ensureCodeburn() {
   return false;
 }
 async function runRepair() {
-  console.log(`\uD83D\uDD27 Usage Tracker 복구 시작
+  console.log(`\uD83D\uDD27 Usage Tracker v${CLI_VERSION} 복구 시작`);
+  console.log(`   (옛 cli 가 캐시됐다면: npx --yes --ignore-existing ...)
 `);
   preflightOwnership();
   preflightGlobalPackages();
@@ -1360,7 +1434,8 @@ async function runRepair() {
   process.exit(0);
 }
 async function runInit() {
-  console.log(`\uD83D\uDE80 Usage Tracker 설치 시작
+  console.log(`\uD83D\uDE80 Usage Tracker v${CLI_VERSION} 설치 시작`);
+  console.log(`   (옛 cli 가 캐시됐다면: npx --yes --ignore-existing ...)
 `);
   preflightOwnership();
   preflightGlobalPackages();
@@ -1547,13 +1622,185 @@ if (isMain) {
   });
 }
 
+// src/doctor.ts
+import { execSync as execSync2 } from "child_process";
+import * as fs2 from "fs";
+import * as os2 from "os";
+import * as path2 from "path";
+var STABLE_DIR2 = path2.join(os2.homedir(), ".primus-usage-tracker");
+var API_KEY_FALLBACK2 = path2.join(os2.homedir(), ".primus-usage-key");
+var LAUNCHD_PLIST2 = process.platform === "darwin" ? path2.join(os2.homedir(), "Library", "LaunchAgents", "com.primus.usage-tracker.daily.plist") : null;
+function safeExec(cmd) {
+  try {
+    return execSync2(cmd, { stdio: ["ignore", "pipe", "ignore"], encoding: "utf8" }).trim();
+  } catch {
+    return null;
+  }
+}
+function detectNodeManager(nodePath) {
+  if (!nodePath)
+    return null;
+  if (nodePath.includes("/.nvm/"))
+    return "nvm";
+  if (nodePath.includes("/.asdf/"))
+    return "asdf";
+  if (nodePath.includes("/.volta/"))
+    return "volta";
+  if (nodePath.includes("/.fnm/") || process.env.FNM_DIR)
+    return "fnm";
+  if (nodePath === "/usr/local/bin/node")
+    return "pkg_installer";
+  if (nodePath.startsWith("/opt/homebrew/") || nodePath.includes("/Cellar/node/"))
+    return "homebrew";
+  return "unknown";
+}
+function readLastSync() {
+  const lock = path2.join(STABLE_DIR2, "submit.lock");
+  for (const candidate of [lock]) {
+    if (fs2.existsSync(candidate)) {
+      try {
+        return fs2.statSync(candidate).mtime.toISOString();
+      } catch {}
+    }
+  }
+  return null;
+}
+function buildReport(cliVersion) {
+  const nodePath = safeExec(process.platform === "win32" ? "where node" : "which node");
+  const nodeVersion = safeExec("node --version");
+  const nodeMajor = nodeVersion ? parseInt(nodeVersion.replace(/^v/, "").split(".")[0], 10) || null : null;
+  const manager = detectNodeManager(nodePath);
+  const npmRoot = safeExec("npm root -g");
+  let npmRootOwner = null;
+  let npmRootWritable = null;
+  if (npmRoot && fs2.existsSync(npmRoot)) {
+    try {
+      npmRootOwner = fs2.statSync(npmRoot).uid;
+    } catch {}
+    try {
+      fs2.accessSync(npmRoot, fs2.constants.W_OK);
+      npmRootWritable = true;
+    } catch {
+      npmRootWritable = false;
+    }
+  }
+  const codeburnVer = safeExec("codeburn --version");
+  const ccusageVer = safeExec("ccusage --version");
+  let launchdStatus = "n/a";
+  if (LAUNCHD_PLIST2) {
+    launchdStatus = fs2.existsSync(LAUNCHD_PLIST2) ? "registered" : "not_registered";
+  }
+  const apiKeyStatus = fs2.existsSync(API_KEY_FALLBACK2) ? "registered" : "not_registered";
+  const lastSyncIso = readLastSync();
+  const issues = [];
+  if (npmRootWritable === false) {
+    issues.push("npm 전역 디렉토리 쓰기 불가 — codeburn/ccusage 업데이트가 EACCES 로 실패합니다");
+  }
+  if (!codeburnVer) {
+    issues.push("codeburn 미설치 — one-shot rate / cost 데이터 수집 안 됨");
+  }
+  if (!ccusageVer) {
+    issues.push("ccusage 미설치 — 토큰/비용 데이터 수집 안 됨");
+  }
+  if (nodeMajor !== null && nodeMajor < 22) {
+    issues.push(`Node ${nodeMajor} 감지 — codeburn 0.9.8+ 는 Node 22 이상 권장`);
+  }
+  if (manager === "pkg_installer") {
+    issues.push("시스템 .pkg Node 사용 중 — nvm 전환 권장 (반복적 sudo 사고 위험)");
+  }
+  if (apiKeyStatus === "not_registered") {
+    issues.push("API 키 미등록 — init 실행 필요");
+  }
+  return {
+    cli_version: cliVersion,
+    platform: process.platform,
+    node_path: nodePath,
+    node_version: nodeVersion,
+    node_major: nodeMajor,
+    node_manager: manager,
+    npm_root: npmRoot,
+    npm_root_owner_uid: npmRootOwner,
+    npm_root_writable: npmRootWritable,
+    codeburn_version: codeburnVer,
+    ccusage_version: ccusageVer,
+    launchd_status: launchdStatus,
+    api_key_status: apiKeyStatus,
+    last_sync_iso: lastSyncIso,
+    issues
+  };
+}
+function maskHome(s) {
+  if (!s)
+    return "—";
+  const home = os2.homedir();
+  return s.startsWith(home) ? s.replace(home, "~") : s;
+}
+function printHumanReport(r) {
+  const bar = "━".repeat(60);
+  console.log("\uD83D\uDD0D Usage Tracker 환경 진단");
+  console.log("");
+  console.log(bar);
+  console.log("Node:");
+  console.log(`  ${maskHome(r.node_path)} (${r.node_version ?? "—"})`);
+  const managerWarn = r.node_manager === "pkg_installer" ? " ⚠️" : "";
+  console.log(`  매니저: ${r.node_manager ?? "—"}${managerWarn}`);
+  console.log("");
+  console.log("npm 전역:");
+  console.log(`  ${maskHome(r.npm_root)}`);
+  if (r.npm_root_writable !== null) {
+    const writeMark = r.npm_root_writable ? "✓" : "❌";
+    const ownerStr = r.npm_root_owner_uid !== null ? `uid=${r.npm_root_owner_uid}` : "—";
+    console.log(`  소유자: ${ownerStr}  쓰기: ${writeMark}`);
+  }
+  console.log("");
+  console.log("설치된 패키지:");
+  console.log(`  codeburn: ${r.codeburn_version ?? "미설치 ❌"}`);
+  console.log(`  ccusage:  ${r.ccusage_version ?? "미설치 ❌"}`);
+  console.log("");
+  console.log("자동화:");
+  console.log(`  launchd: ${r.launchd_status}`);
+  console.log(`  API 키:  ${r.api_key_status}`);
+  if (r.last_sync_iso)
+    console.log(`  마지막 sync: ${r.last_sync_iso}`);
+  console.log(bar);
+  if (r.issues.length > 0) {
+    console.log("");
+    console.log(`발견된 문제 (${r.issues.length}):`);
+    r.issues.forEach((s, i) => console.log(`  ${i + 1}. ${s}`));
+    console.log("");
+    console.log("복구하려면:");
+    console.log("  npx --yes --ignore-existing github:eugene-eee-hongkyu/ai-usage-tracker repair");
+    console.log("");
+    console.log("  → repair 가 권한 문제를 감지하면 자동 복구 prompt 를 띄웁니다.");
+  } else {
+    console.log("");
+    console.log("✅ 발견된 문제 없음 — 환경 정상");
+  }
+  console.log("");
+  console.log("진단 데이터:");
+  for (const [k, v] of Object.entries(r)) {
+    if (k === "issues")
+      continue;
+    console.log(`  ${k}=${v === null ? "null" : v}`);
+  }
+}
+function runDoctor(opts) {
+  const r = buildReport(opts.cliVersion);
+  if (opts.json) {
+    console.log(JSON.stringify(r, null, 2));
+    return;
+  }
+  printHumanReport(r);
+}
+
 // src/index.ts
 var program = new import_commander.Command;
-program.name("usage-tracker").description("Primus Labs Claude Code usage tracker").version("0.1.0");
+program.name("usage-tracker").description("Primus Labs Claude Code usage tracker").version(CLI_VERSION);
 program.command("init").description("인증 및 SessionEnd hook 등록").action(runInit);
 program.command("repair").description("API 키 유지하고 hook·스케줄만 재등록").action(runRepair);
 program.command("reset").description("API 키 재발급 및 재설정").action(runReset);
 program.command("sync").description("과거 데이터 수동 동기화").option("-d, --days <number>", "동기화할 일수", "90").action((opts) => runSync(parseInt(opts.days)));
+program.command("doctor").description("환경 진단 — Node·npm·codeburn·ccusage·자동화 상태").option("--json", "JSON 으로 출력 (머신 파싱용)").action((opts) => runDoctor({ json: !!opts.json, cliVersion: CLI_VERSION }));
 if (process.argv[2] === "init" || process.argv.length <= 2) {
   program.parse(["node", "usage-tracker", "init", ...process.argv.slice(3)]);
 } else {

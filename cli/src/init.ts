@@ -9,6 +9,7 @@ import { fileURLToPath } from "url";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const SERVER_URL = process.env.USAGE_TRACKER_URL ?? "https://ai-usage-tracker-web-psi.vercel.app";
+export const CLI_VERSION = "0.2.0";
 const KEYTAR_SERVICE = "primus-usage-tracker";
 const KEYTAR_ACCOUNT = "api-key";
 const CLAUDE_SETTINGS_PATH = path.join(os.homedir(), ".claude", "settings.json");
@@ -75,11 +76,43 @@ function preflightOwnership(): void {
   process.exit(1);
 }
 
-// npm 전역 prefix 가 root 소유 등으로 쓰기 불가일 때 사전 차단.
+// /dev/tty 에서 한 줄 읽기. `curl|bash`·`npx` 환경에서 stdin 이 pipe 여도
+// user 터미널의 키 입력을 직접 받음. TTY 없으면 (CI 등) false 반환.
+// 응답 없이 Enter → 빈 문자열 → default Y (호출자가 처리).
+function promptYn(question: string): boolean {
+  let ttyFd: number;
+  try {
+    ttyFd = fs.openSync("/dev/tty", "r");
+  } catch {
+    return false; // TTY 없음 → 자동 진행 안 함
+  }
+  process.stdout.write(question);
+  const chunks: number[] = [];
+  const single = Buffer.alloc(1);
+  try {
+    // 라인 단위 read. \n 만나면 종료.
+    while (true) {
+      const n = fs.readSync(ttyFd, single, 0, 1, null);
+      if (n === 0) break;
+      const c = single[0];
+      if (c === 0x0a) break;          // LF
+      if (c === 0x0d) continue;        // CR (Windows-style line ending)
+      chunks.push(c);
+    }
+  } finally {
+    fs.closeSync(ttyFd);
+  }
+  const ans = Buffer.from(chunks).toString("utf8").trim();
+  if (!ans) return true; // Enter → default Y
+  const lower = ans.toLowerCase();
+  return lower === "y" || lower === "yes";
+}
+
+// npm 전역 prefix 가 root 소유 등으로 쓰기 불가일 때 사전 차단 + 자동 복구 권유.
 // 이전 sudo 설치 흔적이 남아있거나 macOS 시스템 Node 사용 시 codeburn/ccusage
 // @latest 업그레이드가 EACCES (npm 의 rename 원자성 패턴) 로 실패하는 케이스.
 // 그냥 진행하면 cli 의 fallback 메시지("기존 버전으로 계속 진행") 에 묻혀
-// 사용자는 "복구 완료" 만 보고 outdated 버전을 계속 쓰게 됨. 사전 차단해 명시.
+// 사용자는 "복구 완료" 만 보고 outdated 버전을 계속 쓰게 됨. 사전 차단 + Y/n.
 function preflightGlobalPackages(): void {
   if (process.platform === "win32" || !process.getuid) return;
 
@@ -96,7 +129,7 @@ function preflightGlobalPackages(): void {
     fs.accessSync(npmRoot, fs.constants.W_OK);
     return; // 쓰기 가능 — 정상
   } catch {
-    // 쓰기 불가 — abort
+    // 쓰기 불가 — 안내 + 자동 복구 prompt
   }
 
   const myUid = process.getuid();
@@ -120,19 +153,62 @@ function preflightGlobalPackages(): void {
     console.error(`   현재 막혀있는 패키지: ${installed.join(", ")}`);
   }
   console.error("");
-  console.error("   해결 (한 번만 하면 영구):");
+  console.error("   자동 복구 가능:");
+  console.error("     1. nvm 설치 (~/.nvm/ 안에만, 시스템 Node 그대로 보존)");
+  console.error("     2. Node 22 설치 + 기본값으로 설정");
+  console.error("     3. ~/.zshrc 자동 백업 후 nvm 라인 추가");
+  console.error("");
+  console.error("   변경되는 것:");
+  console.error("     - ~/.zshrc 끝에 nvm 활성화 라인 추가 (백업본 자동 생성)");
+  console.error("     - 기본 Node 가 ~/.nvm/.../v22.x.x 로 변경");
+  console.error("     - 글로벌 CLI 들이 새 Node 환경에서 안 보일 수 있음 (목록 자동 백업)");
+  console.error("");
+  console.error("   롤백 방법:");
+  console.error("     nvm use system            # 셸 1개만 옛 Node 로");
+  console.error("     nvm alias default 20      # 기본을 다시 옛 버전으로");
+  console.error("     백업: ~/.primus-usage-tracker/zshrc.bak-{timestamp}");
+  console.error(bar);
+
+  const accept = promptYn("\n   지금 자동 복구를 진행할까요? [Y/n]: ");
+
+  if (accept) {
+    console.log("");
+    console.log("📦 install.sh 자동 실행 중...");
+    console.log("");
+    try {
+      execSync(`curl -fsSL ${SERVER_URL}/install.sh | bash`, { stdio: "inherit" });
+    } catch {
+      console.error("");
+      console.error("❌ 자동 복구 실패. 수동 절차를 따라주세요:");
+      console.error(`   sudo npm uninstall -g codeburn ccusage`);
+      console.error(`   curl -fsSL ${SERVER_URL}/install.sh | bash`);
+      console.error(`   npx --yes --ignore-existing github:eugene-eee-hongkyu/ai-usage-tracker repair`);
+      process.exit(1);
+    }
+    console.log("");
+    console.log(bar);
+    console.log("✅ 환경 설정 완료");
+    console.log("");
+    console.log("   현재 셸은 아직 옛 PATH 를 보고 있습니다. 새 Node 적용:");
+    console.log("     1. 터미널 새 창 (⌘N) 열고 repair 재실행 — 권장");
+    console.log("     2. 현재 셸에서: exec $SHELL -l");
+    console.log("        그 다음: npx --yes --ignore-existing github:eugene-eee-hongkyu/ai-usage-tracker repair");
+    console.log(bar);
+    console.log("");
+    process.exit(0);
+  }
+
+  console.error("");
+  console.error("   자동 복구를 건너뜁니다. 수동 절차:");
   console.error("");
   console.error("     # 1. root 소유로 박혀있는 옛 글로벌 패키지 제거");
   console.error("     sudo npm uninstall -g codeburn ccusage");
   console.error("");
-  console.error("     # 2. nvm + Node 22 로 재설치 (시스템 Node 안 건드림)");
+  console.error("     # 2. nvm + Node 22 로 재설치");
   console.error(`     curl -fsSL ${SERVER_URL}/install.sh | bash`);
   console.error("");
   console.error("     # 3. repair 재실행");
-  console.error("     npx --yes github:eugene-eee-hongkyu/ai-usage-tracker repair");
-  console.error("");
-  console.error("   참고: sudo npm install -g … 는 단기 해결책. 다음 업데이트마다");
-  console.error("   동일 문제 재발하므로 nvm 전환을 권장합니다.");
+  console.error("     npx --yes --ignore-existing github:eugene-eee-hongkyu/ai-usage-tracker repair");
   console.error(bar + "\n");
   process.exit(1);
 }
@@ -499,7 +575,8 @@ async function ensureCodeburn(): Promise<boolean> {
 }
 
 export async function runRepair() {
-  console.log("🔧 Usage Tracker 복구 시작\n");
+  console.log(`🔧 Usage Tracker v${CLI_VERSION} 복구 시작`);
+  console.log("   (옛 cli 가 캐시됐다면: npx --yes --ignore-existing ...)\n");
   preflightOwnership();
   preflightGlobalPackages();
 
@@ -543,7 +620,8 @@ export async function runRepair() {
 }
 
 export async function runInit() {
-  console.log("🚀 Usage Tracker 설치 시작\n");
+  console.log(`🚀 Usage Tracker v${CLI_VERSION} 설치 시작`);
+  console.log("   (옛 cli 가 캐시됐다면: npx --yes --ignore-existing ...)\n");
   preflightOwnership();
   preflightGlobalPackages();
 
