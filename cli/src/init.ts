@@ -75,6 +75,68 @@ function preflightOwnership(): void {
   process.exit(1);
 }
 
+// npm 전역 prefix 가 root 소유 등으로 쓰기 불가일 때 사전 차단.
+// 이전 sudo 설치 흔적이 남아있거나 macOS 시스템 Node 사용 시 codeburn/ccusage
+// @latest 업그레이드가 EACCES (npm 의 rename 원자성 패턴) 로 실패하는 케이스.
+// 그냥 진행하면 cli 의 fallback 메시지("기존 버전으로 계속 진행") 에 묻혀
+// 사용자는 "복구 완료" 만 보고 outdated 버전을 계속 쓰게 됨. 사전 차단해 명시.
+function preflightGlobalPackages(): void {
+  if (process.platform === "win32" || !process.getuid) return;
+
+  let npmRoot: string;
+  try {
+    npmRoot = execSync("npm root -g", { stdio: ["ignore", "pipe", "ignore"] })
+      .toString().trim();
+  } catch {
+    return; // npm 자체가 없거나 호출 실패면 다른 단계에서 잡힘
+  }
+  if (!npmRoot || !fs.existsSync(npmRoot)) return;
+
+  try {
+    fs.accessSync(npmRoot, fs.constants.W_OK);
+    return; // 쓰기 가능 — 정상
+  } catch {
+    // 쓰기 불가 — abort
+  }
+
+  const myUid = process.getuid();
+  const parentStat = fs.statSync(npmRoot);
+  const installed: string[] = [];
+  for (const p of ["codeburn", "ccusage"]) {
+    if (fs.existsSync(path.join(npmRoot, p))) installed.push(p);
+  }
+
+  const bar = "═".repeat(60);
+  console.error("\n" + bar);
+  console.error("❌ npm 전역 디렉토리에 쓰기 권한이 없습니다");
+  console.error(`   ${npmRoot}`);
+  console.error(`   소유자 uid=${parentStat.uid}, 현재 uid=${myUid}`);
+  console.error("");
+  console.error("   원인: 시스템 Node 사용 중이거나 과거 sudo 로 설치됨.");
+  console.error("   이 상태에선 codeburn/ccusage @latest 업그레이드가 EACCES");
+  console.error("   (npm rename 단계) 로 실패합니다.");
+  if (installed.length > 0) {
+    console.error("");
+    console.error(`   현재 막혀있는 패키지: ${installed.join(", ")}`);
+  }
+  console.error("");
+  console.error("   해결 (한 번만 하면 영구):");
+  console.error("");
+  console.error("     # 1. root 소유로 박혀있는 옛 글로벌 패키지 제거");
+  console.error("     sudo npm uninstall -g codeburn ccusage");
+  console.error("");
+  console.error("     # 2. nvm + Node 22 로 재설치 (시스템 Node 안 건드림)");
+  console.error(`     curl -fsSL ${SERVER_URL}/install.sh | bash`);
+  console.error("");
+  console.error("     # 3. repair 재실행");
+  console.error("     npx --yes github:eugene-eee-hongkyu/ai-usage-tracker repair");
+  console.error("");
+  console.error("   참고: sudo npm install -g … 는 단기 해결책. 다음 업데이트마다");
+  console.error("   동일 문제 재발하므로 nvm 전환을 권장합니다.");
+  console.error(bar + "\n");
+  process.exit(1);
+}
+
 async function getKeytar() {
   try {
     const kt = await import("keytar");
@@ -439,6 +501,7 @@ async function ensureCodeburn(): Promise<boolean> {
 export async function runRepair() {
   console.log("🔧 Usage Tracker 복구 시작\n");
   preflightOwnership();
+  preflightGlobalPackages();
 
   const apiKey = await loadApiKey();
   if (!apiKey) {
@@ -482,6 +545,7 @@ export async function runRepair() {
 export async function runInit() {
   console.log("🚀 Usage Tracker 설치 시작\n");
   preflightOwnership();
+  preflightGlobalPackages();
 
   // init 시에도 항상 @latest 시도. 기존 사용자도 install.sh 재실행만으로
   // codeburn/ccusage 최신 fix 자동 반영.

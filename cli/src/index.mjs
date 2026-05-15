@@ -936,6 +936,60 @@ function preflightOwnership() {
 `);
   process.exit(1);
 }
+function preflightGlobalPackages() {
+  if (process.platform === "win32" || !process.getuid)
+    return;
+  let npmRoot;
+  try {
+    npmRoot = execSync("npm root -g", { stdio: ["ignore", "pipe", "ignore"] }).toString().trim();
+  } catch {
+    return;
+  }
+  if (!npmRoot || !fs.existsSync(npmRoot))
+    return;
+  try {
+    fs.accessSync(npmRoot, fs.constants.W_OK);
+    return;
+  } catch {}
+  const myUid = process.getuid();
+  const parentStat = fs.statSync(npmRoot);
+  const installed = [];
+  for (const p of ["codeburn", "ccusage"]) {
+    if (fs.existsSync(path.join(npmRoot, p)))
+      installed.push(p);
+  }
+  const bar = "═".repeat(60);
+  console.error(`
+` + bar);
+  console.error("❌ npm 전역 디렉토리에 쓰기 권한이 없습니다");
+  console.error(`   ${npmRoot}`);
+  console.error(`   소유자 uid=${parentStat.uid}, 현재 uid=${myUid}`);
+  console.error("");
+  console.error("   원인: 시스템 Node 사용 중이거나 과거 sudo 로 설치됨.");
+  console.error("   이 상태에선 codeburn/ccusage @latest 업그레이드가 EACCES");
+  console.error("   (npm rename 단계) 로 실패합니다.");
+  if (installed.length > 0) {
+    console.error("");
+    console.error(`   현재 막혀있는 패키지: ${installed.join(", ")}`);
+  }
+  console.error("");
+  console.error("   해결 (한 번만 하면 영구):");
+  console.error("");
+  console.error("     # 1. root 소유로 박혀있는 옛 글로벌 패키지 제거");
+  console.error("     sudo npm uninstall -g codeburn ccusage");
+  console.error("");
+  console.error("     # 2. nvm + Node 22 로 재설치 (시스템 Node 안 건드림)");
+  console.error(`     curl -fsSL ${SERVER_URL}/install.sh | bash`);
+  console.error("");
+  console.error("     # 3. repair 재실행");
+  console.error("     npx --yes github:eugene-eee-hongkyu/ai-usage-tracker repair");
+  console.error("");
+  console.error("   참고: sudo npm install -g … 는 단기 해결책. 다음 업데이트마다");
+  console.error("   동일 문제 재발하므로 nvm 전환을 권장합니다.");
+  console.error(bar + `
+`);
+  process.exit(1);
+}
 async function getKeytar() {
   try {
     const kt = await import("keytar");
@@ -1269,6 +1323,7 @@ async function runRepair() {
   console.log(`\uD83D\uDD27 Usage Tracker 복구 시작
 `);
   preflightOwnership();
+  preflightGlobalPackages();
   const apiKey = await loadApiKey();
   if (!apiKey) {
     console.error("❌ 설치된 API 키가 없습니다. 먼저 init을 실행하세요:");
@@ -1308,6 +1363,7 @@ async function runInit() {
   console.log(`\uD83D\uDE80 Usage Tracker 설치 시작
 `);
   preflightOwnership();
+  preflightGlobalPackages();
   const codeburnOk = await ensureCodeburn();
   if (!codeburnOk) {
     console.error("❌ codeburn 설치 실패. 수동으로 설치 후 다시 시도하세요:");
