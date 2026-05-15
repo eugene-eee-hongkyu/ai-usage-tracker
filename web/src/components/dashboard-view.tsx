@@ -9,7 +9,25 @@ import { CacheHitModal, OneShotRateModal, CostPerSessionModal, CallsPerSessionMo
 import { computeTokenLevel } from "@/lib/rules";
 import { ActivityCalendar } from "react-activity-calendar";
 import { ScoreGauge, scoreLabel } from "@/components/score-gauge";
-import { ScoreDrilldown, type DrilldownPeriod } from "@/components/score-drilldown";
+import dynamic from "next/dynamic";
+import type { DrilldownPeriod } from "@/components/score-drilldown";
+
+const ScoreDrilldown = dynamic(
+  () => import("@/components/score-drilldown").then((m) => m.ScoreDrilldown),
+  {
+    ssr: false,
+    loading: () => (
+      <div
+        data-testid="score-drilldown-loading"
+        className="bg-neutral-950 border-t border-neutral-800/60 px-4 py-4"
+      >
+        <div className="max-w-6xl mx-auto h-56 flex items-center justify-center">
+          <span className="text-xs font-mono text-neutral-600 animate-pulse">차트 로딩 중...</span>
+        </div>
+      </div>
+    ),
+  }
+);
 
 type Period = "today" | "8days" | "month" | "30days" | "all";
 
