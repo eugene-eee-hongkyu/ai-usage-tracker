@@ -77,7 +77,7 @@ interface ChartDatum {
   isToday: boolean;
 }
 
-const LABEL_THRESHOLD = 15; // 막대 이하면 데이터 라벨 노출, 넘으면 가독성 위해 숨김
+const LABEL_THRESHOLD = 31; // 막대 이하면 데이터 라벨 노출 (8일/이번달/30일 커버). 주간 모드는 자체적으로 ≤14주.
 
 interface ChangeEvent {
   date: string;
@@ -273,10 +273,13 @@ export function ScoreDrilldown({ daily, period }: Props) {
               />
               <Bar dataKey="score" radius={[2, 2, 0, 0]} maxBarSize={28} isAnimationActive={false}>
                 {chartData.map((d, i) => {
+                  // 오늘 막대 = 진행 중(partial-day) → 점수 색 카테고리에서 분리.
+                  // 회색 + 낮은 불투명도로 "완료일과 비교 불가" 시각 메시지.
+                  if (d.isToday && !isWeekly) {
+                    return <Cell key={i} fill="#525252" fillOpacity={0.5} />;
+                  }
                   const fill = d.score === null ? "transparent" : scoreColorHex(d.score);
-                  // 오늘 막대: 진행 중 = partial-day data. 불투명도 낮춰 시각적으로 구분.
-                  const opacity = d.isToday && !isWeekly ? 0.55 : 1;
-                  return <Cell key={i} fill={fill} fillOpacity={opacity} />;
+                  return <Cell key={i} fill={fill} />;
                 })}
                 {showLabels && (
                   <LabelList
@@ -301,7 +304,7 @@ export function ScoreDrilldown({ daily, period }: Props) {
           <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-red-700" />경고 &lt;35</span>
           {chartData.some((d) => d.isToday) && !isWeekly && (
             <span className="flex items-center gap-1 ml-2 text-neutral-400">
-              <span className="w-2.5 h-2.5 rounded-sm bg-emerald-500 opacity-55" /> 오늘 (진행 중)
+              <span className="w-2.5 h-2.5 rounded-sm bg-neutral-600 opacity-50" /> 오늘 (진행 중 · 비교 제외)
             </span>
           )}
         </div>
