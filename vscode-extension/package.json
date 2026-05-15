@@ -1,0 +1,96 @@
+{
+  "name": "ai-usage-tracker",
+  "displayName": "AI Usage Tracker",
+  "description": "Claude Code 사용량을 자동 수집해 개인 효율 점수 + 팀 랭킹으로 시각화. 터미널 명령어 없이 IDE 안에서 설치·관리.",
+  "version": "0.1.0",
+  "publisher": "z21labs",
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "keywords": [
+    "claude code",
+    "usage tracker",
+    "ai usage",
+    "analytics",
+    "dashboard"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/eugene-eee-hongkyu/ai-usage-tracker.git",
+    "directory": "vscode-extension"
+  },
+  "homepage": "https://ai-usage-tracker-web-psi.vercel.app",
+  "bugs": {
+    "url": "https://github.com/eugene-eee-hongkyu/ai-usage-tracker/issues"
+  },
+  "main": "./out/extension.js",
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "contributes": {
+    "commands": [
+      {
+        "command": "aiUsageTracker.setup",
+        "title": "AI Usage Tracker: 설치 / Setup",
+        "category": "AI Usage Tracker"
+      },
+      {
+        "command": "aiUsageTracker.repair",
+        "title": "AI Usage Tracker: 복구 / Repair",
+        "category": "AI Usage Tracker"
+      },
+      {
+        "command": "aiUsageTracker.doctor",
+        "title": "AI Usage Tracker: 환경 진단 / Doctor",
+        "category": "AI Usage Tracker"
+      },
+      {
+        "command": "aiUsageTracker.openDashboard",
+        "title": "AI Usage Tracker: 대시보드 열기 / Open Dashboard",
+        "category": "AI Usage Tracker"
+      },
+      {
+        "command": "aiUsageTracker.openSetupStatus",
+        "title": "AI Usage Tracker: 셋업 상태 / Open Setup Status",
+        "category": "AI Usage Tracker"
+      },
+      {
+        "command": "aiUsageTracker.showMenu",
+        "title": "AI Usage Tracker: 메뉴 / Show Menu",
+        "category": "AI Usage Tracker"
+      }
+    ],
+    "configuration": {
+      "title": "AI Usage Tracker",
+      "properties": {
+        "aiUsageTracker.serverUrl": {
+          "type": "string",
+          "default": "https://ai-usage-tracker-web-psi.vercel.app",
+          "description": "AI Usage Tracker 서버 URL (자체 호스팅 시 변경)"
+        },
+        "aiUsageTracker.githubRepo": {
+          "type": "string",
+          "default": "github:eugene-eee-hongkyu/ai-usage-tracker",
+          "description": "CLI 패키지 GitHub 경로 (npx 가 fetch 할 spec)"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p .",
+    "watch": "tsc -watch -p .",
+    "package": "vsce package",
+    "publish": "vsce publish"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/vscode": "^1.85.0",
+    "@vscode/vsce": "^3.0.0",
+    "typescript": "^5.4.0"
+  }
+}
