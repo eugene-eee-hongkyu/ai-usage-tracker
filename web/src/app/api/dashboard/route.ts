@@ -453,7 +453,14 @@ export async function GET(req: NextRequest) {
   }
 
   const SCORE_DAYS = 90;
-  const scoreSeries: Array<{ date: string; score: number | null; cacheHitPct: number | null }> = [];
+  const scoreSeries: Array<{
+    date: string;
+    score: number | null;
+    cacheHitPct: number | null;
+    oneShotRate: number | null;
+    costPerCall: number | null;
+    totalTokens: number | null;
+  }> = [];
   const scoreBase = new Date();
   for (let i = SCORE_DAYS - 1; i >= 0; i--) {
     const d2 = new Date(scoreBase);
@@ -462,14 +469,21 @@ export async function GET(req: NextRequest) {
     const cu = cuDailyMap[key];
     const cb = cbDailyMap[key];
     if (!cu || !cb || cb.calls === 0) {
-      scoreSeries.push({ date: key, score: null, cacheHitPct: null });
+      scoreSeries.push({ date: key, score: null, cacheHitPct: null, oneShotRate: null, costPerCall: null, totalTokens: null });
       continue;
     }
     const totalDenom = cu.input + cu.cacheRead + cu.cacheWrite;
     const dayCacheHitPct = totalDenom > 0 ? (cu.cacheRead / totalDenom) * 100 : 0;
     const dayCostPerCall = cb.calls > 0 ? cb.cost / cb.calls : 0;
     const dayScore = computeDailyEfficiencyScore(dayCacheHitPct, dayCostPerCall, cb.oneShotRate, cu.total);
-    scoreSeries.push({ date: key, score: dayScore, cacheHitPct: dayCacheHitPct });
+    scoreSeries.push({
+      date: key,
+      score: dayScore,
+      cacheHitPct: dayCacheHitPct,
+      oneShotRate: cb.oneShotRate,
+      costPerCall: dayCostPerCall,
+      totalTokens: cu.total,
+    });
   }
 
   const todayKey = new Date().toISOString().slice(0, 10);

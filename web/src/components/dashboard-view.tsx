@@ -9,6 +9,7 @@ import { CacheHitModal, OneShotRateModal, CostPerSessionModal, CallsPerSessionMo
 import { computeTokenLevel } from "@/lib/rules";
 import { ActivityCalendar } from "react-activity-calendar";
 import { ScoreGauge, scoreLabel } from "@/components/score-gauge";
+import { ScoreDrilldown, type DrilldownPeriod } from "@/components/score-drilldown";
 
 type Period = "today" | "8days" | "month" | "30days" | "all";
 
@@ -92,7 +93,14 @@ interface EfficiencyScoreSummary {
   yesterday: number | null;
   delta: number | null;
   streak: number;
-  daily: Array<{ date: string; score: number | null; cacheHitPct: number | null }>;
+  daily: Array<{
+    date: string;
+    score: number | null;
+    cacheHitPct: number | null;
+    oneShotRate: number | null;
+    costPerCall: number | null;
+    totalTokens: number | null;
+  }>;
   teamRank: {
     position: number;
     total: number;
@@ -216,23 +224,67 @@ function EfficiencyScoreSection({ score, period, periodScore }: EfficiencyScoreS
   // period=today 면 단일 entry → today 점수와 동일.
   const displayScore = periodScore;
 
+  // Drilldown — today 외 period 에서만 활성. localStorage 로 펼침 상태 유지.
+  const drilldownAvailable = period !== "today";
+  const [open, setOpen] = useState(false);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    setOpen(localStorage.getItem("score_drilldown_open") === "1");
+  }, []);
+  const toggleDrilldown = () => {
+    if (!drilldownAvailable) return;
+    setOpen((prev) => {
+      const next = !prev;
+      try { localStorage.setItem("score_drilldown_open", next ? "1" : "0"); } catch {}
+      return next;
+    });
+  };
+
+  const gaugeBlock = (
+    <>
+      <ScoreGauge score={displayScore} />
+      <div className="mt-1.5 flex items-center gap-1.5 text-[11px] font-mono">
+        <span className={`font-bold ${scoreColor(displayScore)}`}>{scoreLabel(displayScore)}</span>
+        {deltaNode && <span className="text-neutral-500">·</span>}
+        {deltaNode}
+      </div>
+      <span className="text-[10px] font-mono text-neutral-600 mt-0.5">cache 42 + one-shot 18 + cost 10 + 사용량 30</span>
+      {drilldownAvailable && (
+        <span
+          data-testid="score-drilldown-hint"
+          className="mt-1 text-[10px] font-mono text-sky-400/70 group-hover:text-sky-300 transition-colors"
+        >
+          {open ? "▲ 추이 닫기" : `▼ ${period === "8days" ? "8일" : period === "month" ? "이번달" : period === "30days" ? "30일" : "전체"} 추이 보기`}
+        </span>
+      )}
+    </>
+  );
+
   return (
     <div data-testid="dash-efficiency-score" className="bg-neutral-950 border-b border-neutral-800">
       <div className="max-w-6xl mx-auto px-4 py-4">
         <div className="grid grid-cols-12 gap-x-6 items-start">
           {/* Hero: 원형 게이지 (3 cols) — 5초 테스트 통과용 단일 focal point */}
-          <div data-testid="score-today" className="col-span-12 sm:col-span-3 flex flex-col items-center">
-            <span className="text-[10px] font-mono text-neutral-500 uppercase tracking-wider mb-1">
-              {labelMain}{labelSuffix}
-            </span>
-            <ScoreGauge score={displayScore} />
-            <div className="mt-1.5 flex items-center gap-1.5 text-[11px] font-mono">
-              <span className={`font-bold ${scoreColor(displayScore)}`}>{scoreLabel(displayScore)}</span>
-              {deltaNode && <span className="text-neutral-500">·</span>}
-              {deltaNode}
+          {drilldownAvailable ? (
+            <button
+              type="button"
+              data-testid="score-today"
+              onClick={toggleDrilldown}
+              className="group col-span-12 sm:col-span-3 flex flex-col items-center bg-transparent border-0 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-500/60 rounded"
+            >
+              <span className="text-[10px] font-mono text-neutral-500 uppercase tracking-wider mb-1">
+                {labelMain}{labelSuffix}
+              </span>
+              {gaugeBlock}
+            </button>
+          ) : (
+            <div data-testid="score-today" className="col-span-12 sm:col-span-3 flex flex-col items-center">
+              <span className="text-[10px] font-mono text-neutral-500 uppercase tracking-wider mb-1">
+                {labelMain}{labelSuffix}
+              </span>
+              {gaugeBlock}
             </div>
-            <span className="text-[10px] font-mono text-neutral-600 mt-0.5">cache 42 + one-shot 18 + cost 10 + 사용량 30</span>
-          </div>
+          )}
 
           {/* 보조: streak + team rank 세로 stack (3 cols) */}
           <div className="col-span-12 sm:col-span-3 flex flex-col gap-3 py-1">
@@ -318,6 +370,10 @@ function EfficiencyScoreSection({ score, period, periodScore }: EfficiencyScoreS
           </div>
         </div>
       </div>
+
+      {drilldownAvailable && open && (
+        <ScoreDrilldown daily={score.daily} period={period as DrilldownPeriod} />
+      )}
     </div>
   );
 }
