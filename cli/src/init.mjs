@@ -167,7 +167,7 @@ function preflightGlobalPackages() {
       console.error("❌ 자동 복구 실패. 수동 절차를 따라주세요:");
       console.error(`   sudo npm uninstall -g codeburn ccusage`);
       console.error(`   curl -fsSL ${SERVER_URL}/install.sh | bash`);
-      console.error(`   npx --yes --ignore-existing github:eugene-eee-hongkyu/ai-usage-tracker repair`);
+      console.error(`   npx --yes github:eugene-eee-hongkyu/ai-usage-tracker repair`);
       process.exit(1);
     }
     console.log("");
@@ -177,7 +177,7 @@ function preflightGlobalPackages() {
     console.log("   현재 셸은 아직 옛 PATH 를 보고 있습니다. 새 Node 적용:");
     console.log("     1. 터미널 새 창 (⌘N) 열고 repair 재실행 — 권장");
     console.log("     2. 현재 셸에서: exec $SHELL -l");
-    console.log("        그 다음: npx --yes --ignore-existing github:eugene-eee-hongkyu/ai-usage-tracker repair");
+    console.log("        그 다음: npx --yes github:eugene-eee-hongkyu/ai-usage-tracker repair");
     console.log(bar);
     console.log("");
     process.exit(0);
@@ -192,7 +192,7 @@ function preflightGlobalPackages() {
   console.error(`     curl -fsSL ${SERVER_URL}/install.sh | bash`);
   console.error("");
   console.error("     # 3. repair 재실행");
-  console.error("     npx --yes --ignore-existing github:eugene-eee-hongkyu/ai-usage-tracker repair");
+  console.error("     npx --yes github:eugene-eee-hongkyu/ai-usage-tracker repair");
   console.error(bar + `
 `);
   process.exit(1);
@@ -527,8 +527,7 @@ async function ensureCodeburn() {
   return false;
 }
 async function runRepair() {
-  console.log(`\uD83D\uDD27 Usage Tracker v${CLI_VERSION} 복구 시작`);
-  console.log(`   (옛 cli 가 캐시됐다면: npx --yes --ignore-existing ...)
+  console.log(`\uD83D\uDD27 Usage Tracker v${CLI_VERSION} 복구 시작
 `);
   preflightOwnership();
   preflightGlobalPackages();
@@ -568,8 +567,7 @@ async function runRepair() {
   process.exit(0);
 }
 async function runInit() {
-  console.log(`\uD83D\uDE80 Usage Tracker v${CLI_VERSION} 설치 시작`);
-  console.log(`   (옛 cli 가 캐시됐다면: npx --yes --ignore-existing ...)
+  console.log(`\uD83D\uDE80 Usage Tracker v${CLI_VERSION} 설치 시작
 `);
   preflightOwnership();
   preflightGlobalPackages();

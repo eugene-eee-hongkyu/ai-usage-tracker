@@ -138,7 +138,7 @@ if [ -n "$OTHER_MGR" ]; then
       echo "       fnm default 22"
       ;;
   esac
-  echo "       npx --yes --ignore-existing github:eugene-eee-hongkyu/ai-usage-tracker repair"
+  echo "       npx --yes github:eugene-eee-hongkyu/ai-usage-tracker repair"
   echo "$BAR"
   echo ""
   SKIP_NVM=1

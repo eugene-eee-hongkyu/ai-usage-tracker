@@ -340,7 +340,7 @@ function EnvDiagnosticCard({ env }: { env: EnvInfo }) {
           <div className="pt-2 text-xs text-amber-300/80 leading-relaxed">
             복구:{" "}
             <code className="bg-slate-900/60 px-1.5 py-0.5 rounded text-amber-200">
-              npx --yes --ignore-existing github:eugene-eee-hongkyu/ai-usage-tracker repair
+              npx --yes github:eugene-eee-hongkyu/ai-usage-tracker repair
             </code>
             <p className="text-[11px] text-slate-400 mt-1">
               repair 가 권한 문제를 감지하면 자동 복구 prompt 를 띄웁니다.

@@ -185,7 +185,7 @@ function printHumanReport(r: DoctorReport): void {
     r.issues.forEach((s, i) => console.log(`  ${i + 1}. ${s}`));
     console.log("");
     console.log("복구하려면:");
-    console.log("  npx --yes --ignore-existing github:eugene-eee-hongkyu/ai-usage-tracker repair");
+    console.log("  npx --yes github:eugene-eee-hongkyu/ai-usage-tracker repair");
     console.log("");
     console.log("  → repair 가 권한 문제를 감지하면 자동 복구 prompt 를 띄웁니다.");
   } else {
