@@ -42,7 +42,9 @@ async function loadApiKey() {
 }
 
 // src/sync.ts
-var SERVER_URL2 = process.env.USAGE_TRACKER_URL ?? "https://aiusage.z21labs.world";
+var LOCAL_MODE = process.env.USAGE_TRACKER_MODE === "local";
+var LOCAL_PORT = process.env.LOCAL_PORT ?? "3000";
+var SERVER_URL2 = process.env.USAGE_TRACKER_URL ?? (LOCAL_MODE ? `http://localhost:${LOCAL_PORT}` : "https://aiusage.z21labs.world");
 var PERIODS = ["today", "week", "month", "30days", "all"];
 var SYSTEM_TZ = Intl.DateTimeFormat().resolvedOptions().timeZone;
 var childEnv = { ...process.env, TZ: SYSTEM_TZ, CODEBURN_TZ: SYSTEM_TZ };
@@ -122,12 +124,12 @@ function spawnCcusageBlocks() {
   });
 }
 async function runSync(_days) {
-  const apiKey = process.env.USAGE_TRACKER_API_KEY ?? await loadApiKey();
-  if (!apiKey) {
+  const apiKey = LOCAL_MODE ? "" : process.env.USAGE_TRACKER_API_KEY ?? await loadApiKey();
+  if (!LOCAL_MODE && !apiKey) {
     console.error("API 키가 없습니다. 먼저 init을 실행하세요.");
     process.exit(1);
   }
-  console.log("codeburn + ccusage 데이터 수집 중...");
+  console.log(`codeburn + ccusage 데이터 수집 중... (${LOCAL_MODE ? "로컬" : "서버"} 모드 → ${SERVER_URL2})`);
   try {
     const [results, ccusageDaily, ccusageBlocks] = await Promise.all([
       Promise.all(PERIODS.map((p) => spawnCodeburn(p))),
@@ -139,9 +141,12 @@ async function runSync(_days) {
       report.ccusageDaily = ccusageDaily;
     if (ccusageBlocks)
       report.ccusageBlocks = ccusageBlocks;
+    const headers = { "Content-Type": "application/json" };
+    if (!LOCAL_MODE)
+      headers["x-api-key"] = apiKey;
     const resp = await fetch(`${SERVER_URL2}/api/ingest`, {
       method: "POST",
-      headers: { "Content-Type": "application/json", "x-api-key": apiKey },
+      headers,
       body: JSON.stringify(report)
     });
     if (resp.ok) {
