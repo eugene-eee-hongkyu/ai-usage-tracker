@@ -37,11 +37,10 @@ interface CodeburnOverview {
   cost?: number;
   sessions?: number;
   calls?: number;
-  cacheHitPercent?: number;
   totalCost?: number;
   totalSessions?: number;
   callsCount?: number;
-  cacheHitPct?: number;
+  tokens?: { input?: number; output?: number; cacheRead?: number; cacheWrite?: number };
 }
 
 interface CodeburnPeriodReport {
@@ -169,7 +168,13 @@ export async function POST(req: NextRequest) {
   const totalCost = ov.cost ?? ov.totalCost ?? 0;
   const sessionsCount = ov.sessions ?? ov.totalSessions ?? 0;
   const callsCount = ov.calls ?? ov.callsCount ?? 0;
-  const cacheHitPct = ov.cacheHitPercent ?? ov.cacheHitPct ?? 0;
+  // codeburn 의 cacheHitPercent 는 100 으로 박히는 버그가 있어 신뢰 불가.
+  // raw token 분모로 자체 계산: cacheRead / (input + cacheRead + cacheWrite) × 100
+  const tRead = ov.tokens?.cacheRead ?? 0;
+  const tWrite = ov.tokens?.cacheWrite ?? 0;
+  const tInput = ov.tokens?.input ?? 0;
+  const cacheDenom = tRead + tWrite + tInput;
+  const cacheHitPct = cacheDenom > 0 ? (tRead / cacheDenom) * 100 : 0;
   const overallOneShot = computeOverallOneShot(activities);
 
   const userTz = userRow[0].timezone ?? "UTC";

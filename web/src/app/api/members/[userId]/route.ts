@@ -17,8 +17,6 @@ interface RawProject {
 }
 
 interface RawOverview {
-  cacheHitPercent?: number;
-  cacheHitPct?: number;
   tokens?: { input?: number; output?: number; cacheRead?: number; cacheWrite?: number };
 }
 
@@ -103,7 +101,7 @@ export async function GET(
   const tInput = ov.tokens?.input ?? 0;
   const cacheHitPct = (tRead + tWrite + tInput) > 0
     ? (tRead / (tRead + tWrite + tInput)) * 100
-    : (ov.cacheHitPercent ?? ov.cacheHitPct ?? snap[0].cacheHitPct ?? 0);
+    : snap[0].cacheHitPct ?? 0;
 
   return NextResponse.json({
     user: { id: user[0].id, name: user[0].name, avatarUrl: user[0].avatarUrl },

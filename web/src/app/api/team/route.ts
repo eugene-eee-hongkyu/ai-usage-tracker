@@ -19,10 +19,8 @@ interface RawOverview {
   cost?: number;
   sessions?: number;
   calls?: number;
-  cacheHitPercent?: number;
   totalCost?: number;
   totalSessions?: number;
-  cacheHitPct?: number;
   tokens?: { input?: number; output?: number; cacheRead?: number; cacheWrite?: number };
 }
 
@@ -303,7 +301,7 @@ export async function GET(req: NextRequest) {
         const tWrite = ov.tokens?.cacheWrite ?? 0;
         cacheHitPct = (tRead + tWrite + tIn) > 0
           ? (tRead / (tRead + tWrite + tIn)) * 100
-          : (ov.cacheHitPercent ?? ov.cacheHitPct ?? 0);
+          : 0;
         outputInputRatio = tIn > 0 ? tOut / tIn : 1;
         topProject = (d.projects ?? []).sort((a, b) => (b.cost ?? 0) - (a.cost ?? 0))[0]?.name ?? "unknown";
       }

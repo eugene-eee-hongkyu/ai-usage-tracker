@@ -18,10 +18,8 @@ interface RawOverview {
   cost?: number;
   sessions?: number;
   calls?: number;
-  cacheHitPercent?: number;
   totalCost?: number;
   totalSessions?: number;
-  cacheHitPct?: number;
   tokens?: { input?: number; output?: number; cacheRead?: number; cacheWrite?: number };
 }
 
@@ -224,7 +222,7 @@ export async function GET(req: NextRequest) {
   const outputInputRatio = tInput > 0 ? tOutput / tInput : 0;
   const cacheHitPct = (tRead + tWrite + tInput) > 0
     ? (tRead / (tRead + tWrite + tInput)) * 100
-    : (ov.cacheHitPercent ?? ov.cacheHitPct ?? 0);
+    : 0;
 
   const allActivities = d.activities ?? [];
   const activitiesWithRate = allActivities.filter((a) => a.oneShotRate != null);
