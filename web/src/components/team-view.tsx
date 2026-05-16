@@ -9,6 +9,7 @@ import { TeamPlanHealthCard, type TeamPlanSummary } from "@/components/team-plan
 import { TeamUsageHero } from "@/components/team-usage-hero";
 import {
   AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
+  LineChart, Line,
 } from "recharts";
 import { ScoreGauge, scoreLabel } from "@/components/score-gauge";
 import { computeTokenLevel, computeDailyEfficiencyScore } from "@/lib/rules";
@@ -136,6 +137,20 @@ interface TeamData {
     priceForPeriodSum: number | null;
     totalWindowTokensSum: number;
   };
+  memberUsage?: Array<{
+    userId: number;
+    name: string;
+    memberKey: string;
+    powerIndex: number;
+    declaredTier: string | null;
+    estimatedTier: string | null;
+    effectiveTier: string | null;
+    monthlyPriceUsd: number | null;
+    isEstimated: boolean;
+    activeDays: number;
+    totalTokens: number;
+  }>;
+  dailyUnitCostByMember?: Array<Record<string, number | string | null>>;
 }
 
 function AdminBadge() {
@@ -623,6 +638,119 @@ export function TeamView({ adminMode = false }: { adminMode?: boolean }) {
                   </div>
                 </div>
               </div>
+            </div>
+
+            {/* Row 2.5: 활용지수 순위 + 일별 토큰 단가 (멤버별) */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+
+              {/* 활용지수 순위 — period 분모가 멤버 동일 → 직접 비교 정확 */}
+              <div data-testid="team-card-power-rank" className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-cyan-500 rounded">
+                <div className="px-3 py-2 border-b border-neutral-800">
+                  <span className="text-xs font-mono font-bold text-cyan-400 uppercase tracking-wider">활용 지수 순위</span>
+                </div>
+                <div className="p-3">
+                  <div className="flex text-xs text-neutral-600 font-mono mb-1.5">
+                    <span className="flex-1">member</span>
+                    <span className="w-16 text-right">score</span>
+                  </div>
+                  <div className="space-y-1">
+                    {(() => {
+                      const rows = (data.memberUsage ?? [])
+                        .filter((m) => m.powerIndex > 0)
+                        .sort((a, b) => b.powerIndex - a.powerIndex);
+                      if (rows.length === 0) {
+                        return <p className="text-neutral-600 text-xs font-mono">no data</p>;
+                      }
+                      const maxScore = Math.max(...rows.map((r) => r.powerIndex), 1);
+                      return rows.map((m) => {
+                        const idx = (data.memberNames ?? []).indexOf(m.memberKey);
+                        const color = MEMBER_COLORS[(idx >= 0 ? idx : 0) % MEMBER_COLORS.length];
+                        return (
+                          <div key={m.userId} className="flex items-center gap-1.5 text-xs font-mono">
+                            <div className="w-16 h-1.5 bg-neutral-800 rounded overflow-hidden shrink-0">
+                              <div className="h-full rounded" style={{ width: `${(m.powerIndex / maxScore) * 100}%`, background: color }} />
+                            </div>
+                            <span className="flex-1 text-neutral-300 truncate">{m.name}</span>
+                            <span className="w-16 text-cyan-300 text-right tabular-nums font-bold">{m.powerIndex}</span>
+                          </div>
+                        );
+                      });
+                    })()}
+                  </div>
+                </div>
+              </div>
+
+              {/* 일별 토큰 단가 (멤버별) — 멤버별 plan 가치 / 일별 토큰 × 1M */}
+              <div data-testid="team-card-daily-unit-cost" className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-yellow-500 rounded">
+                <div className="px-3 py-2 border-b border-neutral-800 flex items-center justify-between flex-wrap gap-y-1">
+                  <span className="text-xs font-mono font-bold text-yellow-400 uppercase tracking-wider">일별 토큰 단가 ($ / 1M)</span>
+                  <div className="flex flex-wrap gap-x-3 gap-y-1 justify-end">
+                    {(data.memberUsage ?? []).filter((m) => m.monthlyPriceUsd).map((m) => {
+                      const idx = (data.memberNames ?? []).indexOf(m.memberKey);
+                      const color = MEMBER_COLORS[(idx >= 0 ? idx : 0) % MEMBER_COLORS.length];
+                      return (
+                        <span key={m.userId} className="flex items-center gap-1 text-[10px] font-mono text-neutral-400">
+                          <span className="w-2 h-2 rounded-full inline-block" style={{ background: color }} />
+                          {m.name}{m.isEstimated && <span className="text-amber-400"> (추정)</span>}
+                        </span>
+                      );
+                    })}
+                  </div>
+                </div>
+                <div className="p-3">
+                  {(data.dailyUnitCostByMember ?? []).length === 0 ? (
+                    <p className="text-neutral-600 text-xs font-mono">no data</p>
+                  ) : (
+                    <ResponsiveContainer width="100%" height={160}>
+                      <LineChart
+                        data={(data.dailyUnitCostByMember ?? []).map((row) => ({
+                          ...row,
+                          date: fmtDate(String(row.date)),
+                        }))}
+                        margin={{ top: 4, right: 8, left: 0, bottom: 0 }}
+                      >
+                        <CartesianGrid strokeDasharray="3 3" stroke="#1f2937" />
+                        <XAxis dataKey="date" stroke="#525252" fontSize={10} interval="preserveStartEnd" />
+                        <YAxis stroke="#525252" fontSize={10} scale="log" domain={[0.001, "auto"]} tickFormatter={(v) => {
+                          const n = Number(v);
+                          if (n >= 1) return `$${n.toFixed(1)}`;
+                          if (n >= 0.01) return `$${n.toFixed(2)}`;
+                          return `$${n.toFixed(3)}`;
+                        }} />
+                        <Tooltip
+                          contentStyle={{ background: "#0a0a0a", border: "1px solid #404040", fontSize: 11, fontFamily: "monospace" }}
+                          formatter={(v, name) => {
+                            if (v == null) return ["—", String(name)];
+                            const n = Number(v);
+                            const s = n >= 1 ? `$${n.toFixed(2)}` : n >= 0.01 ? `$${n.toFixed(3)}` : `$${n.toFixed(4)}`;
+                            return [`${s} / 1M`, memberLabel(String(name))];
+                          }}
+                        />
+                        {(data.memberUsage ?? []).filter((m) => m.monthlyPriceUsd).map((m) => {
+                          const idx = (data.memberNames ?? []).indexOf(m.memberKey);
+                          const color = MEMBER_COLORS[(idx >= 0 ? idx : 0) % MEMBER_COLORS.length];
+                          return (
+                            <Line
+                              key={m.userId}
+                              type="monotone"
+                              dataKey={m.memberKey}
+                              stroke={color}
+                              strokeWidth={1.5}
+                              strokeDasharray={m.isEstimated ? "4 3" : undefined}
+                              dot={false}
+                              connectNulls={false}
+                            />
+                          );
+                        })}
+                      </LineChart>
+                    </ResponsiveContainer>
+                  )}
+                  <p className="text-[10px] font-mono text-neutral-600 mt-1.5">
+                    낮을수록 plan 잘 활용 · 점선 = tier 추정 멤버 · 활동 없는 날은 line 끊김 · log scale
+                  </p>
+                </div>
+              </div>
+
             </div>
 
             {/* Team Headline — 효율 점수 + 업계 비교. page top 에서 Efficiency

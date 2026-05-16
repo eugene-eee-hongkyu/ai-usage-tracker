@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { db, userSnapshots, users, dailyVisits, userBlocks } from "@/lib/db";
-import { analyzePlanHealth, summarizeTeamPlans, type PlanTier } from "@/lib/plan-health";
+import { analyzePlanHealth, summarizeTeamPlans, getPlanLimits, type PlanTier } from "@/lib/plan-health";
 import { computeEfficiencyScore, computeDailyEfficiencyScore, computePowerIndex } from "@/lib/rules";
 import { isAdmin } from "@/lib/admin";
 import { gte } from "drizzle-orm";
@@ -171,6 +171,8 @@ export async function GET(req: NextRequest) {
   // Accumulators for team-level aggregations
   const activityAgg = new Map<string, { totalCost: number; totalTurns: number; members: Set<number> }>();
   const dailyMemberMap = new Map<string, Record<string, number>>();
+  // 멤버별 일별 토큰 — 토큰 단가 그래프 (가격 / 일별 토큰) 분모용.
+  const dailyTokensMemberMap = new Map<string, Record<string, number>>();
   const allTopSessions: Array<{ userId: number; userName: string; id: string; date: string; project: string; cost: number; calls: number }> = [];
   const modelAgg = new Map<string, { cost: number; calls: number; cacheRead: number; cacheWrite: number; input: number }>();
   const toolAgg = new Map<string, number>();
@@ -308,6 +310,21 @@ export async function GET(req: NextRequest) {
         existing[memberKey] = (existing[memberKey] ?? 0) + day.cost;
       }
 
+      // 멤버별 일별 토큰 — ccusageDaily 우선, 없으면 codeburn d.daily.tokens.
+      const dailyTokensSource: Array<{ date?: string; totalTokens?: number; tokens?: number }> =
+        ccusageDaily.length > 0
+          ? ccusageDaily
+          : ((d.daily ?? []) as Array<{ date?: string; tokens?: number }>);
+      for (const row of dailyTokensSource) {
+        if (!row.date) continue;
+        const tk = (row.totalTokens ?? row.tokens ?? 0);
+        if (tk <= 0) continue;
+        if (!dailyTokensMemberMap.has(row.date)) {
+          dailyTokensMemberMap.set(row.date, {});
+        }
+        dailyTokensMemberMap.get(row.date)![memberKey] = tk;
+      }
+
       // Aggregate by model
       for (const m of d.models ?? []) {
         const name = m.name ?? "unknown";
@@ -425,6 +442,23 @@ export async function GET(req: NextRequest) {
   // memberStats lookup — today/8days fallback 에 ov 기반 totalTokens 사용.
   const memberStatsById = new Map(memberStats.map((m) => [m.userId, m]));
 
+  // 멤버별 활용지수 + tier (declared 또는 추정) — 새 카드 (활용지수 순위, 일별
+  // 토큰 단가) 응답 데이터.
+  type MemberUsageRow = {
+    userId: number;
+    name: string;
+    memberKey: string;
+    powerIndex: number;
+    declaredTier: string | null;
+    estimatedTier: string | null;
+    effectiveTier: string | null;     // declared > estimated
+    monthlyPriceUsd: number | null;   // effectiveTier 의 plan price
+    isEstimated: boolean;             // true 면 추정 (UI 에서 점선 / "(추정)" 표시)
+    activeDays: number;
+    totalTokens: number;
+  };
+  const memberUsage: MemberUsageRow[] = [];
+
   // 팀 합산 활용지수 + 토큰 단가 — period 비례 정규화 + today fallback.
   //   teamPowerIndex = 멤버 power score 평균 (활성 멤버만)
   //   teamUnitCost = sum(priceForPeriod) / sum(totalWindowTokens) × 1M
@@ -466,19 +500,42 @@ export async function GET(req: NextRequest) {
     );
 
     // 활용지수 — 활성 멤버만 (effectiveActiveDays > 0).
+    let memScore = 0;
     if (effectiveActiveDays > 0 && effectiveTokens > 0) {
       const memAvgDailyTokens = effectiveTokens / effectiveActiveDays;
-      const memScore = computePowerIndex(effectiveActiveDays, memAvgDailyTokens, periodDays);
+      memScore = computePowerIndex(effectiveActiveDays, memAvgDailyTokens, periodDays);
       teamPowerSum += memScore;
       teamPowerCount += 1;
       teamActiveDaysSum += effectiveActiveDays;
       teamAvgDailyTokensSum += memAvgDailyTokens;
     }
 
-    // 토큰 단가 — 팀 합산 price / 합산 tokens. tier 입력 멤버만.
-    const monthlyPrice = health.declaredLimits?.monthlyPriceUsd ?? null;
-    if (monthlyPrice !== null && monthlyPrice > 0 && effectiveTokens > 0) {
-      teamPriceForPeriodSum += (monthlyPrice * periodDays) / 30;
+    // Effective tier — declared 우선, 없으면 추정 (health.estimatedTier).
+    // 추정은 30일 P90 토큰 기반 (lib/plan-health.ts estimateTierFromP90).
+    const declaredTier = health.declaredTier;
+    const estimatedTier = health.estimatedTier !== "unknown" ? health.estimatedTier : null;
+    const effectiveTier = declaredTier ?? estimatedTier;
+    const isEstimated = declaredTier === null && estimatedTier !== null;
+    const effectiveLimits = effectiveTier ? getPlanLimits(effectiveTier as Exclude<PlanTier, null>) : null;
+    const monthlyPriceUsd = effectiveLimits?.monthlyPriceUsd ?? null;
+
+    memberUsage.push({
+      userId: u.id,
+      name: u.name,
+      memberKey: `${u.name}__${u.id}`,
+      powerIndex: memScore,
+      declaredTier: declaredTier ?? null,
+      estimatedTier,
+      effectiveTier: effectiveTier ?? null,
+      monthlyPriceUsd,
+      isEstimated,
+      activeDays: effectiveActiveDays,
+      totalTokens: effectiveTokens,
+    });
+
+    // 토큰 단가 — 팀 합산 price / 합산 tokens. 추정 tier 도 포함 (UI 에서 명시).
+    if (monthlyPriceUsd !== null && monthlyPriceUsd > 0 && effectiveTokens > 0) {
+      teamPriceForPeriodSum += (monthlyPriceUsd * periodDays) / 30;
       teamTokensSum += effectiveTokens;
     }
   }
@@ -518,6 +575,24 @@ export async function GET(req: NextRequest) {
   const daily = [...dailyMap.entries()]
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([date, cost]) => ({ date, cost }));
+
+  // 일별 토큰 단가 멤버별 — 각 멤버 monthlyPrice/30 / 일별 토큰 × 1M.
+  // 활동 없는 날은 null (line 끊김). declared+estimated 모두 포함, UI 에서 시각 구분.
+  const allTokenDates = [...dailyTokensMemberMap.keys()].sort();
+  const dailyUnitCostByMember = allTokenDates.map((date) => {
+    const row: Record<string, number | string | null> = { date };
+    const tokensMap = dailyTokensMemberMap.get(date) ?? {};
+    for (const m of memberUsage) {
+      const dailyTokens = tokensMap[m.memberKey] ?? 0;
+      if (m.monthlyPriceUsd && m.monthlyPriceUsd > 0 && dailyTokens > 0) {
+        const usdPerDay = m.monthlyPriceUsd / 30;
+        row[m.memberKey] = (usdPerDay / dailyTokens) * 1_000_000;
+      } else {
+        row[m.memberKey] = null;
+      }
+    }
+    return row;
+  });
 
   // Team activities (top 10 by turns)
   // memberKeys are "name__userId" to handle duplicate display names
@@ -689,6 +764,8 @@ export async function GET(req: NextRequest) {
     teamScore,
     teamPlanHealth,
     teamUsage,
+    memberUsage,
+    dailyUnitCostByMember,
     isAdminUser: isAdmin(session.user.email),
   });
 }
