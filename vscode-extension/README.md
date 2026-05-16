@@ -13,7 +13,7 @@ Claude Code 사용량을 자동 수집해 **개인 효율 점수 + 팀 랭킹**�
 - LLM 호출 0건 — 모든 점수·등급·자연어 멘트가 deterministic 룰 기반 (같은 데이터면 항상 같은 결과)
 - 도입 조직의 자체 Supabase + Vercel 인스턴스에 저장 (외부 SaaS 의존 0)
 
-자세한 내용: https://ai-usage-tracker-web-psi.vercel.app
+자세한 내용: https://aiusage.z21labs.world
 
 ---
 
@@ -74,7 +74,7 @@ VS Code Settings (`⌘+,` / `Ctrl+,`) 에서:
 
 | 설정 | 기본값 | 용도 |
 |------|--------|------|
-| `aiUsageTracker.serverUrl` | `https://ai-usage-tracker-web-psi.vercel.app` | 자체 호스팅 시 변경 |
+| `aiUsageTracker.serverUrl` | `https://aiusage.z21labs.world` | 자체 호스팅 시 변경 |
 | `aiUsageTracker.githubRepo` | `github:eugene-eee-hongkyu/ai-usage-tracker` | CLI 패키지 spec |
 
 ---

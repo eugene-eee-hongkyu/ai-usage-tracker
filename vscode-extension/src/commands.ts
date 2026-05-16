@@ -5,7 +5,7 @@ import { isSetupComplete } from "./extension";
 function getConfig() {
   const cfg = vscode.workspace.getConfiguration("aiUsageTracker");
   return {
-    serverUrl: cfg.get<string>("serverUrl") ?? "https://ai-usage-tracker-web-psi.vercel.app",
+    serverUrl: cfg.get<string>("serverUrl") ?? "https://aiusage.z21labs.world",
     githubRepo: cfg.get<string>("githubRepo") ?? "github:eugene-eee-hongkyu/ai-usage-tracker",
   };
 }

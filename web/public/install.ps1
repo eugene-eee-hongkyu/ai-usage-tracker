@@ -1,5 +1,5 @@
 # AI Usage Tracker — one-shot installer (Windows)
-# Usage: irm https://ai-usage-tracker-web-psi.vercel.app/install.ps1 | iex
+# Usage: irm https://aiusage.z21labs.world/install.ps1 | iex
 
 $ErrorActionPreference = "Stop"
 

@@ -1,11 +1,11 @@
 #!/bin/bash
 # AI Usage Tracker — one-shot installer (Mac/Linux)
-# Usage: curl -fsSL https://ai-usage-tracker-web-psi.vercel.app/install.sh | bash
+# Usage: curl -fsSL https://aiusage.z21labs.world/install.sh | bash
 
 set -e
 
 REPO="github:eugene-eee-hongkyu/ai-usage-tracker"
-INSTALL_URL="https://ai-usage-tracker-web-psi.vercel.app/install.sh"
+INSTALL_URL="https://aiusage.z21labs.world/install.sh"
 
 ME=$(id -u)
 WHO=$(whoami)

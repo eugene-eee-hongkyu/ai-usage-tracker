@@ -1,7 +1,7 @@
 import { spawn } from "child_process";
 import { loadApiKey } from "./init.js";
 
-const SERVER_URL = process.env.USAGE_TRACKER_URL ?? "https://ai-usage-tracker-web-psi.vercel.app";
+const SERVER_URL = process.env.USAGE_TRACKER_URL ?? "https://aiusage.z21labs.world";
 
 const PERIODS = ["today", "week", "month", "30days", "all"] as const;
 

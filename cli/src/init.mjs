@@ -10,7 +10,7 @@ import * as path from "path";
 import * as readline from "readline";
 import { fileURLToPath } from "url";
 var __dirname2 = path.dirname(fileURLToPath(import.meta.url));
-var SERVER_URL = process.env.USAGE_TRACKER_URL ?? "https://ai-usage-tracker-web-psi.vercel.app";
+var SERVER_URL = process.env.USAGE_TRACKER_URL ?? "https://aiusage.z21labs.world";
 var CLI_VERSION = "0.2.0";
 var KEYTAR_SERVICE = "primus-usage-tracker";
 var KEYTAR_ACCOUNT = "api-key";

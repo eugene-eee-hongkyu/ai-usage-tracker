@@ -16,7 +16,7 @@ import { existsSync, readFileSync, statSync, truncateSync, appendFileSync, mkdir
 import { join } from "path";
 import { homedir } from "os";
 
-const SERVER_URL = process.env.USAGE_TRACKER_URL ?? "https://ai-usage-tracker-web-psi.vercel.app";
+const SERVER_URL = process.env.USAGE_TRACKER_URL ?? "https://aiusage.z21labs.world";
 const SYSTEM_TZ = Intl.DateTimeFormat().resolvedOptions().timeZone;
 const childEnv = { ...process.env, TZ: SYSTEM_TZ, CODEBURN_TZ: SYSTEM_TZ };
 
