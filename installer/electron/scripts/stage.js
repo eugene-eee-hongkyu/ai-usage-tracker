@@ -48,33 +48,28 @@ for (const file of ["sync.mjs", "index.mjs", "init.mjs"]) {
   if (existsSync(src)) cpSync(src, path.join(CLI_OUT, file));
 }
 
-// better-sqlite3 는 native binary. staged 의 빌드본 ABI 가 사용자 시스템 Node ABI 와
-// 다르면 실행 시 NODE_MODULE_VERSION mismatch 발생. 시도 순서:
-//   1. prebuild-install — GitHub release 의 prebuilt binary fetch (가장 안정)
-//   2. npm rebuild — node-gyp 로 직접 컴파일 (Xcode/Python 필요)
-// 둘 다 실패하면 silent — 빌드 자체는 통과시키고, 실행 시점에 발견되도록.
-const sqliteDir = path.join(WEB_OUT, "node_modules", "better-sqlite3");
-if (existsSync(sqliteDir)) {
-  console.log("==> better-sqlite3 prebuild fetch 시도");
-  try {
-    execSync("npx --yes prebuild-install --runtime=node --target=$(node -p process.versions.node)", {
-      cwd: sqliteDir,
-      stdio: "inherit",
-      shell: "/bin/bash",
-    });
-    console.log("  ✓ prebuild binary 적용");
-  } catch {
-    try {
-      console.log("  prebuild 실패 → npm rebuild fallback");
-      execSync("npm rebuild --update-binary", { cwd: sqliteDir, stdio: "inherit" });
-      console.log("  ✓ rebuild 완료");
-    } catch {
-      console.warn(
-        "  ⚠️  better-sqlite3 ABI 정렬 실패. 실행 시점에 ABI mismatch 가능. " +
-          "사용자 시스템 Node 가 빌드 시 사용한 Node 버전과 같아야 함."
-      );
-    }
-  }
+// better-sqlite3 는 native binary. Next.js standalone 이 자체 node_modules 를
+// 생성하면서 빌드 시점 Node ABI 의 binary 를 가져옴 (예: v20 = ABI 115). 사용자
+// 시스템 Node ABI 와 다르면 실행 시 mismatch 에러.
+//
+// 해결: web/node_modules/better-sqlite3 의 binary (사전에 prebuild-install 로
+// 시스템 brew node ABI 에 맞춰둠) 를 staged 의 standalone node_modules 로 복사.
+//
+// 사전 준비 (한 번):
+//   cd web/node_modules/better-sqlite3
+//   /opt/homebrew/bin/node $(npm root -g)/npm/bin/npx-cli.js --yes \
+//     prebuild-install --runtime=node --target=25.0.0
+const SQLITE_REL = path.join("better-sqlite3", "build", "Release", "better_sqlite3.node");
+const sourceBin = path.join(WEB_ROOT, "node_modules", SQLITE_REL);
+const targetBin = path.join(WEB_OUT, "node_modules", SQLITE_REL);
+if (existsSync(sourceBin) && existsSync(path.dirname(targetBin))) {
+  cpSync(sourceBin, targetBin);
+  console.log("==> better-sqlite3 binary 교체 (web/node_modules → staged standalone)");
+} else if (!existsSync(sourceBin)) {
+  console.warn(
+    "  ⚠️  web/node_modules/better-sqlite3 binary 없음. " +
+      "prebuild-install 먼저 실행 필요."
+  );
 }
 
 console.log(`✅ staged: ${STAGED}`);
