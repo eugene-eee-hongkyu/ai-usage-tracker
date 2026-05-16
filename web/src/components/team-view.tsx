@@ -1212,10 +1212,13 @@ export function TeamView({ adminMode = false }: { adminMode?: boolean }) {
             )}
 
             {/* Row 6.5: 일별 방문 매트릭스 (full-width, admin only) — ENGAGEMENT +
-                TOP SESSIONS 행 아래. 멤버 × 30일 방문 횟수 그리드 + 하단 날짜 라벨. */}
+                TOP SESSIONS 행 아래. 멤버 × 30일 방문 횟수 그리드 + 하단 날짜 라벨.
+                모든 셀 너비 균일 (w-6) · 월 시작 셀 (DD=01) 에 좌측 border 로 시각 구분. */}
             {adminUser && data.dailyVisits30d && (() => {
               const grid = data.dailyVisits30d;
-              const fmtMd = (ymd: string) => ymd.slice(5);  // "MM-DD"
+              const fmtDay = (ymd: string) => ymd.slice(8);    // "DD"
+              const isMonthStart = (ymd: string) => ymd.endsWith("-01");
+              const monthOf = (ymd: string) => ymd.slice(5, 7); // "MM"
               return (
                 <div data-testid="team-card-daily-visits" className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-slate-500 rounded">
                   <div className="px-3 py-2 border-b border-neutral-800 flex items-center gap-2">
@@ -1223,15 +1226,23 @@ export function TeamView({ adminMode = false }: { adminMode?: boolean }) {
                     <AdminBadge />
                   </div>
                   <div className="p-3 overflow-x-auto">
-                    <table className="text-[11px] font-mono border-collapse w-full">
+                    <table className="text-[11px] font-mono border-collapse" style={{ tableLayout: "fixed" }}>
+                      <colgroup>
+                        <col style={{ width: "10rem" }} />
+                        {grid.dates.map((_, i) => (
+                          <col key={i} style={{ width: "1.5rem" }} />
+                        ))}
+                      </colgroup>
                       <tbody>
                         {Object.entries(grid.byUser).map(([userId, row]) => (
                           <tr key={userId} className="hover:bg-neutral-800/30">
-                            <td className="pr-3 py-1 text-neutral-300 whitespace-nowrap">{row.name}</td>
+                            <td className="pr-3 py-1 text-neutral-300 whitespace-nowrap overflow-hidden text-ellipsis">{row.name}</td>
                             {row.counts.map((c, i) => (
                               <td
                                 key={i}
-                                className={`text-center py-1 px-0.5 tabular-nums ${
+                                className={`text-center py-1 tabular-nums ${
+                                  isMonthStart(grid.dates[i]) ? "border-l border-l-neutral-700" : ""
+                                } ${
                                   c === 0 ? "text-neutral-700" :
                                   c >= 10 ? "text-cyan-400 font-bold" :
                                   "text-neutral-200"
@@ -1243,14 +1254,38 @@ export function TeamView({ adminMode = false }: { adminMode?: boolean }) {
                             ))}
                           </tr>
                         ))}
-                        {/* 날짜 라벨 행 — 5일 간격 + 마지막 셀 */}
+                        {/* 일자 라벨 행 — 모두 "DD" 2글자로 균일 폭. 월 시작 셀에 좌측 구분선 + 라벨 표시. */}
                         <tr>
                           <td className="pr-3 py-1" />
-                          {grid.dates.map((d, i) => (
-                            <td key={i} className="text-center py-1 px-0.5 text-neutral-600 text-[10px] tabular-nums">
-                              {(i % 5 === 0 || i === grid.dates.length - 1) ? fmtMd(d) : ""}
-                            </td>
-                          ))}
+                          {grid.dates.map((d, i) => {
+                            const showLabel = i % 5 === 0 || isMonthStart(d) || i === grid.dates.length - 1;
+                            return (
+                              <td
+                                key={i}
+                                className={`text-center py-1 text-[10px] tabular-nums ${
+                                  isMonthStart(d) ? "border-l border-l-neutral-700 text-amber-400" : "text-neutral-600"
+                                }`}
+                              >
+                                {showLabel ? fmtDay(d) : ""}
+                              </td>
+                            );
+                          })}
+                        </tr>
+                        {/* 월 표시 행 — 월 시작 셀에 "M월" 표시. */}
+                        <tr>
+                          <td className="pr-3 py-0.5 text-[10px] text-neutral-500 text-right">월</td>
+                          {grid.dates.map((d, i) => {
+                            const isStart = isMonthStart(d);
+                            const isFirst = i === 0;  // 윈도우 첫 셀 (월 중간 시작)
+                            return (
+                              <td key={i} className={`text-center py-0.5 text-[10px] tabular-nums ${
+                                isStart ? "text-amber-400 font-bold" :
+                                isFirst ? "text-neutral-500" : "text-neutral-700"
+                              }`}>
+                                {isStart || isFirst ? `${parseInt(monthOf(d), 10)}월` : ""}
+                              </td>
+                            );
+                          })}
                         </tr>
                       </tbody>
                     </table>

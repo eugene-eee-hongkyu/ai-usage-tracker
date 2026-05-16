@@ -244,8 +244,8 @@ export function UsageHero({
 
           {/* Power Index */}
           <div data-testid="usage-hero-power" className="bg-neutral-900 border-l-2 border-l-cyan-500 border border-neutral-800 rounded p-4">
-            <div className="flex items-center justify-between gap-2 mb-2">
-              <div className="flex items-center gap-2">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <span className="text-xs font-mono font-bold text-cyan-400 uppercase tracking-wider">⚡ 활용 지수</span>
                 <span className="text-[10px] font-mono text-neutral-600">Power Index · {periodLabel}</span>
               </div>
@@ -338,12 +338,13 @@ export function UsageHero({
 
           {/* 토큰 단가 */}
           <div data-testid="usage-hero-unit-cost" className="bg-neutral-900 border-l-2 border-l-yellow-500 border border-neutral-800 rounded p-4">
-            <div className="flex items-center justify-between gap-2 mb-2">
-              <div className="flex items-center gap-2">
+            {/* 모바일: 라벨 + (select + 버튼) 을 세로로. sm 이상: 가로 한 줄. */}
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <span className="text-xs font-mono font-bold text-yellow-400 uppercase tracking-wider">📊 토큰 단가</span>
                 <span className="text-[10px] font-mono text-neutral-600">{periodLabel} 요금 / {periodLabel} 토큰</span>
               </div>
-              <div className="flex items-center gap-1.5">
+              <div className="flex items-center gap-1.5 flex-wrap">
                 {viewOnly ? (
                   // 어드민이 멤버 dashboard 봄 — read-only 라벨로 표시.
                   <span data-testid="plan-tier-readonly" className={`bg-neutral-800 border text-[11px] font-mono rounded px-1.5 py-0.5 ${
