@@ -2,7 +2,14 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { db, userSnapshots, users, dailyVisits, userBlocks } from "@/lib/db";
-import { analyzePlanHealth, summarizeTeamPlans, getPlanLimits, type PlanTier } from "@/lib/plan-health";
+import {
+  analyzePlanHealth,
+  summarizeTeamPlans,
+  getPlanLimits,
+  estimateTierFromMonthlyCost,
+  maxTierEstimate,
+  type PlanTier,
+} from "@/lib/plan-health";
 import { computeEfficiencyScore, computeDailyEfficiencyScore, computePowerIndex } from "@/lib/rules";
 import { isAdmin } from "@/lib/admin";
 import { gte } from "drizzle-orm";
@@ -438,6 +445,18 @@ export async function GET(req: NextRequest) {
     arr.push({ totalTokens: Number(r.totalTokens ?? 0), startedAt: r.startedAt });
     planBlocksByUser.set(r.userId, arr);
   }
+
+  // 30일 cost (period 무관) — tier 추정의 보조 신호. user_blocks 의 cost_usd
+  // 30일 합. period 가 today 라도 추정은 항상 30일 anchor 로 안정적.
+  const cost30dWindowStart = new Date(Date.now() - 30 * 86_400_000);
+  const cost30dRows = await db
+    .select({ userId: userBlocks.userId, costUsd: userBlocks.costUsd })
+    .from(userBlocks)
+    .where(gte(userBlocks.startedAt, cost30dWindowStart));
+  const monthlyCostByUser = new Map<number, number>();
+  for (const r of cost30dRows) {
+    monthlyCostByUser.set(r.userId, (monthlyCostByUser.get(r.userId) ?? 0) + Number(r.costUsd ?? 0));
+  }
   const memberHealthList: Array<{ userId: number; name: string; health: ReturnType<typeof analyzePlanHealth> }> = [];
   // memberStats lookup — today/8days fallback 에 ov 기반 totalTokens 사용.
   const memberStatsById = new Map(memberStats.map((m) => [m.userId, m]));
@@ -510,10 +529,18 @@ export async function GET(req: NextRequest) {
       teamAvgDailyTokensSum += memAvgDailyTokens;
     }
 
-    // Effective tier — declared 우선, 없으면 추정 (health.estimatedTier).
-    // 추정은 30일 P90 토큰 기반 (lib/plan-health.ts estimateTierFromP90).
+    // Effective tier — declared 우선, 없으면 추정 (P90 + cost 종합).
+    // P90 (cache 포함 토큰) 만으로는 보수적으로 한 단계 낮게 분류되는 케이스
+    // 보정 (예: Max 20x 가입자가 한도 80% 미만으로 사용해도 max5 로 추정).
+    // 30일 cost 기반 추정 (estimateTierFromMonthlyCost) 과 max 채택.
+    //   - $200+ cost → max20 추정
+    //   - $60+ cost  → max5 추정
+    //   - 그 외      → pro
     const declaredTier = health.declaredTier;
-    const estimatedTier = health.estimatedTier !== "unknown" ? health.estimatedTier : null;
+    const monthlyCost30d = monthlyCostByUser.get(u.id) ?? 0;
+    const costTier = estimateTierFromMonthlyCost(monthlyCost30d);
+    const combinedEstimate = maxTierEstimate(health.estimatedTier, costTier);
+    const estimatedTier = combinedEstimate !== "unknown" ? combinedEstimate : null;
     const effectiveTier = declaredTier ?? estimatedTier;
     const isEstimated = declaredTier === null && estimatedTier !== null;
     const effectiveLimits = effectiveTier ? getPlanLimits(effectiveTier as Exclude<PlanTier, null>) : null;

@@ -58,6 +58,32 @@ export function estimateTierFromP90(p90Tokens: number): Exclude<PlanTier, null> 
   return "max20";
 }
 
+// API 환산 cost 로 tier 추정. monthlyCost ≥ plan_price 면 그 plan 본전 + ε
+// 의미 → 그 plan 가입자라고 추정 합리적. cost 가 plan price 보다 크면 더 큰
+// plan 가입자일 가능성 더 높음.
+//   ≥ $200: max20 (Max 20x plan price)
+//   ≥ $60 : max5  (Max 5x plan price 의 60%, 보수적)
+//   ≥ $0  : pro
+// 사용자 1번 답 ("<REDACTED> x20 인데 peak 로 봐야") 반영 — cost peak signal.
+export function estimateTierFromMonthlyCost(monthlyCostUsd: number): Exclude<PlanTier, null> | "unknown" {
+  if (monthlyCostUsd <= 0) return "unknown";
+  if (monthlyCostUsd >= 200) return "max20";
+  if (monthlyCostUsd >= 60) return "max5";
+  return "pro";
+}
+
+// 두 tier 추정 비교 — 더 높은 tier (보수적이지 않은 = 가능성 더 높은) 선택.
+// <REDACTED> 같은 max20 사용자가 P90 보수로 max5 추정되는 케이스 보정.
+const TIER_RANK: Record<string, number> = {
+  unknown: -1, pro: 0, max5: 1, team: 1, max20: 2, api: 3,
+};
+export function maxTierEstimate(
+  a: Exclude<PlanTier, null> | "unknown",
+  b: Exclude<PlanTier, null> | "unknown",
+): Exclude<PlanTier, null> | "unknown" {
+  return (TIER_RANK[a] >= TIER_RANK[b] ? a : b);
+}
+
 export type Verdict =
   | "downgrade"   // 입력 plan 대비 사용량 낮음 — 한 단계 아래 검토
   | "fit"          // 적정
