@@ -981,16 +981,8 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
         </div>
       </div>
 
-      {/* Daily Efficiency Score + Streak + 90일 잔디 + 팀 랭크.
-          게이지 값은 period-aware (periodScore). 다른 카드 (DAILY ACTIVITY / COST /
-          BY MODEL ...) 가 모두 period 따라 변하는데 게이지만 오늘 고정이면 인지
-          부조화 발생 → period 반영. 90일 잔디는 long-term trend 의도라 항상 90일.
-          Streak / 팀 랭크는 period 무관 자체 의미 (현재까지 streak / 이번주 랭크). */}
-      {data.efficiencyScore && (
-        <EfficiencyScoreSection score={data.efficiencyScore} period={period} periodScore={ov.periodScore} />
-      )}
-
-      {/* Plan Health — 본인 view 만 표시. viewOnly (어드민이 멤버 봄) 면 hide (팀 페이지에서 종합). */}
+      {/* Plan Health — 본인 view 만 표시. 사용자 인터뷰 답변 ("내가 적절 plan 구독
+          중인지 가늠 좋다") 기반으로 효율 점수보다 prominent 한 위치로 승격. */}
       {!viewOnly && data.planHealth && (
         <div className="bg-neutral-950 border-b border-neutral-800">
           <div className="max-w-6xl mx-auto px-4 py-3">
@@ -999,18 +991,38 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
         </div>
       )}
 
-      {/* Overview Bar */}
+      {/* Daily Efficiency Score + Streak + 90일 잔디 + 팀 랭크.
+          게이지 값은 period-aware (periodScore). 다른 카드 (DAILY ACTIVITY / COST /
+          BY MODEL ...) 가 모두 period 따라 변하는데 게이지만 오늘 고정이면 인지
+          부조화 발생 → period 반영. 90일 잔디는 long-term trend 의도라 항상 90일.
+          Streak / 팀 랭크는 period 무관 자체 의미 (현재까지 streak / 이번주 랭크).
+          인터뷰에서 "효율 점수에 경각심 안 듦" 답이 다수 → Plan Health / Overview
+          Bar 아래로 위치, 보조 정보 성격으로 조정. */}
+      {data.efficiencyScore && (
+        <EfficiencyScoreSection score={data.efficiencyScore} period={period} periodScore={ov.periodScore} />
+      )}
+
+      {/* Overview Bar — 사용자 인터뷰에서 "activity + cost 만 본다" 답이 다수.
+          폰트 키우고 hero 수준으로 시각 승격. */}
       <div data-testid="dash-overview-bar" className="bg-neutral-900 border-b border-neutral-800">
-        <div className="max-w-6xl mx-auto px-4 py-2.5 flex flex-wrap gap-x-5 gap-y-1 text-sm font-mono">
+        <div className="max-w-6xl mx-auto px-4 py-3.5 flex flex-wrap items-baseline gap-x-6 gap-y-2 font-mono">
           {viewOnly && (
             <span className="text-indigo-400 font-semibold self-center mr-2">{data.user.name}</span>
           )}
-          <span><span className="text-cyan-400 font-bold">{fmtTokens(chartTokenData.reduce((s, d) => s + d.tokens, 0))}</span><span className="text-neutral-500 ml-1 text-xs">tokens</span></span>
-          <span><span className="text-yellow-400 font-bold">${ov.cost.toFixed(2)}</span><span className="text-neutral-500 ml-1 text-xs">cost</span></span>
-          <span><span className="text-blue-400 font-bold">{ov.calls.toLocaleString()}</span><span className="text-neutral-500 ml-1 text-xs">calls</span></span>
-          <span><span className="text-cyan-400 font-bold">{ov.sessions}</span><span className="text-neutral-500 ml-1 text-xs">sessions</span></span>
-          <span><span className="text-emerald-400 font-bold">{ov.cacheHitPct.toFixed(1)}%</span><span className="text-neutral-500 ml-1 text-xs">cache hit</span></span>
-          <span><span className="text-violet-400 font-bold">{Math.round(ov.oneShotRate * 100)}%</span><span className="text-neutral-500 ml-1 text-xs">1-shot</span></span>
+          {/* hero — activity (tokens) + cost. 사용자 인터뷰 답변에서 가장 자주 보는 두 지표. */}
+          <span className="flex items-baseline gap-1">
+            <span className="text-cyan-400 font-bold text-2xl tabular-nums">{fmtTokens(chartTokenData.reduce((s, d) => s + d.tokens, 0))}</span>
+            <span className="text-neutral-500 text-xs">tokens</span>
+          </span>
+          <span className="flex items-baseline gap-1">
+            <span className="text-yellow-400 font-bold text-2xl tabular-nums">${ov.cost.toFixed(2)}</span>
+            <span className="text-neutral-500 text-xs">cost</span>
+          </span>
+          {/* secondary — calls / sessions / cache / 1-shot 은 기존 사이즈 유지 */}
+          <span className="text-sm"><span className="text-blue-400 font-bold">{ov.calls.toLocaleString()}</span><span className="text-neutral-500 ml-1 text-xs">calls</span></span>
+          <span className="text-sm"><span className="text-cyan-400 font-bold">{ov.sessions}</span><span className="text-neutral-500 ml-1 text-xs">sessions</span></span>
+          <span className="text-sm"><span className="text-emerald-400 font-bold">{ov.cacheHitPct.toFixed(1)}%</span><span className="text-neutral-500 ml-1 text-xs">cache hit</span></span>
+          <span className="text-sm"><span className="text-violet-400 font-bold">{Math.round(ov.oneShotRate * 100)}%</span><span className="text-neutral-500 ml-1 text-xs">1-shot</span></span>
           <span className="text-neutral-600 text-xs self-center ml-auto flex items-center gap-3">
             <span>활성 {ov.activeDays}일</span>
             {data.snapshot ? (

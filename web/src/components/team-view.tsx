@@ -397,6 +397,44 @@ export function TeamView({ adminMode = false }: { adminMode?: boolean }) {
 
       <main className={`max-w-6xl mx-auto px-4 py-4 space-y-4 transition-opacity duration-150 ${loading ? "opacity-40 pointer-events-none" : "opacity-100"}`}>
 
+        {/* 매니저 향 AX 척도 한 줄 banner — 5초 안에 "AX 잘 되고 있나" 답.
+            인터뷰에서 매니저 자기 액션 후보 #1 "AX 가시화 즉각성" 반영.
+            OKR / 분기 보고 시 그대로 복사 가능한 한 문장. */}
+        {adminUser && data.teamScore && data.industryComparison && data.industryComparison.activeDayCount > 0 && (() => {
+          const ic = data.industryComparison;
+          const enterpriseAvg = 13;
+          const multiplier = ic.activeDayAvg / enterpriseAvg;
+          const memberActiveCount = data.teamSummary.activeMemberCount;
+          const memberTotal = data.byEfficiency.length;
+          return (
+            <div data-testid="team-ax-banner" className="bg-emerald-950/30 border-l-4 border-l-emerald-500 border border-emerald-800/40 rounded px-4 py-2.5">
+              <div className="flex items-center gap-3 flex-wrap text-sm font-mono">
+                <span className="text-emerald-300 font-bold">🎯 AX 척도</span>
+                <span className="text-neutral-400">·</span>
+                <span className="text-neutral-200">
+                  팀이 회사 도입 평균의 <span className="text-emerald-400 font-bold">{multiplier.toFixed(1)}×</span> 활용
+                </span>
+                <span className="text-neutral-400">·</span>
+                <span className="text-neutral-200">
+                  cache <span className="text-emerald-400 font-bold">{data.teamSummary.avgCacheHitPct.toFixed(0)}%</span>
+                </span>
+                <span className="text-neutral-400">·</span>
+                <span className="text-neutral-200">
+                  활성 <span className="text-emerald-400 font-bold">{memberActiveCount}/{memberTotal}</span>명
+                </span>
+                {data.teamPlanHealth && data.teamPlanHealth.monthlySavingsUsd > 0 && (
+                  <>
+                    <span className="text-neutral-400">·</span>
+                    <span className="text-neutral-200">
+                      Plan 최적화 시 <span className="text-emerald-400 font-bold">${data.teamPlanHealth.monthlySavingsUsd}</span>/월 절감 가능
+                    </span>
+                  </>
+                )}
+              </div>
+            </div>
+          );
+        })()}
+
         {/* Team Headline — 팀 정체성·외부 비교 헤드라인.
             연구: F-pattern + inverted pyramid → 핵심 narrative 카드는 위.
             게이지 (Q3) + multiplier hero (Q1) + bullet graph (Q1).
