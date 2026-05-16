@@ -3,6 +3,7 @@
 import { useSession } from "next-auth/react";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useLocalMode } from "@/lib/use-local-mode";
 
 const TIMEZONE_LIST: { label: string; value: string }[] = [
   { label: "SGT — Singapore (UTC+8)", value: "Asia/Singapore" },
@@ -24,6 +25,7 @@ type Step = { label: string; done: boolean };
 export default function SetupPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
+  const isLocalMode = useLocalMode();
   const [steps, setSteps] = useState<Step[]>([
     { label: "hook 등록", done: false },
     { label: "첫 데이터 수신", done: false },
@@ -42,8 +44,9 @@ export default function SetupPage() {
   }, []);
 
   useEffect(() => {
+    if (isLocalMode === null || isLocalMode) return;
     if (status === "unauthenticated") router.push("/login");
-  }, [status, router]);
+  }, [status, router, isLocalMode]);
 
   useEffect(() => {
     const detected = Intl.DateTimeFormat().resolvedOptions().timeZone;

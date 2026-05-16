@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
+import { useLocalMode } from "@/lib/use-local-mode";
 import { Nav } from "@/components/nav";
 import { AdminNav } from "@/components/admin-nav";
 import { TeamPlanHealthCard, type TeamPlanSummary } from "@/components/team-plan-health-card";
@@ -319,10 +320,13 @@ export function TeamView({ adminMode = false }: { adminMode?: boolean }) {
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
+  const isLocalMode = useLocalMode();
 
   useEffect(() => {
+    if (isLocalMode === null) return;
+    if (isLocalMode) return;
     if (status === "unauthenticated") router.push("/login");
-  }, [status, router]);
+  }, [status, router, isLocalMode]);
 
   useEffect(() => {
     if (!session) return;

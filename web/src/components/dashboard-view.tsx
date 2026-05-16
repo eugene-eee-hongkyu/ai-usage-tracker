@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from "react";
 import { useSession, signOut } from "next-auth/react";
 import { useRouter } from "next/navigation";
+import { useLocalMode } from "@/lib/use-local-mode";
 import { Nav } from "@/components/nav";
 import { AdminNav } from "@/components/admin-nav";
 import { CacheHitModal, OneShotRateModal, CostPerSessionModal, CallsPerSessionModal, CostPerCallModal, TokenVolumeModal } from "@/components/metric-modal";
@@ -680,6 +681,9 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
   const router = useRouter();
   const [period, setPeriod] = useState<Period>("8days");
 
+  // 로컬 모드 (.pkg/.app 설치 환경) 면 NextAuth session 없이도 작동.
+  const isLocalMode = useLocalMode();
+
   useEffect(() => {
     const saved = localStorage.getItem(storageKey);
     // legacy "week" → "8days" (calendar week feature was removed)
@@ -728,8 +732,12 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
   };
 
   useEffect(() => {
+    // 로컬 모드 미확정 (loading) 이면 redirect 보류
+    if (isLocalMode === null) return;
+    // 로컬 모드면 server 가 single-user 자동 인증 → login 우회
+    if (isLocalMode) return;
     if (status === "unauthenticated") router.push("/login");
-  }, [status, router]);
+  }, [status, router, isLocalMode]);
 
   // Mount-time visit POST. session.user 만 카운트 (어드민이 viewOnly 로
   // 다른 사람 보더라도 어드민 본인 row 가 +1). useEffect deps 가 [session]

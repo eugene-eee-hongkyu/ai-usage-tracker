@@ -6,6 +6,7 @@ import { useRouter, useParams } from "next/navigation";
 import { Nav } from "@/components/nav";
 import Link from "next/link";
 import { ActivityCalendar } from "react-activity-calendar";
+import { useLocalMode } from "@/lib/use-local-mode";
 interface MemberData {
   user: { id: number; name: string; avatarUrl: string | null };
   summary: { totalCost: number; sessionsCount: number; cacheHitPct: number };
@@ -21,12 +22,14 @@ export default function MemberProfilePage() {
   const router = useRouter();
   const params = useParams();
   const userId = params.userId as string;
+  const isLocalMode = useLocalMode();
   const [data, setData] = useState<MemberData | null>(null);
   const [notFound, setNotFound] = useState(false);
 
   useEffect(() => {
+    if (isLocalMode === null || isLocalMode) return;
     if (status === "unauthenticated") router.push("/login");
-  }, [status, router]);
+  }, [status, router, isLocalMode]);
 
   useEffect(() => {
     if (!session) return;

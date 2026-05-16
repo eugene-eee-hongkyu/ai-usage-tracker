@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { Nav } from "@/components/nav";
 import Link from "next/link";
 import { isAdmin } from "@/lib/admin";
+import { useLocalMode } from "@/lib/use-local-mode";
 
 interface EnvInfo {
   platform: string | null;
@@ -34,14 +35,16 @@ interface StatusData {
 export default function SetupStatusPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
+  const isLocalMode = useLocalMode();
   const [data, setData] = useState<StatusData | null>(null);
   const [copied, setCopied] = useState(false);
   const [fetchError, setFetchError] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
+    if (isLocalMode === null || isLocalMode) return;
     if (status === "unauthenticated") router.push("/login");
-  }, [status, router]);
+  }, [status, router, isLocalMode]);
 
   useEffect(() => {
     if (!session) return;
