@@ -29,6 +29,8 @@ interface UsageHeroProps {
   cacheHitPctForPeriod: number | null;
   // viewOnly = 어드민이 멤버 dashboard 봄. tier select / hint 숨기고 read-only 라벨만.
   viewOnly?: boolean;
+  // tier 가 자동 추정값이면 (declared 없음) UI 에 "(추정)" 라벨 + 시각 구분.
+  isEstimatedTier?: boolean;
 }
 
 const TIER_OPTIONS: Array<{ value: string; label: string }> = [
@@ -122,6 +124,7 @@ export function UsageHero({
   nonCacheTotalWindowTokens,
   cacheHitPctForPeriod,
   viewOnly = false,
+  isEstimatedTier = false,
 }: UsageHeroProps) {
   const power = powerGrade(powerIndex);
   const hardworkerThreshold = hardworkerThresholdForPeriod(periodDays);
@@ -343,8 +346,14 @@ export function UsageHero({
               <div className="flex items-center gap-1.5">
                 {viewOnly ? (
                   // 어드민이 멤버 dashboard 봄 — read-only 라벨로 표시.
-                  <span data-testid="plan-tier-readonly" className="bg-neutral-800 border border-neutral-700 text-neutral-300 text-[11px] font-mono rounded px-1.5 py-0.5">
-                    {declaredTierLabel ? `${declaredTierLabel}` : "tier 미입력"}
+                  <span data-testid="plan-tier-readonly" className={`bg-neutral-800 border text-[11px] font-mono rounded px-1.5 py-0.5 ${
+                    isEstimatedTier
+                      ? "border-amber-700/60 text-amber-300"
+                      : "border-neutral-700 text-neutral-300"
+                  }`}>
+                    {declaredTierLabel
+                      ? (isEstimatedTier ? `${declaredTierLabel} (추정)` : declaredTierLabel)
+                      : "tier 미입력"}
                   </span>
                 ) : (
                   <select
@@ -422,7 +431,9 @@ export function UsageHero({
                 </div>
                 <div className="mt-3 text-xs font-mono text-neutral-500 space-y-0.5">
                   <p>
-                    <span className="text-neutral-300">{declaredTierLabel ?? "—"}</span>
+                    <span className={isEstimatedTier ? "text-amber-300" : "text-neutral-300"}>
+                      {declaredTierLabel ?? "—"}{isEstimatedTier && " (추정)"}
+                    </span>
                     <span className="text-neutral-600"> · {periodLabel} 분 {fmtPrice(priceForPeriod!)}</span>
                   </p>
                   <p>

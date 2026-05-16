@@ -1050,6 +1050,7 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
           nonCacheTotalWindowTokens={data.planHealth?.nonCacheTotalWindowTokens ?? null}
           cacheHitPctForPeriod={data.planHealth?.cacheHitPctForPeriod ?? null}
           viewOnly={viewOnly}
+          isEstimatedTier={data.planHealth?.isEstimatedTier ?? false}
         />
       )}
 

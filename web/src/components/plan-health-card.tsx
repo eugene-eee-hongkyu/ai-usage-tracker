@@ -32,6 +32,8 @@ export interface PlanHealthResult {
   // period 비례 plan 가치 (UsageHero 단가 계산용)
   priceForPeriod: number | null;
   periodDays: number;
+  // declaredLimits 가 null 이면 추정 tier 로 effectiveLimits 채움 + 표시.
+  isEstimatedTier?: boolean;
 }
 
 const TIER_OPTIONS: Array<{ value: string; label: string }> = [

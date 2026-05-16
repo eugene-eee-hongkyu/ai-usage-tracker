@@ -5,7 +5,13 @@ import { db, userSnapshots, users, periodSnapshots, dailyVisits, userBlocks } fr
 import { and, asc, desc, eq, gte, lt } from "drizzle-orm";
 import { isAdmin } from "@/lib/admin";
 import { computeDailyEfficiencyScore, computePowerIndex } from "@/lib/rules";
-import { analyzePlanHealth, type PlanTier } from "@/lib/plan-health";
+import {
+  analyzePlanHealth,
+  getPlanLimits,
+  estimateTierFromMonthlyCost,
+  maxTierEstimate,
+  type PlanTier,
+} from "@/lib/plan-health";
 
 type Period = "today" | "month" | "8days" | "30days" | "all";
 
@@ -820,7 +826,30 @@ export async function GET(req: NextRequest) {
     : null;
 
   // priceForPeriod — 월 요금을 period 일수에 비례 배분.
-  const monthlyPriceUsd = planHealth.declaredLimits?.monthlyPriceUsd ?? null;
+  // tier 미입력 사용자도 추정 (P90 + cost) 으로 단가 계산. UI 에서 (추정) 명시.
+  //   estimateTier 우선순위: declaredTier > P90 추정 > cost 추정 (max 채택)
+  const declaredLimits = planHealth.declaredLimits;
+  let effectiveLimits = declaredLimits;
+  let isEstimatedTier = false;
+  if (!effectiveLimits) {
+    // 30일 cost (period 무관 anchor) 별도 query 후 종합 추정.
+    const cost30dStart = new Date(Date.now() - 30 * 86_400_000);
+    const cost30dRows = await db
+      .select({ costUsd: userBlocks.costUsd })
+      .from(userBlocks)
+      .where(and(
+        eq(userBlocks.userId, user[0].id),
+        gte(userBlocks.startedAt, cost30dStart),
+      ));
+    const monthlyCost30d = cost30dRows.reduce((s, r) => s + Number(r.costUsd ?? 0), 0);
+    const costTier = estimateTierFromMonthlyCost(monthlyCost30d);
+    const combined = maxTierEstimate(planHealth.estimatedTier, costTier);
+    if (combined !== "unknown") {
+      effectiveLimits = getPlanLimits(combined);
+      isEstimatedTier = true;
+    }
+  }
+  const monthlyPriceUsd = effectiveLimits?.monthlyPriceUsd ?? null;
   const priceForPeriod = monthlyPriceUsd !== null
     ? (monthlyPriceUsd * periodDays) / 30
     : null;
@@ -849,6 +878,10 @@ export async function GET(req: NextRequest) {
     },
     planHealth: {
       ...planHealth,
+      // declaredLimits 가 null 이면 추정 effectiveLimits 로 override.
+      // UI 에서 isEstimatedTier 로 (추정) 시각 구분.
+      declaredLimits: effectiveLimits ?? planHealth.declaredLimits,
+      isEstimatedTier,
       totalWindowTokens,    // fallback 적용된 값으로 override
       nonCacheTotalWindowTokens,
       realUsagePct,
