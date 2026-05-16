@@ -130,6 +130,7 @@ export function UsageHero({
 
   const [tierValue, setTierValue] = useState<string>(declaredTier ?? "");
   const [saving, setSaving] = useState(false);
+  const [tierHintOpen, setTierHintOpen] = useState(false);
   const onChangeTier = async (value: string) => {
     setTierValue(value);
     setSaving(true);
@@ -249,6 +250,26 @@ export function UsageHero({
                 </button>
               </div>
             </div>
+
+            {/* tier 확인 hint — select 바로 아래 토글. 발견성·공간 모두 OK. */}
+            <div className="-mt-1 mb-2 text-[10px] font-mono">
+              <button
+                type="button"
+                data-testid="usage-hero-tier-hint"
+                onClick={() => setTierHintOpen((v) => !v)}
+                className="text-neutral-500 hover:text-yellow-300 transition-colors"
+              >
+                {tierHintOpen ? "▲ 내 tier 확인하기" : "▾ 내 tier 확인하기"}
+              </button>
+              {tierHintOpen && (
+                <div data-testid="usage-hero-tier-hint-body" className="mt-1.5 pl-3 border-l-2 border-l-neutral-800 space-y-0.5 text-neutral-400 leading-relaxed">
+                  <p>1. <span className="text-neutral-200">claude.ai</span> 접속 → 우측 상단 프로필 → <span className="text-neutral-200">Subscription</span></p>
+                  <p>2. 또는 Claude Code 터미널에서 <span className="text-neutral-200">claude</span> 실행 → <span className="text-neutral-200">/usage</span> 입력</p>
+                  <p>3. 표시된 plan 그대로 위 select 에서 선택</p>
+                </div>
+              )}
+            </div>
+
             {!canShowUnitCost ? (
               <div className="space-y-1">
                 <span className="text-2xl font-bold text-neutral-500 font-mono">—</span>
