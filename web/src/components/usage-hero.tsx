@@ -73,18 +73,19 @@ function unitCostGradeFromLevel(level: number): { label: string; color: string }
   return { label: "미활용", color: "text-rose-400" };
 }
 
+// 사용량 11단계 — 위가 높은 점수 (best). 토큰 단가 10단계와 동일 방향.
 const TOKEN_LEVEL_ROWS: Array<{ level: number; range: string; anchor?: string }> = [
-  { level: 0,  range: "활동 없음" },
-  { level: 1,  range: "≤ 1M / 일" },
-  { level: 2,  range: "≤ 3M / 일" },
-  { level: 3,  range: "≤ 8M / 일", anchor: "Anthropic 평균" },
-  { level: 4,  range: "≤ 15M / 일", anchor: "Anthropic P90 (개인)" },
-  { level: 5,  range: "≤ 25M / 일" },
-  { level: 6,  range: "≤ 40M / 일", anchor: "Enterprise P90" },
-  { level: 7,  range: "≤ 80M / 일" },
-  { level: 8,  range: "≤ 150M / 일" },
-  { level: 9,  range: "≤ 300M / 일" },
   { level: 10, range: "> 300M / 일" },
+  { level: 9,  range: "≤ 300M / 일" },
+  { level: 8,  range: "≤ 150M / 일" },
+  { level: 7,  range: "≤ 80M / 일" },
+  { level: 6,  range: "≤ 40M / 일", anchor: "Enterprise P90" },
+  { level: 5,  range: "≤ 25M / 일" },
+  { level: 4,  range: "≤ 15M / 일", anchor: "Anthropic P90 (개인)" },
+  { level: 3,  range: "≤ 8M / 일", anchor: "Anthropic 평균" },
+  { level: 2,  range: "≤ 3M / 일" },
+  { level: 1,  range: "≤ 1M / 일" },
+  { level: 0,  range: "활동 없음" },
 ];
 
 // 토큰 단가 10단계 — anchor 는 "동일 토큰을 API 직접 호출했을 때 비용" 대비.
@@ -347,7 +348,7 @@ export function UsageHero({
                       <span className="text-neutral-600">
                         {" "}· non-cache <span className="text-neutral-400">{fmtTokens(nonCacheTotalWindowTokens)}</span>
                         {cacheHitPctForPeriod !== null && (
-                          <> · cache hit {cacheHitPctForPeriod.toFixed(0)}%</>
+                          <> · cache hit {cacheHitPctForPeriod.toFixed(1)}%</>
                         )}
                       </span>
                     </p>
