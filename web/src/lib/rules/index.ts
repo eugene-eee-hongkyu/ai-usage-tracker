@@ -92,6 +92,34 @@ export function computePowerIndex(
   return Math.round(frequency + depth);
 }
 
+// 토큰 단가 10단계 — $ / 1M tokens. 낮을수록 cache leverage 큼 → 높은 레벨.
+// Sonnet API input ($3 / 1M) 을 cache 0% 기준선으로 잡고 로그 anchor.
+//   L10 (≤ $0.003): ~1000× cheaper than API — power user (대용량 컨텍스트 재사용)
+//   L9  (≤ $0.01) : ~300×  cheaper
+//   L8  (≤ $0.03) : ~100×  cheaper — Claude Code typical heavy
+//   L7  (≤ $0.1)  : ~30×   cheaper
+//   L6  (≤ $0.3)  : ~10×   cheaper — Sonnet cache_read ($0.30 / 1M) 동급
+//   L5  (≤ $1)    : ~3×    cheaper
+//   L4  (≤ $3)    : 1×     — Sonnet API input 동급 (cache 거의 없음)
+//   L3  (≤ $10)   : 3×     비쌈
+//   L2  (≤ $30)   : 10×    비쌈
+//   L1  (> $30)   : plan 거의 안 씀 (예: Max 20x \$200 / 6M tokens)
+//   L0  : 데이터 없음
+// 사용량 레벨과 일관성 — 높은 숫자 = 좋음.
+export function computeUnitCostLevel(usdPerMTok: number): number {
+  if (usdPerMTok <= 0) return 0;
+  if (usdPerMTok <= 0.003) return 10;
+  if (usdPerMTok <= 0.01) return 9;
+  if (usdPerMTok <= 0.03) return 8;
+  if (usdPerMTok <= 0.1) return 7;
+  if (usdPerMTok <= 0.3) return 6;
+  if (usdPerMTok <= 1) return 5;
+  if (usdPerMTok <= 3) return 4;
+  if (usdPerMTok <= 10) return 3;
+  if (usdPerMTok <= 30) return 2;
+  return 1;
+}
+
 export function generateMvpBlurb(
   name: string,
   project: string,

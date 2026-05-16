@@ -1006,6 +1006,9 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
           declaredTierLabel={data.planHealth?.declaredLimits?.label ?? null}
           monthlyPriceUsd={data.planHealth?.declaredLimits?.monthlyPriceUsd ?? null}
           totalWindowTokens={data.planHealth?.totalWindowTokens ?? 0}
+          realUsagePct={data.planHealth?.realUsagePct ?? null}
+          nonCacheTotalWindowTokens={data.planHealth?.nonCacheTotalWindowTokens ?? null}
+          cacheHitPct30d={data.planHealth?.cacheHitPct30d ?? null}
         />
       )}
 

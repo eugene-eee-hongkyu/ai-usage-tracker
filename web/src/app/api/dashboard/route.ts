@@ -749,6 +749,22 @@ export async function GET(req: NextRequest) {
     windowDays: 30,
   });
 
+  // 캐시 제외 토큰 사용률 — totalWindowTokens 는 cache_read 포함이라 5h 한도와
+  // 직접 비교 시 100% 훌쩍 초과. 누적 cacheHitPct 로 비례 분해해 cache 제외 토큰
+  // 추정 후 (한도 × 블록수) 분모로 평균 블록 사용률 산출. 100% cap.
+  //   nonCache ≈ totalTokens × (1 - cacheHitPct/100)
+  //   realUsagePct = min(100, nonCache / (limit × blockCount) × 100)
+  // 데이터 한계 — user_blocks 에 토큰 분해 컬럼 없어 블록별 동일 cacheHitPct 가정.
+  const cacheHitPctFor30d = snap[0]?.cacheHitPct ?? null;
+  const blockCount30d = planBlockRows.length;
+  const limit5h = planHealth.declaredLimits?.estimated5hTokenLimit ?? 0;
+  const nonCacheTotalWindowTokens = cacheHitPctFor30d !== null
+    ? Math.round(planHealth.totalWindowTokens * (1 - cacheHitPctFor30d / 100))
+    : null;
+  const realUsagePct = (nonCacheTotalWindowTokens !== null && limit5h > 0 && blockCount30d > 0)
+    ? Math.min(100, Math.round((nonCacheTotalWindowTokens / (limit5h * blockCount30d)) * 100))
+    : null;
+
   // Power Index — 30일 anchor (period 무관). Plan Health 와 같은 윈도우.
   // 활성일 + 일평균 token 으로 계산. avgDailyTokens 는 30일 윈도우 기준 재계산.
   const power30dWindowStart = planBlocksWindowStart;
@@ -779,7 +795,13 @@ export async function GET(req: NextRequest) {
       // 배지가 사용 — 게이지와 영원히 동기화.
       periodScore,
     },
-    planHealth,
+    planHealth: {
+      ...planHealth,
+      nonCacheTotalWindowTokens,
+      realUsagePct,
+      blockCount30d,
+      cacheHitPct30d: cacheHitPctFor30d,
+    },
     powerIndex: {
       score: powerIndexValue,
       activeDays: power30dActiveDays,
