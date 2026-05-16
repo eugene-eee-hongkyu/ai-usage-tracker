@@ -9,7 +9,6 @@ import {
   analyzePlanHealth,
   getPlanLimits,
   estimateTierFromMonthlyCost,
-  maxTierEstimate,
   type PlanTier,
 } from "@/lib/plan-health";
 
@@ -842,8 +841,8 @@ export async function GET(req: NextRequest) {
         gte(userBlocks.startedAt, cost30dStart),
       ));
     const monthlyCost30d = cost30dRows.reduce((s, r) => s + Number(r.costUsd ?? 0), 0);
-    const costTier = estimateTierFromMonthlyCost(monthlyCost30d);
-    const combined = maxTierEstimate(planHealth.estimatedTier, costTier);
+    // P90 token 신호는 cache 포함이라 단위 안 맞아 폐기 — cost 단독 추정.
+    const combined = estimateTierFromMonthlyCost(monthlyCost30d);
     if (combined !== "unknown") {
       effectiveLimits = getPlanLimits(combined);
       isEstimatedTier = true;

@@ -7,9 +7,6 @@ import {
   summarizeTeamPlans,
   getPlanLimits,
   estimateTierFromMonthlyCost,
-  estimateTierFromP90,
-  calculateP90,
-  maxTierEstimate,
   type PlanTier,
 } from "@/lib/plan-health";
 import { computeEfficiencyScore, computeDailyEfficiencyScore, computePowerIndex } from "@/lib/rules";
@@ -519,14 +516,12 @@ export async function GET(req: NextRequest) {
     const blocks = planBlocksByUser.get(u.id) ?? [];
     const declared = (u.planTier ?? null) as PlanTier;
 
-    // 추정 tier (P90 토큰 + 30일 cost 종합) — declared null 멤버 평가용.
-    // health 호출 전 계산해 declaredTier 로 주입 → verdict/recommended 가
-    // 추정값 기준 정상 계산.
-    const p90 = calculateP90(blocks.map((b) => b.totalTokens).filter((t) => t > 0));
-    const p90Tier = estimateTierFromP90(p90);
+    // 추정 tier — 30일 cost 만 사용. P90 token 신호는 cache_read 포함이라
+    // 한도 (220k non-cache 기준) 와 단위 불일치 → 거의 항상 max20 분류되어
+    // cost 신호를 묻어버림 → 폐기. cost 단독 + 보수적 임계 (Pro $176 케이스
+    // 보호) 로 정확도 ↑.
     const monthlyCost30d = monthlyCostByUser.get(u.id) ?? 0;
-    const costTier = estimateTierFromMonthlyCost(monthlyCost30d);
-    const combinedEstimateTier = maxTierEstimate(p90Tier, costTier);
+    const combinedEstimateTier = estimateTierFromMonthlyCost(monthlyCost30d);
     const isEstimatedMember = declared === null && combinedEstimateTier !== "unknown";
     const effectiveDeclared: PlanTier = declared ?? (isEstimatedMember ? (combinedEstimateTier as Exclude<PlanTier, null>) : null);
 

@@ -58,17 +58,17 @@ export function estimateTierFromP90(p90Tokens: number): Exclude<PlanTier, null> 
   return "max20";
 }
 
-// API 환산 cost 로 tier 추정. monthlyCost ≥ plan_price 면 그 plan 본전 + ε
-// 의미 → 그 plan 가입자라고 추정 합리적. cost 가 plan price 보다 크면 더 큰
-// plan 가입자일 가능성 더 높음.
-//   ≥ $200: max20 (Max 20x plan price)
-//   ≥ $60 : max5  (Max 5x plan price 의 60%, 보수적)
-//   ≥ $0  : pro
-// 사용자 1번 답 ("<REDACTED> x20 인데 peak 로 봐야") 반영 — cost peak signal.
+// API 환산 cost 로 tier 추정. cache leverage 가 사용자별 5×~100× 다양해서
+// cost-only 추정은 본질적으로 부정확. 보수적 임계 (Pro 가입자도 cache 잘
+// 쓰면 cost 수백 \$ 만들 수 있음) — 사용자 피드백 (<REDACTED> Pro \$176/월) 반영.
+//   ≥ \$500: max20 (cache 100× leverage 가정해도 max20 가입자 신호 강함)
+//   ≥ \$200: max5  (plan price 2× 본전)
+//   그 외   : pro  (보수적 default)
+// 본인 입력 modal 강력 유도 (UsageHero) → 추정 부정확 시 사용자가 정정.
 export function estimateTierFromMonthlyCost(monthlyCostUsd: number): Exclude<PlanTier, null> | "unknown" {
   if (monthlyCostUsd <= 0) return "unknown";
-  if (monthlyCostUsd >= 200) return "max20";
-  if (monthlyCostUsd >= 60) return "max5";
+  if (monthlyCostUsd >= 500) return "max20";
+  if (monthlyCostUsd >= 200) return "max5";
   return "pro";
 }
 

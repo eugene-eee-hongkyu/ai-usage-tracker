@@ -1148,54 +1148,6 @@ export function TeamView({ adminMode = false }: { adminMode?: boolean }) {
                           })}
                       </tbody>
                     </table>
-
-                    {/* 일별 방문 그리드 — 최근 30일 멤버 × 날짜 매트릭스.
-                        0 셀은 회색 dot, 1~9 는 흰색 숫자, 10+ 는 cyan 강조.
-                        하단에 30일 날짜 라벨 (5일 간격). */}
-                    {data.dailyVisits30d && (() => {
-                      const grid = data.dailyVisits30d;
-                      const fmtMd = (ymd: string) => ymd.slice(5);  // "MM-DD"
-                      return (
-                        <div data-testid="team-engagement-daily-grid" className="mt-4 pt-3 border-t border-neutral-800">
-                          <p className="text-[10px] font-mono text-neutral-500 uppercase tracking-wider mb-2">
-                            일별 방문 (최근 30일)
-                          </p>
-                          <div className="overflow-x-auto">
-                            <table className="text-[10px] font-mono border-collapse">
-                              <tbody>
-                                {Object.entries(grid.byUser).map(([userId, row]) => (
-                                  <tr key={userId} className="hover:bg-neutral-800/30">
-                                    <td className="pr-3 py-0.5 text-neutral-400 whitespace-nowrap">{row.name}</td>
-                                    {row.counts.map((c, i) => (
-                                      <td
-                                        key={i}
-                                        className={`w-6 text-center py-0.5 tabular-nums ${
-                                          c === 0 ? "text-neutral-700" :
-                                          c >= 10 ? "text-cyan-400 font-bold" :
-                                          "text-neutral-200"
-                                        }`}
-                                        title={`${grid.dates[i]}: ${c}회`}
-                                      >
-                                        {c === 0 ? "·" : c}
-                                      </td>
-                                    ))}
-                                  </tr>
-                                ))}
-                                {/* 날짜 라벨 행 — 5일 간격 + 마지막 셀 */}
-                                <tr>
-                                  <td className="pr-3 py-0.5" />
-                                  {grid.dates.map((d, i) => (
-                                    <td key={i} className="w-6 text-center py-0.5 text-neutral-600 text-[9px] tabular-nums">
-                                      {(i % 5 === 0 || i === grid.dates.length - 1) ? fmtMd(d) : ""}
-                                    </td>
-                                  ))}
-                                </tr>
-                              </tbody>
-                            </table>
-                          </div>
-                        </div>
-                      );
-                    })()}
                   </div>
                 </div>
 
@@ -1258,6 +1210,54 @@ export function TeamView({ adminMode = false }: { adminMode?: boolean }) {
                 </div>
               </div>
             )}
+
+            {/* Row 6.5: 일별 방문 매트릭스 (full-width, admin only) — ENGAGEMENT +
+                TOP SESSIONS 행 아래. 멤버 × 30일 방문 횟수 그리드 + 하단 날짜 라벨. */}
+            {adminUser && data.dailyVisits30d && (() => {
+              const grid = data.dailyVisits30d;
+              const fmtMd = (ymd: string) => ymd.slice(5);  // "MM-DD"
+              return (
+                <div data-testid="team-card-daily-visits" className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-slate-500 rounded">
+                  <div className="px-3 py-2 border-b border-neutral-800 flex items-center gap-2">
+                    <span className="text-xs font-mono font-bold text-slate-400 uppercase tracking-wider">일별 방문 (최근 30일)</span>
+                    <AdminBadge />
+                  </div>
+                  <div className="p-3 overflow-x-auto">
+                    <table className="text-[11px] font-mono border-collapse w-full">
+                      <tbody>
+                        {Object.entries(grid.byUser).map(([userId, row]) => (
+                          <tr key={userId} className="hover:bg-neutral-800/30">
+                            <td className="pr-3 py-1 text-neutral-300 whitespace-nowrap">{row.name}</td>
+                            {row.counts.map((c, i) => (
+                              <td
+                                key={i}
+                                className={`text-center py-1 px-0.5 tabular-nums ${
+                                  c === 0 ? "text-neutral-700" :
+                                  c >= 10 ? "text-cyan-400 font-bold" :
+                                  "text-neutral-200"
+                                }`}
+                                title={`${grid.dates[i]}: ${c}회`}
+                              >
+                                {c === 0 ? "·" : c}
+                              </td>
+                            ))}
+                          </tr>
+                        ))}
+                        {/* 날짜 라벨 행 — 5일 간격 + 마지막 셀 */}
+                        <tr>
+                          <td className="pr-3 py-1" />
+                          {grid.dates.map((d, i) => (
+                            <td key={i} className="text-center py-1 px-0.5 text-neutral-600 text-[10px] tabular-nums">
+                              {(i % 5 === 0 || i === grid.dates.length - 1) ? fmtMd(d) : ""}
+                            </td>
+                          ))}
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              );
+            })()}
 
             {/* (Row 7 Industry Comparison 카드는 page top "team-card-headline"
                  으로 흡수·이동 — Q1/Q2/Q3 일괄 해결) */}
