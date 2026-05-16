@@ -332,6 +332,7 @@ export interface TeamMemberPlan {
   monthlyCostRecommendedUsd: number;
   verdict: Verdict;
   actionFirst: boolean;
+  isEstimated: boolean;       // 본인 declaredTier 없어 추정값으로 평가됨
 }
 
 export interface TeamPlanSummary {
@@ -348,6 +349,7 @@ export function summarizeTeamPlans(members: Array<{
   userId: number;
   name: string;
   health: PlanHealthResult;
+  isEstimated?: boolean;
 }>): TeamPlanSummary {
   const memberRows: TeamMemberPlan[] = [];
   const currentDist: Record<string, number> = {};
@@ -360,8 +362,13 @@ export function summarizeTeamPlans(members: Array<{
     const h = m.health;
     const declared = h.declaredTier;
     const recommended = h.recommendedTier;
-    const currentCostMember = declared && declared !== "api" ? PLAN_LIMITS[declared].monthlyPriceUsd : 0;
-    const recCostMember = recommended && recommended !== "api" ? PLAN_LIMITS[recommended].monthlyPriceUsd : 0;
+    const isEstimated = !!m.isEstimated;
+    // 추정 멤버는 "현재" 비용에 합산 안 함 (실제 결제 미발생). 권장 비용도
+    // 추정값 기반이라 절감액 노이즈 방지 위해 제외.
+    const currentCostMember = !isEstimated && declared && declared !== "api"
+      ? PLAN_LIMITS[declared].monthlyPriceUsd : 0;
+    const recCostMember = !isEstimated && recommended && recommended !== "api"
+      ? PLAN_LIMITS[recommended].monthlyPriceUsd : 0;
 
     memberRows.push({
       userId: m.userId,
@@ -372,8 +379,10 @@ export function summarizeTeamPlans(members: Array<{
       monthlyCostRecommendedUsd: recCostMember,
       verdict: h.verdict,
       actionFirst: h.actionFirst,
+      isEstimated,
     });
 
+    // 분포는 추정값 포함 (현황 파악 위해).
     const declaredKey = declared ?? "unknown";
     const recKey = recommended ?? "unknown";
     currentDist[declaredKey] = (currentDist[declaredKey] ?? 0) + 1;

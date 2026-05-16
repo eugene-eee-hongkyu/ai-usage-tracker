@@ -7,6 +7,8 @@ import {
   summarizeTeamPlans,
   getPlanLimits,
   estimateTierFromMonthlyCost,
+  estimateTierFromP90,
+  calculateP90,
   maxTierEstimate,
   type PlanTier,
 } from "@/lib/plan-health";
@@ -457,7 +459,12 @@ export async function GET(req: NextRequest) {
   for (const r of cost30dRows) {
     monthlyCostByUser.set(r.userId, (monthlyCostByUser.get(r.userId) ?? 0) + Number(r.costUsd ?? 0));
   }
-  const memberHealthList: Array<{ userId: number; name: string; health: ReturnType<typeof analyzePlanHealth> }> = [];
+  const memberHealthList: Array<{
+    userId: number;
+    name: string;
+    health: ReturnType<typeof analyzePlanHealth>;
+    isEstimated: boolean;
+  }> = [];
   // memberStats lookup — today/8days fallback 에 ov 기반 totalTokens 사용.
   const memberStatsById = new Map(memberStats.map((m) => [m.userId, m]));
 
@@ -490,14 +497,27 @@ export async function GET(req: NextRequest) {
   for (const u of allUsers) {
     const snap = snapMap.get(u.id);
     const blocks = planBlocksByUser.get(u.id) ?? [];
+    const declared = (u.planTier ?? null) as PlanTier;
+
+    // 추정 tier (P90 토큰 + 30일 cost 종합) — declared null 멤버 평가용.
+    // health 호출 전 계산해 declaredTier 로 주입 → verdict/recommended 가
+    // 추정값 기준 정상 계산.
+    const p90 = calculateP90(blocks.map((b) => b.totalTokens).filter((t) => t > 0));
+    const p90Tier = estimateTierFromP90(p90);
+    const monthlyCost30d = monthlyCostByUser.get(u.id) ?? 0;
+    const costTier = estimateTierFromMonthlyCost(monthlyCost30d);
+    const combinedEstimateTier = maxTierEstimate(p90Tier, costTier);
+    const isEstimatedMember = declared === null && combinedEstimateTier !== "unknown";
+    const effectiveDeclared: PlanTier = declared ?? (isEstimatedMember ? (combinedEstimateTier as Exclude<PlanTier, null>) : null);
+
     const health = analyzePlanHealth({
       blocks,
-      declaredTier: (u.planTier ?? null) as PlanTier,
+      declaredTier: effectiveDeclared,
       cacheHitPct: snap?.cacheHitPct ?? undefined,
       oneShotRate: snap?.overallOneShot != null ? snap.overallOneShot * 100 : undefined,
       windowDays: periodDays,
     });
-    memberHealthList.push({ userId: u.id, name: u.name, health });
+    memberHealthList.push({ userId: u.id, name: u.name, health, isEstimated: isEstimatedMember });
 
     // user_blocks 기반 1차 집계
     const memActiveDates = new Set(blocks.map((b) => b.startedAt.toISOString().slice(0, 10)));
@@ -529,21 +549,14 @@ export async function GET(req: NextRequest) {
       teamAvgDailyTokensSum += memAvgDailyTokens;
     }
 
-    // Effective tier — declared 우선, 없으면 추정 (P90 + cost 종합).
-    // P90 (cache 포함 토큰) 만으로는 보수적으로 한 단계 낮게 분류되는 케이스
-    // 보정 (예: Max 20x 가입자가 한도 80% 미만으로 사용해도 max5 로 추정).
-    // 30일 cost 기반 추정 (estimateTierFromMonthlyCost) 과 max 채택.
-    //   - $200+ cost → max20 추정
-    //   - $60+ cost  → max5 추정
-    //   - 그 외      → pro
-    const declaredTier = health.declaredTier;
-    const monthlyCost30d = monthlyCostByUser.get(u.id) ?? 0;
-    const costTier = estimateTierFromMonthlyCost(monthlyCost30d);
-    const combinedEstimate = maxTierEstimate(health.estimatedTier, costTier);
-    const estimatedTier = combinedEstimate !== "unknown" ? combinedEstimate : null;
-    const effectiveTier = declaredTier ?? estimatedTier;
-    const isEstimated = declaredTier === null && estimatedTier !== null;
-    const effectiveLimits = effectiveTier ? getPlanLimits(effectiveTier as Exclude<PlanTier, null>) : null;
+    // Effective tier 는 위에서 health 계산 시 결정함 (effectiveDeclared).
+    // memberUsage 응답엔 declared / estimated / effective 모두 노출.
+    const estimatedTierForUsage = isEstimatedMember
+      ? (combinedEstimateTier as Exclude<PlanTier, null>)
+      : null;
+    const effectiveLimits = effectiveDeclared
+      ? getPlanLimits(effectiveDeclared as Exclude<PlanTier, null>)
+      : null;
     const monthlyPriceUsd = effectiveLimits?.monthlyPriceUsd ?? null;
 
     memberUsage.push({
@@ -551,11 +564,11 @@ export async function GET(req: NextRequest) {
       name: u.name,
       memberKey: `${u.name}__${u.id}`,
       powerIndex: memScore,
-      declaredTier: declaredTier ?? null,
-      estimatedTier,
-      effectiveTier: effectiveTier ?? null,
+      declaredTier: declared ?? null,
+      estimatedTier: estimatedTierForUsage,
+      effectiveTier: effectiveDeclared ?? null,
       monthlyPriceUsd,
-      isEstimated,
+      isEstimated: isEstimatedMember,
       activeDays: effectiveActiveDays,
       totalTokens: effectiveTokens,
     });

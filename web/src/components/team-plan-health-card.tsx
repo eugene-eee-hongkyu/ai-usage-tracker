@@ -15,6 +15,7 @@ interface TeamMemberPlan {
   monthlyCostRecommendedUsd: number;
   verdict: "downgrade" | "fit" | "tight" | "over" | "unknown";
   actionFirst: boolean;
+  isEstimated: boolean;
 }
 
 export interface TeamPlanSummary {
@@ -118,16 +119,24 @@ export function TeamPlanHealthCard({ summary }: { summary: TeamPlanSummary }) {
                   className="border-b border-amber-900/20 hover:bg-amber-900/10 transition-colors"
                 >
                   <td className="py-1.5 text-neutral-300">{m.name}</td>
-                  <td className="py-1.5 px-2 text-neutral-400">
+                  <td className={`py-1.5 px-2 ${m.isEstimated ? "text-amber-300" : "text-neutral-400"}`}>
                     {TIER_LABEL[declared] ?? declared}
-                    {m.declaredTier === null && <span className="text-[10px] text-neutral-600"> (미입력)</span>}
+                    {m.isEstimated && <span className="text-[10px] text-amber-400/70"> (추정)</span>}
+                    {!m.isEstimated && m.declaredTier === null && <span className="text-[10px] text-neutral-600"> (미입력)</span>}
                   </td>
                   <td className={`py-1.5 px-2 ${VERDICT_COLOR[m.verdict]}`}>
                     {VERDICT_LABEL[m.verdict]}
                     {m.actionFirst && <span className="text-amber-400 ml-1">💡</span>}
                   </td>
                   <td className="py-1.5 px-2 text-neutral-300">
-                    {declared === rec ? <span className="text-neutral-600">—</span> : TIER_LABEL[rec] ?? rec}
+                    {/* 권장 = 추천 tier. declared 와 같으면 회색으로 (현 plan 유지) 명시. */}
+                    {rec === "unknown" ? (
+                      <span className="text-neutral-600">—</span>
+                    ) : declared === rec ? (
+                      <span className="text-neutral-500">{TIER_LABEL[rec] ?? rec} <span className="text-[10px]">(유지)</span></span>
+                    ) : (
+                      <span>{TIER_LABEL[rec] ?? rec}</span>
+                    )}
                   </td>
                   <td className="py-1.5 text-right tabular-nums">
                     {delta === 0 ? (
