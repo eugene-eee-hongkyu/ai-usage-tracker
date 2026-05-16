@@ -151,6 +151,10 @@ interface TeamData {
     totalTokens: number;
   }>;
   dailyUnitCostByMember?: Array<Record<string, number | string | null>>;
+  dailyVisits30d?: {
+    dates: string[];
+    byUser: Record<string, { name: string; counts: number[] }>;
+  };
 }
 
 function AdminBadge() {
@@ -1144,6 +1148,54 @@ export function TeamView({ adminMode = false }: { adminMode?: boolean }) {
                           })}
                       </tbody>
                     </table>
+
+                    {/* 일별 방문 그리드 — 최근 30일 멤버 × 날짜 매트릭스.
+                        0 셀은 회색 dot, 1~9 는 흰색 숫자, 10+ 는 cyan 강조.
+                        하단에 30일 날짜 라벨 (5일 간격). */}
+                    {data.dailyVisits30d && (() => {
+                      const grid = data.dailyVisits30d;
+                      const fmtMd = (ymd: string) => ymd.slice(5);  // "MM-DD"
+                      return (
+                        <div data-testid="team-engagement-daily-grid" className="mt-4 pt-3 border-t border-neutral-800">
+                          <p className="text-[10px] font-mono text-neutral-500 uppercase tracking-wider mb-2">
+                            일별 방문 (최근 30일)
+                          </p>
+                          <div className="overflow-x-auto">
+                            <table className="text-[10px] font-mono border-collapse">
+                              <tbody>
+                                {Object.entries(grid.byUser).map(([userId, row]) => (
+                                  <tr key={userId} className="hover:bg-neutral-800/30">
+                                    <td className="pr-3 py-0.5 text-neutral-400 whitespace-nowrap">{row.name}</td>
+                                    {row.counts.map((c, i) => (
+                                      <td
+                                        key={i}
+                                        className={`w-6 text-center py-0.5 tabular-nums ${
+                                          c === 0 ? "text-neutral-700" :
+                                          c >= 10 ? "text-cyan-400 font-bold" :
+                                          "text-neutral-200"
+                                        }`}
+                                        title={`${grid.dates[i]}: ${c}회`}
+                                      >
+                                        {c === 0 ? "·" : c}
+                                      </td>
+                                    ))}
+                                  </tr>
+                                ))}
+                                {/* 날짜 라벨 행 — 5일 간격 + 마지막 셀 */}
+                                <tr>
+                                  <td className="pr-3 py-0.5" />
+                                  {grid.dates.map((d, i) => (
+                                    <td key={i} className="w-6 text-center py-0.5 text-neutral-600 text-[9px] tabular-nums">
+                                      {(i % 5 === 0 || i === grid.dates.length - 1) ? fmtMd(d) : ""}
+                                    </td>
+                                  ))}
+                                </tr>
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+                      );
+                    })()}
                   </div>
                 </div>
 

@@ -145,6 +145,26 @@ export async function GET(req: NextRequest) {
     visitAgg.set(r.userId, cur);
   }
 
+  // 30일 일별 방문 매트릭스 — ENGAGEMENT 카드 일별 그리드용.
+  // (멤버 × 날짜) count. 0 인 셀은 응답에 0 으로 채움 (UI 에서 dot 표시).
+  const visit30Start = new Date(Date.now() - 30 * 86_400_000);
+  const visit30StartYmd = visit30Start.toISOString().slice(0, 10);
+  const visits30d = await db
+    .select({ userId: dailyVisits.userId, date: dailyVisits.date, count: dailyVisits.count })
+    .from(dailyVisits)
+    .where(gte(dailyVisits.date, visit30StartYmd));
+  const visit30AggByUser = new Map<number, Record<string, number>>();
+  for (const r of visits30d) {
+    if (!visit30AggByUser.has(r.userId)) visit30AggByUser.set(r.userId, {});
+    visit30AggByUser.get(r.userId)![r.date] = r.count;
+  }
+  // 30일치 날짜 라벨 (오늘부터 거꾸로 30일).
+  const visit30Dates: string[] = [];
+  for (let i = 29; i >= 0; i--) {
+    const d = new Date(Date.now() - i * 86_400_000);
+    visit30Dates.push(d.toISOString().slice(0, 10));
+  }
+
   // user_blocks 기반 멤버별 분당 토큰 집계. period 별 윈도우는 dashboard 와 동일.
   // today 면 빈 Map (효율성 테이블에 0 표시되거나 ─ 으로 표기).
   const blocksWindowStart = (() => {
@@ -806,6 +826,19 @@ export async function GET(req: NextRequest) {
     teamUsage,
     memberUsage,
     dailyUnitCostByMember,
+    // 30일 일별 방문 매트릭스 — ENGAGEMENT 카드용
+    dailyVisits30d: {
+      dates: visit30Dates,
+      byUser: Object.fromEntries(
+        memberStats.map((m) => [
+          m.userId,
+          {
+            name: m.name,
+            counts: visit30Dates.map((d) => visit30AggByUser.get(m.userId)?.[d] ?? 0),
+          },
+        ])
+      ),
+    },
     isAdminUser: isAdmin(session.user.email),
   });
 }
