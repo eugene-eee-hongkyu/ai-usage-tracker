@@ -458,9 +458,12 @@ export async function GET(req: NextRequest) {
     const ovActiveDays = member?.memberActiveDays ?? 0;
     const useOvFallback = ovTokens > blockTotalTokens * 1.5;
     const effectiveTokens = useOvFallback ? ovTokens : blockTotalTokens;
-    const effectiveActiveDays = useOvFallback
-      ? Math.max(blockActiveDays, ovActiveDays)
-      : blockActiveDays;
+    // periodDays 로 cap — codeburn/ccusage merge 가 boundary day 포함해
+    // 9/8일 같은 비정상 값 방어.
+    const effectiveActiveDays = Math.min(
+      periodDays,
+      useOvFallback ? Math.max(blockActiveDays, ovActiveDays) : blockActiveDays
+    );
 
     // 활용지수 — 활성 멤버만 (effectiveActiveDays > 0).
     if (effectiveActiveDays > 0 && effectiveTokens > 0) {

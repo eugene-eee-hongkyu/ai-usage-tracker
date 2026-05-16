@@ -794,9 +794,12 @@ export async function GET(req: NextRequest) {
   const totalWindowTokens = useOverviewFallback
     ? overviewTotalTokens
     : planHealth.totalWindowTokens;
-  const effectiveActiveDays = useOverviewFallback
-    ? Math.max(planBlockActiveDays, activeDays)
-    : planBlockActiveDays;
+  // periodDays 로 cap — codeburn/ccusage merge 가 boundary day 포함해 9/8일
+  // 같은 비정상 값이 들어오는 케이스 방어.
+  const effectiveActiveDays = Math.min(
+    periodDays,
+    useOverviewFallback ? Math.max(planBlockActiveDays, activeDays) : planBlockActiveDays
+  );
   const effectiveBlockCount = useOverviewFallback
     // overview 기반일 때 block count 추정 = activeDays × (typical 1.5 blocks/day)
     // — 1일 활동 시간 5~8시간 가정.

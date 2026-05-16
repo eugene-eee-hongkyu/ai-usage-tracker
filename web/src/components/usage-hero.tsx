@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   POWER_FREQUENCY_TARGET_DAYS,
   targetWorkdaysForPeriod,
@@ -142,6 +142,22 @@ export function UsageHero({
   const [tierValue, setTierValue] = useState<string>(declaredTier ?? "");
   const [saving, setSaving] = useState(false);
   const [tierHintOpen, setTierHintOpen] = useState(false);
+
+  // tier 미입력 멤버에게 진입 시 modal 강제. 본인 view 에서만 + declaredTier
+  // null + localStorage 미dismiss. dismiss 후엔 카드 안 hint 만 유지.
+  const [tierModalOpen, setTierModalOpen] = useState(false);
+  useEffect(() => {
+    if (viewOnly) return;
+    if (declaredTier && declaredTier !== "") return;
+    if (typeof window === "undefined") return;
+    const dismissed = localStorage.getItem("tier_modal_dismissed");
+    if (dismissed === "1") return;
+    setTierModalOpen(true);
+  }, [viewOnly, declaredTier]);
+  const dismissTierModal = () => {
+    setTierModalOpen(false);
+    try { localStorage.setItem("tier_modal_dismissed", "1"); } catch {}
+  };
   const onChangeTier = async (value: string) => {
     setTierValue(value);
     setSaving(true);
@@ -152,6 +168,10 @@ export function UsageHero({
         body: JSON.stringify({ planTier: value || null }),
       });
       if (res.ok) {
+        // tier 입력 완료 시 modal 자동 dismiss (next reload 후 declaredTier != null 이므로 어차피 안 뜸).
+        if (value) {
+          try { localStorage.setItem("tier_modal_dismissed", "1"); } catch {}
+        }
         setTimeout(() => window.location.reload(), 300);
       }
     } finally {
@@ -160,6 +180,61 @@ export function UsageHero({
   };
 
   return (
+    <>
+    {/* Tier 미입력 강제 modal — 본인 view 에서 첫 진입 시 1회. dismiss 후엔
+        카드 안 hint 만 유지. dismiss 는 localStorage 영구. */}
+    {tierModalOpen && (
+      <div
+        data-testid="tier-modal-overlay"
+        className="fixed inset-0 z-[100] bg-black/70 backdrop-blur-sm flex items-center justify-center px-4"
+        onClick={dismissTierModal}
+      >
+        <div
+          data-testid="tier-modal-card"
+          className="bg-neutral-900 border-2 border-yellow-500/70 rounded-lg shadow-2xl max-w-md w-full p-6 space-y-4"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="flex items-center gap-2">
+            <span className="text-3xl">📊</span>
+            <h2 className="text-lg font-mono font-bold text-yellow-300">Plan tier 를 알려주세요</h2>
+          </div>
+          <p className="text-sm font-mono text-neutral-300 leading-relaxed">
+            토큰 단가와 plan 활용도를 계산하려면 본인 Claude 플랜이 필요합니다.
+            아래에서 선택하면 즉시 반영됩니다.
+          </p>
+          <div className="space-y-2">
+            <label className="text-xs font-mono text-neutral-500 block">본인 plan tier</label>
+            <select
+              data-testid="tier-modal-select"
+              value={tierValue}
+              onChange={(e) => onChangeTier(e.target.value)}
+              disabled={saving}
+              className="w-full bg-neutral-800 border border-neutral-700 text-neutral-100 text-sm font-mono rounded px-3 py-2 focus:outline-none focus:border-yellow-500"
+            >
+              {TIER_OPTIONS.map((o) => (
+                <option key={o.value} value={o.value}>{o.label}</option>
+              ))}
+            </select>
+          </div>
+          <div className="text-xs font-mono text-neutral-400 bg-neutral-950 border border-neutral-800 rounded p-3 space-y-1 leading-relaxed">
+            <p className="text-neutral-300">▾ 내 tier 확인하기</p>
+            <p>1. <span className="text-neutral-200">claude.ai</span> 접속 → 우측 상단 프로필 → <span className="text-neutral-200">Subscription</span></p>
+            <p>2. 또는 터미널에서 <span className="text-neutral-200">claude</span> 실행 → <span className="text-neutral-200">/usage</span> 입력</p>
+            <p>3. 표시된 plan 그대로 위에서 선택</p>
+          </div>
+          <div className="flex items-center justify-end gap-2 pt-2">
+            <button
+              type="button"
+              data-testid="tier-modal-dismiss"
+              onClick={dismissTierModal}
+              className="text-xs font-mono text-neutral-500 hover:text-neutral-300 px-3 py-1.5 transition-colors"
+            >
+              나중에 입력
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
     <div data-testid="dash-usage-hero" className="bg-neutral-950 border-b border-neutral-800">
       <div className="max-w-6xl mx-auto px-4 py-5">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -429,5 +504,6 @@ export function UsageHero({
         </div>
       </div>
     </div>
+    </>
   );
 }
