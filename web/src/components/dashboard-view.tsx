@@ -11,6 +11,7 @@ import { ActivityCalendar } from "react-activity-calendar";
 import { ScoreGauge, scoreLabel } from "@/components/score-gauge";
 import dynamic from "next/dynamic";
 import type { DrilldownPeriod } from "@/components/score-drilldown";
+import { PlanHealthCard } from "@/components/plan-health-card";
 
 const ScoreDrilldown = dynamic(
   () => import("@/components/score-drilldown").then((m) => m.ScoreDrilldown),
@@ -87,7 +88,8 @@ interface SnapshotInfo {
 }
 
 interface DashboardData {
-  user: { name: string; lastSyncedAt: string | null; timezone: string | null };
+  user: { name: string; lastSyncedAt: string | null; timezone: string | null; planTier: string | null };
+  planHealth?: import("@/components/plan-health-card").PlanHealthResult;
   overview: Overview | null;
   daily: DailyRow[];
   dailyTokens?: DailyTokenRow[];
@@ -986,6 +988,15 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
           Streak / 팀 랭크는 period 무관 자체 의미 (현재까지 streak / 이번주 랭크). */}
       {data.efficiencyScore && (
         <EfficiencyScoreSection score={data.efficiencyScore} period={period} periodScore={ov.periodScore} />
+      )}
+
+      {/* Plan Health — 본인 view 만 표시. viewOnly (어드민이 멤버 봄) 면 hide (팀 페이지에서 종합). */}
+      {!viewOnly && data.planHealth && (
+        <div className="bg-neutral-950 border-b border-neutral-800">
+          <div className="max-w-6xl mx-auto px-4 py-3">
+            <PlanHealthCard planHealth={data.planHealth} declaredTier={data.user.planTier} />
+          </div>
+        </div>
       )}
 
       {/* Overview Bar */}

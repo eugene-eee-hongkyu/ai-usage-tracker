@@ -5,6 +5,7 @@ import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { Nav } from "@/components/nav";
 import { AdminNav } from "@/components/admin-nav";
+import { TeamPlanHealthCard, type TeamPlanSummary } from "@/components/team-plan-health-card";
 import {
   AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
 } from "recharts";
@@ -124,6 +125,7 @@ interface TeamData {
     memberCount: number;
     windowDays: number;
   } | null;
+  teamPlanHealth?: TeamPlanSummary;
 }
 
 function AdminBadge() {
@@ -896,6 +898,11 @@ export function TeamView({ adminMode = false }: { adminMode?: boolean }) {
                 </div>
               </div>
             </div>
+
+            {/* Team Plan Health (admin only) — full width, 매니저 의사결정용 */}
+            {adminUser && data.teamPlanHealth && (
+              <TeamPlanHealthCard summary={data.teamPlanHealth} />
+            )}
 
             {/* Row 6: Last Sync + Top Sessions (admin only) */}
             {adminUser && (

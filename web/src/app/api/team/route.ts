@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { db, userSnapshots, users, dailyVisits, userBlocks } from "@/lib/db";
+import { analyzePlanHealth, summarizeTeamPlans, type PlanTier } from "@/lib/plan-health";
 import { computeEfficiencyScore, computeDailyEfficiencyScore } from "@/lib/rules";
 import { isAdmin } from "@/lib/admin";
 import { gte } from "drizzle-orm";
@@ -374,6 +375,39 @@ export async function GET(req: NextRequest) {
     .filter((m): m is NonNullable<typeof m> => m !== null);
 
   const byEfficiency = [...memberStats].sort((a, b) => b.efficiencyScore - a.efficiencyScore);
+
+  // Team Plan Health — 멤버별 plan 적정성. 어드민만 UI 노출 (응답엔 항상 포함).
+  // 30일 윈도우 user_blocks 별도 조회 (period 와 무관).
+  const planBlocksWindowStart = new Date(Date.now() - 30 * 86_400_000);
+  const planBlockRows = await db
+    .select({
+      userId: userBlocks.userId,
+      totalTokens: userBlocks.totalTokens,
+      startedAt: userBlocks.startedAt,
+    })
+    .from(userBlocks)
+    .where(gte(userBlocks.startedAt, planBlocksWindowStart));
+  const planBlocksByUser = new Map<number, Array<{ totalTokens: number; startedAt: Date }>>();
+  for (const r of planBlockRows) {
+    const arr = planBlocksByUser.get(r.userId) ?? [];
+    arr.push({ totalTokens: Number(r.totalTokens ?? 0), startedAt: r.startedAt });
+    planBlocksByUser.set(r.userId, arr);
+  }
+  const memberHealthList: Array<{ userId: number; name: string; health: ReturnType<typeof analyzePlanHealth> }> = [];
+  for (const u of allUsers) {
+    const snap = snapMap.get(u.id);
+    const blocks = planBlocksByUser.get(u.id) ?? [];
+    const health = analyzePlanHealth({
+      blocks,
+      declaredTier: (u.planTier ?? null) as PlanTier,
+      cacheHitPct: snap?.cacheHitPct ?? undefined,
+      oneShotRate: snap?.overallOneShot != null ? snap.overallOneShot * 100 : undefined,
+      windowDays: 30,
+    });
+    memberHealthList.push({ userId: u.id, name: u.name, health });
+  }
+  const teamPlanHealth = summarizeTeamPlans(memberHealthList);
+
   const bySessions = [...memberStats].sort((a, b) => b.sessionsCount - a.sessionsCount);
 
   const teamSummary = {
@@ -565,6 +599,7 @@ export async function GET(req: NextRequest) {
     teamShellCommands,
     industryComparison,
     teamScore,
+    teamPlanHealth,
     isAdminUser: isAdmin(session.user.email),
   });
 }

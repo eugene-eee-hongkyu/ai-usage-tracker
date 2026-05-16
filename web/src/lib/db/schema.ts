@@ -21,6 +21,9 @@ export const users = pgTable("users", {
   avatarUrl: text("avatar_url"),
   apiKeyHash: text("api_key_hash"),
   timezone: text("timezone"),
+  // 사용자가 명시한 Claude Code plan tier. 자동 추정과 별도로 본인 입력 받음.
+  // null 이면 추정만 사용. 값: 'pro' | 'max5' | 'max20' | 'team' | 'api'
+  planTier: text("plan_tier"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   lastSyncedAt: timestamp("last_synced_at"),
 });

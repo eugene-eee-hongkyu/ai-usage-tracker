@@ -5,6 +5,7 @@ import { db, userSnapshots, users, periodSnapshots, dailyVisits, userBlocks } fr
 import { and, asc, desc, eq, gte, lt } from "drizzle-orm";
 import { isAdmin } from "@/lib/admin";
 import { computeDailyEfficiencyScore } from "@/lib/rules";
+import { analyzePlanHealth, type PlanTier } from "@/lib/plan-health";
 
 type Period = "today" | "month" | "8days" | "30days" | "all";
 
@@ -724,8 +725,32 @@ export async function GET(req: NextRequest) {
         trend: prevTrend,
       };
 
+  // Plan Health — 항상 최근 30일 윈도우 (period 와 무관). user_blocks 30일치 별도 조회.
+  const planBlocksWindowStart = new Date(Date.now() - 30 * 86_400_000);
+  const planBlockRows = await db
+    .select({
+      totalTokens: userBlocks.totalTokens,
+      startedAt: userBlocks.startedAt,
+    })
+    .from(userBlocks)
+    .where(and(
+      eq(userBlocks.userId, user[0].id),
+      gte(userBlocks.startedAt, planBlocksWindowStart),
+    ));
+  const planHealth = analyzePlanHealth({
+    blocks: planBlockRows.map((b) => ({
+      totalTokens: Number(b.totalTokens ?? 0),
+      startedAt: b.startedAt,
+    })),
+    declaredTier: (user[0].planTier ?? null) as PlanTier,
+    // user_snapshots 의 누적 평균 cacheHitPct / overallOneShot — period 무관.
+    cacheHitPct: user[0].apiKeyHash ? (snap[0]?.cacheHitPct ?? undefined) : undefined,
+    oneShotRate: snap[0]?.overallOneShot ? snap[0].overallOneShot * 100 : undefined,
+    windowDays: 30,
+  });
+
   return NextResponse.json({
-    user: { name: user[0].name, lastSyncedAt: user[0].lastSyncedAt, timezone: user[0].timezone ?? null },
+    user: { name: user[0].name, lastSyncedAt: user[0].lastSyncedAt, timezone: user[0].timezone ?? null, planTier: user[0].planTier ?? null },
     overview: {
       cost: finalCost,
       sessions,
@@ -741,6 +766,7 @@ export async function GET(req: NextRequest) {
       // 배지가 사용 — 게이지와 영원히 동기화.
       periodScore,
     },
+    planHealth,
     daily,
     dailyTokens,
     heatmapDaily,
