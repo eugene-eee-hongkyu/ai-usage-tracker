@@ -6,6 +6,7 @@ import {
   targetWorkdaysForPeriod,
   hardworkerThresholdForPeriod,
   computeUnitCostLevel,
+  computeTokenLevel,
 } from "@/lib/rules";
 
 // 사용량 zone hero — Power Index + 토큰 단가 동등 크기 2-card.
@@ -189,34 +190,60 @@ export function UsageHero({
               <p className="text-[10px] text-neutral-600">활성일 40 + 사용량 60 = 100</p>
             </div>
 
-            {breakdownOpen && (
-              <div data-testid="usage-hero-power-breakdown" className="mt-3 pt-3 border-t border-neutral-800 space-y-3 text-[11px] font-mono">
-                <div>
-                  <p className="text-cyan-400 mb-1">활성일 (40점)</p>
-                  <p className="text-neutral-400 leading-relaxed">
-                    <span className="text-neutral-200">활성일 ÷ {targetWorkdays.toFixed(targetWorkdays >= 10 ? 0 : 1)}일 × 40</span>
-                    <span className="text-neutral-600"> ({periodLabel} 비례 — 30일 anchor {POWER_FREQUENCY_TARGET_DAYS}일)</span>
-                  </p>
-                  <p className="text-neutral-500 mt-0.5">
-                    {targetWorkdays.toFixed(targetWorkdays >= 10 ? 0 : 1)}일 이상 만점 ·
-                    {hardworkerThreshold.toFixed(hardworkerThreshold >= 10 ? 0 : 1)}일 이상이면 🔥 하드워커
-                  </p>
-                </div>
-                <div>
-                  <p className="text-cyan-400 mb-1">사용량 (60점) — 일평균 토큰 기준</p>
-                  <div className="space-y-0.5">
-                    {TOKEN_LEVEL_ROWS.map((r) => (
-                      <div key={r.level} className="flex items-center gap-2 text-neutral-400">
-                        <span className="w-10 text-neutral-500">{r.level * 6}점</span>
-                        <span className="w-28 text-neutral-200">{r.range}</span>
-                        {r.anchor && <span className="text-[10px] text-neutral-600">{r.anchor}</span>}
-                      </div>
-                    ))}
+            {breakdownOpen && (() => {
+              // 활성일 점수 — frequency × 40
+              const frequencyScore = Math.round(Math.min(1, activeDays / targetWorkdays) * 40);
+              // 사용량 레벨 (0~10)
+              const tokenLevel = computeTokenLevel(avgDailyTokens);
+              return (
+                <div data-testid="usage-hero-power-breakdown" className="mt-3 pt-3 border-t border-neutral-800 space-y-3 text-[11px] font-mono">
+                  <div>
+                    <p className="text-cyan-400 mb-1">활성일 (40점)</p>
+                    <p className="text-neutral-400 leading-relaxed">
+                      <span className="text-neutral-200">활성일 ÷ {targetWorkdays.toFixed(targetWorkdays >= 10 ? 0 : 1)}일 × 40</span>
+                      <span className="text-neutral-600"> ({periodLabel} 비례 — 30일 anchor {POWER_FREQUENCY_TARGET_DAYS}일)</span>
+                    </p>
+                    <p className="text-neutral-500 mt-0.5">
+                      {targetWorkdays.toFixed(targetWorkdays >= 10 ? 0 : 1)}일 이상 만점 ·
+                      {hardworkerThreshold.toFixed(hardworkerThreshold >= 10 ? 0 : 1)}일 이상이면 🔥 하드워커
+                    </p>
+                    <div className="mt-1.5 pl-3 -ml-1.5 border-l-2 border-l-cyan-500 bg-cyan-900/20 py-0.5">
+                      <span className="text-cyan-300 font-bold">
+                        나: {activeDays}/{periodDays}일 · {frequencyScore}점
+                      </span>
+                      {isHardworker && <span className="text-rose-300 ml-2">🔥</span>}
+                    </div>
                   </div>
-                  <p className="text-neutral-600 mt-1">cache reads 포함 (Claude Code 특성상 90%+ 가 cache)</p>
+                  <div>
+                    <p className="text-cyan-400 mb-1">사용량 (60점) — 일평균 토큰 기준</p>
+                    <div className="space-y-0.5">
+                      {TOKEN_LEVEL_ROWS.map((r) => {
+                        const isCurrent = r.level === tokenLevel;
+                        return (
+                          <div
+                            key={r.level}
+                            className={`flex items-center gap-2 ${isCurrent ? "bg-cyan-900/30 border-l-2 border-l-cyan-500 pl-1.5 -ml-1.5" : "text-neutral-400"}`}
+                          >
+                            <span className={`w-10 ${isCurrent ? "text-cyan-300 font-bold" : "text-neutral-500"}`}>
+                              {r.level * 6}점
+                            </span>
+                            <span className={`w-28 ${isCurrent ? "text-cyan-200 font-bold" : "text-neutral-200"}`}>
+                              {r.range}
+                            </span>
+                            {r.anchor && (
+                              <span className={`text-[10px] ${isCurrent ? "text-cyan-400" : "text-neutral-600"}`}>
+                                {r.anchor}
+                              </span>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                    <p className="text-neutral-600 mt-1">cache reads 포함 (Claude Code 특성상 90%+ 가 cache)</p>
+                  </div>
                 </div>
-              </div>
-            )}
+              );
+            })()}
           </div>
 
           {/* 토큰 단가 */}
