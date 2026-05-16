@@ -11,7 +11,6 @@ import { ActivityCalendar } from "react-activity-calendar";
 import { ScoreGauge, scoreLabel } from "@/components/score-gauge";
 import dynamic from "next/dynamic";
 import type { DrilldownPeriod } from "@/components/score-drilldown";
-import { PlanHealthCard } from "@/components/plan-health-card";
 import { UsageHero } from "@/components/usage-hero";
 import { PrivacyBanner } from "@/components/privacy-banner";
 
@@ -307,8 +306,8 @@ function EfficiencyScoreSection({ score, period, periodScore }: EfficiencyScoreS
   );
 
   return (
-    <div data-testid="dash-efficiency-score" className="bg-neutral-950 border-b border-neutral-800">
-      <div className="max-w-6xl mx-auto px-4 py-4">
+    <div data-testid="dash-efficiency-score" className="bg-neutral-900 border border-neutral-800 rounded">
+      <div className="px-4 py-4">
         <div className="grid grid-cols-12 gap-x-6 items-start">
           {/* Hero: 원형 게이지 (3 cols) — 5초 테스트 통과용 단일 focal point */}
           {drilldownAvailable ? (
@@ -1010,27 +1009,6 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
         />
       )}
 
-      {/* Plan Health 카드 — tier select + verdict + 분석 근거.
-          본인 view 만. viewOnly (어드민이 멤버 봄) 면 hide (팀 페이지에서 종합). */}
-      {!viewOnly && data.planHealth && (
-        <div className="bg-neutral-950 border-b border-neutral-800">
-          <div className="max-w-6xl mx-auto px-4 py-3">
-            <PlanHealthCard planHealth={data.planHealth} declaredTier={data.user.planTier} />
-          </div>
-        </div>
-      )}
-
-      {/* Daily Efficiency Score + Streak + 90일 잔디 + 팀 랭크.
-          게이지 값은 period-aware (periodScore). 다른 카드 (DAILY ACTIVITY / COST /
-          BY MODEL ...) 가 모두 period 따라 변하는데 게이지만 오늘 고정이면 인지
-          부조화 발생 → period 반영. 90일 잔디는 long-term trend 의도라 항상 90일.
-          Streak / 팀 랭크는 period 무관 자체 의미 (현재까지 streak / 이번주 랭크).
-          인터뷰에서 "효율 점수에 경각심 안 듦" 답이 다수 → Plan Health / Overview
-          Bar 아래로 위치, 보조 정보 성격으로 조정. */}
-      {data.efficiencyScore && (
-        <EfficiencyScoreSection score={data.efficiencyScore} period={period} periodScore={ov.periodScore} />
-      )}
-
       {/* Overview Bar — 사용자 인터뷰에서 "activity + cost 만 본다" 답이 다수.
           폰트 키우고 hero 수준으로 시각 승격. */}
       <div data-testid="dash-overview-bar" className="bg-neutral-900 border-b border-neutral-800">
@@ -1375,7 +1353,7 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
           })() : <div />}
         </div>
 
-        {/* Row 3: By Model + Top Sessions */}
+        {/* Row 3: By Model + By Project — 비용 분해 그룹 (어디에 썼나) */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
 
           {/* By Model */}
@@ -1409,48 +1387,6 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
               </div>
             </div>
           </div>
-
-          {/* Top Sessions */}
-          <div data-testid="dash-card-top-sessions" className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-red-500 rounded">
-            <div className="px-3 py-2 border-b border-neutral-800">
-              <span className="text-xs font-mono font-bold text-red-400 uppercase tracking-wider">Top Sessions</span>
-            </div>
-            <div className="p-3">
-              <div className="flex text-xs text-neutral-600 font-mono mb-1.5">
-                <span className="w-5">#</span>
-                <span className="w-20">date</span>
-                <span className="flex-1">project</span>
-                <span className="w-16 text-right">cost</span>
-                <span className="w-16 text-right">calls</span>
-              </div>
-              <div className="space-y-1">
-                {data.topSessions.slice(0, 5).map((s, i) => {
-                  const displayPath = formatPath(s.projectPath || s.project);
-                  return (
-                    <div key={s.id || i} className="flex items-center gap-2 text-xs font-mono">
-                      <span className="w-5 text-neutral-600">{i + 1}.</span>
-                      <span className="w-20 text-neutral-500 shrink-0">{s.date}</span>
-                      <div className="flex-1 flex items-center gap-2 min-w-0">
-                        <div className="w-16 h-1.5 bg-neutral-800 rounded overflow-hidden shrink-0">
-                          <div className="h-full bg-red-500 rounded" style={{ width: `${(s.cost / maxSessionCost) * 100}%` }} />
-                        </div>
-                        <span className="text-neutral-300 overflow-hidden whitespace-nowrap" style={{ direction: "rtl", textOverflow: "ellipsis", textAlign: "left" }} title={s.projectPath || s.project}>{displayPath}</span>
-                      </div>
-                      <span className="w-16 text-yellow-400 text-right shrink-0">{fmt$(s.cost)}</span>
-                      <span className="w-16 text-neutral-500 text-right shrink-0">{s.calls.toLocaleString()}</span>
-                    </div>
-                  );
-                })}
-                {data.topSessions.length === 0 && (
-                  <p className="text-neutral-600 text-xs font-mono">no data</p>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Row 4: By Project + By Activity */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
 
           {/* By Project */}
           <div data-testid="dash-card-by-project" className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-yellow-500 rounded">
@@ -1489,6 +1425,48 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
                     <p className="text-neutral-600 text-xs font-mono">no data</p>
                   )}
                 </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Row 4: Top Sessions + By Activity — 이상치 / 카테고리 점검 */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+
+          {/* Top Sessions */}
+          <div data-testid="dash-card-top-sessions" className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-red-500 rounded">
+            <div className="px-3 py-2 border-b border-neutral-800">
+              <span className="text-xs font-mono font-bold text-red-400 uppercase tracking-wider">Top Sessions</span>
+            </div>
+            <div className="p-3">
+              <div className="flex text-xs text-neutral-600 font-mono mb-1.5">
+                <span className="w-5">#</span>
+                <span className="w-20">date</span>
+                <span className="flex-1">project</span>
+                <span className="w-16 text-right">cost</span>
+                <span className="w-16 text-right">calls</span>
+              </div>
+              <div className="space-y-1">
+                {data.topSessions.slice(0, 5).map((s, i) => {
+                  const displayPath = formatPath(s.projectPath || s.project);
+                  return (
+                    <div key={s.id || i} className="flex items-center gap-2 text-xs font-mono">
+                      <span className="w-5 text-neutral-600">{i + 1}.</span>
+                      <span className="w-20 text-neutral-500 shrink-0">{s.date}</span>
+                      <div className="flex-1 flex items-center gap-2 min-w-0">
+                        <div className="w-16 h-1.5 bg-neutral-800 rounded overflow-hidden shrink-0">
+                          <div className="h-full bg-red-500 rounded" style={{ width: `${(s.cost / maxSessionCost) * 100}%` }} />
+                        </div>
+                        <span className="text-neutral-300 overflow-hidden whitespace-nowrap" style={{ direction: "rtl", textOverflow: "ellipsis", textAlign: "left" }} title={s.projectPath || s.project}>{displayPath}</span>
+                      </div>
+                      <span className="w-16 text-yellow-400 text-right shrink-0">{fmt$(s.cost)}</span>
+                      <span className="w-16 text-neutral-500 text-right shrink-0">{s.calls.toLocaleString()}</span>
+                    </div>
+                  );
+                })}
+                {data.topSessions.length === 0 && (
+                  <p className="text-neutral-600 text-xs font-mono">no data</p>
+                )}
               </div>
             </div>
           </div>
@@ -1614,6 +1592,14 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
             </div>
           </div>
         </div>
+
+        {/* Daily Efficiency Score + Streak + 90일 잔디 + 팀 랭크 — 동기부여·게임화 패널.
+            매일 보는 액션 카드가 아니라 주 1회 "이번 주 어땠지" 확인용. Core Tools /
+            Shell Commands 아래로 배치해 핵심 의사결정 layer (activity → 효율 →
+            비용 분해 → 이상치 → 작업 텍스처) 와 분리. */}
+        {data.efficiencyScore && (
+          <EfficiencyScoreSection score={data.efficiencyScore} period={period} periodScore={ov.periodScore} />
+        )}
 
         {/* Row 6: Active Blocks + Dwell Heatmap */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
