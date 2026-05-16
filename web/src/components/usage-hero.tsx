@@ -115,8 +115,8 @@ export function UsageHero({
 }: UsageHeroProps) {
   const power = powerGrade(powerIndex);
   const isHardworker = activeDays >= POWER_HARDWORKER_THRESHOLD_DAYS;
-  const [powerBreakdownOpen, setPowerBreakdownOpen] = useState(false);
-  const [unitBreakdownOpen, setUnitBreakdownOpen] = useState(false);
+  // 두 카드의 산정 기준 패널은 함께 열리고 함께 닫힘 (대응 시각화).
+  const [breakdownOpen, setBreakdownOpen] = useState(false);
 
   const canShowUnitCost =
     monthlyPriceUsd !== null && monthlyPriceUsd > 0 && totalWindowTokens > 0;
@@ -160,11 +160,11 @@ export function UsageHero({
               <button
                 type="button"
                 data-testid="usage-hero-power-info"
-                onClick={() => setPowerBreakdownOpen((v) => !v)}
+                onClick={() => setBreakdownOpen((v) => !v)}
                 className="text-[11px] font-mono text-neutral-500 hover:text-cyan-300 border border-neutral-700 hover:border-cyan-500/60 rounded px-1.5 py-0.5 transition-colors"
-                title="점수 산정 기준 보기"
+                title="활용지수 + 토큰단가 산정 기준 보기"
               >
-                {powerBreakdownOpen ? "닫기 ▲" : "? 산정 기준"}
+                {breakdownOpen ? "닫기 ▲" : "? 산정 기준"}
               </button>
             </div>
             <div className="flex items-baseline gap-3 flex-wrap">
@@ -186,7 +186,7 @@ export function UsageHero({
               <p className="text-[10px] text-neutral-600">활성일 40 + 사용량 60 = 100</p>
             </div>
 
-            {powerBreakdownOpen && (
+            {breakdownOpen && (
               <div data-testid="usage-hero-power-breakdown" className="mt-3 pt-3 border-t border-neutral-800 space-y-3 text-[11px] font-mono">
                 <div>
                   <p className="text-cyan-400 mb-1">활성일 (40점)</p>
@@ -239,11 +239,11 @@ export function UsageHero({
                 <button
                   type="button"
                   data-testid="usage-hero-unit-info"
-                  onClick={() => setUnitBreakdownOpen((v) => !v)}
+                  onClick={() => setBreakdownOpen((v) => !v)}
                   className="text-[11px] font-mono text-neutral-500 hover:text-yellow-300 border border-neutral-700 hover:border-yellow-500/60 rounded px-1.5 py-0.5 transition-colors"
-                  title="단가 등급 기준 보기"
+                  title="활용지수 + 토큰단가 산정 기준 보기"
                 >
-                  {unitBreakdownOpen ? "닫기 ▲" : "? 산정 기준"}
+                  {breakdownOpen ? "닫기 ▲" : "? 산정 기준"}
                 </button>
               </div>
             </div>
@@ -301,7 +301,7 @@ export function UsageHero({
               </>
             )}
 
-            {unitBreakdownOpen && (
+            {breakdownOpen && (
               <div data-testid="usage-hero-unit-breakdown" className="mt-3 pt-3 border-t border-neutral-800 space-y-2 text-[11px] font-mono">
                 <p className="text-yellow-400">토큰 단가 10단계 — 낮은 단가 = 높은 레벨</p>
                 <div className="space-y-0.5">
