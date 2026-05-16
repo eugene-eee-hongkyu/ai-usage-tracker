@@ -3,7 +3,6 @@
 import { useState } from "react";
 import {
   POWER_FREQUENCY_TARGET_DAYS,
-  POWER_HARDWORKER_THRESHOLD_DAYS,
   targetWorkdaysForPeriod,
   hardworkerThresholdForPeriod,
   computeUnitCostLevel,
