@@ -4,6 +4,11 @@ var __require = /* @__PURE__ */ createRequire(import.meta.url);
 // src/sync.ts
 import { spawn } from "child_process";
 
+// src/destinations.ts
+import { readFileSync as readFileSync2 } from "fs";
+import { join as join2 } from "path";
+import { homedir as homedir2 } from "os";
+
 // src/init.ts
 import * as fs from "fs";
 import * as os from "os";
@@ -41,10 +46,41 @@ async function loadApiKey() {
   return null;
 }
 
+// src/destinations.ts
+function readConfigFile() {
+  const path2 = process.env.USAGE_TRACKER_CONFIG ?? join2(homedir2(), ".usage-tracker", "config.json");
+  try {
+    const raw = readFileSync2(path2, "utf8");
+    const parsed = JSON.parse(raw);
+    if (parsed.destinations && Array.isArray(parsed.destinations) && parsed.destinations.length > 0) {
+      return parsed;
+    }
+  } catch {}
+  return null;
+}
+async function loadDestinations() {
+  const cfg = readConfigFile();
+  if (cfg?.destinations?.length) {
+    return cfg.destinations.map((d) => ({
+      name: d.name,
+      url: d.url.replace(/\/$/, ""),
+      apiKey: d.apiKey ?? null
+    }));
+  }
+  const localMode = process.env.USAGE_TRACKER_MODE === "local";
+  const localPort = process.env.LOCAL_PORT ?? "3000";
+  const url = process.env.USAGE_TRACKER_URL ?? (localMode ? `http://localhost:${localPort}` : "https://aiusage.z21labs.world");
+  const apiKey = localMode ? null : process.env.USAGE_TRACKER_API_KEY ?? await loadApiKey();
+  return [
+    {
+      name: localMode ? "local" : "default",
+      url: url.replace(/\/$/, ""),
+      apiKey
+    }
+  ];
+}
+
 // src/sync.ts
-var LOCAL_MODE = process.env.USAGE_TRACKER_MODE === "local";
-var LOCAL_PORT = process.env.LOCAL_PORT ?? "3000";
-var SERVER_URL2 = process.env.USAGE_TRACKER_URL ?? (LOCAL_MODE ? `http://localhost:${LOCAL_PORT}` : "https://aiusage.z21labs.world");
 var PERIODS = ["today", "week", "month", "30days", "all"];
 var SYSTEM_TZ = Intl.DateTimeFormat().resolvedOptions().timeZone;
 var childEnv = { ...process.env, TZ: SYSTEM_TZ, CODEBURN_TZ: SYSTEM_TZ };
@@ -123,42 +159,63 @@ function spawnCcusageBlocks() {
     }, 600000);
   });
 }
+async function postTo(dest, payload) {
+  try {
+    const headers = { "Content-Type": "application/json" };
+    if (dest.apiKey)
+      headers["x-api-key"] = dest.apiKey;
+    const resp = await fetch(`${dest.url}/api/ingest`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify(payload)
+    });
+    return { ok: resp.ok, status: resp.status };
+  } catch (err) {
+    return { ok: false, error: err.message };
+  }
+}
 async function runSync(_days) {
-  const apiKey = LOCAL_MODE ? "" : process.env.USAGE_TRACKER_API_KEY ?? await loadApiKey();
-  if (!LOCAL_MODE && !apiKey) {
-    console.error("API 키가 없습니다. 먼저 init을 실행하세요.");
+  const destinations = await loadDestinations();
+  const orphan = destinations.find((d) => !d.apiKey && !d.url.includes("localhost") && !d.url.includes("127.0.0.1"));
+  if (orphan) {
+    console.error(`API 키가 없습니다 (destination=${orphan.name}). config.json 의 apiKey 또는 init 실행.`);
     process.exit(1);
   }
-  console.log(`codeburn + ccusage 데이터 수집 중... (${LOCAL_MODE ? "로컬" : "서버"} 모드 → ${SERVER_URL2})`);
+  const summary = destinations.map((d) => d.name).join(", ");
+  console.log(`codeburn + ccusage 데이터 수집 중... (destinations: ${summary})`);
+  let report;
   try {
     const [results, ccusageDaily, ccusageBlocks] = await Promise.all([
       Promise.all(PERIODS.map((p) => spawnCodeburn(p))),
       spawnCcusageDaily(),
       spawnCcusageBlocks()
     ]);
-    const report = Object.fromEntries(PERIODS.map((p, i) => [p, results[i]]));
+    report = Object.fromEntries(PERIODS.map((p, i) => [p, results[i]]));
     if (ccusageDaily)
       report.ccusageDaily = ccusageDaily;
     if (ccusageBlocks)
       report.ccusageBlocks = ccusageBlocks;
-    const headers = { "Content-Type": "application/json" };
-    if (!LOCAL_MODE)
-      headers["x-api-key"] = apiKey;
-    const resp = await fetch(`${SERVER_URL2}/api/ingest`, {
-      method: "POST",
-      headers,
-      body: JSON.stringify(report)
-    });
-    if (resp.ok) {
-      console.log("✅ 데이터 전송 완료");
-    } else {
-      console.error(`❌ 전송 실패: ${resp.status}`);
-      process.exit(1);
-    }
   } catch (err) {
     console.error("codeburn 실행 실패:", err.message);
     process.exit(1);
   }
+  const outcomes = await Promise.allSettled(destinations.map((d) => postTo(d, report)));
+  let successCount = 0;
+  outcomes.forEach((r, i) => {
+    const d = destinations[i];
+    if (r.status === "fulfilled" && r.value.ok) {
+      console.log(`  ✅ ${d.name} (${d.url})`);
+      successCount++;
+    } else {
+      const msg = r.status === "fulfilled" ? `HTTP ${r.value.status ?? "?"}${r.value.error ? " — " + r.value.error : ""}` : r.reason?.message ?? "unknown";
+      console.error(`  ❌ ${d.name} (${d.url}) — ${msg}`);
+    }
+  });
+  if (successCount === 0) {
+    console.error("❌ 모든 destination 실패");
+    process.exit(1);
+  }
+  console.log(`✅ ${successCount}/${destinations.length} destination 전송 완료`);
 }
 var isMain = typeof process !== "undefined" && process.argv[1] && (process.argv[1].endsWith("sync.mjs") || process.argv[1].endsWith("sync.js"));
 if (isMain) {

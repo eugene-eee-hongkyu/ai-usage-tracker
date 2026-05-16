@@ -1,14 +1,5 @@
 import { spawn } from "child_process";
-import { loadApiKey } from "./init.js";
-
-// 로컬 단독 모드 (.pkg/.msi 인스톨러) — Next.js 가 SQLite 모드로 localhost 에 떠 있다고 가정.
-// API key 인증 우회 (서버 측 IS_LOCAL_MODE 가 ensureLocalUser 자동 생성).
-// 명시 USAGE_TRACKER_URL 이 있으면 그것 우선. LOCAL_PORT 환경변수로 포트 커스터마이즈.
-const LOCAL_MODE = process.env.USAGE_TRACKER_MODE === "local";
-const LOCAL_PORT = process.env.LOCAL_PORT ?? "3000";
-const SERVER_URL =
-  process.env.USAGE_TRACKER_URL ??
-  (LOCAL_MODE ? `http://localhost:${LOCAL_PORT}` : "https://aiusage.z21labs.world");
+import { loadDestinations, type Destination } from "./destinations.js";
 
 const PERIODS = ["today", "week", "month", "30days", "all"] as const;
 
@@ -76,44 +67,76 @@ function spawnCcusageBlocks(): Promise<unknown> {
   });
 }
 
+interface PostOutcome { ok: boolean; status?: number; error?: string; }
+
+async function postTo(dest: Destination, payload: object): Promise<PostOutcome> {
+  try {
+    const headers: Record<string, string> = { "Content-Type": "application/json" };
+    if (dest.apiKey) headers["x-api-key"] = dest.apiKey;
+    const resp = await fetch(`${dest.url}/api/ingest`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify(payload),
+    });
+    return { ok: resp.ok, status: resp.status };
+  } catch (err) {
+    return { ok: false, error: (err as Error).message };
+  }
+}
+
 export async function runSync(_days?: number) {
-  // 로컬 모드면 API key 불필요 — 서버 (localhost Next.js, SQLite) 가 자동 단일 사용자 보장.
-  const apiKey = LOCAL_MODE ? "" : (process.env.USAGE_TRACKER_API_KEY ?? await loadApiKey());
-  if (!LOCAL_MODE && !apiKey) {
-    console.error("API 키가 없습니다. 먼저 init을 실행하세요.");
+  const destinations = await loadDestinations();
+
+  // 외부 (localhost 아님) destination 인데 API 키 없으면 의미가 없으니 사전 차단.
+  const orphan = destinations.find(
+    (d) => !d.apiKey && !d.url.includes("localhost") && !d.url.includes("127.0.0.1")
+  );
+  if (orphan) {
+    console.error(`API 키가 없습니다 (destination=${orphan.name}). config.json 의 apiKey 또는 init 실행.`);
     process.exit(1);
   }
 
-  console.log(`codeburn + ccusage 데이터 수집 중... (${LOCAL_MODE ? "로컬" : "서버"} 모드 → ${SERVER_URL})`);
+  const summary = destinations.map((d) => d.name).join(", ");
+  console.log(`codeburn + ccusage 데이터 수집 중... (destinations: ${summary})`);
 
+  let report: Record<string, unknown>;
   try {
     const [results, ccusageDaily, ccusageBlocks] = await Promise.all([
-      Promise.all(PERIODS.map(p => spawnCodeburn(p))),
+      Promise.all(PERIODS.map((p) => spawnCodeburn(p))),
       spawnCcusageDaily(),
       spawnCcusageBlocks(),
     ]);
-    const report: Record<string, unknown> = Object.fromEntries(PERIODS.map((p, i) => [p, results[i]]));
+    report = Object.fromEntries(PERIODS.map((p, i) => [p, results[i]]));
     if (ccusageDaily) report.ccusageDaily = ccusageDaily;
     if (ccusageBlocks) report.ccusageBlocks = ccusageBlocks;
-
-    const headers: Record<string, string> = { "Content-Type": "application/json" };
-    if (!LOCAL_MODE) headers["x-api-key"] = apiKey;
-    const resp = await fetch(`${SERVER_URL}/api/ingest`, {
-      method: "POST",
-      headers,
-      body: JSON.stringify(report),
-    });
-
-    if (resp.ok) {
-      console.log("✅ 데이터 전송 완료");
-    } else {
-      console.error(`❌ 전송 실패: ${resp.status}`);
-      process.exit(1);
-    }
   } catch (err) {
     console.error("codeburn 실행 실패:", (err as Error).message);
     process.exit(1);
   }
+
+  // fan-out: 각 destination 독립 — 하나 실패해도 다른 destination 진행.
+  const outcomes = await Promise.allSettled(destinations.map((d) => postTo(d, report)));
+
+  let successCount = 0;
+  outcomes.forEach((r, i) => {
+    const d = destinations[i];
+    if (r.status === "fulfilled" && r.value.ok) {
+      console.log(`  ✅ ${d.name} (${d.url})`);
+      successCount++;
+    } else {
+      const msg =
+        r.status === "fulfilled"
+          ? `HTTP ${r.value.status ?? "?"}${r.value.error ? " — " + r.value.error : ""}`
+          : (r as PromiseRejectedResult).reason?.message ?? "unknown";
+      console.error(`  ❌ ${d.name} (${d.url}) — ${msg}`);
+    }
+  });
+
+  if (successCount === 0) {
+    console.error("❌ 모든 destination 실패");
+    process.exit(1);
+  }
+  console.log(`✅ ${successCount}/${destinations.length} destination 전송 완료`);
 }
 
 const isMain = typeof process !== "undefined" &&

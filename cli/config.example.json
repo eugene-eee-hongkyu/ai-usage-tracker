@@ -1,0 +1,15 @@
+{
+  "_comment": "위치: ~/.usage-tracker/config.json (USAGE_TRACKER_CONFIG 로 override 가능). 이 파일이 있으면 destinations 가 우선, 없으면 USAGE_TRACKER_MODE/URL/API_KEY 환경변수가 fallback.",
+
+  "destinations": [
+    {
+      "name": "local",
+      "url": "http://localhost:3000"
+    },
+    {
+      "name": "company",
+      "url": "https://aiusage.z21labs.world",
+      "apiKey": "REPLACE_WITH_API_KEY"
+    }
+  ]
+}
