@@ -997,7 +997,7 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
       {/* Usage Hero — Power Index (활용 지수) + Plan 활용률 동등 크기 2-card.
           인터뷰 4/4 일치: "사용량/cost 만 본다, 효율 점수는 약하다".
           최상단 hero — F-pattern top-left + Dashboard UX best practice. */}
-      {!viewOnly && data.powerIndex && (
+      {data.powerIndex && (
         <UsageHero
           powerIndex={data.powerIndex.score}
           activeDays={data.powerIndex.activeDays}
@@ -1011,6 +1011,7 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
           realUsagePct={data.planHealth?.realUsagePct ?? null}
           nonCacheTotalWindowTokens={data.planHealth?.nonCacheTotalWindowTokens ?? null}
           cacheHitPctForPeriod={data.planHealth?.cacheHitPctForPeriod ?? null}
+          viewOnly={viewOnly}
         />
       )}
 

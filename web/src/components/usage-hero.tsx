@@ -27,6 +27,8 @@ interface UsageHeroProps {
   realUsagePct: number | null;
   nonCacheTotalWindowTokens: number | null;
   cacheHitPctForPeriod: number | null;
+  // viewOnly = 어드민이 멤버 dashboard 봄. tier select / hint 숨기고 read-only 라벨만.
+  viewOnly?: boolean;
 }
 
 const TIER_OPTIONS: Array<{ value: string; label: string }> = [
@@ -119,6 +121,7 @@ export function UsageHero({
   realUsagePct,
   nonCacheTotalWindowTokens,
   cacheHitPctForPeriod,
+  viewOnly = false,
 }: UsageHeroProps) {
   const power = powerGrade(powerIndex);
   const hardworkerThreshold = hardworkerThresholdForPeriod(periodDays);
@@ -263,18 +266,25 @@ export function UsageHero({
                 <span className="text-[10px] font-mono text-neutral-600">{periodLabel} 요금 / {periodLabel} 토큰</span>
               </div>
               <div className="flex items-center gap-1.5">
-                <select
-                  data-testid="plan-tier-select"
-                  value={tierValue}
-                  onChange={(e) => onChangeTier(e.target.value)}
-                  disabled={saving}
-                  className="bg-neutral-800 border border-neutral-700 text-neutral-200 text-[11px] font-mono rounded px-1.5 py-0.5 focus:outline-none focus:border-yellow-500"
-                  title="본인 plan tier"
-                >
-                  {TIER_OPTIONS.map((o) => (
-                    <option key={o.value} value={o.value}>{o.label}</option>
-                  ))}
-                </select>
+                {viewOnly ? (
+                  // 어드민이 멤버 dashboard 봄 — read-only 라벨로 표시.
+                  <span data-testid="plan-tier-readonly" className="bg-neutral-800 border border-neutral-700 text-neutral-300 text-[11px] font-mono rounded px-1.5 py-0.5">
+                    {declaredTierLabel ? `${declaredTierLabel}` : "tier 미입력"}
+                  </span>
+                ) : (
+                  <select
+                    data-testid="plan-tier-select"
+                    value={tierValue}
+                    onChange={(e) => onChangeTier(e.target.value)}
+                    disabled={saving}
+                    className="bg-neutral-800 border border-neutral-700 text-neutral-200 text-[11px] font-mono rounded px-1.5 py-0.5 focus:outline-none focus:border-yellow-500"
+                    title="본인 plan tier"
+                  >
+                    {TIER_OPTIONS.map((o) => (
+                      <option key={o.value} value={o.value}>{o.label}</option>
+                    ))}
+                  </select>
+                )}
                 <button
                   type="button"
                   data-testid="usage-hero-unit-info"
@@ -287,31 +297,33 @@ export function UsageHero({
               </div>
             </div>
 
-            {/* tier 확인 hint — select 바로 아래 토글. 발견성·공간 모두 OK. */}
-            <div className="-mt-1 mb-2 text-[10px] font-mono">
-              <button
-                type="button"
-                data-testid="usage-hero-tier-hint"
-                onClick={() => setTierHintOpen((v) => !v)}
-                className="text-neutral-500 hover:text-yellow-300 transition-colors"
-              >
-                {tierHintOpen ? "▲ 내 tier 확인하기" : "▾ 내 tier 확인하기"}
-              </button>
-              {tierHintOpen && (
-                <div data-testid="usage-hero-tier-hint-body" className="mt-1.5 pl-3 border-l-2 border-l-neutral-800 space-y-0.5 text-neutral-400 leading-relaxed">
-                  <p>1. <span className="text-neutral-200">claude.ai</span> 접속 → 우측 상단 프로필 → <span className="text-neutral-200">Subscription</span></p>
-                  <p>2. 또는 Claude Code 터미널에서 <span className="text-neutral-200">claude</span> 실행 → <span className="text-neutral-200">/usage</span> 입력</p>
-                  <p>3. 표시된 plan 그대로 위 select 에서 선택</p>
-                </div>
-              )}
-            </div>
+            {/* tier 확인 hint — select 바로 아래 토글. viewOnly 면 숨김. */}
+            {!viewOnly && (
+              <div className="-mt-1 mb-2 text-[10px] font-mono">
+                <button
+                  type="button"
+                  data-testid="usage-hero-tier-hint"
+                  onClick={() => setTierHintOpen((v) => !v)}
+                  className="text-neutral-500 hover:text-yellow-300 transition-colors"
+                >
+                  {tierHintOpen ? "▲ 내 tier 확인하기" : "▾ 내 tier 확인하기"}
+                </button>
+                {tierHintOpen && (
+                  <div data-testid="usage-hero-tier-hint-body" className="mt-1.5 pl-3 border-l-2 border-l-neutral-800 space-y-0.5 text-neutral-400 leading-relaxed">
+                    <p>1. <span className="text-neutral-200">claude.ai</span> 접속 → 우측 상단 프로필 → <span className="text-neutral-200">Subscription</span></p>
+                    <p>2. 또는 Claude Code 터미널에서 <span className="text-neutral-200">claude</span> 실행 → <span className="text-neutral-200">/usage</span> 입력</p>
+                    <p>3. 표시된 plan 그대로 위 select 에서 선택</p>
+                  </div>
+                )}
+              </div>
+            )}
 
             {!canShowUnitCost ? (
               <div className="space-y-1">
                 <span className="text-2xl font-bold text-neutral-500 font-mono">—</span>
                 <p className="text-xs font-mono text-neutral-500">
                   {priceForPeriod === null
-                    ? "Plan tier 를 위에서 선택하세요"
+                    ? (viewOnly ? "멤버가 plan tier 입력 안 함" : "Plan tier 를 위에서 선택하세요")
                     : priceForPeriod === 0
                       ? "API 종량제 — 단가 계산 N/A"
                       : `${periodLabel} 토큰 데이터 부족`}
