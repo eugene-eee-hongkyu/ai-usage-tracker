@@ -229,6 +229,8 @@ export async function GET(req: NextRequest) {
           callsCount: 0,
           outputInputRatio: 0,
           prevCostPerSession: null,
+          avgDailyTokens: 0,
+          memberActiveDays: 0,
           ccusageMissing,
           monthVisits,
           avgDwellSec,
@@ -366,6 +368,7 @@ export async function GET(req: NextRequest) {
         prevCostPerSession,
         totalTokens,
         avgDailyTokens,
+        memberActiveDays,   // ov 기반 활성일 (fallback 용)
         ccusageMissing,
         monthVisits,
         avgDwellSec,
@@ -419,7 +422,10 @@ export async function GET(req: NextRequest) {
     planBlocksByUser.set(r.userId, arr);
   }
   const memberHealthList: Array<{ userId: number; name: string; health: ReturnType<typeof analyzePlanHealth> }> = [];
-  // 팀 합산 활용지수 + 토큰 단가 — period 비례 정규화.
+  // memberStats lookup — today/8days fallback 에 ov 기반 totalTokens 사용.
+  const memberStatsById = new Map(memberStats.map((m) => [m.userId, m]));
+
+  // 팀 합산 활용지수 + 토큰 단가 — period 비례 정규화 + today fallback.
   //   teamPowerIndex = 멤버 power score 평균 (활성 멤버만)
   //   teamUnitCost = sum(priceForPeriod) / sum(totalWindowTokens) × 1M
   let teamPowerSum = 0;
@@ -440,26 +446,37 @@ export async function GET(req: NextRequest) {
     });
     memberHealthList.push({ userId: u.id, name: u.name, health });
 
-    // 활용지수 — 멤버별 계산 후 평균 (활성 멤버만, blockCount > 0).
-    if (blocks.length > 0) {
-      const memActiveDates = new Set(
-        blocks.map((b) => b.startedAt.toISOString().slice(0, 10))
-      );
-      const memActiveDays = memActiveDates.size;
-      const memTotalTokens = blocks.reduce((s, b) => s + b.totalTokens, 0);
-      const memAvgDailyTokens = memActiveDays > 0 ? memTotalTokens / memActiveDays : 0;
-      const memScore = computePowerIndex(memActiveDays, memAvgDailyTokens, periodDays);
+    // user_blocks 기반 1차 집계
+    const memActiveDates = new Set(blocks.map((b) => b.startedAt.toISOString().slice(0, 10)));
+    const blockActiveDays = memActiveDates.size;
+    const blockTotalTokens = blocks.reduce((s, b) => s + b.totalTokens, 0);
+
+    // today/8days fallback — user_blocks 가 5h 종료 후 저장이라 진행 중 블록은
+    // 미포함. overview 가 명백히 크면 ov 값 사용 (개인 dashboard 와 동일 패턴).
+    const member = memberStatsById.get(u.id);
+    const ovTokens = member?.totalTokens ?? 0;
+    const ovActiveDays = member?.memberActiveDays ?? 0;
+    const useOvFallback = ovTokens > blockTotalTokens * 1.5;
+    const effectiveTokens = useOvFallback ? ovTokens : blockTotalTokens;
+    const effectiveActiveDays = useOvFallback
+      ? Math.max(blockActiveDays, ovActiveDays)
+      : blockActiveDays;
+
+    // 활용지수 — 활성 멤버만 (effectiveActiveDays > 0).
+    if (effectiveActiveDays > 0 && effectiveTokens > 0) {
+      const memAvgDailyTokens = effectiveTokens / effectiveActiveDays;
+      const memScore = computePowerIndex(effectiveActiveDays, memAvgDailyTokens, periodDays);
       teamPowerSum += memScore;
       teamPowerCount += 1;
-      teamActiveDaysSum += memActiveDays;
+      teamActiveDaysSum += effectiveActiveDays;
       teamAvgDailyTokensSum += memAvgDailyTokens;
     }
 
     // 토큰 단가 — 팀 합산 price / 합산 tokens. tier 입력 멤버만.
     const monthlyPrice = health.declaredLimits?.monthlyPriceUsd ?? null;
-    if (monthlyPrice !== null && monthlyPrice > 0) {
+    if (monthlyPrice !== null && monthlyPrice > 0 && effectiveTokens > 0) {
       teamPriceForPeriodSum += (monthlyPrice * periodDays) / 30;
-      teamTokensSum += health.totalWindowTokens;
+      teamTokensSum += effectiveTokens;
     }
   }
   const teamPlanHealth = summarizeTeamPlans(memberHealthList);

@@ -1,7 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { computeUnitCostLevel } from "@/lib/rules";
+import {
+  computeUnitCostLevel,
+  computeTokenLevel,
+  targetWorkdaysForPeriod,
+  POWER_FREQUENCY_TARGET_DAYS,
+} from "@/lib/rules";
 
 // 팀 합산 활용지수 + 토큰 단가 — 개인 UsageHero 의 팀 버전.
 // 활용지수 = 활성 멤버 평균 power score.
@@ -53,6 +58,20 @@ function unitCostGradeFromLevel(level: number): { label: string; color: string }
   if (level >= 3) return { label: "낮음", color: "text-orange-400" };
   return { label: "미활용", color: "text-rose-400" };
 }
+
+const TOKEN_LEVEL_ROWS: Array<{ level: number; range: string; anchor?: string }> = [
+  { level: 0,  range: "활동 없음" },
+  { level: 1,  range: "≤ 1M / 일" },
+  { level: 2,  range: "≤ 3M / 일" },
+  { level: 3,  range: "≤ 8M / 일", anchor: "Anthropic 평균" },
+  { level: 4,  range: "≤ 15M / 일", anchor: "Anthropic P90 (개인)" },
+  { level: 5,  range: "≤ 25M / 일" },
+  { level: 6,  range: "≤ 40M / 일", anchor: "Enterprise P90" },
+  { level: 7,  range: "≤ 80M / 일" },
+  { level: 8,  range: "≤ 150M / 일" },
+  { level: 9,  range: "≤ 300M / 일" },
+  { level: 10, range: "> 300M / 일" },
+];
 
 // Sonnet 4.6 input $3/1M anchor. "API 직접 호출이면 plan 의 N배" 의미.
 const UNIT_COST_LEVEL_ROWS: Array<{ level: number; range: string; anchor?: string }> = [
@@ -118,6 +137,56 @@ export function TeamUsageHero({
           <p>활성 <span className="text-neutral-300">{activeMembers}명</span> · 멤버 평균 활성 <span className="text-neutral-300">{avgActiveDays.toFixed(1)}/{periodDays}일</span></p>
           <p>일평균 <span className="text-neutral-300">{fmtTokens(Math.round(avgDailyTokens))}</span> tokens (멤버 평균)</p>
         </div>
+
+        {breakdownOpen && (() => {
+          const targetWorkdays = targetWorkdaysForPeriod(periodDays);
+          const teamTokenLevel = computeTokenLevel(avgDailyTokens);
+          return (
+            <div data-testid="team-usage-hero-power-breakdown" className="mt-3 pt-3 border-t border-neutral-800 space-y-3 text-[11px] font-mono">
+              <div>
+                <p className="text-cyan-400 mb-1">활성일 (40점) — 멤버별 계산 후 평균</p>
+                <p className="text-neutral-400 leading-relaxed">
+                  <span className="text-neutral-200">멤버 활성일 ÷ {targetWorkdays.toFixed(targetWorkdays >= 10 ? 0 : 1)}일 × 40</span>
+                  <span className="text-neutral-600"> ({periodLabel} 비례 — 30일 anchor {POWER_FREQUENCY_TARGET_DAYS}일)</span>
+                </p>
+                <div className="mt-1.5 pl-3 -ml-1.5 border-l-2 border-l-cyan-500 bg-cyan-900/20 py-0.5">
+                  <span className="text-cyan-300 font-bold">
+                    팀 평균: {avgActiveDays.toFixed(1)}/{periodDays}일 ({activeMembers}명)
+                  </span>
+                </div>
+              </div>
+              <div>
+                <p className="text-cyan-400 mb-1">사용량 (60점) — 멤버 평균 일평균 토큰 기준</p>
+                <div className="space-y-0.5">
+                  {TOKEN_LEVEL_ROWS.map((r) => {
+                    const isCurrent = r.level === teamTokenLevel;
+                    return (
+                      <div
+                        key={r.level}
+                        className={`flex items-center gap-2 ${isCurrent ? "bg-cyan-900/30 border-l-2 border-l-cyan-500 pl-1.5 -ml-1.5" : "text-neutral-400"}`}
+                      >
+                        <span className={`w-10 ${isCurrent ? "text-cyan-300 font-bold" : "text-neutral-500"}`}>
+                          {r.level * 6}점
+                        </span>
+                        <span className={`w-28 ${isCurrent ? "text-cyan-200 font-bold" : "text-neutral-200"}`}>
+                          {r.range}
+                        </span>
+                        {r.anchor && (
+                          <span className={`text-[10px] ${isCurrent ? "text-cyan-400" : "text-neutral-600"}`}>
+                            {r.anchor}
+                          </span>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+                <p className="text-neutral-600 mt-1">
+                  팀 활용지수 = 활성 멤버 score 평균. 위 표는 멤버 평균 일평균 토큰 기준 위치.
+                </p>
+              </div>
+            </div>
+          );
+        })()}
       </div>
 
       {/* 토큰 단가 */}
