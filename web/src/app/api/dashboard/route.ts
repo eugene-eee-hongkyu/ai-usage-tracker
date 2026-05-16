@@ -4,7 +4,7 @@ import { authOptions } from "@/lib/auth";
 import { db, userSnapshots, users, periodSnapshots, dailyVisits, userBlocks } from "@/lib/db";
 import { and, asc, desc, eq, gte, lt } from "drizzle-orm";
 import { isAdmin } from "@/lib/admin";
-import { computeDailyEfficiencyScore } from "@/lib/rules";
+import { computeDailyEfficiencyScore, computePowerIndex } from "@/lib/rules";
 import { analyzePlanHealth, type PlanTier } from "@/lib/plan-health";
 
 type Period = "today" | "month" | "8days" | "30days" | "all";
@@ -749,6 +749,19 @@ export async function GET(req: NextRequest) {
     windowDays: 30,
   });
 
+  // Power Index — 30일 anchor (period 무관). Plan Health 와 같은 윈도우.
+  // 활성일 + 일평균 token 으로 계산. avgDailyTokens 는 30일 윈도우 기준 재계산.
+  const power30dWindowStart = planBlocksWindowStart;
+  const power30dActiveDates = new Set(
+    planBlockRows
+      .filter((b) => b.startedAt >= power30dWindowStart)
+      .map((b) => b.startedAt.toISOString().slice(0, 10))
+  );
+  const power30dActiveDays = power30dActiveDates.size;
+  const power30dTotalTokens = planBlockRows.reduce((s, b) => s + Number(b.totalTokens ?? 0), 0);
+  const power30dAvgDailyTokens = power30dActiveDays > 0 ? power30dTotalTokens / power30dActiveDays : 0;
+  const powerIndexValue = computePowerIndex(power30dActiveDays, power30dAvgDailyTokens);
+
   return NextResponse.json({
     user: { name: user[0].name, lastSyncedAt: user[0].lastSyncedAt, timezone: user[0].timezone ?? null, planTier: user[0].planTier ?? null },
     overview: {
@@ -767,6 +780,12 @@ export async function GET(req: NextRequest) {
       periodScore,
     },
     planHealth,
+    powerIndex: {
+      score: powerIndexValue,
+      activeDays: power30dActiveDays,
+      avgDailyTokens: Math.round(power30dAvgDailyTokens),
+      windowDays: 30,
+    },
     daily,
     dailyTokens,
     heatmapDaily,

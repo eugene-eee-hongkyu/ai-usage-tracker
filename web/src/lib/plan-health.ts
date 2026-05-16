@@ -93,6 +93,13 @@ export interface PlanHealthResult {
   // 행동 변경 vs plan 변경 분기 메시지
   actionFirst: boolean;           // true 이면 plan 업 전에 행동 변경 권장
   reasoning: string[];            // 사람용 근거 한 줄들
+
+  // Plan 활용률 (월간) — 진우님 "월 요금제 뽕뽑기" 응답.
+  //   = total tokens in window / (5h limit × activeDays)
+  // hero "Plan 활용률" 카드 + Plan Health 카드 둘 다에서 사용.
+  // declaredTier 없으면 null. API tier 도 null (한도 X).
+  activationPct: number | null;
+  totalWindowTokens: number;      // 윈도우 안 5h 블록 token 합
 }
 
 // 최근 N일 블록만 필터. days >= 1 가정.
@@ -127,6 +134,17 @@ export function analyzePlanHealth(input: PlanHealthInput): PlanHealthResult {
   const declaredTier = input.declaredTier;
   const declaredLimits = declaredTier ? PLAN_LIMITS[declaredTier] : null;
 
+  // 윈도우 안 총 토큰 (활용률 계산 + hero card 표시용)
+  const totalWindowTokens = tokens.reduce((s, t) => s + t, 0);
+
+  // Plan 활용률 = 실제 사용 / (한도 × 활성일).
+  // 활성일 0 또는 한도 0(api) 또는 declaredTier 없으면 null.
+  let activationPct: number | null = null;
+  if (declaredLimits && declaredLimits.estimated5hTokenLimit > 0 && activeDays > 0) {
+    const possibleTokens = declaredLimits.estimated5hTokenLimit * activeDays;
+    activationPct = Math.round((totalWindowTokens / possibleTokens) * 100);
+  }
+
   // 데이터 부족 처리 — 활성일 7일 미만이면 unknown verdict
   const dataInsufficient = activeDays < 7;
 
@@ -154,6 +172,8 @@ export function analyzePlanHealth(input: PlanHealthInput): PlanHealthResult {
       recommendedSavingsUsd: 0,
       actionFirst: false,
       reasoning,
+      activationPct: null,
+      totalWindowTokens,
     };
   }
 
@@ -175,6 +195,8 @@ export function analyzePlanHealth(input: PlanHealthInput): PlanHealthResult {
       recommendedSavingsUsd: 0,
       actionFirst: false,
       reasoning,
+      activationPct: null,
+      totalWindowTokens,
     };
   }
 
@@ -255,6 +277,8 @@ export function analyzePlanHealth(input: PlanHealthInput): PlanHealthResult {
     recommendedSavingsUsd,
     actionFirst,
     reasoning,
+    activationPct,
+    totalWindowTokens,
   };
 }
 

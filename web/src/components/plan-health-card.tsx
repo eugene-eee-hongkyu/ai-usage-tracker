@@ -22,6 +22,8 @@ export interface PlanHealthResult {
   recommendedSavingsUsd: number;
   actionFirst: boolean;
   reasoning: string[];
+  activationPct: number | null;
+  totalWindowTokens: number;
 }
 
 const TIER_OPTIONS: Array<{ value: string; label: string }> = [

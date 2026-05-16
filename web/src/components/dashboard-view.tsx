@@ -12,6 +12,8 @@ import { ScoreGauge, scoreLabel } from "@/components/score-gauge";
 import dynamic from "next/dynamic";
 import type { DrilldownPeriod } from "@/components/score-drilldown";
 import { PlanHealthCard } from "@/components/plan-health-card";
+import { UsageHero } from "@/components/usage-hero";
+import { PrivacyBanner } from "@/components/privacy-banner";
 
 const ScoreDrilldown = dynamic(
   () => import("@/components/score-drilldown").then((m) => m.ScoreDrilldown),
@@ -87,9 +89,17 @@ interface SnapshotInfo {
   dataRangeEnd: string | null;
 }
 
+interface PowerIndexSummary {
+  score: number;
+  activeDays: number;
+  avgDailyTokens: number;
+  windowDays: number;
+}
+
 interface DashboardData {
   user: { name: string; lastSyncedAt: string | null; timezone: string | null; planTier: string | null };
   planHealth?: import("@/components/plan-health-card").PlanHealthResult;
+  powerIndex?: PowerIndexSummary;
   overview: Overview | null;
   daily: DailyRow[];
   dailyTokens?: DailyTokenRow[];
@@ -981,8 +991,27 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
         </div>
       </div>
 
-      {/* Plan Health — 본인 view 만 표시. 사용자 인터뷰 답변 ("내가 적절 plan 구독
-          중인지 가늠 좋다") 기반으로 효율 점수보다 prominent 한 위치로 승격. */}
+      {/* Privacy banner — dismiss 가능. 진우님 "프롬프트 저장 여부 궁금" 응답 반영.
+          본인 view 만. viewOnly 면 어드민 컨텍스트라 별도 banner 불필요. */}
+      {!viewOnly && <PrivacyBanner />}
+
+      {/* Usage Hero — Power Index (활용 지수) + Plan 활용률 동등 크기 2-card.
+          인터뷰 4/4 일치: "사용량/cost 만 본다, 효율 점수는 약하다".
+          최상단 hero — F-pattern top-left + Dashboard UX best practice. */}
+      {!viewOnly && data.powerIndex && (
+        <UsageHero
+          powerIndex={data.powerIndex.score}
+          activeDays={data.powerIndex.activeDays}
+          avgDailyTokens={data.powerIndex.avgDailyTokens}
+          activationPct={data.planHealth?.activationPct ?? null}
+          declaredTierLabel={data.planHealth?.declaredLimits?.label ?? null}
+          planLimitTokens={data.planHealth?.declaredLimits?.estimated5hTokenLimit ?? null}
+          totalWindowTokens={data.planHealth?.totalWindowTokens ?? 0}
+        />
+      )}
+
+      {/* Plan Health 카드 — tier select + verdict + 분석 근거.
+          본인 view 만. viewOnly (어드민이 멤버 봄) 면 hide (팀 페이지에서 종합). */}
       {!viewOnly && data.planHealth && (
         <div className="bg-neutral-950 border-b border-neutral-800">
           <div className="max-w-6xl mx-auto px-4 py-3">

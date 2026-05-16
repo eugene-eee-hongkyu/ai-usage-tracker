@@ -64,6 +64,27 @@ export function computeDailyEfficiencyScore(
   return Math.round(cacheNorm * 42 + oneShotNorm * 18 + costNorm * 10 + tokenNorm * 30);
 }
 
+// Power Index — 사용자가 얼마나 파워풀하게 쓰는가. 객관 측정.
+// product analytics 표준 (Frequency + Depth) 기반. Breadth 차원은 Claude Code
+// 특성상 변별력 낮아 제외 (4명 인터뷰에서도 도구 다양성 언급 X).
+// 항상 30일 anchor — Plan Health 와 같은 윈도우. 장기 패턴 지표 성격이라
+// period 따라 흔들리지 않게 고정.
+//
+// 가중치: 활성일 40 + token level 60 = 100
+//   Frequency (40점) = activeDays / 30 × 40
+//   Depth     (60점) = computeTokenLevel(avgDailyTokens) × 6
+//
+// 사용자 1번 답 ("그냥 사용량으로 점수 주면 되지 캐시·원샷 빼고") 반영.
+// 인터뷰 4/4 일치: "사용량/cost 만 본다, 효율 점수는 약하다".
+export function computePowerIndex(
+  activeDays: number,      // 최근 30일 중 활성일 수 (0~30)
+  avgDailyTokens: number,  // 활성일 평균 일 token (cache reads 포함)
+): number {
+  const frequency = Math.min(1, activeDays / 30) * 40;
+  const depth = computeTokenLevel(avgDailyTokens) * 6;
+  return Math.round(frequency + depth);
+}
+
 export function generateMvpBlurb(
   name: string,
   project: string,
