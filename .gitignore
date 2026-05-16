@@ -25,6 +25,11 @@ cli/tsconfig.tsbuildinfo
 # ── Drizzle 마이그레이션 생성물 ───────────────────
 web/drizzle/             # drizzle-kit generate 결과 (재생성 가능)
 
+# ── 로컬 단독 모드 SQLite 데이터 ──────────────────
+web/*.sqlite3
+web/*.sqlite3-shm
+web/*.sqlite3-wal
+
 # ── CLI 빌드 결과 ─────────────────────────────────
 # cli/bin/ 은 커밋 대상 (npx 실행용 번들)
 

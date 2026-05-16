@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import { db, userSnapshots, users } from "@/lib/db";
+import { db, userSnapshots, users, IS_LOCAL_MODE } from "@/lib/db";
+import { getAuthedEmail } from "@/lib/local-user";
 import { eq } from "drizzle-orm";
 import { isAdmin } from "@/lib/admin";
 
@@ -39,8 +40,9 @@ export async function GET(
   _req: NextRequest,
   { params }: { params: { userId: string } }
 ) {
-  const session = await getServerSession(authOptions);
-  if (!session?.user?.email)
+  const session = IS_LOCAL_MODE ? null : await getServerSession(authOptions);
+  const authedEmail = await getAuthedEmail(session?.user?.email);
+  if (!authedEmail)
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
 
   const userId = parseInt(params.userId);
@@ -113,6 +115,6 @@ export async function GET(
     daily: recentDaily.map((d) => ({ date: d.date, cost: d.cost, sessions: d.sessions })),
     streak,
     projects: projects.sort((a, b) => b.cost - a.cost).slice(0, 10),
-    canViewFullDashboard: isAdmin(session.user.email!),
+    canViewFullDashboard: IS_LOCAL_MODE ? true : isAdmin(authedEmail),
   });
 }

@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import { db, userSnapshots, users, periodSnapshots, dailyVisits, userBlocks } from "@/lib/db";
+import { db, userSnapshots, users, periodSnapshots, dailyVisits, userBlocks, IS_LOCAL_MODE } from "@/lib/db";
+import { getAuthedEmail } from "@/lib/local-user";
 import { and, asc, desc, eq, gte, lt } from "drizzle-orm";
 import { isAdmin } from "@/lib/admin";
 import { computeDailyEfficiencyScore, computePowerIndex } from "@/lib/rules";
@@ -105,8 +106,10 @@ function getPeriodData(raw: unknown, period: string): RawPeriodData {
 }
 
 export async function GET(req: NextRequest) {
-  const session = await getServerSession(authOptions);
-  if (!session?.user?.email)
+  // 로컬 모드면 NextAuth session 우회, 단일 사용자 자동 보장.
+  const session = IS_LOCAL_MODE ? null : await getServerSession(authOptions);
+  const authedEmail = await getAuthedEmail(session?.user?.email);
+  if (!authedEmail)
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
 
   const period = (req.nextUrl.searchParams.get("period") ?? "8days") as Period;
@@ -115,14 +118,17 @@ export async function GET(req: NextRequest) {
   const monthOffset = parseInt(req.nextUrl.searchParams.get("monthOffset") ?? "0") || 0;
   const dayOffset = parseInt(req.nextUrl.searchParams.get("dayOffset") ?? "0") || 0;
 
-  let targetEmail = session.user.email!;
+  let targetEmail = authedEmail;
   if (requestedUserId) {
-    if (!isAdmin(session.user.email!)) {
+    // 로컬 모드는 단일 사용자라 멤버 view 가 의미 없음 — 무시하고 본인 데이터로 폴백.
+    if (!IS_LOCAL_MODE && !isAdmin(authedEmail)) {
       return NextResponse.json({ error: "forbidden" }, { status: 403 });
     }
-    const targetUser = await db.select().from(users).where(eq(users.id, parseInt(requestedUserId))).limit(1);
-    if (!targetUser[0]) return NextResponse.json({ error: "not found" }, { status: 404 });
-    targetEmail = targetUser[0].email;
+    if (!IS_LOCAL_MODE) {
+      const targetUser = await db.select().from(users).where(eq(users.id, parseInt(requestedUserId))).limit(1);
+      if (!targetUser[0]) return NextResponse.json({ error: "not found" }, { status: 404 });
+      targetEmail = targetUser[0].email;
+    }
   }
 
   const user = await db

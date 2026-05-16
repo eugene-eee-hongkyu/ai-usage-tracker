@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import { db, userSnapshots, users, dailyVisits, userBlocks } from "@/lib/db";
+import { db, userSnapshots, users, dailyVisits, userBlocks, IS_LOCAL_MODE } from "@/lib/db";
+import { getAuthedEmail } from "@/lib/local-user";
 import {
   analyzePlanHealth,
   summarizeTeamPlans,
@@ -110,8 +111,9 @@ function computePrevCostPerSession(
 }
 
 export async function GET(req: NextRequest) {
-  const session = await getServerSession(authOptions);
-  if (!session?.user?.email)
+  const session = IS_LOCAL_MODE ? null : await getServerSession(authOptions);
+  const authedEmail = await getAuthedEmail(session?.user?.email);
+  if (!authedEmail)
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
 
   const period = (req.nextUrl.searchParams.get("period") ?? "all") as Period;
@@ -832,6 +834,6 @@ export async function GET(req: NextRequest) {
         ])
       ),
     },
-    isAdminUser: isAdmin(session.user.email),
+    isAdminUser: IS_LOCAL_MODE ? false : isAdmin(authedEmail),
   });
 }
