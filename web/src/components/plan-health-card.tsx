@@ -24,11 +24,14 @@ export interface PlanHealthResult {
   reasoning: string[];
   activationPct: number | null;
   totalWindowTokens: number;
-  // 캐시 제외 토큰 사용률 — dashboard route 에서 누적 cacheHitPct 로 분해해 추가.
+  // 캐시 제외 토큰 사용률 — dashboard route 에서 period cacheHitPct 로 분해해 추가.
   nonCacheTotalWindowTokens: number | null;
   realUsagePct: number | null;   // 0~100 cap. null 이면 데이터 부족.
-  blockCount30d: number;
-  cacheHitPct30d: number | null;
+  blockCountInPeriod: number;
+  cacheHitPctForPeriod: number | null;
+  // period 비례 plan 가치 (UsageHero 단가 계산용)
+  priceForPeriod: number | null;
+  periodDays: number;
 }
 
 const TIER_OPTIONS: Array<{ value: string; label: string }> = [

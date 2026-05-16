@@ -67,27 +67,38 @@ export function computeDailyEfficiencyScore(
 // Power Index — 사용자가 얼마나 파워풀하게 쓰는가. 객관 측정.
 // product analytics 표준 (Frequency + Depth) 기반. Breadth 차원은 Claude Code
 // 특성상 변별력 낮아 제외 (4명 인터뷰에서도 도구 다양성 언급 X).
-// 항상 30일 anchor — Plan Health 와 같은 윈도우. 장기 패턴 지표 성격이라
-// period 따라 흔들리지 않게 고정.
 //
 // 가중치: 활성일 40 + token level 60 = 100
-//   Frequency (40점) = min(1, activeDays / 23) × 40
+//   Frequency (40점) = min(1, activeDays / targetWorkdays) × 40
 //   Depth     (60점) = computeTokenLevel(avgDailyTokens) × 6
 //
-// 23일 분모: 평일 ≈ 30일 × (5/7) = 21.4 + 약간의 야근/주말 작업 = 23.
-// 30일을 만점 기준으로 잡으면 주말까지 일해야 만점이 나와서 불합리.
-// 23일 이상은 모두 40점 만점 (cap) — 더 일한 사람은 별도 badge 로 표현.
+// targetWorkdays = 23 × periodDays / 30. period 비례 정규화로 8일/today/전체
+// 어느 윈도우에서도 의미 일관. 23일 분모 = 30일의 평일 (5/7) + 약간의 야근/주말.
+// 30일 만점 기준으로 잡으면 주말까지 일해야 만점이 나와서 불합리.
 //
 // 사용자 1번 답 ("그냥 사용량으로 점수 주면 되지 캐시·원샷 빼고") 반영.
 // 인터뷰 4/4 일치: "사용량/cost 만 본다, 효율 점수는 약하다".
-export const POWER_FREQUENCY_TARGET_DAYS = 23;
-export const POWER_HARDWORKER_THRESHOLD_DAYS = 27;
+export const POWER_FREQUENCY_TARGET_DAYS = 23;        // 30일 anchor 분모
+export const POWER_HARDWORKER_THRESHOLD_DAYS = 27;    // 30일 anchor 배지 임계
+
+// period 기간에 비례한 워크데이 분모 산출. periodDays 가 30일이면 23, 8일이면
+// 약 6.13 → cap 만점 만족 위해 ceil 후 max(1). period=today 면 1일 분모 0.767
+// 가 활성 1일에 1.3x → cap 만점 40.
+export function targetWorkdaysForPeriod(periodDays: number): number {
+  return Math.max(1, (POWER_FREQUENCY_TARGET_DAYS * periodDays) / 30);
+}
+
+export function hardworkerThresholdForPeriod(periodDays: number): number {
+  return Math.max(1, (POWER_HARDWORKER_THRESHOLD_DAYS * periodDays) / 30);
+}
 
 export function computePowerIndex(
-  activeDays: number,      // 최근 30일 중 활성일 수 (0~30)
+  activeDays: number,      // period 내 활성일 수
   avgDailyTokens: number,  // 활성일 평균 일 token (cache reads 포함)
+  periodDays: number,      // period 길이 (today=1, 8days=8, 30days=30 ...)
 ): number {
-  const frequency = Math.min(1, activeDays / POWER_FREQUENCY_TARGET_DAYS) * 40;
+  const targetWorkdays = targetWorkdaysForPeriod(periodDays);
+  const frequency = Math.min(1, activeDays / targetWorkdays) * 40;
   const depth = computeTokenLevel(avgDailyTokens) * 6;
   return Math.round(frequency + depth);
 }

@@ -3,7 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { db, userSnapshots, users, dailyVisits, userBlocks } from "@/lib/db";
 import { analyzePlanHealth, summarizeTeamPlans, type PlanTier } from "@/lib/plan-health";
-import { computeEfficiencyScore, computeDailyEfficiencyScore } from "@/lib/rules";
+import { computeEfficiencyScore, computeDailyEfficiencyScore, computePowerIndex } from "@/lib/rules";
 import { isAdmin } from "@/lib/admin";
 import { gte } from "drizzle-orm";
 
@@ -376,9 +376,34 @@ export async function GET(req: NextRequest) {
 
   const byEfficiency = [...memberStats].sort((a, b) => b.efficiencyScore - a.efficiencyScore);
 
-  // Team Plan Health — 멤버별 plan 적정성. 어드민만 UI 노출 (응답엔 항상 포함).
-  // 30일 윈도우 user_blocks 별도 조회 (period 와 무관).
-  const planBlocksWindowStart = new Date(Date.now() - 30 * 86_400_000);
+  // period → days 환산. all 은 retention 한계 (90일) 로 cap.
+  const periodDays = (() => {
+    const now = new Date();
+    switch (period) {
+      case "today": return 1;
+      case "8days": return 8;
+      case "month": {
+        const start = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+        return Math.max(1, Math.ceil((now.getTime() - start.getTime()) / 86_400_000));
+      }
+      case "30days": return 30;
+      case "all": return 90;
+      default: return 30;
+    }
+  })();
+
+  // Team Plan Health — 멤버별 plan 적정성. period 비례 정규화.
+  const planBlocksWindowStart = (() => {
+    const now = new Date();
+    switch (period) {
+      case "today": return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+      case "month": return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+      case "8days": return new Date(now.getTime() - 8 * 86_400_000);
+      case "30days": return new Date(now.getTime() - 30 * 86_400_000);
+      case "all": return new Date(now.getTime() - 90 * 86_400_000);
+      default: return new Date(now.getTime() - 30 * 86_400_000);
+    }
+  })();
   const planBlockRows = await db
     .select({
       userId: userBlocks.userId,
@@ -394,6 +419,15 @@ export async function GET(req: NextRequest) {
     planBlocksByUser.set(r.userId, arr);
   }
   const memberHealthList: Array<{ userId: number; name: string; health: ReturnType<typeof analyzePlanHealth> }> = [];
+  // 팀 합산 활용지수 + 토큰 단가 — period 비례 정규화.
+  //   teamPowerIndex = 멤버 power score 평균 (활성 멤버만)
+  //   teamUnitCost = sum(priceForPeriod) / sum(totalWindowTokens) × 1M
+  let teamPowerSum = 0;
+  let teamPowerCount = 0;
+  let teamPriceForPeriodSum = 0;
+  let teamTokensSum = 0;
+  let teamActiveDaysSum = 0;
+  let teamAvgDailyTokensSum = 0;
   for (const u of allUsers) {
     const snap = snapMap.get(u.id);
     const blocks = planBlocksByUser.get(u.id) ?? [];
@@ -402,11 +436,45 @@ export async function GET(req: NextRequest) {
       declaredTier: (u.planTier ?? null) as PlanTier,
       cacheHitPct: snap?.cacheHitPct ?? undefined,
       oneShotRate: snap?.overallOneShot != null ? snap.overallOneShot * 100 : undefined,
-      windowDays: 30,
+      windowDays: periodDays,
     });
     memberHealthList.push({ userId: u.id, name: u.name, health });
+
+    // 활용지수 — 멤버별 계산 후 평균 (활성 멤버만, blockCount > 0).
+    if (blocks.length > 0) {
+      const memActiveDates = new Set(
+        blocks.map((b) => b.startedAt.toISOString().slice(0, 10))
+      );
+      const memActiveDays = memActiveDates.size;
+      const memTotalTokens = blocks.reduce((s, b) => s + b.totalTokens, 0);
+      const memAvgDailyTokens = memActiveDays > 0 ? memTotalTokens / memActiveDays : 0;
+      const memScore = computePowerIndex(memActiveDays, memAvgDailyTokens, periodDays);
+      teamPowerSum += memScore;
+      teamPowerCount += 1;
+      teamActiveDaysSum += memActiveDays;
+      teamAvgDailyTokensSum += memAvgDailyTokens;
+    }
+
+    // 토큰 단가 — 팀 합산 price / 합산 tokens. tier 입력 멤버만.
+    const monthlyPrice = health.declaredLimits?.monthlyPriceUsd ?? null;
+    if (monthlyPrice !== null && monthlyPrice > 0) {
+      teamPriceForPeriodSum += (monthlyPrice * periodDays) / 30;
+      teamTokensSum += health.totalWindowTokens;
+    }
   }
   const teamPlanHealth = summarizeTeamPlans(memberHealthList);
+
+  const teamUsage = {
+    periodDays,
+    // 팀 활용지수 — 활성 멤버 평균. 활성 멤버 없으면 0.
+    powerIndex: teamPowerCount > 0 ? Math.round(teamPowerSum / teamPowerCount) : 0,
+    activeMembers: teamPowerCount,
+    avgActiveDays: teamPowerCount > 0 ? teamActiveDaysSum / teamPowerCount : 0,
+    avgDailyTokens: teamPowerCount > 0 ? teamAvgDailyTokensSum / teamPowerCount : 0,
+    // 팀 토큰 단가 — 팀 합산 priceForPeriod / 합산 토큰. tier 입력 멤버 없으면 null.
+    priceForPeriodSum: teamPriceForPeriodSum > 0 ? teamPriceForPeriodSum : null,
+    totalWindowTokensSum: teamTokensSum,
+  };
 
   const bySessions = [...memberStats].sort((a, b) => b.sessionsCount - a.sessionsCount);
 
@@ -600,6 +668,7 @@ export async function GET(req: NextRequest) {
     industryComparison,
     teamScore,
     teamPlanHealth,
+    teamUsage,
     isAdminUser: isAdmin(session.user.email),
   });
 }

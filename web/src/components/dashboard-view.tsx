@@ -1002,13 +1002,15 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
           powerIndex={data.powerIndex.score}
           activeDays={data.powerIndex.activeDays}
           avgDailyTokens={data.powerIndex.avgDailyTokens}
+          periodDays={data.planHealth?.periodDays ?? 30}
+          periodLabel={PERIOD_LABELS[period]}
           declaredTier={data.user.planTier ?? null}
           declaredTierLabel={data.planHealth?.declaredLimits?.label ?? null}
-          monthlyPriceUsd={data.planHealth?.declaredLimits?.monthlyPriceUsd ?? null}
+          priceForPeriod={data.planHealth?.priceForPeriod ?? null}
           totalWindowTokens={data.planHealth?.totalWindowTokens ?? 0}
           realUsagePct={data.planHealth?.realUsagePct ?? null}
           nonCacheTotalWindowTokens={data.planHealth?.nonCacheTotalWindowTokens ?? null}
-          cacheHitPct30d={data.planHealth?.cacheHitPct30d ?? null}
+          cacheHitPctForPeriod={data.planHealth?.cacheHitPctForPeriod ?? null}
         />
       )}
 

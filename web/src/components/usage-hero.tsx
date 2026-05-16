@@ -4,32 +4,29 @@ import { useState } from "react";
 import {
   POWER_FREQUENCY_TARGET_DAYS,
   POWER_HARDWORKER_THRESHOLD_DAYS,
+  targetWorkdaysForPeriod,
+  hardworkerThresholdForPeriod,
   computeUnitCostLevel,
 } from "@/lib/rules";
 
 // 사용량 zone hero — Power Index + 토큰 단가 동등 크기 2-card.
-// 둘 다 30일 anchor (period 무관). Plan Health 와 같은 윈도우.
-//
-// 토큰 단가 = monthlyPriceUsd / totalWindowTokens × 1M.
-// 이전 "Plan 활용률" 은 totalWindowTokens 가 cache_read 포함이라 5h 한도와
-// 직접 비교 시 100% 를 훌쩍 넘어 무의미. cost-per-token (API 단가 대비
-// leverage) 로 재해석해 의미 있는 지표로 전환.
-//
-// 캐시 제외 사용률 (realUsagePct) 은 보조 정보 — 누적 cacheHitPct 로 비례
-// 분해한 non-cache 토큰 / (5h 한도 × 블록수). 100% cap.
+// period 비례 정규화 — 30일 anchor 를 기준으로 8days/today/all 어느 윈도우에서도
+// 의미 일관. 토큰 단가는 (월 요금 × periodDays/30) / period 토큰 으로 계산.
+// 활용지수 frequency 분모도 23 × periodDays/30 으로 비례.
 
 interface UsageHeroProps {
   powerIndex: number;             // 0-100
-  activeDays: number;             // 0-30
+  activeDays: number;             // period 활성일
   avgDailyTokens: number;
+  periodDays: number;             // 1 / 8 / month-current / 30 / 90 등
+  periodLabel: string;            // "오늘" / "8일" / "이번달" / "30일" / "전체"
   declaredTier: string | null;
   declaredTierLabel: string | null;
-  monthlyPriceUsd: number | null;
+  priceForPeriod: number | null;  // monthlyPriceUsd × periodDays/30
   totalWindowTokens: number;
-  // 캐시 제외 실제 사용률 (옵션) — null 이면 데이터 부족
   realUsagePct: number | null;
   nonCacheTotalWindowTokens: number | null;
-  cacheHitPct30d: number | null;
+  cacheHitPctForPeriod: number | null;
 }
 
 const TIER_OPTIONS: Array<{ value: string; label: string }> = [
@@ -53,6 +50,11 @@ function fmtCostPerMTok(usdPerMTok: number): string {
   if (usdPerMTok >= 1) return `$${usdPerMTok.toFixed(2)}`;
   if (usdPerMTok >= 0.01) return `$${usdPerMTok.toFixed(3)}`;
   return `$${usdPerMTok.toFixed(4)}`;
+}
+
+function fmtPrice(n: number): string {
+  if (Number.isInteger(n)) return `$${n}`;
+  return `$${n.toFixed(2)}`;
 }
 
 function powerGrade(score: number): { label: string; color: string } {
@@ -85,8 +87,6 @@ const TOKEN_LEVEL_ROWS: Array<{ level: number; range: string; anchor?: string }>
   { level: 10, range: "> 300M / 일" },
 ];
 
-// 토큰 단가 10단계 — computeUnitCostLevel 과 sync.
-// L10 best (가장 싼 단가), L1 worst.
 const UNIT_COST_LEVEL_ROWS: Array<{ level: number; range: string; anchor?: string }> = [
   { level: 10, range: "≤ $0.003 / 1M", anchor: "Sonnet API 대비 1000× 저렴" },
   { level: 9,  range: "≤ $0.01 / 1M",  anchor: "300× 저렴 — 헤비 cache leverage" },
@@ -105,23 +105,26 @@ export function UsageHero({
   powerIndex,
   activeDays,
   avgDailyTokens,
+  periodDays,
+  periodLabel,
   declaredTier,
   declaredTierLabel,
-  monthlyPriceUsd,
+  priceForPeriod,
   totalWindowTokens,
   realUsagePct,
   nonCacheTotalWindowTokens,
-  cacheHitPct30d,
+  cacheHitPctForPeriod,
 }: UsageHeroProps) {
   const power = powerGrade(powerIndex);
-  const isHardworker = activeDays >= POWER_HARDWORKER_THRESHOLD_DAYS;
-  // 두 카드의 산정 기준 패널은 함께 열리고 함께 닫힘 (대응 시각화).
+  const hardworkerThreshold = hardworkerThresholdForPeriod(periodDays);
+  const targetWorkdays = targetWorkdaysForPeriod(periodDays);
+  const isHardworker = activeDays >= hardworkerThreshold;
   const [breakdownOpen, setBreakdownOpen] = useState(false);
 
   const canShowUnitCost =
-    monthlyPriceUsd !== null && monthlyPriceUsd > 0 && totalWindowTokens > 0;
+    priceForPeriod !== null && priceForPeriod > 0 && totalWindowTokens > 0;
   const usdPerMTok = canShowUnitCost
-    ? (monthlyPriceUsd! / totalWindowTokens) * 1_000_000
+    ? (priceForPeriod! / totalWindowTokens) * 1_000_000
     : 0;
   const unitLevel = canShowUnitCost ? computeUnitCostLevel(usdPerMTok) : 0;
   const unitGrade = canShowUnitCost ? unitCostGradeFromLevel(unitLevel) : null;
@@ -155,7 +158,7 @@ export function UsageHero({
             <div className="flex items-center justify-between gap-2 mb-2">
               <div className="flex items-center gap-2">
                 <span className="text-xs font-mono font-bold text-cyan-400 uppercase tracking-wider">⚡ 활용 지수</span>
-                <span className="text-[10px] font-mono text-neutral-600">Power Index · 30일</span>
+                <span className="text-[10px] font-mono text-neutral-600">Power Index · {periodLabel}</span>
               </div>
               <button
                 type="button"
@@ -175,14 +178,14 @@ export function UsageHero({
                 <span
                   data-testid="usage-hero-hardworker"
                   className="text-[10px] font-mono font-bold text-rose-300 bg-rose-950/50 border border-rose-800/60 rounded px-1.5 py-0.5"
-                  title="30일 중 27일 이상 활성 — 건강도 챙기세요"
+                  title={`${periodLabel} 중 ${Math.round(hardworkerThreshold)}일 이상 활성 — 건강도 챙기세요`}
                 >
                   🔥 하드워커
                 </span>
               )}
             </div>
             <div className="mt-3 text-xs font-mono text-neutral-500 space-y-0.5">
-              <p>활성 <span className="text-neutral-300">{activeDays}/30일</span> · 일평균 <span className="text-neutral-300">{fmtTokens(Math.round(avgDailyTokens))}</span> tokens</p>
+              <p>활성 <span className="text-neutral-300">{activeDays}/{periodDays}일</span> · 일평균 <span className="text-neutral-300">{fmtTokens(Math.round(avgDailyTokens))}</span> tokens</p>
               <p className="text-[10px] text-neutral-600">활성일 40 + 사용량 60 = 100</p>
             </div>
 
@@ -191,12 +194,12 @@ export function UsageHero({
                 <div>
                   <p className="text-cyan-400 mb-1">활성일 (40점)</p>
                   <p className="text-neutral-400 leading-relaxed">
-                    <span className="text-neutral-200">활성일 ÷ {POWER_FREQUENCY_TARGET_DAYS}일 × 40</span>
-                    <span className="text-neutral-600"> (주말 제외 평일 기준)</span>
+                    <span className="text-neutral-200">활성일 ÷ {targetWorkdays.toFixed(targetWorkdays >= 10 ? 0 : 1)}일 × 40</span>
+                    <span className="text-neutral-600"> ({periodLabel} 비례 — 30일 anchor {POWER_FREQUENCY_TARGET_DAYS}일)</span>
                   </p>
                   <p className="text-neutral-500 mt-0.5">
-                    {POWER_FREQUENCY_TARGET_DAYS}일 이상은 모두 만점 ·
-                    {POWER_HARDWORKER_THRESHOLD_DAYS}일 이상이면 🔥 하드워커 배지
+                    {targetWorkdays.toFixed(targetWorkdays >= 10 ? 0 : 1)}일 이상 만점 ·
+                    {hardworkerThreshold.toFixed(hardworkerThreshold >= 10 ? 0 : 1)}일 이상이면 🔥 하드워커
                   </p>
                 </div>
                 <div>
@@ -221,7 +224,7 @@ export function UsageHero({
             <div className="flex items-center justify-between gap-2 mb-2">
               <div className="flex items-center gap-2">
                 <span className="text-xs font-mono font-bold text-yellow-400 uppercase tracking-wider">📊 토큰 단가</span>
-                <span className="text-[10px] font-mono text-neutral-600">월 요금 / 30일 토큰</span>
+                <span className="text-[10px] font-mono text-neutral-600">{periodLabel} 요금 / {periodLabel} 토큰</span>
               </div>
               <div className="flex items-center gap-1.5">
                 <select
@@ -251,11 +254,11 @@ export function UsageHero({
               <div className="space-y-1">
                 <span className="text-2xl font-bold text-neutral-500 font-mono">—</span>
                 <p className="text-xs font-mono text-neutral-500">
-                  {monthlyPriceUsd === null
+                  {priceForPeriod === null
                     ? "Plan tier 를 위에서 선택하세요"
-                    : monthlyPriceUsd === 0
+                    : priceForPeriod === 0
                       ? "API 종량제 — 단가 계산 N/A"
-                      : "30일 토큰 데이터 부족"}
+                      : `${periodLabel} 토큰 데이터 부족`}
                 </p>
               </div>
             ) : (
@@ -277,10 +280,10 @@ export function UsageHero({
                 <div className="mt-3 text-xs font-mono text-neutral-500 space-y-0.5">
                   <p>
                     <span className="text-neutral-300">{declaredTierLabel ?? "—"}</span>
-                    <span className="text-neutral-600"> · ${monthlyPriceUsd}/mo</span>
+                    <span className="text-neutral-600"> · {periodLabel} 분 {fmtPrice(priceForPeriod!)}</span>
                   </p>
                   <p>
-                    30일 합 <span className="text-neutral-300">{fmtTokens(totalWindowTokens)}</span> tokens
+                    {periodLabel} 합 <span className="text-neutral-300">{fmtTokens(totalWindowTokens)}</span> tokens
                   </p>
                   {realUsagePct !== null && nonCacheTotalWindowTokens !== null && (
                     <p data-testid="usage-hero-real-usage" className="pt-1 border-t border-neutral-800/60 mt-1">
@@ -288,8 +291,8 @@ export function UsageHero({
                       <span className="text-neutral-200 font-bold">{realUsagePct}%</span>
                       <span className="text-neutral-600">
                         {" "}· non-cache <span className="text-neutral-400">{fmtTokens(nonCacheTotalWindowTokens)}</span>
-                        {cacheHitPct30d !== null && (
-                          <> · cache hit {cacheHitPct30d.toFixed(0)}%</>
+                        {cacheHitPctForPeriod !== null && (
+                          <> · cache hit {cacheHitPctForPeriod.toFixed(0)}%</>
                         )}
                       </span>
                     </p>
@@ -327,10 +330,26 @@ export function UsageHero({
                     );
                   })}
                 </div>
-                <p className="text-neutral-600">
-                  cache reads 포함 단가. cache leverage 클수록 단가 ↓ 레벨 ↑.
-                  외부 anchor: Sonnet API input $3 / 1M, cache_read $0.30 / 1M.
-                </p>
+                <div className="text-neutral-600 space-y-1 leading-relaxed">
+                  <p>cache reads 포함 단가. cache leverage 클수록 단가 ↓ 레벨 ↑.</p>
+                  <p className="text-neutral-500">
+                    <span className="text-neutral-400">외부 anchor (Anthropic 공식, 2026-05)</span>:
+                    Sonnet 4.6 input $3 / 1M, output $15 / 1M,
+                    cache_read $0.30 / 1M (= input 10%), cache_write $3.75 / 1M.
+                  </p>
+                  <p className="text-neutral-500">
+                    <span className="text-neutral-400">실사용 분포 anchor</span>:
+                    Claude Code 사용자의 90%+ 토큰이 cache_read, 6%가 cache_write,
+                    1% 미만이 새 input/output (커뮤니티 보고). 헤비 사용자는
+                    Opus 170턴 세션이 cache 없이 $168 → cache 적용 $21
+                    (98% leverage) 라는 사례.
+                  </p>
+                  <p className="text-neutral-600">
+                    10단계 boundary 는 위 anchor 위에 logarithmic 간격으로
+                    내부 추정 (실사용자 단가 분포는 비공개 → 정확한 percentile
+                    아님). 본인 위치 변화 추이를 보는 용도.
+                  </p>
+                </div>
               </div>
             )}
           </div>

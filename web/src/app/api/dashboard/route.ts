@@ -725,8 +725,34 @@ export async function GET(req: NextRequest) {
         trend: prevTrend,
       };
 
-  // Plan Health — 항상 최근 30일 윈도우 (period 와 무관). user_blocks 30일치 별도 조회.
-  const planBlocksWindowStart = new Date(Date.now() - 30 * 86_400_000);
+  // period → days 환산. all 은 retention 한계 (90일) 로 cap.
+  const periodDays = (() => {
+    const now = new Date();
+    switch (period) {
+      case "today": return 1;
+      case "8days": return 8;
+      case "month": {
+        const start = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+        return Math.max(1, Math.ceil((now.getTime() - start.getTime()) / 86_400_000));
+      }
+      case "30days": return 30;
+      case "all": return 90;
+      default: return 30;
+    }
+  })();
+
+  // Plan Health & Power Index — period 비례 정규화. window 도 period 기반.
+  const planBlocksWindowStart = (() => {
+    const now = new Date();
+    switch (period) {
+      case "today": return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+      case "month": return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+      case "8days": return new Date(now.getTime() - 8 * 86_400_000);
+      case "30days": return new Date(now.getTime() - 30 * 86_400_000);
+      case "all": return new Date(now.getTime() - 90 * 86_400_000);
+      default: return new Date(now.getTime() - 30 * 86_400_000);
+    }
+  })();
   const planBlockRows = await db
     .select({
       totalTokens: userBlocks.totalTokens,
@@ -743,40 +769,44 @@ export async function GET(req: NextRequest) {
       startedAt: b.startedAt,
     })),
     declaredTier: (user[0].planTier ?? null) as PlanTier,
-    // user_snapshots 의 누적 평균 cacheHitPct / overallOneShot — period 무관.
-    cacheHitPct: user[0].apiKeyHash ? (snap[0]?.cacheHitPct ?? undefined) : undefined,
+    // period 의 cacheHitPct (overview 에서 계산된 값 사용 — period 정확도 ↑).
+    // snap[0].cacheHitPct (누적 평균) 보다 period 의 실제 값이 정확.
+    cacheHitPct: cacheHitPct > 0 ? cacheHitPct : undefined,
     oneShotRate: snap[0]?.overallOneShot ? snap[0].overallOneShot * 100 : undefined,
-    windowDays: 30,
+    windowDays: periodDays,
   });
 
   // 캐시 제외 토큰 사용률 — totalWindowTokens 는 cache_read 포함이라 5h 한도와
-  // 직접 비교 시 100% 훌쩍 초과. 누적 cacheHitPct 로 비례 분해해 cache 제외 토큰
-  // 추정 후 (한도 × 블록수) 분모로 평균 블록 사용률 산출. 100% cap.
+  // 직접 비교 시 100% 훌쩍 초과. period 의 cacheHitPct 로 비례 분해해 cache 제외
+  // 토큰 추정 후 (한도 × 블록수) 분모로 평균 블록 사용률 산출. 100% cap.
   //   nonCache ≈ totalTokens × (1 - cacheHitPct/100)
   //   realUsagePct = min(100, nonCache / (limit × blockCount) × 100)
   // 데이터 한계 — user_blocks 에 토큰 분해 컬럼 없어 블록별 동일 cacheHitPct 가정.
-  const cacheHitPctFor30d = snap[0]?.cacheHitPct ?? null;
-  const blockCount30d = planBlockRows.length;
+  const cacheHitPctForPeriod = cacheHitPct > 0 ? cacheHitPct : null;
+  const blockCountInPeriod = planBlockRows.length;
   const limit5h = planHealth.declaredLimits?.estimated5hTokenLimit ?? 0;
-  const nonCacheTotalWindowTokens = cacheHitPctFor30d !== null
-    ? Math.round(planHealth.totalWindowTokens * (1 - cacheHitPctFor30d / 100))
+  const nonCacheTotalWindowTokens = cacheHitPctForPeriod !== null
+    ? Math.round(planHealth.totalWindowTokens * (1 - cacheHitPctForPeriod / 100))
     : null;
-  const realUsagePct = (nonCacheTotalWindowTokens !== null && limit5h > 0 && blockCount30d > 0)
-    ? Math.min(100, Math.round((nonCacheTotalWindowTokens / (limit5h * blockCount30d)) * 100))
+  const realUsagePct = (nonCacheTotalWindowTokens !== null && limit5h > 0 && blockCountInPeriod > 0)
+    ? Math.min(100, Math.round((nonCacheTotalWindowTokens / (limit5h * blockCountInPeriod)) * 100))
     : null;
 
-  // Power Index — 30일 anchor (period 무관). Plan Health 와 같은 윈도우.
-  // 활성일 + 일평균 token 으로 계산. avgDailyTokens 는 30일 윈도우 기준 재계산.
-  const power30dWindowStart = planBlocksWindowStart;
-  const power30dActiveDates = new Set(
-    planBlockRows
-      .filter((b) => b.startedAt >= power30dWindowStart)
-      .map((b) => b.startedAt.toISOString().slice(0, 10))
+  // priceForPeriod — 월 요금을 period 일수에 비례 배분. UsageHero 에서 단가
+  // (priceForPeriod / totalWindowTokens × 1M) 계산용.
+  const monthlyPriceUsd = planHealth.declaredLimits?.monthlyPriceUsd ?? null;
+  const priceForPeriod = monthlyPriceUsd !== null
+    ? (monthlyPriceUsd * periodDays) / 30
+    : null;
+
+  // Power Index — period 비례 정규화. activeDays + avgDailyTokens period 기반.
+  const powerActiveDates = new Set(
+    planBlockRows.map((b) => b.startedAt.toISOString().slice(0, 10))
   );
-  const power30dActiveDays = power30dActiveDates.size;
-  const power30dTotalTokens = planBlockRows.reduce((s, b) => s + Number(b.totalTokens ?? 0), 0);
-  const power30dAvgDailyTokens = power30dActiveDays > 0 ? power30dTotalTokens / power30dActiveDays : 0;
-  const powerIndexValue = computePowerIndex(power30dActiveDays, power30dAvgDailyTokens);
+  const powerActiveDays = powerActiveDates.size;
+  const powerTotalTokens = planBlockRows.reduce((s, b) => s + Number(b.totalTokens ?? 0), 0);
+  const powerAvgDailyTokens = powerActiveDays > 0 ? powerTotalTokens / powerActiveDays : 0;
+  const powerIndexValue = computePowerIndex(powerActiveDays, powerAvgDailyTokens, periodDays);
 
   return NextResponse.json({
     user: { name: user[0].name, lastSyncedAt: user[0].lastSyncedAt, timezone: user[0].timezone ?? null, planTier: user[0].planTier ?? null },
@@ -799,14 +829,16 @@ export async function GET(req: NextRequest) {
       ...planHealth,
       nonCacheTotalWindowTokens,
       realUsagePct,
-      blockCount30d,
-      cacheHitPct30d: cacheHitPctFor30d,
+      blockCountInPeriod,
+      cacheHitPctForPeriod,
+      priceForPeriod,
+      periodDays,
     },
     powerIndex: {
       score: powerIndexValue,
-      activeDays: power30dActiveDays,
-      avgDailyTokens: Math.round(power30dAvgDailyTokens),
-      windowDays: 30,
+      activeDays: powerActiveDays,
+      avgDailyTokens: Math.round(powerAvgDailyTokens),
+      periodDays,
     },
     daily,
     dailyTokens,
