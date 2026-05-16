@@ -87,17 +87,21 @@ const TOKEN_LEVEL_ROWS: Array<{ level: number; range: string; anchor?: string }>
   { level: 10, range: "> 300M / 일" },
 ];
 
+// 토큰 단가 10단계 — anchor 는 "동일 토큰을 API 직접 호출했을 때 비용" 대비.
+// 기준 모델: Sonnet 4.6 input ($3 / 1M). Claude Code default + 가장 흔히 사용.
+// 의미: "Sonnet API 1000× 저렴" = "내가 처리한 토큰을 Sonnet API 로 직접
+// 호출했다면 plan 요금의 1000배가 들었을 것". cache leverage 효과의 정량화.
 const UNIT_COST_LEVEL_ROWS: Array<{ level: number; range: string; anchor?: string }> = [
-  { level: 10, range: "≤ $0.003 / 1M", anchor: "Sonnet API 대비 1000× 저렴" },
-  { level: 9,  range: "≤ $0.01 / 1M",  anchor: "300× 저렴 — 헤비 cache leverage" },
-  { level: 8,  range: "≤ $0.03 / 1M",  anchor: "100× 저렴 — Claude Code 헤비 평균" },
-  { level: 7,  range: "≤ $0.1 / 1M",   anchor: "30× 저렴" },
-  { level: 6,  range: "≤ $0.3 / 1M",   anchor: "10× 저렴 — Sonnet cache_read 동급" },
-  { level: 5,  range: "≤ $1 / 1M",     anchor: "3× 저렴" },
-  { level: 4,  range: "≤ $3 / 1M",     anchor: "Sonnet API input 동급 (cache 거의 없음)" },
-  { level: 3,  range: "≤ $10 / 1M",    anchor: "3× 비쌈" },
-  { level: 2,  range: "≤ $30 / 1M",    anchor: "10× 비쌈" },
-  { level: 1,  range: "> $30 / 1M",    anchor: "plan 거의 안 씀" },
+  { level: 10, range: "≤ $0.003 / 1M", anchor: "API 직접 호출이면 plan 의 1000배 비용" },
+  { level: 9,  range: "≤ $0.01 / 1M",  anchor: "API 직접 호출이면 plan 의 300배" },
+  { level: 8,  range: "≤ $0.03 / 1M",  anchor: "API 직접 호출이면 plan 의 100배 — Claude Code 헤비 평균" },
+  { level: 7,  range: "≤ $0.1 / 1M",   anchor: "API 직접 호출이면 plan 의 30배" },
+  { level: 6,  range: "≤ $0.3 / 1M",   anchor: "API 직접 호출이면 plan 의 10배 — Sonnet cache_read 가격 동급" },
+  { level: 5,  range: "≤ $1 / 1M",     anchor: "API 직접 호출이면 plan 의 3배" },
+  { level: 4,  range: "≤ $3 / 1M",     anchor: "API 직접 호출과 동급 — cache 거의 없음" },
+  { level: 3,  range: "≤ $10 / 1M",    anchor: "API 직접 호출보다 3배 비쌈 (plan 낭비)" },
+  { level: 2,  range: "≤ $30 / 1M",    anchor: "API 직접 호출보다 10배 비쌈" },
+  { level: 1,  range: "> $30 / 1M",    anchor: "plan 거의 안 씀 — API 직접 호출이 훨씬 쌈" },
   { level: 0,  range: "데이터 없음" },
 ];
 
@@ -378,23 +382,27 @@ export function UsageHero({
                   })}
                 </div>
                 <div className="text-neutral-600 space-y-1 leading-relaxed">
-                  <p>cache reads 포함 단가. cache leverage 클수록 단가 ↓ 레벨 ↑.</p>
+                  <p>
+                    <span className="text-neutral-300">읽는 법</span>: ‘API 직접 호출이면 plan 의 N배’ =
+                    내가 처리한 토큰을 Sonnet API 로 직접 호출했다면 비용이 plan 요금의 N배 들었을 것.
+                    cache leverage 효과의 정량화.
+                  </p>
+                  <p className="text-neutral-500">
+                    <span className="text-neutral-400">기준 모델</span>: Sonnet 4.6 input $3 / 1M
+                    (Claude Code default + 가장 흔히 사용). Opus 4.6 input $5 / 1M (1.7×),
+                    Haiku 4.5 input $1 / 1M (0.3×) — 모델 mix 에 따라 anchor 약간 다르지만
+                    같은 레벨대 위치는 유지됨.
+                  </p>
                   <p className="text-neutral-500">
                     <span className="text-neutral-400">외부 anchor (Anthropic 공식, 2026-05)</span>:
-                    Sonnet 4.6 input $3 / 1M, output $15 / 1M,
                     cache_read $0.30 / 1M (= input 10%), cache_write $3.75 / 1M.
-                  </p>
-                  <p className="text-neutral-500">
-                    <span className="text-neutral-400">실사용 분포 anchor</span>:
-                    Claude Code 사용자의 90%+ 토큰이 cache_read, 6%가 cache_write,
-                    1% 미만이 새 input/output (커뮤니티 보고). 헤비 사용자는
-                    Opus 170턴 세션이 cache 없이 $168 → cache 적용 $21
-                    (98% leverage) 라는 사례.
+                    Claude Code 사용자의 90%+ 토큰이 cache_read (커뮤니티 보고).
+                    Opus 170턴 세션이 cache 없이 $168 → cache 적용 $21 (98% leverage) 사례.
                   </p>
                   <p className="text-neutral-600">
-                    10단계 boundary 는 위 anchor 위에 logarithmic 간격으로
-                    내부 추정 (실사용자 단가 분포는 비공개 → 정확한 percentile
-                    아님). 본인 위치 변화 추이를 보는 용도.
+                    10단계 boundary 는 위 anchor 위에 logarithmic 간격으로 내부 추정
+                    (실사용자 단가 분포는 비공개 → 정확한 percentile 아님). 본인 위치
+                    변화 추이를 보는 용도.
                   </p>
                 </div>
               </div>

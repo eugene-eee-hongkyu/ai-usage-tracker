@@ -776,36 +776,55 @@ export async function GET(req: NextRequest) {
     windowDays: periodDays,
   });
 
+  // user_blocks 기반 1차 집계
+  const planBlockTotalTokens = planBlockRows.reduce((s, b) => s + Number(b.totalTokens ?? 0), 0);
+  const planBlockActiveDates = new Set(
+    planBlockRows.map((b) => b.startedAt.toISOString().slice(0, 10))
+  );
+  const planBlockActiveDays = planBlockActiveDates.size;
+  const planBlockCount = planBlockRows.length;
+
+  // today/8days fallback — user_blocks 는 5h 블록이 종료될 때만 저장됨.
+  // 진행 중인 active 블록은 미저장이라 "오늘" period 에 user_blocks 가 비어
+  // overview 에 데이터가 있어도 hero 카드가 빈 상태로 보이는 버그. period
+  // 윈도우에서 user_blocks total 이 overview total 보다 명백히 작으면
+  // overview 의 ov.tokens 합으로 fallback.
+  const overviewTotalTokens = tRead + tWrite + tInput + tOutput;
+  const useOverviewFallback = overviewTotalTokens > planBlockTotalTokens * 1.5;
+  const totalWindowTokens = useOverviewFallback
+    ? overviewTotalTokens
+    : planHealth.totalWindowTokens;
+  const effectiveActiveDays = useOverviewFallback
+    ? Math.max(planBlockActiveDays, activeDays)
+    : planBlockActiveDays;
+  const effectiveBlockCount = useOverviewFallback
+    // overview 기반일 때 block count 추정 = activeDays × (typical 1.5 blocks/day)
+    // — 1일 활동 시간 5~8시간 가정.
+    ? Math.max(planBlockCount, Math.ceil(effectiveActiveDays * 1.5))
+    : planBlockCount;
+
   // 캐시 제외 토큰 사용률 — totalWindowTokens 는 cache_read 포함이라 5h 한도와
   // 직접 비교 시 100% 훌쩍 초과. period 의 cacheHitPct 로 비례 분해해 cache 제외
   // 토큰 추정 후 (한도 × 블록수) 분모로 평균 블록 사용률 산출. 100% cap.
-  //   nonCache ≈ totalTokens × (1 - cacheHitPct/100)
-  //   realUsagePct = min(100, nonCache / (limit × blockCount) × 100)
-  // 데이터 한계 — user_blocks 에 토큰 분해 컬럼 없어 블록별 동일 cacheHitPct 가정.
   const cacheHitPctForPeriod = cacheHitPct > 0 ? cacheHitPct : null;
-  const blockCountInPeriod = planBlockRows.length;
+  const blockCountInPeriod = effectiveBlockCount;
   const limit5h = planHealth.declaredLimits?.estimated5hTokenLimit ?? 0;
   const nonCacheTotalWindowTokens = cacheHitPctForPeriod !== null
-    ? Math.round(planHealth.totalWindowTokens * (1 - cacheHitPctForPeriod / 100))
+    ? Math.round(totalWindowTokens * (1 - cacheHitPctForPeriod / 100))
     : null;
   const realUsagePct = (nonCacheTotalWindowTokens !== null && limit5h > 0 && blockCountInPeriod > 0)
     ? Math.min(100, Math.round((nonCacheTotalWindowTokens / (limit5h * blockCountInPeriod)) * 100))
     : null;
 
-  // priceForPeriod — 월 요금을 period 일수에 비례 배분. UsageHero 에서 단가
-  // (priceForPeriod / totalWindowTokens × 1M) 계산용.
+  // priceForPeriod — 월 요금을 period 일수에 비례 배분.
   const monthlyPriceUsd = planHealth.declaredLimits?.monthlyPriceUsd ?? null;
   const priceForPeriod = monthlyPriceUsd !== null
     ? (monthlyPriceUsd * periodDays) / 30
     : null;
 
-  // Power Index — period 비례 정규화. activeDays + avgDailyTokens period 기반.
-  const powerActiveDates = new Set(
-    planBlockRows.map((b) => b.startedAt.toISOString().slice(0, 10))
-  );
-  const powerActiveDays = powerActiveDates.size;
-  const powerTotalTokens = planBlockRows.reduce((s, b) => s + Number(b.totalTokens ?? 0), 0);
-  const powerAvgDailyTokens = powerActiveDays > 0 ? powerTotalTokens / powerActiveDays : 0;
+  // Power Index — period 비례 정규화. fallback 적용된 값 사용.
+  const powerActiveDays = effectiveActiveDays;
+  const powerAvgDailyTokens = effectiveActiveDays > 0 ? totalWindowTokens / effectiveActiveDays : 0;
   const powerIndexValue = computePowerIndex(powerActiveDays, powerAvgDailyTokens, periodDays);
 
   return NextResponse.json({
@@ -827,6 +846,7 @@ export async function GET(req: NextRequest) {
     },
     planHealth: {
       ...planHealth,
+      totalWindowTokens,    // fallback 적용된 값으로 override
       nonCacheTotalWindowTokens,
       realUsagePct,
       blockCountInPeriod,
