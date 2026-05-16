@@ -30,6 +30,12 @@ web/*.sqlite3
 web/*.sqlite3-shm
 web/*.sqlite3-wal
 
+# ── 인스톨러 빌드 산출물 ────────────────────────
+installer/mac/build/
+installer/mac/dist/
+installer/windows/build/
+installer/windows/dist/
+
 # ── CLI 빌드 결과 ─────────────────────────────────
 # cli/bin/ 은 커밋 대상 (npx 실행용 번들)
 
