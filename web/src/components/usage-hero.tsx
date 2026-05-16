@@ -34,12 +34,13 @@ interface UsageHeroProps {
 }
 
 const TIER_OPTIONS: Array<{ value: string; label: string }> = [
-  { value: "",       label: "잘 모름 (자동 추정)" },
-  { value: "pro",    label: "Pro ($20/mo)" },
-  { value: "max5",   label: "Max 5x ($100/mo)" },
-  { value: "max20",  label: "Max 20x ($200/mo)" },
-  { value: "team",   label: "Team ($30/mo)" },
-  { value: "api",    label: "API (종량제)" },
+  { value: "",               label: "잘 모름 (자동 추정)" },
+  { value: "pro",            label: "Pro ($20/mo)" },
+  { value: "max5",           label: "Max 5x ($100/mo)" },
+  { value: "max20",          label: "Max 20x ($200/mo)" },
+  { value: "team_standard",  label: "Team Standard ($25/mo · 연 $20)" },
+  { value: "team_premium",   label: "Team Premium ($125/mo · 연 $100)" },
+  { value: "api",            label: "API (종량제)" },
 ];
 
 function fmtTokens(n: number): string {

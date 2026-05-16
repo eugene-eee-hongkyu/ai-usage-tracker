@@ -37,16 +37,19 @@ export interface PlanHealthResult {
 }
 
 const TIER_OPTIONS: Array<{ value: string; label: string }> = [
-  { value: "",       label: "잘 모름 (자동 추정 사용)" },
-  { value: "pro",    label: "Pro ($20/mo)" },
-  { value: "max5",   label: "Max 5x ($100/mo)" },
-  { value: "max20",  label: "Max 20x ($200/mo)" },
-  { value: "team",   label: "Team ($30/mo)" },
-  { value: "api",    label: "API (종량제)" },
+  { value: "",               label: "잘 모름 (자동 추정 사용)" },
+  { value: "pro",            label: "Pro ($20/mo)" },
+  { value: "max5",           label: "Max 5x ($100/mo)" },
+  { value: "max20",          label: "Max 20x ($200/mo)" },
+  { value: "team_standard",  label: "Team Standard ($25/mo · 연 $20)" },
+  { value: "team_premium",   label: "Team Premium ($125/mo · 연 $100)" },
+  { value: "api",            label: "API (종량제)" },
 ];
 
 const TIER_LABEL: Record<string, string> = {
-  pro: "Pro", max5: "Max 5x", max20: "Max 20x", team: "Team", api: "API", unknown: "알 수 없음",
+  pro: "Pro", max5: "Max 5x", max20: "Max 20x",
+  team_standard: "Team Std", team_premium: "Team Prem", team: "Team",
+  api: "API", unknown: "알 수 없음",
 };
 
 const VERDICT_STYLE: Record<PlanHealthResult["verdict"], { color: string; bg: string; icon: string; label: string }> = {

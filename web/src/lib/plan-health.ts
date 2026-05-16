@@ -8,7 +8,7 @@
 // 한도 추정치는 Claude-Code-Usage-Monitor (Maciek-roboblog) 커뮤니티 분석
 // 기반. Anthropic 공식 공개 X → 추정. 사용자에게 "추정" 명시 필요.
 
-export type PlanTier = "pro" | "max5" | "max20" | "team" | "api" | null;
+export type PlanTier = "pro" | "max5" | "max20" | "team_standard" | "team_premium" | "team" | "api" | null;
 
 export interface PlanLimits {
   tier: Exclude<PlanTier, null>;
@@ -19,13 +19,18 @@ export interface PlanLimits {
 }
 
 // 커뮤니티 추정. Anthropic 한도는 비공개 + 시간에 따라 조정됨.
-// 2026-05 doubled 반영. 정확도 한계 — 사용자에게 "추정" 명시.
+// 2026-05 doubled 반영. Team 은 Standard / Premium 두 단계 (Anthropic 공식).
+//   Team Standard \$25/mo (연 \$20): Pro 와 동일 사용량 + SAML/SSO + 협업
+//   Team Premium  \$125/mo (연 \$100): Standard 의 5× 사용량 + Claude Code 포함
+// 정확도 한계 — 사용자에게 "추정" 명시.
 const PLAN_LIMITS: Record<Exclude<PlanTier, null>, PlanLimits> = {
-  pro:   { tier: "pro",   label: "Pro",     monthlyPriceUsd: 20,  estimated5hTokenLimit: 44_000 },
-  max5:  { tier: "max5",  label: "Max 5x",  monthlyPriceUsd: 100, estimated5hTokenLimit: 88_000 },
-  max20: { tier: "max20", label: "Max 20x", monthlyPriceUsd: 200, estimated5hTokenLimit: 220_000 },
-  team:  { tier: "team",  label: "Team",    monthlyPriceUsd: 30,  estimated5hTokenLimit: 88_000 },
-  api:   { tier: "api",   label: "API",     monthlyPriceUsd: 0,   estimated5hTokenLimit: 0 }, // API는 종량제, 한도 X
+  pro:           { tier: "pro",           label: "Pro",          monthlyPriceUsd: 20,  estimated5hTokenLimit: 44_000 },
+  max5:          { tier: "max5",          label: "Max 5x",       monthlyPriceUsd: 100, estimated5hTokenLimit: 88_000 },
+  max20:         { tier: "max20",         label: "Max 20x",      monthlyPriceUsd: 200, estimated5hTokenLimit: 220_000 },
+  team_standard: { tier: "team_standard", label: "Team Standard", monthlyPriceUsd: 25,  estimated5hTokenLimit: 44_000 },  // Pro 동일 사용량
+  team_premium:  { tier: "team_premium",  label: "Team Premium",  monthlyPriceUsd: 125, estimated5hTokenLimit: 220_000 }, // Standard × 5
+  team:          { tier: "team",          label: "Team (legacy)", monthlyPriceUsd: 30,  estimated5hTokenLimit: 88_000 },  // 기존 입력 호환
+  api:           { tier: "api",           label: "API",          monthlyPriceUsd: 0,   estimated5hTokenLimit: 0 }, // API는 종량제, 한도 X
 };
 
 export function getPlanLimits(tier: Exclude<PlanTier, null>): PlanLimits {
@@ -75,7 +80,7 @@ export function estimateTierFromMonthlyCost(monthlyCostUsd: number): Exclude<Pla
 // 두 tier 추정 비교 — 더 높은 tier (보수적이지 않은 = 가능성 더 높은) 선택.
 // <REDACTED> 같은 max20 사용자가 P90 보수로 max5 추정되는 케이스 보정.
 const TIER_RANK: Record<string, number> = {
-  unknown: -1, pro: 0, max5: 1, team: 1, max20: 2, api: 3,
+  unknown: -1, pro: 0, team_standard: 0, max5: 1, team: 1, max20: 2, team_premium: 2, api: 3,
 };
 export function maxTierEstimate(
   a: Exclude<PlanTier, null> | "unknown",
@@ -311,6 +316,7 @@ export function analyzePlanHealth(input: PlanHealthInput): PlanHealthResult {
 function nextTierUp(tier: PlanTier): Exclude<PlanTier, null> | null {
   if (tier === "pro") return "max5";
   if (tier === "max5") return "max20";
+  if (tier === "team_standard") return "team_premium";
   if (tier === "team") return "max20";
   return null;
 }
@@ -318,6 +324,7 @@ function nextTierUp(tier: PlanTier): Exclude<PlanTier, null> | null {
 function nextTierDown(tier: PlanTier): Exclude<PlanTier, null> | null {
   if (tier === "max20") return "max5";
   if (tier === "max5") return "pro";
+  if (tier === "team_premium") return "team_standard";
   if (tier === "team") return "pro";
   return null;
 }

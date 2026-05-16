@@ -3,7 +3,9 @@
 // 매니저 시점 팀 plan 적정성 종합. /admin/team 어드민 view 에서만 노출.
 
 const TIER_LABEL: Record<string, string> = {
-  pro: "Pro", max5: "Max5", max20: "Max20", team: "Team", api: "API", unknown: "—",
+  pro: "Pro", max5: "Max5", max20: "Max20",
+  team_standard: "Team Std", team_premium: "Team Prem", team: "Team",
+  api: "API", unknown: "—",
 };
 
 interface TeamMemberPlan {
@@ -29,7 +31,7 @@ export interface TeamPlanSummary {
 }
 
 function distToText(d: Record<string, number>): string {
-  const order = ["pro", "max5", "max20", "team", "api", "unknown"];
+  const order = ["pro", "max5", "max20", "team_standard", "team_premium", "team", "api", "unknown"];
   return order
     .filter((k) => d[k])
     .map((k) => `${d[k]} ${TIER_LABEL[k] ?? k}`)

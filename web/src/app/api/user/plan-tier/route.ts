@@ -4,7 +4,7 @@ import { authOptions } from "@/lib/auth";
 import { db, users } from "@/lib/db";
 import { eq } from "drizzle-orm";
 
-const VALID_TIERS = ["pro", "max5", "max20", "team", "api"] as const;
+const VALID_TIERS = ["pro", "max5", "max20", "team_standard", "team_premium", "team", "api"] as const;
 
 export async function PATCH(req: NextRequest) {
   const session = await getServerSession(authOptions);
