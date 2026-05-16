@@ -122,7 +122,9 @@ export function UsageHero({
   const power = powerGrade(powerIndex);
   const hardworkerThreshold = hardworkerThresholdForPeriod(periodDays);
   const targetWorkdays = targetWorkdaysForPeriod(periodDays);
-  const isHardworker = activeDays >= hardworkerThreshold;
+  // 하드워커 배지는 period 가 충분히 길 때만 (today = 1일은 1회 활동만으로
+  // 배지가 부여돼 의미 없음). 8일 이상부터 표시.
+  const isHardworker = periodDays >= 8 && activeDays >= hardworkerThreshold;
   const [breakdownOpen, setBreakdownOpen] = useState(false);
 
   const canShowUnitCost =
@@ -208,8 +210,10 @@ export function UsageHero({
                       <span className="text-neutral-600"> ({periodLabel} 비례 — 30일 anchor {POWER_FREQUENCY_TARGET_DAYS}일)</span>
                     </p>
                     <p className="text-neutral-500 mt-0.5">
-                      {targetWorkdays.toFixed(targetWorkdays >= 10 ? 0 : 1)}일 이상 만점 ·
-                      {hardworkerThreshold.toFixed(hardworkerThreshold >= 10 ? 0 : 1)}일 이상이면 🔥 하드워커
+                      {targetWorkdays.toFixed(targetWorkdays >= 10 ? 0 : 1)}일 이상 만점
+                      {periodDays >= 8 && (
+                        <> · {hardworkerThreshold.toFixed(hardworkerThreshold >= 10 ? 0 : 1)}일 이상이면 🔥 하드워커</>
+                      )}
                     </p>
                     <div className="mt-1.5 pl-3 -ml-1.5 border-l-2 border-l-cyan-500 bg-cyan-900/20 py-0.5">
                       <span className="text-cyan-300 font-bold">
