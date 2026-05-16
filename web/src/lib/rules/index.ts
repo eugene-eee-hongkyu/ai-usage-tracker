@@ -71,16 +71,23 @@ export function computeDailyEfficiencyScore(
 // period 따라 흔들리지 않게 고정.
 //
 // 가중치: 활성일 40 + token level 60 = 100
-//   Frequency (40점) = activeDays / 30 × 40
+//   Frequency (40점) = min(1, activeDays / 23) × 40
 //   Depth     (60점) = computeTokenLevel(avgDailyTokens) × 6
+//
+// 23일 분모: 평일 ≈ 30일 × (5/7) = 21.4 + 약간의 야근/주말 작업 = 23.
+// 30일을 만점 기준으로 잡으면 주말까지 일해야 만점이 나와서 불합리.
+// 23일 이상은 모두 40점 만점 (cap) — 더 일한 사람은 별도 badge 로 표현.
 //
 // 사용자 1번 답 ("그냥 사용량으로 점수 주면 되지 캐시·원샷 빼고") 반영.
 // 인터뷰 4/4 일치: "사용량/cost 만 본다, 효율 점수는 약하다".
+export const POWER_FREQUENCY_TARGET_DAYS = 23;
+export const POWER_HARDWORKER_THRESHOLD_DAYS = 27;
+
 export function computePowerIndex(
   activeDays: number,      // 최근 30일 중 활성일 수 (0~30)
   avgDailyTokens: number,  // 활성일 평균 일 token (cache reads 포함)
 ): number {
-  const frequency = Math.min(1, activeDays / 30) * 40;
+  const frequency = Math.min(1, activeDays / POWER_FREQUENCY_TARGET_DAYS) * 40;
   const depth = computeTokenLevel(avgDailyTokens) * 6;
   return Math.round(frequency + depth);
 }
