@@ -909,6 +909,44 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
   const maxProjectCost = Math.max(...data.projects.map((p) => p.cost), 0.01);
   const maxSessionCost = Math.max(...data.topSessions.map((s) => s.cost), 0.01);
 
+  // MCP Servers 카드 — today period 면 Active Blocks 가 미표시라 빈 슬롯이
+  // 생김. 그 자리에 MCP 를 올려 한 줄 절약. 그 외 period 는 Row 7 에 표시.
+  const mcpServersBlock = (
+    <div data-testid="dash-card-mcp" className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-cyan-500 rounded">
+      <div className="px-3 py-2 border-b border-neutral-800 flex items-center justify-between">
+        <span className="text-xs font-mono font-bold text-cyan-400 uppercase tracking-wider">MCP Servers</span>
+        {(data.mcpServers ?? []).length > 15 && (
+          <span className="flex items-center gap-1 text-[10px] font-mono bg-cyan-900/40 text-cyan-300 border border-cyan-700/60 rounded px-1.5 py-0.5">
+            ↕ scroll · {(data.mcpServers ?? []).length}
+          </span>
+        )}
+      </div>
+      <div className="p-3">
+        <div className="flex text-xs text-neutral-600 font-mono mb-1.5">
+          <span className="flex-1">server</span>
+          <span className="w-16 text-right">calls</span>
+        </div>
+        <div className={(data.mcpServers ?? []).length > 15 ? "overflow-y-auto max-h-[300px] no-scrollbar" : ""}>
+          <div className="space-y-1">
+            {(data.mcpServers ?? []).map((m) => {
+              const maxCalls = Math.max(...(data.mcpServers ?? []).map((x) => x.calls), 0.01);
+              return (
+                <div key={m.name} className="flex items-center gap-1.5 text-xs font-mono">
+                  <div className="w-16 h-1.5 bg-neutral-800 rounded overflow-hidden shrink-0">
+                    <div className="h-full bg-cyan-500 rounded" style={{ width: `${(m.calls / maxCalls) * 100}%` }} />
+                  </div>
+                  <span className="flex-1 text-neutral-300 truncate">{m.name}</span>
+                  <span className="w-16 text-blue-400 text-right">{m.calls.toLocaleString()}</span>
+                </div>
+              );
+            })}
+            {(data.mcpServers ?? []).length === 0 && <p className="text-neutral-600 text-xs font-mono">no data</p>}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
   return (
     <div className={`min-h-screen bg-neutral-950 text-neutral-100 transition-opacity duration-150 ${loading ? "opacity-50 pointer-events-none" : ""}`}>
       <NavComponent />
@@ -1607,13 +1645,14 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
           <EfficiencyScoreSection score={data.efficiencyScore} period={period} periodScore={ov.periodScore} />
         )}
 
-        {/* Row 6: Active Blocks + Dwell Heatmap */}
+        {/* Row 6: Active Blocks + Dwell Heatmap.
+            today period 면 좌측 Active Blocks 가 미표시라 그 자리에 MCP Servers 올림. */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
 
-          {/* Active Blocks pattern. ccusage blocks --json 기반 wall-clock 집계.
-              period === "today" 면 카드 자체 렌더링 안 함 (blocks=null).
-              count < 5 면 tooFewData=true → 안내 문구만 표시. */}
-          {period !== "today" && data.blocks ? (
+          {/* 좌측 슬롯 — today 면 MCP Servers, 그 외 Active Blocks. */}
+          {period === "today" ? (
+            mcpServersBlock
+          ) : data.blocks ? (
             <div data-testid="dash-card-active-blocks" className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-sky-500 rounded">
               <div className="px-3 py-2 border-b border-neutral-800 flex items-center justify-between">
                 <span className="text-xs font-mono font-bold text-sky-400 uppercase tracking-wider">Active Blocks</span>
@@ -1769,45 +1808,13 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
           })() : <div />}
         </div>
 
-        {/* Row 7: MCP Servers (반쪽만, 우측은 빈칸 — Active Blocks 추가로 한 칸 밀려남) */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-
-          {/* MCP Servers */}
-          <div data-testid="dash-card-mcp" className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-cyan-500 rounded">
-            <div className="px-3 py-2 border-b border-neutral-800 flex items-center justify-between">
-              <span className="text-xs font-mono font-bold text-cyan-400 uppercase tracking-wider">MCP Servers</span>
-              {(data.mcpServers ?? []).length > 15 && (
-                <span className="flex items-center gap-1 text-[10px] font-mono bg-cyan-900/40 text-cyan-300 border border-cyan-700/60 rounded px-1.5 py-0.5">
-                  ↕ scroll · {(data.mcpServers ?? []).length}
-                </span>
-              )}
-            </div>
-            <div className="p-3">
-              <div className="flex text-xs text-neutral-600 font-mono mb-1.5">
-                <span className="flex-1">server</span>
-                <span className="w-16 text-right">calls</span>
-              </div>
-              <div className={(data.mcpServers ?? []).length > 15 ? "overflow-y-auto max-h-[300px] no-scrollbar" : ""}>
-                <div className="space-y-1">
-                  {(data.mcpServers ?? []).map((m) => {
-                    const maxCalls = Math.max(...(data.mcpServers ?? []).map((x) => x.calls), 0.01);
-                    return (
-                      <div key={m.name} className="flex items-center gap-1.5 text-xs font-mono">
-                        <div className="w-16 h-1.5 bg-neutral-800 rounded overflow-hidden shrink-0">
-                          <div className="h-full bg-cyan-500 rounded" style={{ width: `${(m.calls / maxCalls) * 100}%` }} />
-                        </div>
-                        <span className="flex-1 text-neutral-300 truncate">{m.name}</span>
-                        <span className="w-16 text-blue-400 text-right">{m.calls.toLocaleString()}</span>
-                      </div>
-                    );
-                  })}
-                  {(data.mcpServers ?? []).length === 0 && <p className="text-neutral-600 text-xs font-mono">no data</p>}
-                </div>
-              </div>
-            </div>
+        {/* Row 7: MCP Servers — today period 에선 Row 6 좌측으로 올렸으므로 미렌더링.
+            그 외 period 는 반쪽 (우측 빈칸). */}
+        {period !== "today" && (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            {mcpServersBlock}
           </div>
-
-        </div>
+        )}
 
       </main>
 
