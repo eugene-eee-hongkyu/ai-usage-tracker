@@ -1,12 +1,24 @@
 "use client";
 
 import { signIn } from "next-auth/react";
-import { useSearchParams } from "next/navigation";
-import { Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useEffect } from "react";
+import { useLocalMode } from "@/lib/use-local-mode";
 
 function LoginContent() {
   const params = useSearchParams();
+  const router = useRouter();
   const error = params.get("error");
+  const isLocalMode = useLocalMode();
+
+  // 로컬 모드면 로그인 X — 자동으로 dashboard 로 보냄. 어쩌다 /login URL 로
+  // 진입해도 (예전 캐시/링크) 자동 우회. defense in depth.
+  useEffect(() => {
+    if (isLocalMode) router.replace("/dashboard");
+  }, [isLocalMode, router]);
+
+  // 로컬 모드 확인 중이거나 확정된 경우 login UI 렌더 안 함 (깜빡임 방지)
+  if (isLocalMode === null || isLocalMode) return null;
 
   return (
     <div className="flex flex-col items-center justify-center min-h-screen gap-8">
