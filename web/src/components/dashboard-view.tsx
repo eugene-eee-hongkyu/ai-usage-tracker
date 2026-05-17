@@ -1296,10 +1296,11 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
             BY MEMBER / 일별 토큰 단가 카드와 동일 시각화 패턴. */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
 
-          {/* 내 코스트 추세 (area) */}
-          <div data-testid="dash-card-cost-trend" className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-fuchsia-500 rounded">
+          {/* 내 코스트 추세 (area) — Daily Cost (yellow) 의 trend 시리즈.
+              살짝 짙은 amber 로 연속성 + 차별화. */}
+          <div data-testid="dash-card-cost-trend" className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-amber-500 rounded">
             <div className="px-3 py-2 border-b border-neutral-800">
-              <span className="text-xs font-mono font-bold text-fuchsia-400 uppercase tracking-wider">My Cost</span>
+              <span className="text-xs font-mono font-bold text-amber-400 uppercase tracking-wider">My Cost</span>
             </div>
             <div className="p-3">
               {chartData.length === 0 ? (
@@ -1308,9 +1309,9 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
                 <ResponsiveContainer width="100%" height={160}>
                   <AreaChart data={chartData} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
                     <defs>
-                      <linearGradient id="fillCostFuchsia" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="#d946ef" stopOpacity={0.4} />
-                        <stop offset="100%" stopColor="#d946ef" stopOpacity={0} />
+                      <linearGradient id="fillCostAmber" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="#f59e0b" stopOpacity={0.35} />
+                        <stop offset="100%" stopColor="#f59e0b" stopOpacity={0} />
                       </linearGradient>
                     </defs>
                     <CartesianGrid strokeDasharray="3 3" stroke="#1f2937" />
@@ -1327,9 +1328,9 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
                     <Area
                       type="monotone"
                       dataKey="cost"
-                      stroke="#d946ef"
-                      strokeWidth={1.5}
-                      fill="url(#fillCostFuchsia)"
+                      stroke="#f59e0b"
+                      strokeWidth={1.75}
+                      fill="url(#fillCostAmber)"
                       dot={false}
                     />
                   </AreaChart>
@@ -1338,10 +1339,11 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
             </div>
           </div>
 
-          {/* 일별 토큰 단가 ($/1M tokens) — log scale */}
-          <div data-testid="dash-card-unit-cost" className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-yellow-500 rounded">
+          {/* 일별 토큰 단가 ($/1M tokens) — log scale. 브랜드 emerald 로
+              "plan 활용 효율" 의 별도 metric 위계 강조. */}
+          <div data-testid="dash-card-unit-cost" className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-emerald-500 rounded">
             <div className="px-3 py-2 border-b border-neutral-800">
-              <span className="text-xs font-mono font-bold text-yellow-400 uppercase tracking-wider">일별 토큰 단가 ($ / 1M)</span>
+              <span className="text-xs font-mono font-bold text-emerald-400 uppercase tracking-wider">일별 토큰 단가 ($ / 1M)</span>
             </div>
             <div className="p-3">
               {(() => {
@@ -1385,8 +1387,8 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
                         <Line
                           type="monotone"
                           dataKey="unitCost"
-                          stroke="#d946ef"
-                          strokeWidth={1.5}
+                          stroke="#10b981"
+                          strokeWidth={1.75}
                           dot={false}
                           connectNulls={false}
                         />
