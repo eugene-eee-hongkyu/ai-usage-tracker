@@ -1,6 +1,6 @@
 {
   "name": "ai-usage-tracker-desktop",
-  "version": "0.1.0",
+  "version": "0.1.3",
   "private": true,
   "description": "AI Usage Tracker desktop app (Electron).",
   "main": "main.js",
@@ -41,6 +41,10 @@
       {
         "from": "staged/cli",
         "to": "cli"
+      },
+      {
+        "from": "staged/runtime",
+        "to": "runtime"
       }
     ],
     "mac": {

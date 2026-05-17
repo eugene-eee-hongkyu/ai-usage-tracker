@@ -108,7 +108,20 @@ ADMIN_EMAIL=admin@yourcompany.com      # 쉼표로 여러 명 지정 가능. 어
 
 ---
 
-### 2. CLI 설치 (팀원 각자 실행)
+### 2. 클라이언트 설치 (팀원 각자 실행)
+
+#### 옵션 A — macOS .dmg (권장, 자족형)
+
+[aiusage.z21labs.world/downloads/mac](https://aiusage.z21labs.world/downloads/mac) 에서 `.dmg` 다운로드 → Applications 로 드래그 → 첫 실행.
+
+`.dmg` 안에 다음이 모두 동봉되어 있어 **별도 설치가 필요 없습니다**:
+- Node 22 런타임 (better-sqlite3 ABI 정렬용)
+- `codeburn@0.9.7` + `ccusage@19.0.2` (검증 핀, prebuilt `node_modules` 그대로 동봉)
+- launchd plist 자동 등록 (2시간 주기 sync)
+
+첫 실행 시 `~/.usage-tracker/runtime/` 에 동봉 의존성을 한 번 복사하고, 그 다음부터는 시스템에 Node·codeburn·ccusage 가 없어도 동작합니다.
+
+#### 옵션 B — CLI install.sh (터미널 사용자 / Windows / Linux)
 
 ```bash
 npx github:eugene-eee-hongkyu/ai-usage-tracker init
@@ -119,7 +132,7 @@ npx github:eugene-eee-hongkyu/ai-usage-tracker init
 - Claude Code `~/.claude/settings.json`에 SessionEnd hook 자동 등록
 - 최근 90일치 데이터 백그라운드 백필
 
-이후 Claude Code 세션이 종료될 때마다 자동으로 데이터가 수집됩니다.
+이 경로는 사용자 시스템에 Node 18+ / codeburn / ccusage 가 별도 설치되어 있어야 합니다 (`install.sh` 가 자동 보정).
 
 #### 기타 CLI 명령어
 

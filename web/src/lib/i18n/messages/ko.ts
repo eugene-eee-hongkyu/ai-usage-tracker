@@ -10,6 +10,12 @@ export const ko: DeepPartial<Messages> = {
     setup: "셋업",
     logout: "로그아웃",
   },
+  about: {
+    title: "버전 정보",
+    headerLocal: "동봉됨",
+    headerCloud: "권장 버전",
+    loading: "불러오는 중...",
+  },
   grades: {
     exemplary: "탁월",
     good: "양호",

@@ -9,6 +9,12 @@ export const zh: DeepPartial<Messages> = {
     setup: "设置",
     logout: "登出",
   },
+  about: {
+    title: "版本信息",
+    headerLocal: "随附",
+    headerCloud: "推荐版本",
+    loading: "加载中...",
+  },
   dashboard: {
     loading: {
       title: "正在收集数据",

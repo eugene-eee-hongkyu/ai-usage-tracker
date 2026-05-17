@@ -7,6 +7,7 @@ import { Suspense, useState } from "react";
 import { useLocalModeInfo } from "@/lib/use-local-mode";
 import { useMessages } from "@/lib/use-i18n";
 import { LocaleSwitcher } from "@/components/locale-switcher";
+import { AboutPopover } from "@/components/about-popover";
 
 function NavInner() {
   const path = usePathname();
@@ -67,6 +68,7 @@ function NavInner() {
       </div>
       <div className="relative shrink-0 flex items-center gap-2">
         <LocaleSwitcher variant="nav" />
+        <AboutPopover />
         <button
           data-testid="nav-user-toggle"
           onClick={() => setOpen(!open)}

@@ -1,0 +1,33 @@
+// GET /api/about — 동봉 / 권장 의존성 버전을 반환.
+//
+// .dmg (Local) 모드: main.js 가 spawn 시 env 로 동봉 버전 주입
+//   - APP_VERSION                = installer/electron/package.json
+//   - RUNTIME_NODE_VERSION       = staged/runtime/manifest.json 의 node 버전
+//   - RUNTIME_CODEBURN_VERSION   = staged manifest packages[].version
+//   - RUNTIME_CCUSAGE_VERSION    = 동
+//
+// 클라우드 (Vercel) 모드: env 미설정 → install.sh / cli/src/init.ts 핀 정책과 동일한
+// 권장 버전을 보여준다. 핀 변경 시 PINNED 상수만 갱신.
+//
+// nav 의 AboutPopover 가 클라이언트 fetch 로 호출.
+
+import { NextResponse } from "next/server";
+
+// 핀 정책 단일 출처. install.sh / cli/src/init.ts 와 동기화 유지.
+const PINNED = {
+  CODEBURN: "0.9.7",
+  CCUSAGE: "19.0.2",
+  NODE_RECOMMENDED: "22",
+} as const;
+
+export async function GET() {
+  const isLocal = process.env.LOCAL_MODE === "1" || process.env.NEXT_PUBLIC_LOCAL_MODE === "1";
+
+  return NextResponse.json({
+    mode: isLocal ? "local" : "cloud",
+    app: process.env.APP_VERSION ?? null,
+    node: process.env.RUNTIME_NODE_VERSION ?? PINNED.NODE_RECOMMENDED,
+    codeburn: process.env.RUNTIME_CODEBURN_VERSION ?? PINNED.CODEBURN,
+    ccusage: process.env.RUNTIME_CCUSAGE_VERSION ?? PINNED.CCUSAGE,
+  });
+}

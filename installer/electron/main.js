@@ -21,8 +21,21 @@ const crypto = require("crypto");
 
 // better-sqlite3 가 시스템 Node 용으로 빌드되어 있음 (npm install 결과).
 // Electron 의 Node ABI 와 안 맞아 NODE_MODULE_VERSION 충돌.
-// 우회: 시스템 Node 를 찾아서 standalone server child 를 그걸로 띄움.
+// 우회: Node 바이너리를 찾아서 standalone server child 를 그걸로 띄움.
+// 우선순위: ① .app 동봉 Node 22 → ② 시스템 Node (brew/nvm/system) → ③ which.
+function findBundledNode() {
+  // packaged: process.resourcesPath/runtime/node/bin/node
+  // dev: installer/electron/staged/runtime/node/bin/node
+  const candidate = isDev
+    ? path.join(__dirname, "staged", "runtime", "node", "bin", "node")
+    : path.join(process.resourcesPath, "runtime", "node", "bin", "node");
+  return existsSync(candidate) ? candidate : null;
+}
+
 function findSystemNode() {
+  // 동봉 Node 가 최우선 — better-sqlite3 ABI 127 (Node 22) prebuilt 와 일치.
+  const bundled = findBundledNode();
+  if (bundled) return bundled;
   const candidates = [
     "/opt/homebrew/bin/node",  // arm64 brew
     "/usr/local/bin/node",     // x86_64 brew + nvm shim
@@ -51,6 +64,14 @@ const SQLITE_PATH = path.join(DATA_DIR, "data.sqlite3");
 const CONFIG_FILE = path.join(DATA_DIR, "config.json");
 const SECRET_FILE = path.join(DATA_DIR, ".nextauth-secret");
 const LOG_FILE = path.join(DATA_DIR, "server.log");
+
+// 동봉 의존성 (codeburn/ccusage) 가 설치되는 사용자별 위치.
+// .app 안 (read-only) 이 아니라 ~/.usage-tracker/runtime/ 에 두는 이유:
+//   1) .app 은 mac Gatekeeper 가 read-only mount 처리
+//   2) 사용자별로 codeburn 캐시 / config 분리
+const RUNTIME_DIR = path.join(DATA_DIR, "runtime");
+const RUNTIME_BIN = path.join(RUNTIME_DIR, "node_modules", ".bin");
+const RUNTIME_MANIFEST = path.join(RUNTIME_DIR, "installed.json");
 
 const WEB_DIR = path.join(APP_ROOT, "web");
 const STANDALONE_DIR = isDev
@@ -135,6 +156,92 @@ async function ensureSqliteSchema() {
   }
 }
 
+// .dmg 자족화 — .app 안 prebuilt/node_modules 트리를 ~/.usage-tracker/runtime/ 에
+// 한 번 복사. installed.json 의 버전 매니페스트가 staged manifest 와 일치하면 skip.
+//
+// 사용자 홈에 두는 이유:
+//   - .app 은 Gatekeeper read-only mount (codeburn 이 install 디렉토리에 쓰려 하면 실패)
+//   - codeburn cache / config 도 같은 트리에 모이도록
+async function ensureRuntimeDeps() {
+  const stagedManifestPath = isDev
+    ? path.join(__dirname, "staged", "runtime", "manifest.json")
+    : path.join(process.resourcesPath, "runtime", "manifest.json");
+  if (!existsSync(stagedManifestPath)) {
+    log(`동봉 runtime 매니페스트 없음 (${stagedManifestPath}) — dep 복사 건너뜀`);
+    return;
+  }
+  const stagedManifest = JSON.parse(readFileSync(stagedManifestPath, "utf8"));
+  const packages = stagedManifest.packages || [];
+  if (packages.length === 0) return;
+
+  // 이미 동일 버전 설치되어 있으면 skip.
+  const stagedKey = packages.map((p) => `${p.name}@${p.version}`).sort().join(",");
+  if (existsSync(RUNTIME_MANIFEST)) {
+    try {
+      const installed = JSON.parse(readFileSync(RUNTIME_MANIFEST, "utf8"));
+      const installedKey = (installed.packages || [])
+        .map((p) => `${p.name}@${p.version}`)
+        .sort()
+        .join(",");
+      if (installedKey === stagedKey && existsSync(path.join(RUNTIME_BIN, "codeburn"))) {
+        log(`runtime deps 이미 설치됨 (${installedKey}) — skip`);
+        return;
+      }
+    } catch {
+      // 매니페스트 손상 — 재설치
+    }
+  }
+
+  const prebuiltDir = isDev
+    ? path.join(__dirname, "staged", "runtime", "prebuilt")
+    : path.join(process.resourcesPath, "runtime", "prebuilt");
+  const prebuiltNm = path.join(prebuiltDir, "node_modules");
+  if (!existsSync(prebuiltNm)) {
+    log(`prebuilt node_modules 없음 (${prebuiltNm}) — dep 복사 건너뜀`);
+    return;
+  }
+
+  log(`runtime deps 복사 시작 (${stagedKey}) — ${prebuiltNm} → ${RUNTIME_DIR}`);
+  mkdirSync(RUNTIME_DIR, { recursive: true });
+
+  // 기존 node_modules 가 있으면 제거 후 통째로 복사.
+  const targetNm = path.join(RUNTIME_DIR, "node_modules");
+  if (existsSync(targetNm)) {
+    require("fs").rmSync(targetNm, { recursive: true, force: true });
+  }
+  // symlink (.bin/* → ../<pkg>/bin/...) 보존 — `cp -RP` (preserve symlinks
+  // verbatim). Node 의 fs.cpSync 는 기본값으로 symlink target 을 resolve 해버려
+  // 상대 경로가 절대 경로로 깨진다.
+  execSync(`cp -RP "${prebuiltNm}" "${targetNm}"`, { stdio: "ignore" });
+
+  writeFileSync(
+    RUNTIME_MANIFEST,
+    JSON.stringify({ installedAt: new Date().toISOString(), packages }, null, 2)
+  );
+  log(`runtime deps 복사 완료 — ${RUNTIME_BIN}`);
+}
+
+function buildEnrichedPath() {
+  // codeburn/ccusage 탐색 우선순위:
+  //   ① 사용자 홈 runtime/.bin (~/.usage-tracker/runtime/node_modules/.bin)
+  //   ② .app 동봉 Node bin (#!/usr/bin/env node 해석용)
+  //   ③ nvm 버전 bin
+  //   ④ /opt/homebrew/bin (arm64 brew)
+  //   ⑤ /usr/local/bin (x86_64 brew + nvm shim)
+  //   ⑥ 기존 PATH
+  const bundledNode = findBundledNode();
+  const bundledNodeBin = bundledNode ? path.dirname(bundledNode) : "";
+  const homeNvm = path.join(homedir(), ".nvm", "versions", "node");
+  let nvmBins = "";
+  try {
+    const versions = require("fs").readdirSync(homeNvm).filter((v) => v.startsWith("v"));
+    nvmBins = versions.map((v) => path.join(homeNvm, v, "bin")).join(":");
+  } catch {}
+  return [RUNTIME_BIN, bundledNodeBin, nvmBins, "/opt/homebrew/bin", "/usr/local/bin", process.env.PATH || "/usr/bin:/bin"]
+    .filter(Boolean)
+    .join(":");
+}
+
 function isPortOpen(port) {
   return new Promise((resolve) => {
     const sock = net.createConnection({ host: "127.0.0.1", port });
@@ -180,27 +287,12 @@ function triggerFirstSync(syncPath, configPath) {
   }
   const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
   const syncLog = openSync(path.join(DATA_DIR, "sync.log"), "a");
-  // GUI launch 환경의 PATH 는 빈약 (`/usr/bin:/bin` 만). codeburn/ccusage 가
-  // brew/npm 글로벌 (/opt/homebrew/bin, /usr/local/bin, nvm) 에 있어 그 경로
-  // 명시 보강. nvm 사용자도 흔하므로 ~/.nvm/versions/node/*/bin 도 포함.
-  const homeNvm = path.join(homedir(), ".nvm", "versions", "node");
-  let nvmBins = "";
-  try {
-    const versions = require("fs").readdirSync(homeNvm).filter((v) => v.startsWith("v"));
-    nvmBins = versions.map((v) => path.join(homeNvm, v, "bin")).join(":");
-  } catch {}
-  const enrichedPath = [
-    nvmBins,
-    "/opt/homebrew/bin",
-    "/usr/local/bin",
-    process.env.PATH || "/usr/bin:/bin",
-  ]
-    .filter(Boolean)
-    .join(":");
+  // GUI launch 환경의 PATH 는 빈약 (`/usr/bin:/bin` 만). 동봉 codeburn/ccusage 와
+  // 시스템 글로벌을 모두 보강 (buildEnrichedPath).
   const proc = spawn(nodeBin, [syncPath], {
     env: {
       ...process.env,
-      PATH: enrichedPath,
+      PATH: buildEnrichedPath(),
       USAGE_TRACKER_CONFIG: configPath,
       TZ: tz,
     },
@@ -214,27 +306,20 @@ function triggerFirstSync(syncPath, configPath) {
 function ensureLaunchAgentMac(syncPath, configPath) {
   if (process.platform !== "darwin") return;
   if (existsSync(LEGACY_LAUNCH_AGENT)) return;  // legacy 그대로
-  if (existsSync(NEW_LAUNCH_AGENT_PATH)) return;
   if (!existsSync(syncPath)) {
     log(`sync.mjs 없음 (${syncPath}) — launchd 등록 건너뜀`);
     return;
   }
   const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
   const logPath = path.join(DATA_DIR, "sync.log");
-  // ProgramArguments 에 사용자 시스템 node 가 필요. findSystemNode 가 찾은 path
-  // 사용 — 사용자별 brew/nvm 위치 다를 수 있음.
+  // ProgramArguments 의 Node 경로 — findSystemNode 는 동봉 Node (.app 안) 를
+  // 우선 반환. 사용자가 .app 옮기면 launchd 가 깨지지만, 정상 설치 경로 (Applications)
+  // 면 안정.
   const nodePath = findSystemNode() || "/usr/local/bin/node";
-  // launchd 의 기본 PATH 가 빈약해 codeburn/ccusage 못 찾음. 보강.
-  const homeNvm = path.join(homedir(), ".nvm", "versions", "node");
-  let nvmBins = "";
-  try {
-    const versions = require("fs").readdirSync(homeNvm).filter((v) => v.startsWith("v"));
-    nvmBins = versions.map((v) => path.join(homeNvm, v, "bin")).join(":");
-  } catch {}
-  const launchdPath = [nvmBins, "/opt/homebrew/bin", "/usr/local/bin", "/usr/bin", "/bin"]
-    .filter(Boolean)
-    .join(":");
-  const plist = `<?xml version="1.0" encoding="UTF-8"?>
+  // launchd 의 기본 PATH 가 빈약해 codeburn/ccusage 못 찾음. 동봉 deps 포함
+  // 우선순위 PATH 보강 (buildEnrichedPath 와 동일 정책).
+  const launchdPath = buildEnrichedPath();
+  const desiredPlist = `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
@@ -263,10 +348,29 @@ function ensureLaunchAgentMac(syncPath, configPath) {
 </dict>
 </plist>
 `;
+  // 업그레이드 경로 처리: 기존 plist 의 내용이 desired 와 다르면 unload + 재작성.
+  // 이전 .dmg 버전 (시스템 Node 의존) 사용자가 v0.1.1 으로 올라올 때 plist 가
+  // 옛 Node 경로 / 옛 PATH 를 그대로 두면 launchd 가 codeburn 못 찾음.
+  if (existsSync(NEW_LAUNCH_AGENT_PATH)) {
+    try {
+      const currentPlist = readFileSync(NEW_LAUNCH_AGENT_PATH, "utf8");
+      if (currentPlist === desiredPlist) {
+        return; // 이미 최신
+      }
+      log(`launchd plist 변경 감지 — unload + 재작성`);
+      try {
+        execSync(`launchctl unload "${NEW_LAUNCH_AGENT_PATH}"`, { stdio: "ignore" });
+      } catch {
+        // unload 실패 (이미 unloaded 일 수 있음) — 무시
+      }
+    } catch {
+      // 읽기 실패 — 그냥 덮어쓰기
+    }
+  }
   const laDir = path.dirname(NEW_LAUNCH_AGENT_PATH);
   if (!existsSync(laDir)) mkdirSync(laDir, { recursive: true });
-  writeFileSync(NEW_LAUNCH_AGENT_PATH, plist);
-  log(`launchd plist 생성: ${NEW_LAUNCH_AGENT_PATH}`);
+  writeFileSync(NEW_LAUNCH_AGENT_PATH, desiredPlist);
+  log(`launchd plist 작성: ${NEW_LAUNCH_AGENT_PATH}`);
   spawn("launchctl", ["load", NEW_LAUNCH_AGENT_PATH], {
     stdio: "ignore",
     detached: true,
@@ -291,6 +395,26 @@ function startServer(port) {
   const out = openSync(LOG_FILE, "a");
   const err = openSync(LOG_FILE, "a");
 
+  // 동봉 의존성 버전 — nav 의 AboutPopover 에서 표시. staged manifest + electron
+  // app.getVersion() 으로 산출. cloud 빌드에는 env 가 안 박혀 있어 권장 버전
+  // fallback (PINNED 상수) 으로 표시됨.
+  const stagedManifestPath = isDev
+    ? path.join(__dirname, "staged", "runtime", "manifest.json")
+    : path.join(process.resourcesPath, "runtime", "manifest.json");
+  let runtimeNodeVersion = "";
+  let runtimeCodeburnVersion = "";
+  let runtimeCcusageVersion = "";
+  try {
+    const stagedManifest = JSON.parse(readFileSync(stagedManifestPath, "utf8"));
+    runtimeNodeVersion = stagedManifest.node || "";
+    const pkgs = stagedManifest.packages || [];
+    runtimeCodeburnVersion = pkgs.find((p) => p.name === "codeburn")?.version || "";
+    runtimeCcusageVersion = pkgs.find((p) => p.name === "ccusage")?.version || "";
+  } catch {
+    // manifest 없음 (dev 또는 broken stage) — env 비움
+  }
+  const appVersion = app.getVersion ? app.getVersion() : "";
+
   // Next.js standalone server 가 spawn 의 process.env 를 module-load 시점 평가에
   // 즉시 반영 못 하는 케이스가 있어 (특히 DATABASE_KIND 같이 module top-level 에서
   // 확인되는 값), .env 파일로 함께 주입. .env 는 standalone cwd 에서 next-server 가
@@ -300,7 +424,12 @@ function startServer(port) {
     `DATABASE_KIND=sqlite\n` +
     `SQLITE_PATH=${SQLITE_PATH}\n` +
     `NEXTAUTH_SECRET=${secret}\n` +
-    `NEXTAUTH_URL=http://localhost:${port}\n`;
+    `NEXTAUTH_URL=http://localhost:${port}\n` +
+    `LOCAL_MODE=1\n` +
+    `APP_VERSION=${appVersion}\n` +
+    `RUNTIME_NODE_VERSION=${runtimeNodeVersion}\n` +
+    `RUNTIME_CODEBURN_VERSION=${runtimeCodeburnVersion}\n` +
+    `RUNTIME_CCUSAGE_VERSION=${runtimeCcusageVersion}\n`;
   writeFileSync(envFile, envBody, { mode: 0o600 });
 
   // Electron 안의 환경변수 leak 방지 — child 에는 standalone 에 필요한 것만 전달.
@@ -320,6 +449,11 @@ function startServer(port) {
       SQLITE_PATH,
       NEXTAUTH_SECRET: secret,
       NEXTAUTH_URL: `http://localhost:${port}`,
+      LOCAL_MODE: "1",
+      APP_VERSION: appVersion,
+      RUNTIME_NODE_VERSION: runtimeNodeVersion,
+      RUNTIME_CODEBURN_VERSION: runtimeCodeburnVersion,
+      RUNTIME_CCUSAGE_VERSION: runtimeCcusageVersion,
       PORT: String(port),
       HOSTNAME: "127.0.0.1",
     },
@@ -349,6 +483,11 @@ let serverPort = 3737;
 async function main() {
   ensureDataDir();
   await ensureSqliteSchema();
+  try {
+    await ensureRuntimeDeps();
+  } catch (e) {
+    log(`runtime deps 복사 실패 (계속 진행): ${e.message}`);
+  }
 
   const firstRun = isFirstRun();
   serverPort = await findFreePort(3737);

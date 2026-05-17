@@ -8,6 +8,12 @@ export interface Messages {
     setup: string;
     logout: string;
   };
+  about: {
+    title: string;        // ⓘ aria-label
+    headerLocal: string;  // "Bundled" (dmg)
+    headerCloud: string;  // "Recommended" (cloud)
+    loading: string;
+  };
   grades: {
     exemplary: string;     // 탁월
     good: string;          // 양호
@@ -622,6 +628,12 @@ export const en: Messages = {
     team: "Team",
     setup: "Setup",
     logout: "Logout",
+  },
+  about: {
+    title: "Version info",
+    headerLocal: "Bundled",
+    headerCloud: "Recommended",
+    loading: "Loading...",
   },
   grades: {
     exemplary: "Exemplary",

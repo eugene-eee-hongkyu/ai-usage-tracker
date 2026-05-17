@@ -9,6 +9,12 @@ export const ja: DeepPartial<Messages> = {
     setup: "セットアップ",
     logout: "ログアウト",
   },
+  about: {
+    title: "バージョン情報",
+    headerLocal: "同梱",
+    headerCloud: "推奨バージョン",
+    loading: "読み込み中...",
+  },
   dashboard: {
     loading: {
       title: "データ収集中",
