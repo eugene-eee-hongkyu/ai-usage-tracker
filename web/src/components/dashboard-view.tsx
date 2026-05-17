@@ -1023,7 +1023,7 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
     return (
       <div className="min-h-screen bg-neutral-950">
         <header className="border-b border-neutral-800 px-4 py-3 flex items-center justify-between">
-          <span className="font-mono font-bold text-neutral-200">Primus Usage</span>
+          <span className="font-mono font-bold text-neutral-200">z21labs Usage</span>
           <button onClick={() => signOut({ callbackUrl: "/login" })} className="text-sm text-neutral-500 hover:text-neutral-300 font-mono">logout</button>
         </header>
         <main data-testid="dash-sync-needed" className="max-w-md mx-auto px-4 py-20 text-center space-y-6">

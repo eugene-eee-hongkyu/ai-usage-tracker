@@ -23,7 +23,7 @@ export function AdminNav() {
     <header className="border-b border-amber-900/40 bg-amber-950/10 px-4 py-3 flex items-center justify-between gap-2">
       <div className="flex items-center gap-3 min-w-0">
         <span className="font-bold text-amber-200 shrink-0 hidden sm:inline-flex items-center gap-2">
-          Primus Usage
+          z21labs Usage
           <span className="text-[9px] font-mono font-bold px-1 py-0.5 rounded bg-amber-500/20 text-amber-400 border border-amber-500/40 leading-none">ADMIN</span>
         </span>
         <nav className="flex gap-1 sm:gap-3">

@@ -5,9 +5,13 @@ import CredentialsProvider from "next-auth/providers/credentials";
 import { db, users } from "@/lib/db";
 import { eq } from "drizzle-orm";
 
-// e2e Credentials provider — NODE_ENV='test' 또는 PRIMUS_E2E_AUTH=1 일 때만 활성
+// e2e Credentials provider — NODE_ENV='test' 또는 Z21_E2E_AUTH=1 일 때만 활성
+// (옛 PRIMUS_E2E_AUTH 도 fallback — 마이그레이션 안정 후 제거)
 // 진짜 OAuth (captcha/2FA) 우회용 (C-1 §3 #1 우회 전략)
-const e2eEnabled = process.env.NODE_ENV === "test" || process.env.PRIMUS_E2E_AUTH === "1";
+const e2eEnabled =
+  process.env.NODE_ENV === "test" ||
+  process.env.Z21_E2E_AUTH === "1" ||
+  process.env.PRIMUS_E2E_AUTH === "1";
 
 const providers = [
   GithubProvider({

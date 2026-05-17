@@ -795,7 +795,7 @@ export function TeamView({ adminMode = false }: { adminMode?: boolean }) {
                 { label: t.teamView.industryEnterpriseAvg, value: 13, benchmark: true },
                 { label: t.teamView.industryEnterpriseTop10, value: 30 },
                 { label: t.teamView.industryTop1, value: 92 },
-                { label: t.teamView.primusTeam, value: ic.activeDayAvg, star: true },
+                { label: t.teamView.teamLabel, value: ic.activeDayAvg, star: true },
               ];
               return (
                 <div data-testid="team-card-headline" className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-emerald-500 rounded">

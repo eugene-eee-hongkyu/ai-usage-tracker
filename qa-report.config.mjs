@@ -4,9 +4,9 @@
 export default {
   // ── 브랜드 ────────────────────────────────────────────────────
   brand: {
-    name: 'Primus Usage',
+    name: 'z21labs Usage',
     subtitle: 'QA Report',
-    initial: 'P',
+    initial: 'Z',
   },
 
   // ── 모듈 목록 ─────────────────────────────────────────────────

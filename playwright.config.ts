@@ -36,7 +36,7 @@ export default defineConfig({
     ['json', { outputFile: 'playwright-report/results.json' }],
   ],
   use: {
-    baseURL: process.env.PRIMUS_BASE_URL ?? 'http://localhost:3000',
+    baseURL: process.env.Z21_BASE_URL ?? process.env.PRIMUS_BASE_URL ?? 'http://localhost:3000',
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
     video: 'retain-on-failure',

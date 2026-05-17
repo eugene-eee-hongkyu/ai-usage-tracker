@@ -444,7 +444,7 @@ export interface Messages {
     industryEnterpriseAvg: string;
     industryEnterpriseTop10: string;
     industryTop1: string;
-    primusTeam: string;
+    teamLabel: string;
     headlineTitle: string;
     teamAvgN: string;
     vsEnterpriseAvg: string;
@@ -1127,8 +1127,8 @@ export const en: Messages = {
     industryEnterpriseAvg: "Enterprise adoption avg",
     industryEnterpriseTop10: "Enterprise adoption top 10%",
     industryTop1: "Global top 1% (est.)",
-    primusTeam: "PRIMUS Team",
-    headlineTitle: "Primus team headline — efficiency + industry comparison (last 30 days)",
+    teamLabel: "z21labs Team",
+    headlineTitle: "z21labs team headline — efficiency + industry comparison (last 30 days)",
     teamAvgN: " · team avg ({n} members)",
     vsEnterpriseAvg: "vs Enterprise adoption avg (${n})",
     activeUsageDescription: "Active Claude Code team",

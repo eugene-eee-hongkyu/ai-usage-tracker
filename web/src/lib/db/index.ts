@@ -50,7 +50,7 @@ function makeLocalDb(): Db {
 
 function makeRemoteDb(): Db {
   const rawUrl =
-    process.env.DATABASE_URL ?? "postgresql://postgres:postgres@localhost:5432/primus_usage";
+    process.env.DATABASE_URL ?? "postgresql://postgres:postgres@localhost:5432/z21_usage";
   const isLocalPg = rawUrl.includes("localhost") || rawUrl.includes("127.0.0.1");
   const pool = new Pool({
     connectionString: rawUrl,

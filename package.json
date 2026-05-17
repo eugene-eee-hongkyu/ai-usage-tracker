@@ -8,7 +8,7 @@
     "ai-usage-tracker": "./cli/src/index.mjs"
   },
   "scripts": {
-    "test:qa": "SKIP_AUTH_SETUP=1 PRIMUS_BASE_URL=http://localhost:3000 DATABASE_URL='postgresql://postgres:postgres@localhost:5432/primus_usage' npx playwright test --project=chromium",
+    "test:qa": "SKIP_AUTH_SETUP=1 Z21_BASE_URL=http://localhost:3000 DATABASE_URL='postgresql://postgres:postgres@localhost:5432/z21_usage' npx playwright test --project=chromium",
     "report:qa": "node scripts/generate-qa-report.mjs",
     "report:deploy": "rm -rf web/public/qa-report && mkdir -p web/public/qa-report && cp playwright-report/qa-report.html web/public/qa-report/index.html && cp -r playwright-report/detail web/public/qa-report/detail"
   },

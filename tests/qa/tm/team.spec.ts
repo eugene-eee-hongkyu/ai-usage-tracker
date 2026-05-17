@@ -65,7 +65,7 @@ test.describe("TM-1 P2 정상", () => {
   test("[TM-1-21] P2 fixture 30일 daily → industry card visible", async ({ page }) => {
     await page.goto("/team");
     await expect(page.getByTestId("team-card-industry")).toBeVisible();
-    await expect(page.getByTestId("team-card-industry")).toContainText("Primus vs 업계");
+    await expect(page.getByTestId("team-card-industry")).toContainText("z21labs vs 업계");
   });
 
   test("[TM-1-22] industry-external — 외부 6 출처 텍스트 포함", async ({ page }) => {
