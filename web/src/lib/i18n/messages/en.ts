@@ -156,6 +156,27 @@ export interface Messages {
     unitCostAnchorWastedHeavy: string;     // plan 거의 안 씀 — API 직접 호출이 훨씬 쌈
     unitCostNoData: string;                // 데이터 없음
   };
+  teamUsageHero: {
+    powerLabel: string;             // ⚡ 팀 활용 지수
+    powerSubtitle: string;          // Power Index 평균 · {period}
+    unitCostLabel: string;          // 📊 팀 토큰 단가
+    unitCostSubtitle: string;       // {period} 합산 요금 / 합산 토큰
+    activeMembersLine: string;      // "활성 {n}명 · 멤버 평균 활성 {a}/{p}일"
+    dailyAvgLine: string;           // 일평균 {tok} tokens (멤버 평균)
+    breakdownActiveTitle: string;   // 활성일 (40점) — 멤버별 계산 후 평균
+    breakdownActiveFormula: string; // 멤버 활성일 ÷ {target}일 × 40
+    breakdownTeamAvgLine: string;   // 팀 평균: {a}/{p}일 ({n}명)
+    breakdownUsageTitle: string;    // 사용량 (60점) — 멤버 평균 일평균 토큰 기준
+    breakdownUsageNote: string;     // 팀 활용지수 = …
+    noTier: string;                 // tier 입력 멤버 0 — 멤버 설정 페이지…
+    periodSumPrice: string;         // {period} 합산 요금
+    periodSumTokens: string;        // {period} 합산 토큰
+    unitCostReadingTitle: string;
+    unitCostReadingBody: string;
+    unitCostModelTitle: string;
+    unitCostModelBody: string;
+    unitCostBoundaryNote: string;
+  };
   wizard: {
     title: string;
     step1: {
@@ -343,6 +364,30 @@ export const en: Messages = {
     unitCostAnchorWasted10x: "10× more expensive than direct API",
     unitCostAnchorWastedHeavy: "Barely using the plan — direct API is much cheaper",
     unitCostNoData: "no data",
+  },
+  teamUsageHero: {
+    powerLabel: "⚡ Team Power Index",
+    powerSubtitle: "Power Index avg · {period}",
+    unitCostLabel: "📊 Team Unit Cost",
+    unitCostSubtitle: "{period} total plan / total tokens",
+    activeMembersLine: "Active {n} members · member avg active {a}/{p} days",
+    dailyAvgLine: "Daily avg {tok} tokens (member avg)",
+    breakdownActiveTitle: "Active days (40 pts) — per-member then averaged",
+    breakdownActiveFormula: "member active days ÷ {target} days × 40",
+    breakdownTeamAvgLine: "Team avg: {a}/{p} days ({n} members)",
+    breakdownUsageTitle: "Usage (60 pts) — by member avg daily tokens",
+    breakdownUsageNote: "Team Power Index = avg of active members' scores. Table position is by member-average daily tokens.",
+    noTier: "0 members with tier entered — totals show once members enter plan tier",
+    periodSumPrice: "{period} total plan",
+    periodSumTokens: "{period} total tokens",
+    unitCostReadingTitle: "How to read",
+    unitCostReadingBody:
+      "“API direct call = N× plan” = if the team's tokens had been called directly via the Sonnet API, it would have cost N× the total plan price.",
+    unitCostModelTitle: "Reference model",
+    unitCostModelBody:
+      "Sonnet 4.6 input $3 / 1M (Claude Code default). Opus $5 (1.7×), Haiku $1 (0.3×) — anchor shifts slightly with model mix but the level stays in the same band.",
+    unitCostBoundaryNote:
+      "cache_read $0.30 / 1M (input × 10%, Anthropic official 2026-05). Level boundaries are interpolated logarithmically.",
   },
   wizard: {
     title: "AI Usage Tracker — Setup",

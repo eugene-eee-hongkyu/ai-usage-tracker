@@ -162,6 +162,30 @@ export const ko: DeepPartial<Messages> = {
     unitCostAnchorWastedHeavy: "plan 거의 안 씀 — API 직접 호출이 훨씬 쌈",
     unitCostNoData: "데이터 없음",
   },
+  teamUsageHero: {
+    powerLabel: "⚡ 팀 활용 지수",
+    powerSubtitle: "Power Index 평균 · {period}",
+    unitCostLabel: "📊 팀 토큰 단가",
+    unitCostSubtitle: "{period} 합산 요금 / 합산 토큰",
+    activeMembersLine: "활성 {n}명 · 멤버 평균 활성 {a}/{p}일",
+    dailyAvgLine: "일평균 {tok} tokens (멤버 평균)",
+    breakdownActiveTitle: "활성일 (40점) — 멤버별 계산 후 평균",
+    breakdownActiveFormula: "멤버 활성일 ÷ {target}일 × 40",
+    breakdownTeamAvgLine: "팀 평균: {a}/{p}일 ({n}명)",
+    breakdownUsageTitle: "사용량 (60점) — 멤버 평균 일평균 토큰 기준",
+    breakdownUsageNote: "팀 활용지수 = 활성 멤버 score 평균. 위 표는 멤버 평균 일평균 토큰 기준 위치.",
+    noTier: "tier 입력 멤버 0 — 멤버 설정 페이지에서 plan tier 입력 시 합산",
+    periodSumPrice: "{period} 합산 요금",
+    periodSumTokens: "{period} 합산 토큰",
+    unitCostReadingTitle: "읽는 법",
+    unitCostReadingBody:
+      "'API 직접 호출이면 plan 의 N배' = 팀이 처리한 토큰을 Sonnet API 로 직접 호출했다면 plan 합산 요금의 N배 들었을 것.",
+    unitCostModelTitle: "기준 모델",
+    unitCostModelBody:
+      "Sonnet 4.6 input $3 / 1M (Claude Code default). Opus $5 (1.7×), Haiku $1 (0.3×) — 모델 mix 에 따라 anchor 약간 다르지만 같은 레벨대 위치는 유지됨.",
+    unitCostBoundaryNote:
+      "cache_read $0.30 / 1M (input 10%, Anthropic 공식 2026-05). 10단계 boundary 는 logarithmic 간격 내부 추정.",
+  },
   wizard: {
     title: "AI Usage Tracker — 셋업",
     step1: {
