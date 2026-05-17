@@ -22,7 +22,7 @@
   <key>com.apple.security.network.client</key>
   <true/>
 
-  <!-- ~/.usage-tracker, ~/.claude, ~/.primus-usage-key 등 사용자 home 접근 -->
+  <!-- ~/.usage-tracker, ~/.claude, ~/.z21labs/usage-key (옛 ~/.primus-usage-key fallback) 등 사용자 home 접근 -->
   <key>com.apple.security.files.user-selected.read-write</key>
   <true/>
 </dict>

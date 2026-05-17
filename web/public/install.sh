@@ -78,7 +78,8 @@ check_owner "$HOME/.npm" "$HOME/.npm (npm 캐시)" "dir"
 check_owner "$HOME/.primus-usage-tracker" "$HOME/.primus-usage-tracker" "dir"
 check_owner "$HOME/.primus-usage-key" "$HOME/.primus-usage-key (API 키)" "file"
 if [ "$(uname)" = "Darwin" ]; then
-  check_owner "$HOME/Library/LaunchAgents/com.primus.usage-tracker.daily.plist" "LaunchAgent plist" "file"
+  check_owner "$HOME/Library/LaunchAgents/com.primus.usage-tracker.daily.plist" "LaunchAgent plist (legacy)" "file"
+  check_owner "$HOME/Library/LaunchAgents/world.z21labs.ai-usage-tracker.sync.plist" "LaunchAgent plist (z21labs)" "file"
 fi
 
 if [ -n "$CHOWN_CMDS" ]; then

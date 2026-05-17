@@ -18,11 +18,17 @@ export async function GET() {
   const dataDir = process.env.DATA_DIR ?? join(home, ".usage-tracker");
   const configPath = join(dataDir, "config.json");
   const legacyApiKeyFile = join(home, ".primus-usage-key");
-  const legacyLaunchAgent = join(
+  const legacyLaunchAgentPath = join(
     home,
     "Library",
     "LaunchAgents",
     "com.primus.usage-tracker.daily.plist"
+  );
+  const newLaunchAgentPath = join(
+    home,
+    "Library",
+    "LaunchAgents",
+    "world.z21labs.ai-usage-tracker.sync.plist"
   );
 
   const hasConfig = existsSync(configPath);
@@ -31,7 +37,8 @@ export async function GET() {
       ? readFileSync(legacyApiKeyFile, "utf8").trim() || null
       : null;
   const hasLegacyLaunchAgent =
-    process.platform === "darwin" && existsSync(legacyLaunchAgent);
+    process.platform === "darwin" &&
+    (existsSync(legacyLaunchAgentPath) || existsSync(newLaunchAgentPath));
 
   return NextResponse.json({
     hasConfig,
