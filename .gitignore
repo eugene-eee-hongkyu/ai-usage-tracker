@@ -38,6 +38,7 @@ installer/windows/dist/
 installer/electron/staged/
 installer/electron/dist/
 installer/electron/node_modules/
+installer/electron/cache/
 
 # ── CLI 빌드 결과 ─────────────────────────────────
 # cli/bin/ 은 커밋 대상 (npx 실행용 번들)
