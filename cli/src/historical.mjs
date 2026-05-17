@@ -16,9 +16,34 @@ import { existsSync, readFileSync, statSync, truncateSync, appendFileSync, mkdir
 import { join } from "path";
 import { homedir } from "os";
 
-const SERVER_URL = process.env.USAGE_TRACKER_URL ?? "https://aiusage.z21labs.world";
 const SYSTEM_TZ = Intl.DateTimeFormat().resolvedOptions().timeZone;
 const childEnv = { ...process.env, TZ: SYSTEM_TZ, CODEBURN_TZ: SYSTEM_TZ };
+
+// destinations 로더 — sync.mjs / destinations.ts 와 동일 패턴.
+// 우선순위:
+//   1. ~/.usage-tracker/config.json 의 destinations[] (위저드가 만든 .dmg 환경)
+//   2. env (USAGE_TRACKER_URL + apiKey 또는 fallback) — install.sh / 단일 destination
+async function loadDestinations() {
+  const configPath =
+    process.env.USAGE_TRACKER_CONFIG ?? join(homedir(), ".usage-tracker", "config.json");
+  try {
+    const raw = readFileSync(configPath, "utf8");
+    const parsed = JSON.parse(raw);
+    if (parsed?.destinations && Array.isArray(parsed.destinations) && parsed.destinations.length > 0) {
+      return parsed.destinations.map((d) => ({
+        name: d.name,
+        url: String(d.url).replace(/\/$/, ""),
+        apiKey: d.apiKey ?? null,
+      }));
+    }
+  } catch {
+    // 파일 없음·파싱 실패 → env fallback
+  }
+  // 단일 destination fallback (install.sh 흐름)
+  const url = (process.env.USAGE_TRACKER_URL ?? "https://aiusage.z21labs.world").replace(/\/$/, "");
+  const apiKey = await loadApiKey();
+  return [{ name: "default", url, apiKey }];
+}
 
 // 새 위치 우선, 옛 위치 fallback
 const NEW_STABLE_DIR = join(homedir(), ".z21labs", "usage-tracker");
@@ -192,31 +217,48 @@ async function generateSnapshots() {
   return snapshots;
 }
 
+async function postTo(dest, snapshots) {
+  const headers = { "Content-Type": "application/json" };
+  if (dest.apiKey) headers["x-api-key"] = dest.apiKey;
+  try {
+    const resp = await fetch(`${dest.url}/api/ingest/historical`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ snapshots }),
+    });
+    if (resp.ok) {
+      const data = await resp.json().catch(() => ({}));
+      log(`✅ ${dest.name} (${dest.url}): inserted=${data?.inserted ?? "?"} skipped=${data?.skipped ?? "?"}`);
+      return true;
+    }
+    log(`❌ ${dest.name} (${dest.url}): POST failed ${resp.status}`);
+    return false;
+  } catch (err) {
+    log(`❌ ${dest.name} (${dest.url}): ${err?.message ?? err}`);
+    return false;
+  }
+}
+
 async function main() {
   log("historical backfill start");
   try {
-    const apiKey = await loadApiKey();
-    if (!apiKey) {
-      log("ERROR: API key not found");
+    const destinations = await loadDestinations();
+    // apiKey 가 필요한 cloud destination (localhost 가 아닌 URL) 에 apiKey 없으면 skip.
+    const usable = destinations.filter((d) => {
+      const isLocal = /localhost|127\.0\.0\.1/.test(d.url);
+      return isLocal || d.apiKey;
+    });
+    if (usable.length === 0) {
+      log("no usable destinations (apiKey 없음 + local destination 도 없음) — skip");
       return;
     }
     const snapshots = await generateSnapshots();
-    log(`generated ${snapshots.length} snapshots`);
+    log(`generated ${snapshots.length} snapshots → ${usable.map((d) => d.name).join(", ")}`);
     if (snapshots.length === 0) {
       log("no snapshots to send");
       return;
     }
-    const resp = await fetch(`${SERVER_URL}/api/ingest/historical`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "x-api-key": apiKey },
-      body: JSON.stringify({ snapshots }),
-    });
-    if (resp.ok) {
-      const data = await resp.json();
-      log(`✅ inserted=${data.inserted} skipped=${data.skipped}`);
-    } else {
-      log(`❌ POST failed: ${resp.status}`);
-    }
+    await Promise.all(usable.map((d) => postTo(d, snapshots)));
   } catch (err) {
     log(`ERROR: ${err?.message ?? err}`);
   }

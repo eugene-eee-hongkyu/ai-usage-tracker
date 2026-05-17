@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { db, periodSnapshots, users } from "@/lib/db";
+import { db, periodSnapshots, users, IS_LOCAL_MODE } from "@/lib/db";
+import { ensureLocalUser } from "@/lib/local-user";
 import { eq } from "drizzle-orm";
 import crypto from "crypto";
 
@@ -15,14 +16,20 @@ interface HistoricalPayload {
 }
 
 export async function POST(req: NextRequest) {
-  const apiKey = req.headers.get("x-api-key");
-  if (!apiKey) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
-
-  const userRow = await db
-    .select()
-    .from(users)
-    .where(eq(users.apiKeyHash, crypto.createHash("sha256").update(apiKey).digest("hex")))
-    .limit(1);
+  // LOCAL_MODE (.dmg) — apiKey 인증 우회, 단일 사용자 자동 보장. 일반 ingest 와 동일 패턴.
+  let userRow: Array<{ id: number }>;
+  if (IS_LOCAL_MODE) {
+    const u = await ensureLocalUser();
+    userRow = [{ id: u.id }];
+  } else {
+    const apiKey = req.headers.get("x-api-key");
+    if (!apiKey) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+    userRow = await db
+      .select()
+      .from(users)
+      .where(eq(users.apiKeyHash, crypto.createHash("sha256").update(apiKey).digest("hex")))
+      .limit(1);
+  }
 
   if (!userRow[0]) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
 

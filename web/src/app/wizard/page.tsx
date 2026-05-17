@@ -150,11 +150,15 @@ function WizardInner() {
         <section className="mt-10 space-y-3">
           <h2 className="text-lg font-semibold">{m.wizard.destinations.heading}</h2>
           <div className="space-y-2">
-            <ChoiceRow
-              checked={choice === "local"}
-              onChange={() => setChoice("local")}
-              label={m.wizard.destinations.localOnly}
-            />
+            {/* 회사 cloud 연동이 이미 된 사용자 (legacy apiKey 보유) 에겐 "Local only"
+                옵션을 숨김 — 회사 정책상 사내 사용자의 팀 dashboard 흐름 보장. */}
+            {!status?.legacy.hasApiKey && (
+              <ChoiceRow
+                checked={choice === "local"}
+                onChange={() => setChoice("local")}
+                label={m.wizard.destinations.localOnly}
+              />
+            )}
             {status?.legacy.hasApiKey && (
               <ChoiceRow
                 checked={choice === "local_company"}

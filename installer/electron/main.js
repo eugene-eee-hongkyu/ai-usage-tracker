@@ -307,9 +307,12 @@ async function waitForServer(port, timeoutMs = 30000) {
   return false;
 }
 
-// 첫 실행 시 cli/sync.mjs 한 번 백그라운드 실행 — launchd 다음 사이클 (최대 2h) 까지
-// 기다리지 않고 즉시 데이터 채움. 사용자가 dashboard 새로고침하면 표시됨.
-function triggerFirstSync(syncPath, configPath) {
+// 첫 실행 시 cli/sync.mjs + historical.mjs 한 번 백그라운드 실행.
+//   - sync.mjs: 현재 period (today/week/month/30days/all) 데이터 채움
+//   - historical.mjs: 지난 8주 + 12개월 weekly/monthly period_snapshots 채움
+//     → 로컬 dashboard 의 [지난 주 ▼] / [지난 달 ▼] 드롭다운 즉시 활성화
+// 둘 다 launchd 다음 사이클 (최대 2h) 까지 기다리지 않고 즉시 실행.
+function triggerFirstSync(syncPath, historicalPath, configPath) {
   if (!existsSync(syncPath)) {
     log(`sync.mjs 없음 (${syncPath}) — first-run sync 건너뜀`);
     return;
@@ -320,21 +323,36 @@ function triggerFirstSync(syncPath, configPath) {
     return;
   }
   const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+  const env = {
+    ...process.env,
+    PATH: buildEnrichedPath(),
+    USAGE_TRACKER_CONFIG: configPath,
+    TZ: tz,
+  };
+
+  // sync.mjs — 현재 period
   const syncLog = openSync(path.join(DATA_DIR, "sync.log"), "a");
-  // GUI launch 환경의 PATH 는 빈약 (`/usr/bin:/bin` 만). 동봉 codeburn/ccusage 와
-  // 시스템 글로벌을 모두 보강 (buildEnrichedPath).
-  const proc = spawn(nodeBin, [syncPath], {
-    env: {
-      ...process.env,
-      PATH: buildEnrichedPath(),
-      USAGE_TRACKER_CONFIG: configPath,
-      TZ: tz,
-    },
+  const syncProc = spawn(nodeBin, [syncPath], {
+    env,
     stdio: ["ignore", syncLog, syncLog],
     detached: true,
   });
-  proc.unref();
-  log(`first-run sync 트리거 (PID ${proc.pid})`);
+  syncProc.unref();
+  log(`first-run sync 트리거 (PID ${syncProc.pid})`);
+
+  // historical.mjs — 지난 8주 + 12개월 backfill (config.json 의 destinations 사용,
+  // local + company 둘 다 흐름). historical.mjs 가 자체 로그 (~/.z21labs/usage-tracker/historical.log).
+  if (historicalPath && existsSync(historicalPath)) {
+    const historicalProc = spawn(nodeBin, [historicalPath], {
+      env,
+      stdio: "ignore",
+      detached: true,
+    });
+    historicalProc.unref();
+    log(`first-run historical backfill 트리거 (PID ${historicalProc.pid}, 8w + 12m)`);
+  } else {
+    log(`historical.mjs 없음 (${historicalPath}) — backfill 건너뜀`);
+  }
 }
 
 function ensureLaunchAgentMac(syncPath, configPath) {
@@ -572,6 +590,7 @@ async function main() {
 
   // sync launchd 등록 — 패키지된 cli/sync.mjs 위치
   const syncPath = path.join(APP_ROOT, "cli", "sync.mjs");
+  const historicalPath = path.join(APP_ROOT, "cli", "historical.mjs");
   ensureLaunchAgentMac(syncPath, CONFIG_FILE);
 
   const locale = normalizeLocale(app.getLocale());
@@ -604,7 +623,7 @@ async function main() {
     if (!navUrl.includes("/dashboard")) return;
     if (!existsSync(CONFIG_FILE)) return;
     syncTriggered = true;
-    triggerFirstSync(syncPath, CONFIG_FILE);
+    triggerFirstSync(syncPath, historicalPath, CONFIG_FILE);
   };
   mainWindow.webContents.on("did-navigate-in-page", onNav);
   mainWindow.webContents.on("did-navigate", onNav);

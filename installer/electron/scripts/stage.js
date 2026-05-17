@@ -68,7 +68,7 @@ for (const f of [".env.production", ".env.local"]) {
 }
 
 console.log("==> cli/src/*.mjs → staged/cli");
-for (const file of ["sync.mjs", "index.mjs", "init.mjs"]) {
+for (const file of ["sync.mjs", "index.mjs", "init.mjs", "historical.mjs"]) {
   const src = path.join(CLI_SRC, file);
   if (existsSync(src)) cpSync(src, path.join(CLI_OUT, file));
 }
