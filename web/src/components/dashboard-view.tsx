@@ -1,6 +1,17 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
+import {
+  ResponsiveContainer,
+  AreaChart,
+  Area,
+  LineChart,
+  Line,
+  CartesianGrid,
+  XAxis,
+  YAxis,
+  Tooltip,
+} from "recharts";
 import { useSession, signOut } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { useLocalMode } from "@/lib/use-local-mode";
@@ -1276,6 +1287,117 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
                   </div>
                 </div>
               )}
+            </div>
+          </div>
+        </div>
+
+        {/* Row 1.5: 코스트 추세 (area) + 일별 토큰 단가 ($/1M, log).
+            추세선 형태로 보기 — 위 Row 1 의 bar 와 보완. team-view 의
+            BY MEMBER / 일별 토큰 단가 카드와 동일 시각화 패턴. */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+
+          {/* 내 코스트 추세 (area) */}
+          <div data-testid="dash-card-cost-trend" className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-fuchsia-500 rounded">
+            <div className="px-3 py-2 border-b border-neutral-800">
+              <span className="text-xs font-mono font-bold text-fuchsia-400 uppercase tracking-wider">My Cost</span>
+            </div>
+            <div className="p-3">
+              {chartData.length === 0 ? (
+                <p className="text-neutral-600 text-xs font-mono">no data</p>
+              ) : (
+                <ResponsiveContainer width="100%" height={160}>
+                  <AreaChart data={chartData} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
+                    <defs>
+                      <linearGradient id="fillCostFuchsia" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="#d946ef" stopOpacity={0.4} />
+                        <stop offset="100%" stopColor="#d946ef" stopOpacity={0} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#1f2937" />
+                    <XAxis dataKey="date" stroke="#525252" fontSize={10} interval="preserveStartEnd" />
+                    <YAxis
+                      stroke="#525252"
+                      fontSize={10}
+                      tickFormatter={(v) => `$${Math.round(Number(v))}`}
+                    />
+                    <Tooltip
+                      contentStyle={{ background: "#0a0a0a", border: "1px solid #404040", fontSize: 11, fontFamily: "monospace" }}
+                      formatter={(v) => [`$${Number(v).toFixed(2)}`, "cost"]}
+                    />
+                    <Area
+                      type="monotone"
+                      dataKey="cost"
+                      stroke="#d946ef"
+                      strokeWidth={1.5}
+                      fill="url(#fillCostFuchsia)"
+                      dot={false}
+                    />
+                  </AreaChart>
+                </ResponsiveContainer>
+              )}
+            </div>
+          </div>
+
+          {/* 일별 토큰 단가 ($/1M tokens) — log scale */}
+          <div data-testid="dash-card-unit-cost" className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-yellow-500 rounded">
+            <div className="px-3 py-2 border-b border-neutral-800">
+              <span className="text-xs font-mono font-bold text-yellow-400 uppercase tracking-wider">일별 토큰 단가 ($ / 1M)</span>
+            </div>
+            <div className="p-3">
+              {(() => {
+                // 일별 unit cost = cost × 1_000_000 / totalTokens. 토큰 0 인 날은 null (line 끊김).
+                const unitCostData = chartData.map((d) => {
+                  const tokens = tokenMap[d.date] ?? 0;
+                  const unitCost = tokens > 0 ? (d.cost * 1_000_000) / tokens : null;
+                  return { date: d.date, unitCost };
+                });
+                const hasData = unitCostData.some((u) => u.unitCost != null);
+                if (!hasData) {
+                  return <p className="text-neutral-600 text-xs font-mono">no data</p>;
+                }
+                return (
+                  <>
+                    <ResponsiveContainer width="100%" height={160}>
+                      <LineChart data={unitCostData} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#1f2937" />
+                        <XAxis dataKey="date" stroke="#525252" fontSize={10} interval="preserveStartEnd" />
+                        <YAxis
+                          stroke="#525252"
+                          fontSize={10}
+                          scale="log"
+                          domain={[0.001, "auto"]}
+                          tickFormatter={(v) => {
+                            const n = Number(v);
+                            if (n >= 1) return `$${n.toFixed(1)}`;
+                            if (n >= 0.01) return `$${n.toFixed(2)}`;
+                            return `$${n.toFixed(3)}`;
+                          }}
+                        />
+                        <Tooltip
+                          contentStyle={{ background: "#0a0a0a", border: "1px solid #404040", fontSize: 11, fontFamily: "monospace" }}
+                          formatter={(v) => {
+                            if (v == null) return ["—", "unit cost"];
+                            const n = Number(v);
+                            const s = n >= 1 ? `$${n.toFixed(2)}` : n >= 0.01 ? `$${n.toFixed(3)}` : `$${n.toFixed(4)}`;
+                            return [`${s} / 1M`, "unit cost"];
+                          }}
+                        />
+                        <Line
+                          type="monotone"
+                          dataKey="unitCost"
+                          stroke="#d946ef"
+                          strokeWidth={1.5}
+                          dot={false}
+                          connectNulls={false}
+                        />
+                      </LineChart>
+                    </ResponsiveContainer>
+                    <p className="text-[10px] font-mono text-neutral-600 mt-1.5">
+                      낮을수록 plan 잘 활용 · 활동 없는 날은 line 끊김 · log scale
+                    </p>
+                  </>
+                );
+              })()}
             </div>
           </div>
         </div>
