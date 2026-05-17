@@ -1,0 +1,54 @@
+# electron-builder config — Apple Developer codesign + notarize 빌드.
+#
+# 사용 예 (Apple Developer 계정 받은 후):
+#   CSC_LINK=<base64-encoded .p12 또는 file://path/to/cert.p12> \
+#   CSC_KEY_PASSWORD=<인증서 비밀번호> \
+#   APPLE_ID=<Apple ID 이메일> \
+#   APPLE_APP_SPECIFIC_PASSWORD=<app-specific password> \
+#   APPLE_TEAM_ID=<10자리 Team ID> \
+#     npm run dist:mac:signed
+#
+# 필수 준비:
+#   1. Apple Developer Program 가입 ($99/년)
+#   2. Developer ID Application 인증서 발급 (Keychain Access 또는 web)
+#   3. .p12 export + 비밀번호
+#   4. App-Specific Password 생성 (appleid.apple.com)
+#   5. Team ID 확인 (developer.apple.com 멤버십 페이지)
+#
+# 자세한 안내: installer/README.md 의 "Codesign + Notarize" 섹션.
+
+appId: world.z21labs.ai-usage-tracker
+productName: AI Usage Tracker
+
+directories:
+  output: dist
+  buildResources: build-resources
+
+files:
+  - main.js
+  - package.json
+  - "!**/.DS_Store"
+
+extraResources:
+  - from: staged/web
+    to: web
+  - from: staged/cli
+    to: cli
+
+mac:
+  target:
+    - target: dmg
+      arch:
+        - arm64
+  category: public.app-category.developer-tools
+  icon: build-resources/icon.png
+  hardenedRuntime: true
+  gatekeeperAssess: false
+  entitlements: build-resources/entitlements.mac.plist
+  entitlementsInherit: build-resources/entitlements.mac.plist
+  # CSC_LINK / CSC_KEY_PASSWORD 환경변수 자동 인식. identity 명시 X
+  notarize:
+    teamId: "${env.APPLE_TEAM_ID}"
+
+dmg:
+  writeUpdateInfo: false

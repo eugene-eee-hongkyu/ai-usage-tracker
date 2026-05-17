@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <!-- Electron Chromium 의 V8 JIT 코드 실행에 필요 -->
+  <key>com.apple.security.cs.allow-jit</key>
+  <true/>
+  <key>com.apple.security.cs.allow-unsigned-executable-memory</key>
+  <true/>
+
+  <!-- Next.js standalone 가 spawn 한 Node child 가 env 받기 위해 필요 (PATH 보강 등) -->
+  <key>com.apple.security.cs.allow-dyld-environment-variables</key>
+  <true/>
+
+  <!-- ccusage / codeburn / sync.mjs 등 child process 실행 -->
+  <key>com.apple.security.cs.disable-library-validation</key>
+  <true/>
+
+  <!-- localhost:3737 standalone server (server) + 회사 URL fan-out (client) -->
+  <key>com.apple.security.network.server</key>
+  <true/>
+  <key>com.apple.security.network.client</key>
+  <true/>
+
+  <!-- ~/.usage-tracker, ~/.claude, ~/.primus-usage-key 등 사용자 home 접근 -->
+  <key>com.apple.security.files.user-selected.read-write</key>
+  <true/>
+</dict>
+</plist>

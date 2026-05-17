@@ -104,11 +104,64 @@ http://localhost:3737    https://aiusage.z21labs.world
 - 새 launchd 안 만듦 (중복 sync 방지)
 - 사용자가 legacy 폐기 원하면 `launchctl unload …com.primus.usage-tracker.daily.plist; rm …plist`
 
+## Codesign + Notarize (Apple Developer 받은 후)
+
+현재 self-sign (unsigned) 상태 — Gatekeeper 가 "확인되지 않은 개발자" 차단,
+사용자가 우클릭 → "열기" 로 우회해야 함. Apple Developer Program 가입 ($99/년)
+후 아래 절차로 정식 서명 + notarize 가능 → 일반 더블클릭 설치 가능.
+
+### 사전 준비 (1회)
+
+1. **Apple Developer Program 가입** — https://developer.apple.com/programs/
+2. **Developer ID Application 인증서 발급**
+   - Keychain Access → 인증서 지원 → 인증 기관에서 인증서 요청
+   - https://developer.apple.com → Certificates → "Developer ID Application" 생성
+   - Keychain 에 download 후 `.p12` 로 export (개인 키 포함, 비밀번호 설정)
+3. **App-Specific Password 생성** — https://appleid.apple.com → 보안 → 앱 암호
+4. **Team ID 확인** — https://developer.apple.com/account 의 Membership
+
+### 빌드 명령
+
+```bash
+# unsigned (현재 default — Apple Developer 없을 때)
+npm run dist:mac:unsigned
+
+# signed + notarized
+CSC_LINK="file://$PWD/build-resources/cert.p12" \
+CSC_KEY_PASSWORD="<.p12 비밀번호>" \
+APPLE_ID="<Apple ID 이메일>" \
+APPLE_APP_SPECIFIC_PASSWORD="<App-Specific Password>" \
+APPLE_TEAM_ID="<10자리 Team ID>" \
+  npm run dist:mac:signed
+```
+
+`build-resources/cert.p12` 는 gitignored. 또는 base64 인코딩 후 환경변수:
+`CSC_LINK="$(base64 -i cert.p12)"`.
+
+### 빌드 산출물 차이
+
+| 빌드 | Gatekeeper | 첫 실행 | notarize ticket |
+|---|---|---|---|
+| Unsigned | 차단 (우클릭 → 열기) | 우클릭 → 열기 (1회) | 없음 |
+| Signed + Notarized | 허용 | 일반 더블클릭 | 동봉됨 |
+
+### CI/CD 자동화 (GitHub Actions 예시)
+
+```yaml
+env:
+  CSC_LINK: ${{ secrets.MAC_CERT_P12_BASE64 }}
+  CSC_KEY_PASSWORD: ${{ secrets.MAC_CERT_PASSWORD }}
+  APPLE_ID: ${{ secrets.APPLE_ID }}
+  APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+  APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+```
+
+GitHub macOS runner 에서 `npm run dist:mac:signed` 실행. notarize 단계는
+약 5-15분 소요.
+
 ## TODO
 
-- ABI mismatch 자동 해결 (prebuild fetch 또는 Node 동봉)
 - Windows .msi (electron-builder `--win`)
 - universal binary (arm64 + x64)
-- Apple Developer 계정 확보 후 codesign + notarize
-- 아이콘 적용 (현재 기본 Electron 아이콘)
-- 대시보드 페이지에도 i18n 적용 (현재는 위저드만)
+- dashboard 의 나머지 한국어 텍스트 (등급 라벨, tooltip 등) i18n 적용
+- 첫 빌드 후 사용자가 OS 의 다른 locale 로 변경 시 자동 갱신 (UI 새로고침)

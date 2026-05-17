@@ -40,6 +40,11 @@ installer/electron/dist/
 installer/electron/node_modules/
 installer/electron/cache/
 
+# ── Apple codesign 인증서 (절대 commit 금지) ─────
+*.p12
+*.cer
+installer/electron/build-resources/cert.*
+
 # ── CLI 빌드 결과 ─────────────────────────────────
 # cli/bin/ 은 커밋 대상 (npx 실행용 번들)
 

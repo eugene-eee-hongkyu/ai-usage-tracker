@@ -12,7 +12,9 @@
     "stage": "node ./scripts/stage.js",
     "pack": "electron-builder --dir",
     "dist": "electron-builder",
-    "dist:mac": "electron-builder --mac",
+    "dist:mac": "npm run dist:mac:unsigned",
+    "dist:mac:unsigned": "CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --mac --arm64",
+    "dist:mac:signed": "electron-builder --mac --arm64 --config electron-builder.signed.yml",
     "build": "npm run build:web && npm run stage && npm run dist:mac"
   },
   "devDependencies": {
