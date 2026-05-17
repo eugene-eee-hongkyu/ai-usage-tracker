@@ -3,9 +3,17 @@ import * as fs from "fs";
 import * as os from "os";
 import * as path from "path";
 
-const STABLE_DIR = path.join(os.homedir(), ".primus-usage-tracker");
-const API_KEY_FALLBACK = path.join(os.homedir(), ".primus-usage-key");
+// === 새 (z21labs) — 마이그레이션 후 기본 ===
+const STABLE_DIR = path.join(os.homedir(), ".z21labs", "usage-tracker");
+const API_KEY_FALLBACK = path.join(os.homedir(), ".z21labs", "usage-key");
 const LAUNCHD_PLIST = process.platform === "darwin"
+  ? path.join(os.homedir(), "Library", "LaunchAgents", "world.z21labs.ai-usage-tracker.sync.plist")
+  : null;
+
+// === 옛 (primus) — fallback. 마이그레이션 전이거나 repair 미실행 머신 ===
+const LEGACY_STABLE_DIR = path.join(os.homedir(), ".primus-usage-tracker");
+const LEGACY_API_KEY_FALLBACK = path.join(os.homedir(), ".primus-usage-key");
+const LEGACY_LAUNCHD_PLIST = process.platform === "darwin"
   ? path.join(os.homedir(), "Library", "LaunchAgents", "com.primus.usage-tracker.daily.plist")
   : null;
 
@@ -57,9 +65,12 @@ function detectNodeManager(nodePath: string | null): DoctorReport["node_manager"
 
 function readLastSync(): string | null {
   // submit.mjs 가 마지막 ingest 시각을 lock 파일에 남기는지 확인.
-  // 없으면 stable dir mtime 으로 근사 (최후 수단).
-  const lock = path.join(STABLE_DIR, "submit.lock");
-  for (const candidate of [lock]) {
+  // 새 + 옛 위치 둘 다 시도 (마이그 전이면 옛 위치).
+  const candidates = [
+    path.join(STABLE_DIR, "submit.lock"),
+    path.join(LEGACY_STABLE_DIR, "submit.lock"),
+  ];
+  for (const candidate of candidates) {
     if (fs.existsSync(candidate)) {
       try {
         return fs.statSync(candidate).mtime.toISOString();
@@ -97,12 +108,15 @@ export function buildReport(cliVersion: string): DoctorReport {
 
   let launchdStatus: DoctorReport["launchd_status"] = "n/a";
   if (LAUNCHD_PLIST) {
-    launchdStatus = fs.existsSync(LAUNCHD_PLIST) ? "registered" : "not_registered";
+    const newPresent = fs.existsSync(LAUNCHD_PLIST);
+    const legacyPresent = LEGACY_LAUNCHD_PLIST ? fs.existsSync(LEGACY_LAUNCHD_PLIST) : false;
+    launchdStatus = newPresent || legacyPresent ? "registered" : "not_registered";
   }
 
-  const apiKeyStatus: DoctorReport["api_key_status"] = fs.existsSync(API_KEY_FALLBACK)
-    ? "registered"
-    : "not_registered";
+  const apiKeyStatus: DoctorReport["api_key_status"] =
+    fs.existsSync(API_KEY_FALLBACK) || fs.existsSync(LEGACY_API_KEY_FALLBACK)
+      ? "registered"
+      : "not_registered";
 
   const lastSyncIso = readLastSync();
 

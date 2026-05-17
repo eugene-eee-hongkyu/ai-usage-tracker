@@ -1498,7 +1498,45 @@ async function runReset() {
 
 // src/sync.ts
 import { spawn as spawn2 } from "child_process";
-var SERVER_URL2 = process.env.USAGE_TRACKER_URL ?? "https://aiusage.z21labs.world";
+
+// src/destinations.ts
+import { readFileSync as readFileSync2 } from "fs";
+import { join as join2 } from "path";
+import { homedir as homedir2 } from "os";
+function readConfigFile() {
+  const path2 = process.env.USAGE_TRACKER_CONFIG ?? join2(homedir2(), ".usage-tracker", "config.json");
+  try {
+    const raw = readFileSync2(path2, "utf8");
+    const parsed = JSON.parse(raw);
+    if (parsed.destinations && Array.isArray(parsed.destinations) && parsed.destinations.length > 0) {
+      return parsed;
+    }
+  } catch {}
+  return null;
+}
+async function loadDestinations() {
+  const cfg = readConfigFile();
+  if (cfg?.destinations?.length) {
+    return cfg.destinations.map((d) => ({
+      name: d.name,
+      url: d.url.replace(/\/$/, ""),
+      apiKey: d.apiKey ?? null
+    }));
+  }
+  const localMode = process.env.USAGE_TRACKER_MODE === "local";
+  const localPort = process.env.LOCAL_PORT ?? "3000";
+  const url = process.env.USAGE_TRACKER_URL ?? (localMode ? `http://localhost:${localPort}` : "https://aiusage.z21labs.world");
+  const apiKey = localMode ? null : process.env.USAGE_TRACKER_API_KEY ?? await loadApiKey();
+  return [
+    {
+      name: localMode ? "local" : "default",
+      url: url.replace(/\/$/, ""),
+      apiKey
+    }
+  ];
+}
+
+// src/sync.ts
 var PERIODS = ["today", "week", "month", "30days", "all"];
 var SYSTEM_TZ = Intl.DateTimeFormat().resolvedOptions().timeZone;
 var childEnv = { ...process.env, TZ: SYSTEM_TZ, CODEBURN_TZ: SYSTEM_TZ };
@@ -1577,39 +1615,63 @@ function spawnCcusageBlocks() {
     }, 600000);
   });
 }
+async function postTo(dest, payload) {
+  try {
+    const headers = { "Content-Type": "application/json" };
+    if (dest.apiKey)
+      headers["x-api-key"] = dest.apiKey;
+    const resp = await fetch(`${dest.url}/api/ingest`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify(payload)
+    });
+    return { ok: resp.ok, status: resp.status };
+  } catch (err) {
+    return { ok: false, error: err.message };
+  }
+}
 async function runSync(_days) {
-  const apiKey = process.env.USAGE_TRACKER_API_KEY ?? await loadApiKey();
-  if (!apiKey) {
-    console.error("API 키가 없습니다. 먼저 init을 실행하세요.");
+  const destinations = await loadDestinations();
+  const orphan = destinations.find((d) => !d.apiKey && !d.url.includes("localhost") && !d.url.includes("127.0.0.1"));
+  if (orphan) {
+    console.error(`API 키가 없습니다 (destination=${orphan.name}). config.json 의 apiKey 또는 init 실행.`);
     process.exit(1);
   }
-  console.log("codeburn + ccusage 데이터 수집 중...");
+  const summary = destinations.map((d) => d.name).join(", ");
+  console.log(`codeburn + ccusage 데이터 수집 중... (destinations: ${summary})`);
+  let report;
   try {
     const [results, ccusageDaily, ccusageBlocks] = await Promise.all([
       Promise.all(PERIODS.map((p) => spawnCodeburn(p))),
       spawnCcusageDaily(),
       spawnCcusageBlocks()
     ]);
-    const report = Object.fromEntries(PERIODS.map((p, i) => [p, results[i]]));
+    report = Object.fromEntries(PERIODS.map((p, i) => [p, results[i]]));
     if (ccusageDaily)
       report.ccusageDaily = ccusageDaily;
     if (ccusageBlocks)
       report.ccusageBlocks = ccusageBlocks;
-    const resp = await fetch(`${SERVER_URL2}/api/ingest`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "x-api-key": apiKey },
-      body: JSON.stringify(report)
-    });
-    if (resp.ok) {
-      console.log("✅ 데이터 전송 완료");
-    } else {
-      console.error(`❌ 전송 실패: ${resp.status}`);
-      process.exit(1);
-    }
   } catch (err) {
     console.error("codeburn 실행 실패:", err.message);
     process.exit(1);
   }
+  const outcomes = await Promise.allSettled(destinations.map((d) => postTo(d, report)));
+  let successCount = 0;
+  outcomes.forEach((r, i) => {
+    const d = destinations[i];
+    if (r.status === "fulfilled" && r.value.ok) {
+      console.log(`  ✅ ${d.name} (${d.url})`);
+      successCount++;
+    } else {
+      const msg = r.status === "fulfilled" ? `HTTP ${r.value.status ?? "?"}${r.value.error ? " — " + r.value.error : ""}` : r.reason?.message ?? "unknown";
+      console.error(`  ❌ ${d.name} (${d.url}) — ${msg}`);
+    }
+  });
+  if (successCount === 0) {
+    console.error("❌ 모든 destination 실패");
+    process.exit(1);
+  }
+  console.log(`✅ ${successCount}/${destinations.length} destination 전송 완료`);
 }
 var isMain = typeof process !== "undefined" && process.argv[1] && (process.argv[1].endsWith("sync.mjs") || process.argv[1].endsWith("sync.js"));
 if (isMain) {
@@ -1625,9 +1687,12 @@ import { execSync as execSync2 } from "child_process";
 import * as fs2 from "fs";
 import * as os2 from "os";
 import * as path2 from "path";
-var STABLE_DIR2 = path2.join(os2.homedir(), ".primus-usage-tracker");
-var API_KEY_FALLBACK2 = path2.join(os2.homedir(), ".primus-usage-key");
-var LAUNCHD_PLIST2 = process.platform === "darwin" ? path2.join(os2.homedir(), "Library", "LaunchAgents", "com.primus.usage-tracker.daily.plist") : null;
+var STABLE_DIR2 = path2.join(os2.homedir(), ".z21labs", "usage-tracker");
+var API_KEY_FALLBACK2 = path2.join(os2.homedir(), ".z21labs", "usage-key");
+var LAUNCHD_PLIST2 = process.platform === "darwin" ? path2.join(os2.homedir(), "Library", "LaunchAgents", "world.z21labs.ai-usage-tracker.sync.plist") : null;
+var LEGACY_STABLE_DIR = path2.join(os2.homedir(), ".primus-usage-tracker");
+var LEGACY_API_KEY_FALLBACK = path2.join(os2.homedir(), ".primus-usage-key");
+var LEGACY_LAUNCHD_PLIST = process.platform === "darwin" ? path2.join(os2.homedir(), "Library", "LaunchAgents", "com.primus.usage-tracker.daily.plist") : null;
 function safeExec(cmd) {
   try {
     return execSync2(cmd, { stdio: ["ignore", "pipe", "ignore"], encoding: "utf8" }).trim();
@@ -1653,8 +1718,11 @@ function detectNodeManager(nodePath) {
   return "unknown";
 }
 function readLastSync() {
-  const lock = path2.join(STABLE_DIR2, "submit.lock");
-  for (const candidate of [lock]) {
+  const candidates = [
+    path2.join(STABLE_DIR2, "submit.lock"),
+    path2.join(LEGACY_STABLE_DIR, "submit.lock")
+  ];
+  for (const candidate of candidates) {
     if (fs2.existsSync(candidate)) {
       try {
         return fs2.statSync(candidate).mtime.toISOString();
@@ -1686,9 +1754,11 @@ function buildReport(cliVersion) {
   const ccusageVer = safeExec("ccusage --version");
   let launchdStatus = "n/a";
   if (LAUNCHD_PLIST2) {
-    launchdStatus = fs2.existsSync(LAUNCHD_PLIST2) ? "registered" : "not_registered";
+    const newPresent = fs2.existsSync(LAUNCHD_PLIST2);
+    const legacyPresent = LEGACY_LAUNCHD_PLIST ? fs2.existsSync(LEGACY_LAUNCHD_PLIST) : false;
+    launchdStatus = newPresent || legacyPresent ? "registered" : "not_registered";
   }
-  const apiKeyStatus = fs2.existsSync(API_KEY_FALLBACK2) ? "registered" : "not_registered";
+  const apiKeyStatus = fs2.existsSync(API_KEY_FALLBACK2) || fs2.existsSync(LEGACY_API_KEY_FALLBACK) ? "registered" : "not_registered";
   const lastSyncIso = readLastSync();
   const issues = [];
   if (npmRootWritable === false) {
@@ -1791,14 +1861,201 @@ function runDoctor(opts) {
   printHumanReport(r);
 }
 
+// src/migrate.ts
+import * as fs3 from "fs";
+import * as os3 from "os";
+import * as path3 from "path";
+import { execSync as execSync3 } from "child_process";
+var NEW_DATA_ROOT = path3.join(os3.homedir(), ".z21labs");
+var NEW_STABLE_DIR = path3.join(NEW_DATA_ROOT, "usage-tracker");
+var NEW_API_KEY_FILE = path3.join(NEW_DATA_ROOT, "usage-key");
+var NEW_KEYTAR_SERVICE = "z21labs-usage-tracker";
+var NEW_LAUNCHD_LABEL = "world.z21labs.ai-usage-tracker.sync";
+var NEW_LAUNCHD_PLIST = process.platform === "darwin" ? path3.join(os3.homedir(), "Library", "LaunchAgents", `${NEW_LAUNCHD_LABEL}.plist`) : null;
+var LEGACY_STABLE_DIR2 = path3.join(os3.homedir(), ".primus-usage-tracker");
+var LEGACY_API_KEY_FILE = path3.join(os3.homedir(), ".primus-usage-key");
+var LEGACY_KEYTAR_SERVICE = "primus-usage-tracker";
+var LEGACY_KEYTAR_ACCOUNT = "api-key";
+var LEGACY_LAUNCHD_LABEL = "com.primus.usage-tracker.daily";
+var LEGACY_LAUNCHD_PLIST2 = process.platform === "darwin" ? path3.join(os3.homedir(), "Library", "LaunchAgents", `${LEGACY_LAUNCHD_LABEL}.plist`) : null;
+function safeMv(src, dst) {
+  if (!fs3.existsSync(src))
+    return "no-src";
+  if (fs3.existsSync(dst))
+    return "both-exist";
+  fs3.mkdirSync(path3.dirname(dst), { recursive: true });
+  fs3.renameSync(src, dst);
+  return "moved";
+}
+function migrateDataDir(report, dryRun) {
+  if (!fs3.existsSync(LEGACY_STABLE_DIR2)) {
+    report.dataDir = fs3.existsSync(NEW_STABLE_DIR) ? "already-new" : "no-legacy";
+    return;
+  }
+  if (fs3.existsSync(NEW_STABLE_DIR)) {
+    report.dataDir = "skipped-both-exist";
+    report.notes.push(`옛 ${LEGACY_STABLE_DIR2} 와 새 ${NEW_STABLE_DIR} 모두 존재. 데이터 손실 우려로 자동 mv 건너뜀. 수동 정리 필요.`);
+    return;
+  }
+  if (dryRun) {
+    report.dataDir = "migrated";
+    report.notes.push(`[dry-run] mv ${LEGACY_STABLE_DIR2} → ${NEW_STABLE_DIR}`);
+    return;
+  }
+  try {
+    fs3.mkdirSync(NEW_DATA_ROOT, { recursive: true });
+    fs3.renameSync(LEGACY_STABLE_DIR2, NEW_STABLE_DIR);
+    report.dataDir = "migrated";
+  } catch (e) {
+    report.dataDir = "skipped-both-exist";
+    report.errors.push(`데이터 디렉토리 mv 실패: ${e.message}`);
+  }
+}
+function migrateApiKeyFile(report, dryRun) {
+  if (!fs3.existsSync(LEGACY_API_KEY_FILE)) {
+    report.apiKeyFile = fs3.existsSync(NEW_API_KEY_FILE) ? "already-new" : "no-legacy";
+    return;
+  }
+  if (fs3.existsSync(NEW_API_KEY_FILE)) {
+    report.apiKeyFile = "skipped-both-exist";
+    report.notes.push(`옛 ${LEGACY_API_KEY_FILE} 와 새 ${NEW_API_KEY_FILE} 모두 존재. 수동 정리 필요.`);
+    return;
+  }
+  if (dryRun) {
+    report.apiKeyFile = "migrated";
+    report.notes.push(`[dry-run] mv ${LEGACY_API_KEY_FILE} → ${NEW_API_KEY_FILE}`);
+    return;
+  }
+  try {
+    const result = safeMv(LEGACY_API_KEY_FILE, NEW_API_KEY_FILE);
+    if (result === "moved") {
+      report.apiKeyFile = "migrated";
+      fs3.chmodSync(NEW_API_KEY_FILE, 384);
+    }
+  } catch (e) {
+    report.errors.push(`API key 파일 mv 실패: ${e.message}`);
+  }
+}
+async function migrateKeytar(report, dryRun) {
+  let keytar = null;
+  try {
+    keytar = await import("keytar");
+  } catch {
+    report.keytar = "unavailable";
+    return;
+  }
+  try {
+    const legacyKey = await keytar.getPassword(LEGACY_KEYTAR_SERVICE, LEGACY_KEYTAR_ACCOUNT);
+    if (!legacyKey) {
+      const newKey = await keytar.getPassword(NEW_KEYTAR_SERVICE, LEGACY_KEYTAR_ACCOUNT);
+      report.keytar = newKey ? "already-new" : "no-legacy";
+      return;
+    }
+    const existingNew = await keytar.getPassword(NEW_KEYTAR_SERVICE, LEGACY_KEYTAR_ACCOUNT);
+    if (existingNew && existingNew !== legacyKey) {
+      report.notes.push(`keytar 옛 서비스(${LEGACY_KEYTAR_SERVICE})와 새 서비스(${NEW_KEYTAR_SERVICE}) 키 값이 다름. 수동 검토 필요.`);
+      report.keytar = "error";
+      return;
+    }
+    if (dryRun) {
+      report.keytar = "migrated";
+      report.notes.push(`[dry-run] keytar ${LEGACY_KEYTAR_SERVICE} → ${NEW_KEYTAR_SERVICE} transfer`);
+      return;
+    }
+    await keytar.setPassword(NEW_KEYTAR_SERVICE, LEGACY_KEYTAR_ACCOUNT, legacyKey);
+    await keytar.deletePassword(LEGACY_KEYTAR_SERVICE, LEGACY_KEYTAR_ACCOUNT);
+    report.keytar = "migrated";
+  } catch (e) {
+    report.keytar = "error";
+    report.errors.push(`keytar transfer 실패: ${e.message}`);
+  }
+}
+function migrateLaunchd(report, dryRun) {
+  if (process.platform !== "darwin" || !LEGACY_LAUNCHD_PLIST2 || !NEW_LAUNCHD_PLIST) {
+    report.launchd = "n/a";
+    return;
+  }
+  const legacyExists = fs3.existsSync(LEGACY_LAUNCHD_PLIST2);
+  const newExists = fs3.existsSync(NEW_LAUNCHD_PLIST);
+  if (!legacyExists) {
+    report.launchd = newExists ? "already-new" : "no-legacy";
+    return;
+  }
+  if (dryRun) {
+    report.launchd = "migrated";
+    report.notes.push(`[dry-run] launchctl unload ${LEGACY_LAUNCHD_LABEL} + rm ${LEGACY_LAUNCHD_PLIST2}` + (newExists ? "" : ` (새 plist 는 init/launcher 가 다음 실행 시 생성)`));
+    return;
+  }
+  try {
+    try {
+      execSync3(`launchctl unload "${LEGACY_LAUNCHD_PLIST2}"`, {
+        stdio: ["ignore", "ignore", "ignore"]
+      });
+    } catch {}
+    fs3.unlinkSync(LEGACY_LAUNCHD_PLIST2);
+    report.launchd = "migrated";
+    if (!newExists) {
+      report.notes.push(`옛 plist 제거. 새 plist (${NEW_LAUNCHD_LABEL}) 는 다음 init/launcher 실행 시 자동 생성.`);
+    }
+  } catch (e) {
+    report.errors.push(`launchd 마이그레이션 실패: ${e.message}`);
+  }
+}
+async function runMigrate(opts = {}) {
+  const dryRun = !!opts.dryRun;
+  const report = {
+    dataDir: "no-legacy",
+    apiKeyFile: "no-legacy",
+    keytar: "no-legacy",
+    launchd: "no-legacy",
+    errors: [],
+    notes: []
+  };
+  migrateDataDir(report, dryRun);
+  migrateApiKeyFile(report, dryRun);
+  await migrateKeytar(report, dryRun);
+  migrateLaunchd(report, dryRun);
+  return report;
+}
+function printMigrateReport(r, dryRun) {
+  const bar = "━".repeat(60);
+  console.log(`\uD83D\uDD04 primus → z21labs 마이그레이션${dryRun ? " (dry-run)" : ""}`);
+  console.log(bar);
+  console.log(`  데이터 디렉토리: ${r.dataDir}`);
+  console.log(`  API 키 파일:    ${r.apiKeyFile}`);
+  console.log(`  keytar 서비스:  ${r.keytar}`);
+  console.log(`  launchd plist:  ${r.launchd}`);
+  console.log(bar);
+  if (r.notes.length > 0) {
+    console.log("");
+    console.log("메모:");
+    r.notes.forEach((n, i) => console.log(`  ${i + 1}. ${n}`));
+  }
+  if (r.errors.length > 0) {
+    console.log("");
+    console.log(`⚠️  에러 ${r.errors.length}건:`);
+    r.errors.forEach((e, i) => console.log(`  ${i + 1}. ${e}`));
+  }
+  if (dryRun) {
+    console.log("");
+    console.log("실행하려면 --dry-run 빼고 다시 실행하세요.");
+  }
+}
+
 // src/index.ts
 var program = new import_commander.Command;
-program.name("usage-tracker").description("Primus Labs Claude Code usage tracker").version(CLI_VERSION);
+program.name("usage-tracker").description("z21labs Claude Code usage tracker").version(CLI_VERSION);
 program.command("init").description("인증 및 SessionEnd hook 등록").action(runInit);
 program.command("repair").description("API 키 유지하고 hook·스케줄만 재등록").action(runRepair);
 program.command("reset").description("API 키 재발급 및 재설정").action(runReset);
 program.command("sync").description("과거 데이터 수동 동기화").option("-d, --days <number>", "동기화할 일수", "90").action((opts) => runSync(parseInt(opts.days)));
 program.command("doctor").description("환경 진단 — Node·npm·codeburn·ccusage·자동화 상태").option("--json", "JSON 으로 출력 (머신 파싱용)").action((opts) => runDoctor({ json: !!opts.json, cliVersion: CLI_VERSION }));
+program.command("migrate").description("primus → z21labs 마이그레이션 (옛 ~/.primus-usage-* → 새 ~/.z21labs/usage-*)").option("--dry-run", "실제로 변경하지 않고 계획만 출력").action(async (opts) => {
+  const r = await runMigrate({ dryRun: !!opts.dryRun });
+  printMigrateReport(r, !!opts.dryRun);
+  if (r.errors.length > 0)
+    process.exit(1);
+});
 if (process.argv[2] === "init" || process.argv.length <= 2) {
   program.parse(["node", "usage-tracker", "init", ...process.argv.slice(3)]);
 } else {

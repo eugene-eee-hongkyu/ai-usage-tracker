@@ -4,12 +4,13 @@ import { runInit, runRepair, CLI_VERSION } from "./init.js";
 import { runReset } from "./reset.js";
 import { runSync } from "./sync.js";
 import { runDoctor } from "./doctor.js";
+import { runMigrate, printMigrateReport } from "./migrate.js";
 
 const program = new Command();
 
 program
   .name("usage-tracker")
-  .description("Primus Labs Claude Code usage tracker")
+  .description("z21labs Claude Code usage tracker")
   .version(CLI_VERSION);
 
 program
@@ -38,6 +39,16 @@ program
   .description("환경 진단 — Node·npm·codeburn·ccusage·자동화 상태")
   .option("--json", "JSON 으로 출력 (머신 파싱용)")
   .action((opts) => runDoctor({ json: !!opts.json, cliVersion: CLI_VERSION }));
+
+program
+  .command("migrate")
+  .description("primus → z21labs 마이그레이션 (옛 ~/.primus-usage-* → 새 ~/.z21labs/usage-*)")
+  .option("--dry-run", "실제로 변경하지 않고 계획만 출력")
+  .action(async (opts) => {
+    const r = await runMigrate({ dryRun: !!opts.dryRun });
+    printMigrateReport(r, !!opts.dryRun);
+    if (r.errors.length > 0) process.exit(1);
+  });
 
 // Default command when run as `npx ... init` (positional)
 if (process.argv[2] === "init" || process.argv.length <= 2) {
