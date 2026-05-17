@@ -80,6 +80,7 @@ interface RawPeriodData {
 
 interface CcusageDailyRow {
   date?: string;
+  period?: string;  // ccusage 19.x breaking change: row field 'date' → 'period'. 양쪽 모두 호환 위해 정의.
   inputTokens?: number;
   outputTokens?: number;
   cacheCreationTokens?: number;
@@ -87,11 +88,17 @@ interface CcusageDailyRow {
   totalTokens?: number;
 }
 
+// ccusage 19.x 에서 daily row 의 키가 'date' → 'period' 로 breaking change.
+// 본 함수에서 normalize 하여 caller 가 항상 `.date` 사용 가능.
+function normalizeCcusageRow(row: CcusageDailyRow): CcusageDailyRow {
+  return { ...row, date: row.date ?? row.period };
+}
+
 function getCcusageDaily(raw: unknown): CcusageDailyRow[] {
   if (typeof raw !== "object" || raw === null) return [];
   const r = raw as Record<string, unknown>;
   const cu = r.ccusageDaily as { daily?: CcusageDailyRow[] } | undefined;
-  return cu?.daily ?? [];
+  return (cu?.daily ?? []).map(normalizeCcusageRow);
 }
 
 function getPeriodData(raw: unknown, period: string): RawPeriodData {
@@ -571,9 +578,12 @@ export async function GET(req: NextRequest) {
     const s2 = snapMapAll.get(u.id);
     if (!s2) continue;
     const ccu = (s2.rawJson as Record<string, unknown>).ccusageDaily as
-      | { daily?: Array<{ date?: string; inputTokens?: number; cacheReadTokens?: number; cacheCreationTokens?: number }> }
+      | { daily?: Array<{ date?: string; period?: string; inputTokens?: number; cacheReadTokens?: number; cacheCreationTokens?: number }> }
       | undefined;
-    const recent = (ccu?.daily ?? []).filter((d) => d.date && d.date >= sevenDaysAgoKey);
+    // ccusage 19.x: row 키 'date' → 'period'. 양쪽 fallback.
+    const recent = (ccu?.daily ?? [])
+      .map((d) => ({ ...d, date: d.date ?? d.period }))
+      .filter((d) => d.date && d.date >= sevenDaysAgoKey);
     const tRead = recent.reduce((s3, d) => s3 + (d.cacheReadTokens ?? 0), 0);
     const tIn = recent.reduce((s3, d) => s3 + (d.inputTokens ?? 0), 0);
     const tWrite = recent.reduce((s3, d) => s3 + (d.cacheCreationTokens ?? 0), 0);
