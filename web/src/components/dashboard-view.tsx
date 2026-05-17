@@ -872,9 +872,13 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
 
   if (!data) return null;
 
+  // isLocalMode 가 아직 loading (null) 이면 redirect 보류 — null 은 falsy 라
+  // `!isLocalMode` 가 true 로 평가되어 setup 으로 튕기는 race 방지.
+  if (isLocalMode === null) return null;
+
   // 로컬 모드 (.app 인스톨러) 는 setup 흐름이 다름 (위저드 → launchd 자동 등록).
   // sync 가 아직 안 돈 상태여도 setup 페이지로 보내지 않고 빈 dashboard 표시.
-  if (!data.user.lastSyncedAt && !viewOnly && !isLocalMode) {
+  if (!data.user.lastSyncedAt && !viewOnly && isLocalMode === false) {
     router.push("/setup");
     return null;
   }

@@ -333,12 +333,6 @@ async function main() {
   const syncPath = path.join(APP_ROOT, "cli", "sync.mjs");
   ensureLaunchAgentMac(syncPath, CONFIG_FILE);
 
-  // 첫 실행 (data.sqlite3 처음 생성됐거나 user_snapshots 비어있는 경우) sync 한 번
-  // 즉시 트리거 — 사용자가 launchd 사이클 (최대 2h) 기다리지 않게.
-  if (firstRun) {
-    triggerFirstSync(syncPath, CONFIG_FILE);
-  }
-
   const locale = normalizeLocale(app.getLocale());
   const path0 = firstRun ? "/wizard" : "/dashboard";
   const url = `http://localhost:${serverPort}${path0}?locale=${locale}`;
@@ -356,10 +350,23 @@ async function main() {
   mainWindow.loadURL(url);
 
   // 외부 링크는 시스템 브라우저
-  mainWindow.webContents.setWindowOpenHandler(({ url }) => {
-    shell.openExternal(url);
+  mainWindow.webContents.setWindowOpenHandler(({ url: u }) => {
+    shell.openExternal(u);
     return { action: "deny" };
   });
+
+  // 위저드가 /dashboard 로 client-side router.push 하면 그 시점에 sync 한 번 트리거.
+  // 그래야 위저드 save 가 만든 config.json 을 sync 가 읽음 (legacy fallback 아니라).
+  let syncTriggered = false;
+  const onNav = (_e, navUrl) => {
+    if (syncTriggered) return;
+    if (!navUrl.includes("/dashboard")) return;
+    if (!existsSync(CONFIG_FILE)) return;
+    syncTriggered = true;
+    triggerFirstSync(syncPath, CONFIG_FILE);
+  };
+  mainWindow.webContents.on("did-navigate-in-page", onNav);
+  mainWindow.webContents.on("did-navigate", onNav);
 }
 
 app.whenReady().then(() => {
