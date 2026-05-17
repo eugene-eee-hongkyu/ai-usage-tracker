@@ -1,6 +1,31 @@
 import type { Messages } from "./en";
 
 export const ko: Messages = {
+  brand: "AI Usage Tracker",
+  nav: {
+    personal: "개인",
+    team: "팀",
+    setup: "셋업",
+    logout: "로그아웃",
+  },
+  dashboard: {
+    loading: {
+      title: "데이터 수집 중",
+      body1: "codeburn 과 ccusage 가 백그라운드에서 실행 중입니다.",
+      body2: "보통 30초 ~ 1분 안에 자동으로 표시됩니다.",
+      polling: "자동 새로고침 중… (5초마다)",
+    },
+    cards: {
+      myCost: "내 비용",
+      unitCost: "일별 토큰 단가 ($ / 1M)",
+      unitCostHint: "낮을수록 plan 잘 활용 · 활동 없는 날은 line 끊김 · log scale",
+    },
+    syncNeeded: {
+      title: "sync needed",
+      body: "터미널에서 아래 명령어를 실행하세요.",
+      copy: "복사",
+    },
+  },
   wizard: {
     title: "AI Usage Tracker — 셋업",
     step1: {

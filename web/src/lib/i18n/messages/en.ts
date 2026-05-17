@@ -1,7 +1,31 @@
-// 영어 메시지 catalog. 새 locale 추가 시 ko.ts 처럼 Messages 를 import 해서 구조 유지.
-// 누락 키는 컴파일러가 잡아줌 (타입 강제).
+// 영어 카탈로그 — base 타입. 다른 locale 은 Messages 를 import 해서 구조 유지.
 
 export interface Messages {
+  brand: string;
+  nav: {
+    personal: string;
+    team: string;
+    setup: string;
+    logout: string;
+  };
+  dashboard: {
+    loading: {
+      title: string;
+      body1: string;
+      body2: string;
+      polling: string;
+    };
+    cards: {
+      myCost: string;
+      unitCost: string;
+      unitCostHint: string;
+    };
+    syncNeeded: {
+      title: string;
+      body: string;
+      copy: string;
+    };
+  };
   wizard: {
     title: string;
     step1: {
@@ -30,6 +54,31 @@ export interface Messages {
 }
 
 export const en: Messages = {
+  brand: "AI Usage Tracker",
+  nav: {
+    personal: "Personal",
+    team: "Team",
+    setup: "Setup",
+    logout: "Logout",
+  },
+  dashboard: {
+    loading: {
+      title: "Collecting data",
+      body1: "codeburn and ccusage are running in the background.",
+      body2: "It usually takes 30 seconds to 1 minute.",
+      polling: "Auto-refreshing every 5 seconds…",
+    },
+    cards: {
+      myCost: "My Cost",
+      unitCost: "Daily Unit Cost ($ / 1M)",
+      unitCostHint: "Lower = better plan utilization · No-activity days break the line · log scale",
+    },
+    syncNeeded: {
+      title: "sync needed",
+      body: "Run the command below in your terminal.",
+      copy: "Copy",
+    },
+  },
   wizard: {
     title: "AI Usage Tracker — Setup",
     step1: {

@@ -3,32 +3,37 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useSession, signOut } from "next-auth/react";
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import { useLocalModeInfo } from "@/lib/use-local-mode";
+import { useMessages } from "@/lib/use-i18n";
 
-export function Nav() {
+function NavInner() {
   const path = usePathname();
   const { data: session } = useSession();
   const [open, setOpen] = useState(false);
   const { isLocalMode, companyUrl } = useLocalModeInfo();
+  const { m, locale } = useMessages();
 
   // 메뉴 구성 — 모드별 분기:
-  //   서버 (Vercel) : 개인 / 팀 / 셋업
-  //   로컬 + 회사   : 개인 / 팀 (외부 링크). 셋업 숨김 (인스톨러가 셋업)
-  //   로컬 단독     : 개인 만. 팀/셋업 모두 숨김
+  //   서버 (Vercel)        : 개인 / 팀 / 셋업
+  //   로컬 + 회사 destination : 개인 / 팀 (외부 ↗). 셋업 숨김
+  //   로컬 단독              : 개인 만
   type Tab = { href: string; label: string; external?: boolean };
-  const tabs: Tab[] = [{ href: "/dashboard", label: "개인" }];
+  const tabs: Tab[] = [{ href: "/dashboard", label: m.nav.personal }];
   if (isLocalMode) {
-    if (companyUrl) tabs.push({ href: `${companyUrl}/team`, label: "팀", external: true });
+    if (companyUrl) tabs.push({ href: `${companyUrl}/team`, label: m.nav.team, external: true });
   } else {
-    tabs.push({ href: "/team", label: "팀" });
-    tabs.push({ href: "/setup-status", label: "셋업" });
+    tabs.push({ href: "/team", label: m.nav.team });
+    tabs.push({ href: "/setup-status", label: m.nav.setup });
   }
+
+  // dashboard / team 등 내부 링크에 현재 locale 유지.
+  const withLocale = (href: string) => (href.includes("?") ? href : `${href}?locale=${locale}`);
 
   return (
     <header className="border-b border-slate-800 px-4 py-3 flex items-center justify-between gap-2">
       <div className="flex items-center gap-3 min-w-0">
-        <span className="font-bold text-slate-200 shrink-0 hidden sm:block">Primus Usage</span>
+        <span className="font-bold text-slate-200 shrink-0 hidden sm:block">{m.brand}</span>
         <nav className="flex gap-1 sm:gap-3">
           {tabs.map((t) =>
             t.external ? (
@@ -45,7 +50,7 @@ export function Nav() {
             ) : (
               <Link
                 key={t.href}
-                href={t.href}
+                href={withLocale(t.href)}
                 data-testid={`nav-tab-${t.href.replace(/^\//, "")}`}
                 className={`text-sm px-2 sm:px-3 py-1 rounded transition-colors whitespace-nowrap inline-flex items-center gap-1 ${
                   path.startsWith(t.href)
@@ -66,10 +71,8 @@ export function Nav() {
           className="text-sm text-slate-400 hover:text-slate-200 flex items-center gap-1 whitespace-nowrap"
         >
           {session?.user?.name?.split(" ")[0]}
-          {/* 로컬 모드는 dropdown 메뉴 없음 — 화살표 숨김 */}
           {!isLocalMode && " ▾"}
         </button>
-        {/* dropdown — 로컬 모드 미표시 (NextAuth 안 쓰니 logout 의미 없음) */}
         {open && !isLocalMode && (
           <div className="absolute right-0 top-8 bg-slate-800 border border-slate-700 rounded shadow-lg z-50 whitespace-nowrap">
             <button
@@ -77,11 +80,19 @@ export function Nav() {
               onClick={() => signOut({ callbackUrl: "/login" })}
               className="block px-4 py-2 text-sm text-slate-300 hover:bg-slate-700 w-full text-left"
             >
-              로그아웃
+              {m.nav.logout}
             </button>
           </div>
         )}
       </div>
     </header>
+  );
+}
+
+export function Nav() {
+  return (
+    <Suspense fallback={<header className="border-b border-slate-800 h-12" />}>
+      <NavInner />
+    </Suspense>
   );
 }

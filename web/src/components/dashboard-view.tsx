@@ -15,6 +15,7 @@ import {
 import { useSession, signOut } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { useLocalMode } from "@/lib/use-local-mode";
+import { useMessages } from "@/lib/use-i18n";
 import { Nav } from "@/components/nav";
 import { AdminNav } from "@/components/admin-nav";
 import { CacheHitModal, OneShotRateModal, CostPerSessionModal, CallsPerSessionModal, CostPerCallModal, TokenVolumeModal } from "@/components/metric-modal";
@@ -694,6 +695,7 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
 
   // 로컬 모드 (.pkg/.app 설치 환경) 면 NextAuth session 없이도 작동.
   const isLocalMode = useLocalMode();
+  const { m: t } = useMessages();
 
   useEffect(() => {
     const saved = localStorage.getItem(storageKey);
@@ -928,17 +930,16 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
       return (
         <div className="min-h-screen bg-neutral-950">
           <header className="border-b border-neutral-800 px-4 py-3 flex items-center justify-between">
-            <span className="font-mono font-bold text-neutral-200">AI Usage Tracker</span>
+            <span className="font-mono font-bold text-neutral-200">{t.brand}</span>
           </header>
           <main className="max-w-md mx-auto px-4 py-20 text-center space-y-8">
-            {/* 브랜드 로고 (favicon.svg) 의 arc 를 회전시켜 progress spinner 로 활용 */}
             <div className="flex justify-center">
               <svg
                 width="96"
                 height="96"
                 viewBox="0 0 32 32"
                 xmlns="http://www.w3.org/2000/svg"
-                aria-label="로딩 중"
+                aria-label={t.dashboard.loading.title}
               >
                 <rect x="2" y="2" width="28" height="28" rx="6" fill="#10b981" />
                 <circle
@@ -963,16 +964,14 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
               <style>{`@keyframes wizardSpin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
             </div>
             <div className="space-y-2">
-              <h1 className="text-xl font-bold text-neutral-100">데이터 수집 중</h1>
+              <h1 className="text-xl font-bold text-neutral-100">{t.dashboard.loading.title}</h1>
               <p className="text-neutral-400 text-sm">
-                codeburn 과 ccusage 가 백그라운드에서 실행 중입니다.
+                {t.dashboard.loading.body1}
                 <br />
-                보통 30초 ~ 1분 안에 자동으로 표시됩니다.
+                {t.dashboard.loading.body2}
               </p>
             </div>
-            <p className="text-xs text-neutral-600 font-mono">
-              자동 새로고침 중… (5초마다)
-            </p>
+            <p className="text-xs text-neutral-600 font-mono">{t.dashboard.loading.polling}</p>
           </main>
         </div>
       );
@@ -987,15 +986,15 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
           <button onClick={() => signOut({ callbackUrl: "/login" })} className="text-sm text-neutral-500 hover:text-neutral-300 font-mono">logout</button>
         </header>
         <main data-testid="dash-sync-needed" className="max-w-md mx-auto px-4 py-20 text-center space-y-6">
-          <h1 className="text-2xl font-bold text-neutral-100 font-mono">sync needed</h1>
-          <p className="text-neutral-400 text-sm font-mono">터미널에서 아래 명령어를 실행하세요.</p>
+          <h1 className="text-2xl font-bold text-neutral-100 font-mono">{t.dashboard.syncNeeded.title}</h1>
+          <p className="text-neutral-400 text-sm font-mono">{t.dashboard.syncNeeded.body}</p>
           <div className="flex items-center gap-2 bg-neutral-900 border border-neutral-800 rounded px-4 py-3 text-left">
             <code data-testid="dash-sync-cmd" className="flex-1 text-sm text-cyan-400 font-mono break-all">{syncCmd}</code>
             <button
               data-testid="dash-sync-copy"
               onClick={() => { navigator.clipboard.writeText(syncCmd); setSyncCopied(true); setTimeout(() => setSyncCopied(false), 2000); }}
               className="shrink-0 px-3 py-1 bg-indigo-600 hover:bg-indigo-500 text-white text-xs rounded font-mono"
-            >{syncCopied ? "✓" : "복사"}</button>
+            >{syncCopied ? "✓" : t.dashboard.syncNeeded.copy}</button>
           </div>
         </main>
       </div>
@@ -1300,7 +1299,7 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
               살짝 짙은 amber 로 연속성 + 차별화. */}
           <div data-testid="dash-card-cost-trend" className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-amber-500 rounded">
             <div className="px-3 py-2 border-b border-neutral-800">
-              <span className="text-xs font-mono font-bold text-amber-400 uppercase tracking-wider">My Cost</span>
+              <span className="text-xs font-mono font-bold text-amber-400 uppercase tracking-wider">{t.dashboard.cards.myCost}</span>
             </div>
             <div className="p-3">
               {chartData.length === 0 ? (
@@ -1343,7 +1342,7 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
               "plan 활용 효율" 의 별도 metric 위계 강조. */}
           <div data-testid="dash-card-unit-cost" className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-emerald-500 rounded">
             <div className="px-3 py-2 border-b border-neutral-800">
-              <span className="text-xs font-mono font-bold text-emerald-400 uppercase tracking-wider">일별 토큰 단가 ($ / 1M)</span>
+              <span className="text-xs font-mono font-bold text-emerald-400 uppercase tracking-wider">{t.dashboard.cards.unitCost}</span>
             </div>
             <div className="p-3">
               {(() => {
@@ -1395,7 +1394,7 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
                       </LineChart>
                     </ResponsiveContainer>
                     <p className="text-[10px] font-mono text-neutral-600 mt-1.5">
-                      낮을수록 plan 잘 활용 · 활동 없는 날은 line 끊김 · log scale
+                      {t.dashboard.cards.unitCostHint}
                     </p>
                   </>
                 );
