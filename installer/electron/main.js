@@ -97,12 +97,23 @@ const NEW_LAUNCH_AGENT_PATH = path.join(
   `${NEW_LAUNCH_AGENT_LABEL}.plist`
 );
 const COMPANY_URL = "https://aiusage.z21labs.world";
+const MAIN_LOG_FILE = path.join(DATA_DIR, "main.log");
 
 // ────────────────────────────────────────────────────────────────────────────
 // helpers
 
+// .app 더블클릭 실행 시 main process 의 console.log 는 어디로도 안 감.
+// 진단 가능한 위치로 보내야 ensureRuntimeDeps / config sync 같은 사일런트
+// 실패를 추적할 수 있다. server.log 는 standalone server child 전용이라 분리.
 function log(msg) {
-  console.log(`[main] ${msg}`);
+  const line = `[${new Date().toISOString()}] [main] ${msg}\n`;
+  console.log(line.trim());
+  try {
+    if (!existsSync(DATA_DIR)) mkdirSync(DATA_DIR, { recursive: true });
+    require("fs").appendFileSync(MAIN_LOG_FILE, line);
+  } catch {
+    // logging 실패는 silent — main process 진행에 영향 안 줘야 함
+  }
 }
 
 function ensureDataDir() {
@@ -176,6 +187,22 @@ async function ensureRuntimeDeps() {
 
   // 이미 동일 버전 설치되어 있으면 skip.
   const stagedKey = packages.map((p) => `${p.name}@${p.version}`).sort().join(",");
+  const codeburnBin = path.join(RUNTIME_BIN, "codeburn");
+  const ccusageBin = path.join(RUNTIME_BIN, "ccusage");
+  const binsExist = existsSync(codeburnBin) && existsSync(ccusageBin);
+
+  function writeManifest() {
+    try {
+      writeFileSync(
+        RUNTIME_MANIFEST,
+        JSON.stringify({ installedAt: new Date().toISOString(), packages }, null, 2)
+      );
+      log(`installed.json 작성 완료: ${RUNTIME_MANIFEST}`);
+    } catch (e) {
+      log(`installed.json 작성 실패 (계속 진행): ${e.message}`);
+    }
+  }
+
   if (existsSync(RUNTIME_MANIFEST)) {
     try {
       const installed = JSON.parse(readFileSync(RUNTIME_MANIFEST, "utf8"));
@@ -183,13 +210,19 @@ async function ensureRuntimeDeps() {
         .map((p) => `${p.name}@${p.version}`)
         .sort()
         .join(",");
-      if (installedKey === stagedKey && existsSync(path.join(RUNTIME_BIN, "codeburn"))) {
+      if (installedKey === stagedKey && binsExist) {
         log(`runtime deps 이미 설치됨 (${installedKey}) — skip`);
         return;
       }
     } catch {
       // 매니페스트 손상 — 재설치
     }
+  } else if (binsExist) {
+    // installed.json 만 없고 .bin/* 은 이미 정상 — cp 는 이전 launch 에서 성공했는데
+    // writeFileSync 가 어떤 이유로 실패했던 상태. 다시 cp 할 필요 없이 매니페스트만 박는다.
+    log(`installed.json 없음 but .bin/codeburn + .bin/ccusage 존재 — 매니페스트만 보강`);
+    writeManifest();
+    return;
   }
 
   const prebuiltDir = isDev
@@ -212,13 +245,14 @@ async function ensureRuntimeDeps() {
   // symlink (.bin/* → ../<pkg>/bin/...) 보존 — `cp -RP` (preserve symlinks
   // verbatim). Node 의 fs.cpSync 는 기본값으로 symlink target 을 resolve 해버려
   // 상대 경로가 절대 경로로 깨진다.
-  execSync(`cp -RP "${prebuiltNm}" "${targetNm}"`, { stdio: "ignore" });
-
-  writeFileSync(
-    RUNTIME_MANIFEST,
-    JSON.stringify({ installedAt: new Date().toISOString(), packages }, null, 2)
-  );
+  try {
+    execSync(`cp -RP "${prebuiltNm}" "${targetNm}"`, { stdio: "pipe" });
+  } catch (e) {
+    log(`cp -RP 실패: ${e.message}`);
+    throw e;
+  }
   log(`runtime deps 복사 완료 — ${RUNTIME_BIN}`);
+  writeManifest();
 }
 
 function buildEnrichedPath() {
@@ -474,6 +508,40 @@ function normalizeLocale(input) {
   return ["en", "ko"].includes(lang) ? lang : "en";
 }
 
+// config.json 의 name === "local" destination URL 을 현재 server port 로 자동 갱신.
+// 위저드가 `http://localhost:${window.location.port}` 으로 박은 값이 다음 launch 의
+// 새 동적 port (findFreePort) 와 어긋나는 문제를 해결. launchd sync 가 항상 살아 있는
+// 새 server 로 POST 하도록 유지.
+//
+// 사용자가 손편집한 "local" 도 덮어쓰지만, 자연 흐름엔 그런 케이스 없음 (위저드가
+// 항상 localhost 로 set + 사용자가 손편집할 동기 없음).
+function syncLocalDestinationPort(port) {
+  if (!existsSync(CONFIG_FILE)) return;
+  let cfg;
+  try {
+    cfg = JSON.parse(readFileSync(CONFIG_FILE, "utf8"));
+  } catch (e) {
+    log(`config.json 파싱 실패 — local port 동기화 skip: ${e.message}`);
+    return;
+  }
+  if (!cfg || !Array.isArray(cfg.destinations)) return;
+  const desired = `http://localhost:${port}`;
+  let changed = false;
+  for (const d of cfg.destinations) {
+    if (d?.name === "local" && d.url !== desired) {
+      log(`config.json local destination 갱신: ${d.url} → ${desired}`);
+      d.url = desired;
+      changed = true;
+    }
+  }
+  if (!changed) return;
+  try {
+    writeFileSync(CONFIG_FILE, JSON.stringify(cfg, null, 2) + "\n", { mode: 0o600 });
+  } catch (e) {
+    log(`config.json 쓰기 실패: ${e.message}`);
+  }
+}
+
 // ────────────────────────────────────────────────────────────────────────────
 // app lifecycle
 
@@ -497,6 +565,10 @@ async function main() {
   if (!ready) {
     throw new Error(`server 시작 실패 — 로그: ${LOG_FILE}`);
   }
+
+  // server ready 후 config.json local destination port 동기화 — 매 launch 마다
+  // 동적 port 잡으므로 옛 port 가 stale 상태가 되는 걸 방지.
+  syncLocalDestinationPort(serverPort);
 
   // sync launchd 등록 — 패키지된 cli/sync.mjs 위치
   const syncPath = path.join(APP_ROOT, "cli", "sync.mjs");
