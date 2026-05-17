@@ -49,10 +49,17 @@ installer/electron/build-resources/cert.*
 # cli/bin/ 은 커밋 대상 (npx 실행용 번들)
 
 # ── 하네스 내부 상태 ──────────────────────────────
-.claude/settings.local.json
-.claude/scheduled_tasks.lock
-.harness/.last-worklog
-.harness/.last-notified
+# Internal ops content lives in sibling repo `ai-usage-tracker-ops`.
+# Public clone sees broken symlinks here — that's intentional.
+.claude
+.harness
+docs/internal
+docs/runs
+docs/qa-output
+docs/D-1.homepage-context-brief.md
+docs/D-2a.manager-self-interview.md
+docs/D-2b.user-interview-script.md
+docs/e2e-v2/phase0-prerequisites.md
 
 # ── 테스트 / 커버리지 ─────────────────────────────
 coverage/
