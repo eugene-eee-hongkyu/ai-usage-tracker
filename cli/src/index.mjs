@@ -1966,7 +1966,14 @@ function migrateApiKeyFile(report, dryRun) {
 async function migrateKeytar(report, dryRun) {
   let keytar = null;
   try {
-    keytar = await import("keytar");
+    const kt = await import("keytar");
+    const resolved = kt.default ?? kt;
+    keytar = resolved;
+    if (typeof keytar?.setPassword !== "function") {
+      report.keytar = "unavailable";
+      report.notes.push("keytar import 했지만 setPassword 없음 — native module 호환 이슈로 keytar 단계 skip.");
+      return;
+    }
   } catch {
     report.keytar = "unavailable";
     return;

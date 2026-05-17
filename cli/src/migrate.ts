@@ -109,9 +109,23 @@ function migrateApiKeyFile(report: MigrateReport, dryRun: boolean): void {
 }
 
 async function migrateKeytar(report: MigrateReport, dryRun: boolean): Promise<void> {
-  let keytar: typeof import("keytar") | null = null;
+  // ESM/CommonJS 호환 unwrap — init.ts 의 getKeytar() 와 동일 패턴.
+  // keytar 7.x 는 CommonJS 라 `await import("keytar")` 가 namespace wrapper 반환.
+  // setPassword 등 메서드는 .default 에 있을 수도 있고 namespace 자체에 있을 수도.
+  let keytar: {
+    getPassword: (s: string, a: string) => Promise<string | null>;
+    setPassword: (s: string, a: string, p: string) => Promise<void>;
+    deletePassword: (s: string, a: string) => Promise<boolean>;
+  } | null = null;
   try {
-    keytar = (await import("keytar")) as unknown as typeof import("keytar");
+    const kt = await import("keytar");
+    const resolved = (kt as { default?: unknown }).default ?? kt;
+    keytar = resolved as typeof keytar;
+    if (typeof keytar?.setPassword !== "function") {
+      report.keytar = "unavailable";
+      report.notes.push("keytar import 했지만 setPassword 없음 — native module 호환 이슈로 keytar 단계 skip.");
+      return;
+    }
   } catch {
     report.keytar = "unavailable";
     return;
