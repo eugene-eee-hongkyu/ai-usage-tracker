@@ -1,14 +1,18 @@
+export const dynamic = "force-dynamic";
+
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import { db, users } from "@/lib/db";
+import { db, users, IS_LOCAL_MODE } from "@/lib/db";
+import { getAuthedEmail } from "@/lib/local-user";
 import { eq } from "drizzle-orm";
 
 const VALID_TIERS = ["pro", "max5", "max20", "team_standard", "team_premium", "team", "api"] as const;
 
 export async function PATCH(req: NextRequest) {
-  const session = await getServerSession(authOptions);
-  if (!session?.user?.email)
+  const session = IS_LOCAL_MODE ? null : await getServerSession(authOptions);
+  const authedEmail = await getAuthedEmail(session?.user?.email);
+  if (!authedEmail)
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
 
   const body = await req.json().catch(() => ({}));
@@ -16,7 +20,7 @@ export async function PATCH(req: NextRequest) {
 
   // null 또는 빈 문자열 → 클리어 (자동 추정만 사용)
   if (tier === null || tier === "") {
-    await db.update(users).set({ planTier: null }).where(eq(users.email, session.user.email));
+    await db.update(users).set({ planTier: null }).where(eq(users.email, authedEmail));
     return NextResponse.json({ ok: true, planTier: null });
   }
 
@@ -27,6 +31,6 @@ export async function PATCH(req: NextRequest) {
     );
   }
 
-  await db.update(users).set({ planTier: tier }).where(eq(users.email, session.user.email));
+  await db.update(users).set({ planTier: tier }).where(eq(users.email, authedEmail));
   return NextResponse.json({ ok: true, planTier: tier });
 }

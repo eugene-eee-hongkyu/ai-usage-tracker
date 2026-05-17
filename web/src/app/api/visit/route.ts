@@ -1,7 +1,10 @@
+export const dynamic = "force-dynamic";
+
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import { db, dailyVisits, users } from "@/lib/db";
+import { db, dailyVisits, users, IS_LOCAL_MODE } from "@/lib/db";
+import { getAuthedEmail } from "@/lib/local-user";
 import { eq, sql } from "drizzle-orm";
 
 // POST /api/visit
@@ -12,14 +15,15 @@ import { eq, sql } from "drizzle-orm";
 // today 는 사용자 timezone 기준 (users.timezone, NULL 이면 UTC).
 // 같은 (user_id, date) 행이 있으면 count + 1 atomic 증가.
 export async function POST() {
-  const session = await getServerSession(authOptions);
-  if (!session?.user?.email)
+  const session = IS_LOCAL_MODE ? null : await getServerSession(authOptions);
+  const authedEmail = await getAuthedEmail(session?.user?.email);
+  if (!authedEmail)
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
 
   const userRow = await db
     .select({ id: users.id, timezone: users.timezone })
     .from(users)
-    .where(eq(users.email, session.user.email))
+    .where(eq(users.email, authedEmail))
     .limit(1);
 
   if (!userRow[0]) return NextResponse.json({ error: "not found" }, { status: 404 });
