@@ -166,6 +166,33 @@ async function waitForServer(port, timeoutMs = 30000) {
   return false;
 }
 
+// 첫 실행 시 cli/sync.mjs 한 번 백그라운드 실행 — launchd 다음 사이클 (최대 2h) 까지
+// 기다리지 않고 즉시 데이터 채움. 사용자가 dashboard 새로고침하면 표시됨.
+function triggerFirstSync(syncPath, configPath) {
+  if (!existsSync(syncPath)) {
+    log(`sync.mjs 없음 (${syncPath}) — first-run sync 건너뜀`);
+    return;
+  }
+  const nodeBin = findSystemNode();
+  if (!nodeBin) {
+    log("시스템 Node 없음 — first-run sync 건너뜀");
+    return;
+  }
+  const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+  const syncLog = openSync(path.join(DATA_DIR, "sync.log"), "a");
+  const proc = spawn(nodeBin, [syncPath], {
+    env: {
+      ...process.env,
+      USAGE_TRACKER_CONFIG: configPath,
+      TZ: tz,
+    },
+    stdio: ["ignore", syncLog, syncLog],
+    detached: true,
+  });
+  proc.unref();
+  log(`first-run sync 트리거 (PID ${proc.pid})`);
+}
+
 function ensureLaunchAgentMac(syncPath, configPath) {
   if (process.platform !== "darwin") return;
   if (existsSync(LEGACY_LAUNCH_AGENT)) return;  // legacy 그대로
@@ -305,6 +332,12 @@ async function main() {
   // sync launchd 등록 — 패키지된 cli/sync.mjs 위치
   const syncPath = path.join(APP_ROOT, "cli", "sync.mjs");
   ensureLaunchAgentMac(syncPath, CONFIG_FILE);
+
+  // 첫 실행 (data.sqlite3 처음 생성됐거나 user_snapshots 비어있는 경우) sync 한 번
+  // 즉시 트리거 — 사용자가 launchd 사이클 (최대 2h) 기다리지 않게.
+  if (firstRun) {
+    triggerFirstSync(syncPath, CONFIG_FILE);
+  }
 
   const locale = normalizeLocale(app.getLocale());
   const path0 = firstRun ? "/wizard" : "/dashboard";
