@@ -159,6 +159,83 @@ export interface Messages {
     unitCostAnchorWastedHeavy: string;     // plan 거의 안 씀 — API 직접 호출이 훨씬 쌈
     unitCostNoData: string;                // 데이터 없음
   };
+  teamPlanHealth: {
+    cardTitle: string;
+    currentDistribution: string;
+    recommendedDistribution: string;
+    perMonthSuffix: string;
+    monthlySavings: string;
+    monthlyExtraAfterUpgrade: string;
+    actionFirstCount: string;
+    colMember: string;
+    colCurrent: string;
+    colVerdict: string;
+    colRecommended: string;
+    colDelta: string;
+    estimated: string;
+    notEntered: string;
+    keep: string;
+    verdictDowngrade: string;
+    verdictFit: string;
+    verdictTight: string;
+    verdictOver: string;
+    footnote: string;
+  };
+  planHealth: {
+    cardTitle: string;
+    p90Suffix: string;
+    autoEstimated: string;
+    estimatedDetails: string;
+    yourTier: string;
+    saved: string;
+    utilizationLine: string;
+    monthlySavings: string;
+    monthlyExtra: string;
+    actionFirst: string;
+    reasoningSummary: string;
+    reasoningFootnote: string;
+    verdictDowngrade: string;
+    verdictFit: string;
+    verdictTight: string;
+    verdictOver: string;
+    verdictUnknown: string;
+    tierUnknown: string;
+    tierApi: string;
+  };
+  scoreDrilldown: {
+    weeklyAvgTitle: string;
+    dailyTitle: string;
+    weeksSuffix: string;
+    daysSuffix: string;
+    activeNDays: string;
+    todayInProgress: string;
+    legendExemplary: string;
+    legendGood: string;
+    legendModerate: string;
+    legendInsufficient: string;
+    legendWarning: string;
+    bigChangeTitle: string;
+    stableNote: string;
+    causeIntro: string;
+    causeWeight: string;
+    causeFallback: string;
+    causeCache: string;
+    causeOneShot: string;
+    causeCostCall: string;
+    causeTokenVolume: string;
+  };
+  privacy: {
+    banner: string;
+    bannerEm1: string;
+    bannerEm2: string;
+    dismissAria: string;
+    footerNote: string;
+  };
+  adminNav: {
+    team: string;
+    members: string;
+    home: string;
+  };
   metricModal: {
     common: {
       what: string;        // {label}이란
@@ -649,6 +726,85 @@ export const en: Messages = {
     unitCostAnchorWasted10x: "10× more expensive than direct API",
     unitCostAnchorWastedHeavy: "Barely using the plan — direct API is much cheaper",
     unitCostNoData: "no data",
+  },
+  teamPlanHealth: {
+    cardTitle: "Team Plan Health",
+    currentDistribution: "Current distribution",
+    recommendedDistribution: "Recommended distribution",
+    perMonthSuffix: "${n}/mo",
+    monthlySavings: "▼ Save ${n}/mo",
+    monthlyExtraAfterUpgrade: "▲ +${n}/mo (after upgrade)",
+    actionFirstCount: "💡 Improve efficiency first: {n} members",
+    colMember: "Member",
+    colCurrent: "Current",
+    colVerdict: "Verdict",
+    colRecommended: "Recommended",
+    colDelta: "Δ",
+    estimated: " (estimated)",
+    notEntered: " (not entered)",
+    keep: "(keep)",
+    verdictDowngrade: "▼ Downgrade",
+    verdictFit: "✓ Fit",
+    verdictTight: "▲ Tight",
+    verdictOver: "▲▲ At cap",
+    footnote:
+      "※ Plan limits are community-P90 estimates. 30-day window, members with 7+ active days only. 💡 = improve efficiency before plan upgrade.",
+  },
+  planHealth: {
+    cardTitle: "📊 Plan Health",
+    p90Suffix: "Last 30d P90 = {n} tokens/5h",
+    autoEstimated: "Auto-estimated tier: ",
+    estimatedDetails: "(blocks {blocks}, active {days}d)",
+    yourTier: "Your tier:",
+    saved: "✓ Saved",
+    utilizationLine: "{n}% of {label} limit",
+    monthlySavings: "Save ${n}/mo",
+    monthlyExtra: "+${n}/mo",
+    actionFirst: "💡 Improve efficiency before upgrading the plan",
+    reasoningSummary: "Why ▼",
+    reasoningFootnote:
+      "※ Plan limits are community-P90 estimates. No Anthropic official disclosure.",
+    verdictDowngrade: "Downgrade possible",
+    verdictFit: "Fit",
+    verdictTight: "Tight",
+    verdictOver: "At cap",
+    verdictUnknown: "Insufficient data",
+    tierUnknown: "Unknown",
+    tierApi: "API (pay-as-you-go)",
+  },
+  scoreDrilldown: {
+    weeklyAvgTitle: "Weekly avg efficiency",
+    dailyTitle: "Daily efficiency",
+    weeksSuffix: "wk",
+    daysSuffix: "d",
+    activeNDays: "Active {a}/{total} days",
+    todayInProgress: "Today (in progress · excluded from comparison)",
+    legendExemplary: "Exemplary 90+",
+    legendGood: "Good 75–89",
+    legendModerate: "Moderate 55–74",
+    legendInsufficient: "Needs work 35–54",
+    legendWarning: "Warning <35",
+    bigChangeTitle: "Days with big swings (±{threshold} pts vs. previous)",
+    stableNote: "✓ Efficiency over the last {n}{unit} was stable.",
+    causeIntro: "Main cause:",
+    causeWeight: "({from} → {to}) ({sign}{delta} pts)",
+    causeFallback: "Each metric moved little — no single cause stands out.",
+    causeCache: "Cache hit",
+    causeOneShot: "One-shot rate",
+    causeCostCall: "Cost / call",
+    causeTokenVolume: "Total usage",
+  },
+  privacy: {
+    banner: "🔒 This tool only collects",
+    bannerEm1: "token count · tool names",
+    bannerEm2: "Code · prompts · Claude responses are NOT collected.",
+    dismissAria: "Dismiss notice",
+    footerNote: "🔒 Metadata-only collection — code · prompts · response text are NOT collected",
+  },
+  adminNav: {
+    team: "Team",
+    members: "Members",
+    home: "Home",
   },
   metricModal: {
     common: {

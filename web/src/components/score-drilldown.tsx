@@ -5,6 +5,12 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Cell, LabelList,
 } from "recharts";
 import { computeTokenLevel } from "@/lib/rules";
+import { useMessages } from "@/lib/use-i18n";
+import type { Messages } from "@/lib/i18n";
+
+function tmpl(template: string, vars: Record<string, string | number>): string {
+  return template.replace(/\{(\w+)\}/g, (_, k) => String(vars[k] ?? ""));
+}
 
 export type DrilldownPeriod = "8days" | "month" | "30days" | "all";
 
@@ -102,7 +108,7 @@ function isoWeekKey(d: Date): string {
   return `${d.getUTCFullYear()}-W${String(week).padStart(2, "0")}`;
 }
 
-function buildChangeAnalysis(entries: DailyScoreEntry[], todayKey: string): ChangeEvent[] {
+function buildChangeAnalysis(entries: DailyScoreEntry[], todayKey: string, m: Messages): ChangeEvent[] {
   const events: ChangeEvent[] = [];
   for (let i = 1; i < entries.length; i++) {
     const cur = entries[i];
@@ -122,7 +128,7 @@ function buildChangeAnalysis(entries: DailyScoreEntry[], todayKey: string): Chan
       const w = 42 * (norm(cur.cacheHitPct) - norm(prev.cacheHitPct));
       if (Math.abs(w) >= 3) {
         causes.push({
-          label: "캐시 적중률",
+          label: m.scoreDrilldown.causeCache,
           from: `${prev.cacheHitPct.toFixed(0)}%`,
           to: `${cur.cacheHitPct.toFixed(0)}%`,
           weight: w,
@@ -135,7 +141,7 @@ function buildChangeAnalysis(entries: DailyScoreEntry[], todayKey: string): Chan
       const w = 18 * (norm(cur.oneShotRate) - norm(prev.oneShotRate));
       if (Math.abs(w) >= 3) {
         causes.push({
-          label: "한 번에 끝낸 비율",
+          label: m.scoreDrilldown.causeOneShot,
           from: `${prev.oneShotRate.toFixed(0)}%`,
           to: `${cur.oneShotRate.toFixed(0)}%`,
           weight: w,
@@ -148,7 +154,7 @@ function buildChangeAnalysis(entries: DailyScoreEntry[], todayKey: string): Chan
       const w = 10 * (norm(cur.costPerCall) - norm(prev.costPerCall));
       if (Math.abs(w) >= 3) {
         causes.push({
-          label: "호출당 비용",
+          label: m.scoreDrilldown.causeCostCall,
           from: `$${prev.costPerCall.toFixed(3)}`,
           to: `$${cur.costPerCall.toFixed(3)}`,
           weight: w,
@@ -160,7 +166,7 @@ function buildChangeAnalysis(entries: DailyScoreEntry[], todayKey: string): Chan
       const w = 30 * ((computeTokenLevel(cur.totalTokens) - computeTokenLevel(prev.totalTokens)) / 10);
       if (Math.abs(w) >= 3) {
         causes.push({
-          label: "총 사용량",
+          label: m.scoreDrilldown.causeTokenVolume,
           from: fmtTokens(prev.totalTokens),
           to: fmtTokens(cur.totalTokens),
           weight: w,
@@ -185,6 +191,7 @@ function buildChangeAnalysis(entries: DailyScoreEntry[], todayKey: string): Chan
 }
 
 export function ScoreDrilldown({ daily, period }: Props) {
+  const { m } = useMessages();
   const todayKey = new Date().toISOString().slice(0, 10);
 
   const { chartData, activeDays, totalDays, isWeekly, changeEvents } = useMemo(() => {
@@ -227,7 +234,7 @@ export function ScoreDrilldown({ daily, period }: Props) {
     }
 
     const activeDays = allEntries.filter((e) => e.score !== null).length;
-    const events = buildChangeAnalysis(allEntries, todayKey);
+    const events = buildChangeAnalysis(allEntries, todayKey, m);
 
     return {
       chartData: data,
@@ -236,7 +243,7 @@ export function ScoreDrilldown({ daily, period }: Props) {
       isWeekly: weekly,
       changeEvents: events,
     };
-  }, [daily, period, todayKey]);
+  }, [daily, period, todayKey, m]);
 
   const lowActivity = totalDays > 0 && activeDays / totalDays < 0.5;
   const showLabels = chartData.length <= LABEL_THRESHOLD;
@@ -246,11 +253,11 @@ export function ScoreDrilldown({ daily, period }: Props) {
       <div className="max-w-6xl mx-auto space-y-3">
         <div className="flex items-baseline justify-between gap-2">
           <span className="text-[10px] font-mono text-neutral-500 uppercase tracking-wider">
-            {isWeekly ? "주간 평균 효율 점수" : "일별 효율 점수"} · {totalDays}{isWeekly ? "주" : "일"}
+            {isWeekly ? m.scoreDrilldown.weeklyAvgTitle : m.scoreDrilldown.dailyTitle} · {totalDays}{isWeekly ? m.scoreDrilldown.weeksSuffix : m.scoreDrilldown.daysSuffix}
           </span>
           {lowActivity && (
             <span className="text-[10px] font-mono text-amber-400">
-              활동일 {activeDays}/{totalDays}일
+              {tmpl(m.scoreDrilldown.activeNDays, { a: activeDays, total: totalDays })}
             </span>
           )}
         </div>
@@ -297,23 +304,23 @@ export function ScoreDrilldown({ daily, period }: Props) {
         </div>
 
         <div className="flex items-center gap-2.5 text-[10px] font-mono text-neutral-500 flex-wrap">
-          <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-emerald-500" />탁월 90+</span>
-          <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-lime-600" />양호 75–89</span>
-          <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-yellow-600" />보통 55–74</span>
-          <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-orange-600" />부족 35–54</span>
-          <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-red-700" />경고 &lt;35</span>
+          <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-emerald-500" />{m.scoreDrilldown.legendExemplary}</span>
+          <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-lime-600" />{m.scoreDrilldown.legendGood}</span>
+          <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-yellow-600" />{m.scoreDrilldown.legendModerate}</span>
+          <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-orange-600" />{m.scoreDrilldown.legendInsufficient}</span>
+          <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-red-700" />{m.scoreDrilldown.legendWarning}</span>
           {chartData.some((d) => d.isToday) && !isWeekly && (
             <span className="flex items-center gap-1 ml-2 text-neutral-400">
-              <span className="w-2.5 h-2.5 rounded-sm bg-neutral-600 opacity-50" /> 오늘 (진행 중 · 비교 제외)
+              <span className="w-2.5 h-2.5 rounded-sm bg-neutral-600 opacity-50" /> {m.scoreDrilldown.todayInProgress}
             </span>
           )}
         </div>
 
         <div className="pt-2 border-t border-neutral-800/60">
-          <span className="text-[10px] font-mono text-neutral-500 uppercase tracking-wider">변동이 컸던 날 (전일 대비 ±{CHANGE_THRESHOLD}점 이상)</span>
+          <span className="text-[10px] font-mono text-neutral-500 uppercase tracking-wider">{tmpl(m.scoreDrilldown.bigChangeTitle, { threshold: CHANGE_THRESHOLD })}</span>
           {changeEvents.length === 0 ? (
             <p data-testid="score-drilldown-no-events" className="text-xs text-neutral-500 mt-2 font-mono">
-              ✓ 지난 {totalDays}{isWeekly ? "주" : "일"} 효율 점수는 안정적이었습니다.
+              {tmpl(m.scoreDrilldown.stableNote, { n: totalDays, unit: isWeekly ? m.scoreDrilldown.weeksSuffix : m.scoreDrilldown.daysSuffix })}
             </p>
           ) : (
             <ul data-testid="score-drilldown-events" className="mt-2 space-y-2">
@@ -326,7 +333,7 @@ export function ScoreDrilldown({ daily, period }: Props) {
                   <div className="flex items-baseline gap-2">
                     <span className="text-neutral-300">{fmtDate(e.date)}</span>
                     <span className="text-neutral-500">
-                      {e.prevScore}점 → {e.curScore}점
+                      {e.prevScore} → {e.curScore}
                     </span>
                     <span className={e.delta > 0 ? "text-emerald-400" : "text-rose-400"}>
                       {e.delta > 0 ? `▲ +${e.delta}` : `▼ ${e.delta}`}
@@ -334,20 +341,20 @@ export function ScoreDrilldown({ daily, period }: Props) {
                   </div>
                   {e.causes.length > 0 ? (
                     <div className="mt-1 text-[11px] text-neutral-400 leading-relaxed">
-                      주 원인:{" "}
+                      {m.scoreDrilldown.causeIntro}{" "}
                       {e.causes.map((c, i) => (
                         <span key={i}>
                           {i > 0 && <span className="text-neutral-600"> · </span>}
                           <span className="text-neutral-300">{c.label}</span>{" "}
                           <span className="text-neutral-500">
-                            {c.from} → {c.to} ({c.weight > 0 ? "+" : ""}{c.weight.toFixed(1)}점)
+                            {tmpl(m.scoreDrilldown.causeWeight, { from: c.from, to: c.to, sign: c.weight > 0 ? "+" : "", delta: c.weight.toFixed(1) })}
                           </span>
                         </span>
                       ))}
                     </div>
                   ) : (
                     <div className="mt-1 text-[11px] text-neutral-500">
-                      각 지표 변화가 작아 특정 원인을 짚기 어렵습니다.
+                      {m.scoreDrilldown.causeFallback}
                     </div>
                   )}
                 </li>

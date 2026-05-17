@@ -4,16 +4,19 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useSession, signOut } from "next-auth/react";
 import { useState } from "react";
+import { useMessages } from "@/lib/use-i18n";
+import { LocaleSwitcher } from "@/components/locale-switcher";
 
 export function AdminNav() {
   const path = usePathname();
   const { data: session } = useSession();
   const [open, setOpen] = useState(false);
+  const { m } = useMessages();
 
   const tabs = [
-    { href: "/admin/team", label: "팀" },
-    { href: "/admin/members", label: "팀원" },
-    { href: "/dashboard", label: "홈페이지" },
+    { href: "/admin/team", label: m.adminNav.team },
+    { href: "/admin/members", label: m.adminNav.members },
+    { href: "/dashboard", label: m.adminNav.home },
   ];
 
   return (
@@ -40,7 +43,8 @@ export function AdminNav() {
           ))}
         </nav>
       </div>
-      <div className="relative shrink-0">
+      <div className="relative shrink-0 flex items-center gap-2">
+        <LocaleSwitcher variant="nav" />
         <button
           data-testid="admin-nav-user-toggle"
           onClick={() => setOpen(!open)}
@@ -55,7 +59,7 @@ export function AdminNav() {
               onClick={() => signOut({ callbackUrl: "/login" })}
               className="block px-4 py-2 text-sm text-slate-300 hover:bg-slate-700 w-full text-left"
             >
-              로그아웃
+              {m.nav.logout}
             </button>
           </div>
         )}

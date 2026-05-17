@@ -2,6 +2,9 @@
 
 // 매니저 시점 팀 plan 적정성 종합. /admin/team 어드민 view 에서만 노출.
 
+import { useMessages } from "@/lib/use-i18n";
+import type { Messages } from "@/lib/i18n";
+
 const TIER_LABEL: Record<string, string> = {
   pro: "Pro", max5: "Max5", max20: "Max20",
   team_standard: "Team Std", team_premium: "Team Prem", team: "Team",
@@ -30,6 +33,10 @@ export interface TeamPlanSummary {
   actionFirstCount: number;
 }
 
+function tmpl(template: string, vars: Record<string, string | number>): string {
+  return template.replace(/\{(\w+)\}/g, (_, k) => String(vars[k] ?? ""));
+}
+
 function distToText(d: Record<string, number>): string {
   const order = ["pro", "max5", "max20", "team_standard", "team_premium", "team", "api", "unknown"];
   return order
@@ -46,96 +53,95 @@ const VERDICT_COLOR: Record<TeamMemberPlan["verdict"], string> = {
   unknown:   "text-neutral-500",
 };
 
-const VERDICT_LABEL: Record<TeamMemberPlan["verdict"], string> = {
-  downgrade: "▼ 다운",
-  fit:       "✓ 적정",
-  tight:     "▲ 여유 적음",
-  over:      "▲▲ 한도",
-  unknown:   "—",
-};
+function verdictLabel(v: TeamMemberPlan["verdict"], m: Messages): string {
+  switch (v) {
+    case "downgrade": return m.teamPlanHealth.verdictDowngrade;
+    case "fit":       return m.teamPlanHealth.verdictFit;
+    case "tight":     return m.teamPlanHealth.verdictTight;
+    case "over":      return m.teamPlanHealth.verdictOver;
+    case "unknown":   return "—";
+  }
+}
 
 export function TeamPlanHealthCard({ summary }: { summary: TeamPlanSummary }) {
+  const { m } = useMessages();
   return (
     <div data-testid="team-plan-health-card" className="bg-amber-950/15 border-l-2 border-l-amber-600 border border-amber-900/30 rounded">
       <div className="px-3 py-2 border-b border-amber-900/30 flex items-center gap-2">
-        <span className="text-xs font-mono font-bold text-amber-300 uppercase tracking-wider">Team Plan Health</span>
+        <span className="text-xs font-mono font-bold text-amber-300 uppercase tracking-wider">{m.teamPlanHealth.cardTitle}</span>
         <span className="text-[9px] font-mono px-1 py-0.5 rounded bg-amber-500/20 text-amber-400 border border-amber-500/40">ADMIN</span>
       </div>
 
       <div className="p-3 space-y-3">
-        {/* 분포 + 비용 요약 */}
         <div className="grid grid-cols-2 gap-3 text-xs font-mono">
           <div>
-            <p className="text-neutral-500 mb-0.5">현재 분포</p>
+            <p className="text-neutral-500 mb-0.5">{m.teamPlanHealth.currentDistribution}</p>
             <p className="text-neutral-200">{distToText(summary.currentDistribution) || "—"}</p>
-            <p className="text-yellow-400 mt-1">${summary.currentMonthlyCostUsd}/월</p>
+            <p className="text-yellow-400 mt-1">{tmpl(m.teamPlanHealth.perMonthSuffix, { n: summary.currentMonthlyCostUsd })}</p>
           </div>
           <div>
-            <p className="text-neutral-500 mb-0.5">권장 분포</p>
+            <p className="text-neutral-500 mb-0.5">{m.teamPlanHealth.recommendedDistribution}</p>
             <p className="text-neutral-200">{distToText(summary.recommendedDistribution) || "—"}</p>
-            <p className="text-yellow-400 mt-1">${summary.recommendedMonthlyCostUsd}/월</p>
+            <p className="text-yellow-400 mt-1">{tmpl(m.teamPlanHealth.perMonthSuffix, { n: summary.recommendedMonthlyCostUsd })}</p>
           </div>
         </div>
 
-        {/* 절감 + 행동 우선 */}
         {(summary.monthlySavingsUsd !== 0 || summary.actionFirstCount > 0) && (
           <div className="flex items-center gap-3 text-xs font-mono pt-2 border-t border-amber-900/30">
             {summary.monthlySavingsUsd > 0 && (
               <span className="text-emerald-400">
-                ▼ 월 절감 ${summary.monthlySavingsUsd}
+                {tmpl(m.teamPlanHealth.monthlySavings, { n: summary.monthlySavingsUsd })}
               </span>
             )}
             {summary.monthlySavingsUsd < 0 && (
               <span className="text-rose-400">
-                ▲ 월 +${Math.abs(summary.monthlySavingsUsd)} (업그레이드 후 증가)
+                {tmpl(m.teamPlanHealth.monthlyExtraAfterUpgrade, { n: Math.abs(summary.monthlySavingsUsd) })}
               </span>
             )}
             {summary.actionFirstCount > 0 && (
               <span className="text-amber-300">
-                💡 행동 변경 우선 {summary.actionFirstCount}명
+                {tmpl(m.teamPlanHealth.actionFirstCount, { n: summary.actionFirstCount })}
               </span>
             )}
           </div>
         )}
 
-        {/* 멤버별 테이블 */}
         <table className="w-full text-xs font-mono border-collapse">
           <thead>
             <tr className="border-b border-amber-900/30">
-              <th className="text-left text-neutral-500 pb-1.5 font-normal">멤버</th>
-              <th className="text-left text-neutral-500 pb-1.5 px-2 font-normal">현재</th>
-              <th className="text-left text-neutral-500 pb-1.5 px-2 font-normal">평가</th>
-              <th className="text-left text-neutral-500 pb-1.5 px-2 font-normal">권장</th>
-              <th className="text-right text-neutral-500 pb-1.5 font-normal">변동</th>
+              <th className="text-left text-neutral-500 pb-1.5 font-normal">{m.teamPlanHealth.colMember}</th>
+              <th className="text-left text-neutral-500 pb-1.5 px-2 font-normal">{m.teamPlanHealth.colCurrent}</th>
+              <th className="text-left text-neutral-500 pb-1.5 px-2 font-normal">{m.teamPlanHealth.colVerdict}</th>
+              <th className="text-left text-neutral-500 pb-1.5 px-2 font-normal">{m.teamPlanHealth.colRecommended}</th>
+              <th className="text-right text-neutral-500 pb-1.5 font-normal">{m.teamPlanHealth.colDelta}</th>
             </tr>
           </thead>
           <tbody>
-            {summary.members.map((m) => {
-              const declared = m.declaredTier ?? "unknown";
-              const rec = m.recommendedTier ?? "unknown";
-              const delta = m.monthlyCostRecommendedUsd - m.monthlyCostNowUsd;
+            {summary.members.map((mb) => {
+              const declared = mb.declaredTier ?? "unknown";
+              const rec = mb.recommendedTier ?? "unknown";
+              const delta = mb.monthlyCostRecommendedUsd - mb.monthlyCostNowUsd;
               return (
                 <tr
-                  key={m.userId}
-                  data-testid={`team-plan-row-${m.userId}`}
+                  key={mb.userId}
+                  data-testid={`team-plan-row-${mb.userId}`}
                   className="border-b border-amber-900/20 hover:bg-amber-900/10 transition-colors"
                 >
-                  <td className="py-1.5 text-neutral-300">{m.name}</td>
-                  <td className={`py-1.5 px-2 ${m.isEstimated ? "text-amber-300" : "text-neutral-400"}`}>
+                  <td className="py-1.5 text-neutral-300">{mb.name}</td>
+                  <td className={`py-1.5 px-2 ${mb.isEstimated ? "text-amber-300" : "text-neutral-400"}`}>
                     {TIER_LABEL[declared] ?? declared}
-                    {m.isEstimated && <span className="text-[10px] text-amber-400/70"> (추정)</span>}
-                    {!m.isEstimated && m.declaredTier === null && <span className="text-[10px] text-neutral-600"> (미입력)</span>}
+                    {mb.isEstimated && <span className="text-[10px] text-amber-400/70">{m.teamPlanHealth.estimated}</span>}
+                    {!mb.isEstimated && mb.declaredTier === null && <span className="text-[10px] text-neutral-600">{m.teamPlanHealth.notEntered}</span>}
                   </td>
-                  <td className={`py-1.5 px-2 ${VERDICT_COLOR[m.verdict]}`}>
-                    {VERDICT_LABEL[m.verdict]}
-                    {m.actionFirst && <span className="text-amber-400 ml-1">💡</span>}
+                  <td className={`py-1.5 px-2 ${VERDICT_COLOR[mb.verdict]}`}>
+                    {verdictLabel(mb.verdict, m)}
+                    {mb.actionFirst && <span className="text-amber-400 ml-1">💡</span>}
                   </td>
                   <td className="py-1.5 px-2 text-neutral-300">
-                    {/* 권장 = 추천 tier. declared 와 같으면 회색으로 (현 plan 유지) 명시. */}
                     {rec === "unknown" ? (
                       <span className="text-neutral-600">—</span>
                     ) : declared === rec ? (
-                      <span className="text-neutral-500">{TIER_LABEL[rec] ?? rec} <span className="text-[10px]">(유지)</span></span>
+                      <span className="text-neutral-500">{TIER_LABEL[rec] ?? rec} <span className="text-[10px]">{m.teamPlanHealth.keep}</span></span>
                     ) : (
                       <span>{TIER_LABEL[rec] ?? rec}</span>
                     )}
@@ -156,7 +162,7 @@ export function TeamPlanHealthCard({ summary }: { summary: TeamPlanSummary }) {
         </table>
 
         <p className="text-[10px] text-neutral-600 font-mono">
-          ※ plan 한도는 커뮤니티 P90 추정. 30일 윈도우 / 활성 7일+ 멤버만 평가. 💡 = plan 업 전 효율 개선 권장.
+          {m.teamPlanHealth.footnote}
         </p>
       </div>
     </div>
