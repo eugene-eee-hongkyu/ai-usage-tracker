@@ -178,7 +178,7 @@ if [ -z "${SKIP_NVM:-}" ] && command -v node >/dev/null 2>&1; then
       if prompt_yn "   nvm 으로 자동 전환하시겠습니까? (Y/n): "; then
         # 백업 — shell profile + 글로벌 CLI 목록
         TS=$(date +%s)
-        BACKUP_DIR="$HOME/.primus-usage-tracker"
+        BACKUP_DIR="$HOME/.z21labs/usage-tracker"
         mkdir -p "$BACKUP_DIR"
         echo ""
         echo "💾 백업 중..."
@@ -264,6 +264,13 @@ if [ -n "$NODE_MAJOR" ] && [ "$NODE_MAJOR" -lt 22 ]; then
   echo "$BAR"
   echo ""
 fi
+
+echo ""
+echo "🔄 옛 ~/.primus-usage-* 마이그레이션 확인 (primus → z21labs)..."
+echo ""
+
+# Idempotent migrate — 옛 경로 없으면 noop, 있으면 새 위치로 이동
+npx --yes --ignore-cache "$REPO" migrate || echo "   (migrate 단계 일부 실패 — init 계속 진행)"
 
 echo ""
 echo "📥 Usage Tracker init 실행..."
