@@ -159,6 +159,60 @@ export interface Messages {
     unitCostAnchorWastedHeavy: string;     // plan 거의 안 씀 — API 직접 호출이 훨씬 쌈
     unitCostNoData: string;                // 데이터 없음
   };
+  teamView: {
+    loadFailed: string;
+    retry: string;
+    loading: string;
+    noSync: string;
+    daysAgoN: string;
+    daysWarn: string;
+    summaryTotalTokens: string;
+    summaryTotalCost: string;
+    summarySessions: string;
+    summaryActiveMembers: string;
+    summaryAvgCacheHit: string;
+    summaryAvgOneShot: string;
+    gradeBadge: string;
+    membersCount: string;
+    axHeadline: string;
+    teamMultiplier: string;
+    activeMembers: string;
+    planSavings: string;
+    noActivityPeriod: string;
+    teamSum: string;
+    powerRankCard: string;
+    unitCostCardLabel: string;
+    estimateBadge: string;
+    unitCostFootnote: string;
+    industryUser: string;
+    industryUserTop10: string;
+    industryEnterpriseAvg: string;
+    industryEnterpriseTop10: string;
+    industryTop1: string;
+    primusTeam: string;
+    headlineTitle: string;
+    teamAvgN: string;
+    vsEnterpriseAvg: string;
+    activeUsageDescription: string;
+    perActiveDayCompare: string;
+    sourceFootnote: string;
+    columnMember: string;
+    columnUsage: string;
+    columnOverall: string;
+    selfMark: string;
+    tooltipTeamAvgMyValue: string;
+    tooltipUsageAvgMy: string;
+    activitiesMembersCount: string;
+    planMember: string;
+    planLastReceived: string;
+    planVisitsMonth: string;
+    planAvgDwell: string;
+    monthlyVisitsTitle: string;
+    visitsOfDay: string;
+    monthLabel: string;
+    monthRow: string;
+    columnProject: string;
+  };
   gradeDescriptions: {
     cacheHitExemplary: string;
     cacheHitGood: string;
@@ -469,6 +523,60 @@ export const en: Messages = {
     unitCostAnchorWasted10x: "10× more expensive than direct API",
     unitCostAnchorWastedHeavy: "Barely using the plan — direct API is much cheaper",
     unitCostNoData: "no data",
+  },
+  teamView: {
+    loadFailed: "Failed to load team data.",
+    retry: "Retry",
+    loading: "Loading…",
+    noSync: "no sync",
+    daysAgoN: "{n}d ago",
+    daysWarn: "⚠{n}d",
+    summaryTotalTokens: "total tokens",
+    summaryTotalCost: "total cost",
+    summarySessions: "sessions",
+    summaryActiveMembers: "active members",
+    summaryAvgCacheHit: "avg cache hit",
+    summaryAvgOneShot: "avg 1-shot",
+    gradeBadge: "{g} {n}",
+    membersCount: "{n} members",
+    axHeadline: "🎯 AX score",
+    teamMultiplier: "Team is using {x}× the enterprise adoption average",
+    activeMembers: "Active {n}/{total}",
+    planSavings: "Plan optimization could save ${n}/mo",
+    noActivityPeriod: "No activity data in this period.",
+    teamSum: "Team total",
+    powerRankCard: "Power Index Rank",
+    unitCostCardLabel: "Daily Unit Cost ($ / 1M)",
+    estimateBadge: " (estimated)",
+    unitCostFootnote: "Lower = better plan utilization · dashed = tier estimated · no-activity days break the line · log scale",
+    industryUser: "Avg user",
+    industryUserTop10: "Top 10% user",
+    industryEnterpriseAvg: "Enterprise adoption avg",
+    industryEnterpriseTop10: "Enterprise adoption top 10%",
+    industryTop1: "Global top 1% (est.)",
+    primusTeam: "PRIMUS Team",
+    headlineTitle: "Primus team headline — efficiency + industry comparison (last 30 days)",
+    teamAvgN: " · team avg ({n} members)",
+    vsEnterpriseAvg: "vs Enterprise adoption avg (${n})",
+    activeUsageDescription: "Active Claude Code team",
+    perActiveDayCompare: "$/active day comparison",
+    sourceFootnote: "as of 2026-05 · source: Anthropic Claude Code official stats + community heavy-user reports",
+    columnMember: "Member",
+    columnUsage: "Usage",
+    columnOverall: "Overall",
+    selfMark: "(me)",
+    tooltipTeamAvgMyValue: "Team avg {avg} · me {mine} ({delta})",
+    tooltipUsageAvgMy: "Team avg {avgLvl}/10 ({avgTok}) · me {myLvl}/10 ({myTok})",
+    activitiesMembersCount: "{n} members",
+    planMember: "Member",
+    planLastReceived: "Last received",
+    planVisitsMonth: "Visits/mo",
+    planAvgDwell: "Avg dwell",
+    monthlyVisitsTitle: "Daily visits (last 30 days)",
+    visitsOfDay: "{date}: {n} visits",
+    monthLabel: "M{n}",
+    monthRow: "Mo",
+    columnProject: "Project",
   },
   gradeDescriptions: {
     cacheHitExemplary: "Claude Code internal benchmark",

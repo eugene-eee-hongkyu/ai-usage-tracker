@@ -14,36 +14,58 @@ import {
 } from "recharts";
 import { ScoreGauge, scoreLabel } from "@/components/score-gauge";
 import { computeTokenLevel, computeDailyEfficiencyScore } from "@/lib/rules";
+import { useMessages } from "@/lib/use-i18n";
+import type { Messages } from "@/lib/i18n";
 
 type Period = "today" | "8days" | "month" | "30days" | "all";
-type GradeLevel = "탁월" | "양호" | "보통" | "부족" | "경고";
+type GradeLevel = "exemplary" | "good" | "moderate" | "insufficient" | "warning";
 
-const PERIOD_LABELS: Record<Period, string> = {
-  today: "오늘", "8days": "8일", month: "이번달", "30days": "30일", all: "전체",
-};
+function periodLabel(p: Period, m: Messages): string {
+  switch (p) {
+    case "today":  return m.common.today;
+    case "8days":  return m.common.eightDays;
+    case "month":  return m.common.thisMonth;
+    case "30days": return m.common.thirtyDays;
+    case "all":    return m.common.all;
+  }
+}
+
+function gradeLabel(g: GradeLevel, m: Messages): string {
+  switch (g) {
+    case "exemplary":    return m.grades.exemplary;
+    case "good":         return m.grades.good;
+    case "moderate":     return m.grades.moderate;
+    case "insufficient": return m.grades.insufficient;
+    case "warning":      return m.grades.warning;
+  }
+}
+
+function tmpl(template: string, vars: Record<string, string | number>): string {
+  return template.replace(/\{(\w+)\}/g, (_, k) => String(vars[k] ?? ""));
+}
 
 const GRADE_STYLES: Record<GradeLevel, string> = {
-  "탁월": "bg-emerald-500/15 text-emerald-400 border border-emerald-500/40",
-  "양호": "bg-green-500/15 text-green-400 border border-green-500/40",
-  "보통": "bg-yellow-500/15 text-yellow-400 border border-yellow-500/40",
-  "부족": "bg-orange-500/15 text-orange-400 border border-orange-500/40",
-  "경고": "bg-red-500/15 text-red-400 border border-red-500/40",
+  exemplary:    "bg-emerald-500/15 text-emerald-400 border border-emerald-500/40",
+  good:         "bg-green-500/15 text-green-400 border border-green-500/40",
+  moderate:     "bg-yellow-500/15 text-yellow-400 border border-yellow-500/40",
+  insufficient: "bg-orange-500/15 text-orange-400 border border-orange-500/40",
+  warning:      "bg-red-500/15 text-red-400 border border-red-500/40",
 };
 
 const GRADE_VALUE_COLOR: Record<GradeLevel, string> = {
-  "탁월": "text-emerald-400",
-  "양호": "text-green-400",
-  "보통": "text-yellow-400",
-  "부족": "text-orange-400",
-  "경고": "text-red-400",
+  exemplary:    "text-emerald-400",
+  good:         "text-green-400",
+  moderate:     "text-yellow-400",
+  insufficient: "text-orange-400",
+  warning:      "text-red-400",
 };
 
 const GRADE_CELL_BG: Record<GradeLevel, string> = {
-  "탁월": "bg-emerald-500/25",
-  "양호": "bg-green-500/20",
-  "보통": "bg-slate-600/25",
-  "부족": "bg-amber-500/25",
-  "경고": "bg-red-500/30",
+  exemplary:    "bg-emerald-500/25",
+  good:         "bg-green-500/20",
+  moderate:     "bg-slate-600/25",
+  insufficient: "bg-amber-500/25",
+  warning:      "bg-red-500/30",
 };
 
 const MEMBER_COLORS = [
@@ -164,12 +186,12 @@ function AdminBadge() {
   );
 }
 
-function SyncBadge({ lastSyncedAt, userId }: { lastSyncedAt: string | null; userId?: string | number }) {
+function SyncBadge({ lastSyncedAt, userId, m }: { lastSyncedAt: string | null; userId?: string | number; m: Messages }) {
   const tid = userId !== undefined ? `team-sync-badge-${userId}` : undefined;
-  if (!lastSyncedAt) return <span data-testid={tid} className="text-[10px] text-red-400 font-mono">미수신</span>;
+  if (!lastSyncedAt) return <span data-testid={tid} className="text-[10px] text-red-400 font-mono">{m.teamView.noSync}</span>;
   const days = Math.floor((Date.now() - new Date(lastSyncedAt).getTime()) / 86_400_000);
-  if (days >= 5) return <span data-testid={tid} className="text-[10px] text-red-400 font-mono" title="데이터 수신 없음">⚠{days}일</span>;
-  if (days >= 2) return <span data-testid={tid} className="text-[10px] text-yellow-500 font-mono">{days}일전</span>;
+  if (days >= 5) return <span data-testid={tid} className="text-[10px] text-red-400 font-mono" title={m.teamView.loadFailed}>{tmpl(m.teamView.daysWarn, { n: days })}</span>;
+  if (days >= 2) return <span data-testid={tid} className="text-[10px] text-yellow-500 font-mono">{tmpl(m.teamView.daysAgoN, { n: days })}</span>;
   return null;
 }
 
@@ -180,56 +202,52 @@ function CcusageMissingBadge({ missing, userId }: { missing: boolean | undefined
     <span
       data-testid={tid}
       className="text-[10px] text-orange-400 font-mono px-1 py-0.5 rounded bg-orange-500/10 border border-orange-500/40 leading-none"
-      title="ccusage 미설치 — 토큰/비용 데이터가 수집되지 않습니다. npm install -g ccusage 후 repair 실행 필요"
+      title="ccusage not installed — token/cost data not collected. Run npm install -g ccusage then repair."
     >
       ccusage❌
     </span>
   );
 }
 
-function GradePill({ grade }: { grade: GradeLevel }) {
+function GradePill({ grade, m }: { grade: GradeLevel; m: Messages }) {
   return (
     <span className={`inline-flex px-1.5 py-0.5 rounded text-[10px] font-mono ${GRADE_STYLES[grade]}`}>
-      {grade}
+      {gradeLabel(grade, m)}
     </span>
   );
 }
 
 function cacheHitGrade(v: number): GradeLevel {
-  if (v >= 96) return "탁월"; if (v >= 90) return "양호"; if (v >= 80) return "보통"; if (v >= 60) return "부족"; return "경고";
+  if (v >= 96) return "exemplary"; if (v >= 90) return "good"; if (v >= 80) return "moderate"; if (v >= 60) return "insufficient"; return "warning";
 }
 function oneShotGrade(v: number): GradeLevel {
-  if (v >= 80) return "탁월"; if (v >= 40) return "보통"; return "경고";
+  if (v >= 80) return "exemplary"; if (v >= 40) return "moderate"; return "warning";
 }
 function costGrade(v: number): GradeLevel {
-  if (v < 25) return "탁월"; if (v < 100) return "보통"; return "경고";
+  if (v < 25) return "exemplary"; if (v < 100) return "moderate"; return "warning";
 }
-// 사용량 (token volume) — 개인 EFFICIENCY 카드와 동일 등급 매핑.
-// computeTokenLevel 의 0~10 단계를 5-level GradeLevel 로 압축 (UI 색 컨벤션 공유).
+// 사용량 (token volume) → 5-level GradeLevel.
 function tokenLevelGrade(level: number): GradeLevel {
-  if (level >= 8) return "탁월";
-  if (level >= 6) return "양호";
-  if (level >= 3) return "보통";
-  if (level >= 1) return "부족";
-  return "경고";
+  if (level >= 8) return "exemplary";
+  if (level >= 6) return "good";
+  if (level >= 3) return "moderate";
+  if (level >= 1) return "insufficient";
+  return "warning";
 }
-// outputInputGrade 제거 — 외부 anchor 없음, cache 와 multi-collinear.
 
-// 종합 점수 — 개인 EFFICIENCY 와 동일 공식 (cache 42 + one-shot 18 + cost 10 + 사용량 30).
-// 이전엔 별도 (cache 40 + one-shot 40 + cost 20) 사용했지만 개인 게이지·배지와
-// 불일치 — 같은 사람 점수가 화면마다 달라 보이는 문제. 통일.
+// 종합 점수 — 개인 EFFICIENCY 와 동일 공식.
 function computeMemberScore(m: MemberStat): number | null {
   if (m.sessionsCount === 0) return null;
   const cpc = m.callsCount > 0 ? m.totalCost / m.callsCount : 0;
   return computeDailyEfficiencyScore(m.cacheHitPct, cpc, m.overallOneShot * 100, m.avgDailyTokens);
 }
 function scoreToGrade(score: number | null): GradeLevel {
-  if (score === null) return "경고";
-  if (score >= 90) return "탁월";
-  if (score >= 75) return "양호";
-  if (score >= 55) return "보통";
-  if (score >= 35) return "부족";
-  return "경고";
+  if (score === null) return "warning";
+  if (score >= 90) return "exemplary";
+  if (score >= 75) return "good";
+  if (score >= 55) return "moderate";
+  if (score >= 35) return "insufficient";
+  return "warning";
 }
 function overallGrade(m: MemberStat): GradeLevel {
   return scoreToGrade(computeMemberScore(m));
@@ -244,11 +262,11 @@ function fmtSyncTime(ts: string): string {
   return `${mm}-${dd} ${hh}:${min}`;
 }
 
-function syncStyle(lastSyncedAt: string | null): { timeClass: string; badge: React.ReactNode } {
-  if (!lastSyncedAt) return { timeClass: "text-red-400", badge: <span className="text-[10px] text-red-400">미수신</span> };
+function syncStyle(lastSyncedAt: string | null, m: Messages): { timeClass: string; badge: React.ReactNode } {
+  if (!lastSyncedAt) return { timeClass: "text-red-400", badge: <span className="text-[10px] text-red-400">{m.teamView.noSync}</span> };
   const days = Math.floor((Date.now() - new Date(lastSyncedAt).getTime()) / 86_400_000);
-  if (days >= 5) return { timeClass: "text-red-400", badge: <span className="text-[10px] text-red-400">⚠{days}일</span> };
-  if (days >= 2) return { timeClass: "text-yellow-500", badge: <span className="text-[10px] text-yellow-500">{days}일전</span> };
+  if (days >= 5) return { timeClass: "text-red-400", badge: <span className="text-[10px] text-red-400">{tmpl(m.teamView.daysWarn, { n: days })}</span> };
+  if (days >= 2) return { timeClass: "text-yellow-500", badge: <span className="text-[10px] text-yellow-500">{tmpl(m.teamView.daysAgoN, { n: days })}</span> };
   return { timeClass: "text-neutral-300", badge: null };
 }
 
@@ -299,6 +317,7 @@ function MemberTooltip({ active, payload, label }: { active?: boolean; payload?:
 }
 
 export function TeamView({ adminMode = false }: { adminMode?: boolean }) {
+  const { m: t } = useMessages();
   const NavComponent = adminMode ? AdminNav : Nav;
   const { data: session, status } = useSession();
   const router = useRouter();
@@ -349,12 +368,12 @@ export function TeamView({ adminMode = false }: { adminMode?: boolean }) {
     <div className="min-h-screen bg-neutral-950">
       <NavComponent />
       <div data-testid="team-fetch-error" className="flex flex-col items-center justify-center h-64 gap-4">
-        <p className="text-neutral-400 font-mono text-sm">팀 데이터를 불러오지 못했습니다.</p>
+        <p className="text-neutral-400 font-mono text-sm">{t.teamView.loadFailed}</p>
         <button
           data-testid="team-retry"
           onClick={() => setReloadKey((k) => k + 1)}
           className="px-4 py-1.5 bg-neutral-800 rounded text-sm text-neutral-200 hover:bg-neutral-700 font-mono"
-        >다시 시도</button>
+        >{t.teamView.retry}</button>
       </div>
     </div>
   );
@@ -363,7 +382,7 @@ export function TeamView({ adminMode = false }: { adminMode?: boolean }) {
     <div className="min-h-screen bg-neutral-950">
       <NavComponent />
       <div className="flex items-center justify-center h-64">
-        <div className="animate-pulse text-neutral-500 text-sm font-mono">로딩 중...</div>
+        <div className="animate-pulse text-neutral-500 text-sm font-mono">{t.teamView.loading}</div>
       </div>
     </div>
   );
@@ -391,11 +410,11 @@ export function TeamView({ adminMode = false }: { adminMode?: boolean }) {
       acc[g] = (acc[g] ?? 0) + 1;
       return acc;
     },
-    { "탁월": 0, "양호": 0, "보통": 0, "부족": 0, "경고": 0 }
+    { exemplary: 0, good: 0, moderate: 0, insufficient: 0, warning: 0 }
   );
-  const gradeSummary = (["탁월", "양호", "보통", "부족", "경고"] as GradeLevel[])
+  const gradeSummary = (["exemplary", "good", "moderate", "insufficient", "warning"] as GradeLevel[])
     .filter((g) => gradeCounts[g] > 0)
-    .map((g) => `${g} ${gradeCounts[g]}명`)
+    .map((g) => tmpl(t.teamView.gradeBadge, { g: gradeLabel(g, t), n: gradeCounts[g] }))
     .join(" · ");
 
   return (
@@ -411,7 +430,7 @@ export function TeamView({ adminMode = false }: { adminMode?: boolean }) {
               data-testid={`team-period-${p}`}
               onClick={() => setPeriod(p)}
               className={`w-16 text-center py-1 rounded text-xs font-mono transition-colors ${period === p ? "bg-indigo-600 text-white" : "bg-neutral-800 text-neutral-400 hover:text-neutral-200"}`}
-            >{PERIOD_LABELS[p]}</button>
+            >{periodLabel(p as Period, t)}</button>
           ))}
         </div>
       </div>
@@ -419,12 +438,12 @@ export function TeamView({ adminMode = false }: { adminMode?: boolean }) {
       {/* Team Summary Bar */}
       <div data-testid="team-summary-bar" className="bg-neutral-900 border-b border-neutral-800">
         <div className="max-w-6xl mx-auto px-4 py-2.5 flex flex-wrap gap-x-5 gap-y-1 text-sm font-mono">
-          <span><span className="text-cyan-400 font-bold">{fmtTokens(members.reduce((s, m) => s + m.totalTokens, 0))}</span><span className="text-neutral-500 ml-1 text-xs">총토큰</span></span>
-          <span><span className="text-yellow-400 font-bold">${sum.totalCost.toFixed(2)}</span><span className="text-neutral-500 ml-1 text-xs">총비용</span></span>
-          <span><span className="text-blue-400 font-bold">{sum.totalSessions.toLocaleString()}</span><span className="text-neutral-500 ml-1 text-xs">세션</span></span>
-          <span><span className="text-cyan-400 font-bold">{sum.activeMemberCount}</span><span className="text-neutral-500 ml-1 text-xs">명 활성</span></span>
-          <span><span className="text-emerald-400 font-bold">{sum.avgCacheHitPct.toFixed(1)}%</span><span className="text-neutral-500 ml-1 text-xs">평균 cache hit</span></span>
-          <span><span className="text-pink-400 font-bold">{Math.round(sum.avgOneShotRate * 100)}%</span><span className="text-neutral-500 ml-1 text-xs">평균 1-shot</span></span>
+          <span><span className="text-cyan-400 font-bold">{fmtTokens(members.reduce((s, m) => s + m.totalTokens, 0))}</span><span className="text-neutral-500 ml-1 text-xs">{t.teamView.summaryTotalTokens}</span></span>
+          <span><span className="text-yellow-400 font-bold">${sum.totalCost.toFixed(2)}</span><span className="text-neutral-500 ml-1 text-xs">{t.teamView.summaryTotalCost}</span></span>
+          <span><span className="text-blue-400 font-bold">{sum.totalSessions.toLocaleString()}</span><span className="text-neutral-500 ml-1 text-xs">{t.teamView.summarySessions}</span></span>
+          <span><span className="text-cyan-400 font-bold">{sum.activeMemberCount}</span><span className="text-neutral-500 ml-1 text-xs">{t.teamView.summaryActiveMembers}</span></span>
+          <span><span className="text-emerald-400 font-bold">{sum.avgCacheHitPct.toFixed(1)}%</span><span className="text-neutral-500 ml-1 text-xs">{t.teamView.summaryAvgCacheHit}</span></span>
+          <span><span className="text-pink-400 font-bold">{Math.round(sum.avgOneShotRate * 100)}%</span><span className="text-neutral-500 ml-1 text-xs">{t.teamView.summaryAvgOneShot}</span></span>
         </div>
       </div>
 
@@ -442,10 +461,10 @@ export function TeamView({ adminMode = false }: { adminMode?: boolean }) {
           return (
             <div data-testid="team-ax-banner" className="bg-emerald-950/30 border-l-4 border-l-emerald-500 border border-emerald-800/40 rounded px-4 py-2.5">
               <div className="flex items-center gap-3 flex-wrap text-sm font-mono">
-                <span className="text-emerald-300 font-bold">🎯 AX 척도</span>
+                <span className="text-emerald-300 font-bold">{t.teamView.axHeadline}</span>
                 <span className="text-neutral-400">·</span>
                 <span className="text-neutral-200">
-                  팀이 회사 도입 평균의 <span className="text-emerald-400 font-bold">{multiplier.toFixed(1)}×</span> 활용
+                  {tmpl(t.teamView.teamMultiplier, { x: multiplier.toFixed(1) })}
                 </span>
                 <span className="text-neutral-400">·</span>
                 <span className="text-neutral-200">
@@ -453,13 +472,13 @@ export function TeamView({ adminMode = false }: { adminMode?: boolean }) {
                 </span>
                 <span className="text-neutral-400">·</span>
                 <span className="text-neutral-200">
-                  활성 <span className="text-emerald-400 font-bold">{memberActiveCount}/{memberTotal}</span>명
+                  {tmpl(t.teamView.activeMembers, { n: memberActiveCount, total: memberTotal })}
                 </span>
                 {data.teamPlanHealth && data.teamPlanHealth.monthlySavingsUsd > 0 && (
                   <>
                     <span className="text-neutral-400">·</span>
                     <span className="text-neutral-200">
-                      Plan 최적화 시 <span className="text-emerald-400 font-bold">${data.teamPlanHealth.monthlySavingsUsd}</span>/월 절감 가능
+                      {tmpl(t.teamView.planSavings, { n: data.teamPlanHealth.monthlySavingsUsd })}
                     </span>
                   </>
                 )}
@@ -477,7 +496,7 @@ export function TeamView({ adminMode = false }: { adminMode?: boolean }) {
             avgActiveDays={data.teamUsage.avgActiveDays}
             avgDailyTokens={data.teamUsage.avgDailyTokens}
             periodDays={data.teamUsage.periodDays}
-            periodLabel={PERIOD_LABELS[period]}
+            periodLabel={periodLabel(period, t)}
             priceForPeriodSum={data.teamUsage.priceForPeriodSum}
             totalWindowTokensSum={data.teamUsage.totalWindowTokensSum}
           />
@@ -485,7 +504,7 @@ export function TeamView({ adminMode = false }: { adminMode?: boolean }) {
 
         {members.length === 0 ? (
           <div data-testid="team-empty" className="bg-neutral-900 border border-neutral-800 rounded-lg p-8 text-center text-neutral-500 text-sm font-mono">
-            해당 기간에 활동 데이터가 없어요.
+            {t.teamView.noActivityPeriod}
           </div>
         ) : (
           <>
@@ -560,7 +579,7 @@ export function TeamView({ adminMode = false }: { adminMode?: boolean }) {
                         <YAxis tick={{ fill: "#525252", fontSize: 10, fontFamily: "monospace" }} axisLine={false} tickLine={false} tickFormatter={(v) => `$${v}`} width={40} />
                         <Tooltip
                           contentStyle={{ background: "#171717", border: "1px solid #404040", borderRadius: 6, fontSize: 11, fontFamily: "monospace" }}
-                          formatter={(v) => [`$${Number(v).toFixed(2)}`, "팀 합산"]}
+                          formatter={(v) => [`$${Number(v).toFixed(2)}`, t.teamView.teamSum]}
                         />
                         <Area type="monotone" dataKey="cost" stroke="#06b6d4" strokeWidth={2} fill="url(#grad-total)" dot={false} />
                       </AreaChart>
@@ -654,7 +673,7 @@ export function TeamView({ adminMode = false }: { adminMode?: boolean }) {
               {/* 활용지수 순위 — period 분모가 멤버 동일 → 직접 비교 정확 */}
               <div data-testid="team-card-power-rank" className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-cyan-500 rounded">
                 <div className="px-3 py-2 border-b border-neutral-800">
-                  <span className="text-xs font-mono font-bold text-cyan-400 uppercase tracking-wider">활용 지수 순위</span>
+                  <span className="text-xs font-mono font-bold text-cyan-400 uppercase tracking-wider">{t.teamView.powerRankCard}</span>
                 </div>
                 <div className="p-3">
                   <div className="flex text-xs text-neutral-600 font-mono mb-1.5">
@@ -691,7 +710,7 @@ export function TeamView({ adminMode = false }: { adminMode?: boolean }) {
               {/* 일별 토큰 단가 (멤버별) — 멤버별 plan 가치 / 일별 토큰 × 1M */}
               <div data-testid="team-card-daily-unit-cost" className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-yellow-500 rounded">
                 <div className="px-3 py-2 border-b border-neutral-800 flex items-center justify-between flex-wrap gap-y-1">
-                  <span className="text-xs font-mono font-bold text-yellow-400 uppercase tracking-wider">일별 토큰 단가 ($ / 1M)</span>
+                  <span className="text-xs font-mono font-bold text-yellow-400 uppercase tracking-wider">{t.teamView.unitCostCardLabel}</span>
                   <div className="flex flex-wrap gap-x-3 gap-y-1 justify-end">
                     {(data.memberUsage ?? []).filter((m) => m.monthlyPriceUsd).map((m) => {
                       const idx = (data.memberNames ?? []).indexOf(m.memberKey);
@@ -699,7 +718,7 @@ export function TeamView({ adminMode = false }: { adminMode?: boolean }) {
                       return (
                         <span key={m.userId} className="flex items-center gap-1 text-[10px] font-mono text-neutral-400">
                           <span className="w-2 h-2 rounded-full inline-block" style={{ background: color }} />
-                          {m.name}{m.isEstimated && <span className="text-amber-400"> (추정)</span>}
+                          {m.name}{m.isEstimated && <span className="text-amber-400">{t.teamView.estimateBadge}</span>}
                         </span>
                       );
                     })}
@@ -754,7 +773,7 @@ export function TeamView({ adminMode = false }: { adminMode?: boolean }) {
                     </ResponsiveContainer>
                   )}
                   <p className="text-[10px] font-mono text-neutral-600 mt-1.5">
-                    낮을수록 plan 잘 활용 · 점선 = tier 추정 멤버 · 활동 없는 날은 line 끊김 · log scale
+                    {t.teamView.unitCostFootnote}
                   </p>
                 </div>
               </div>
@@ -771,18 +790,18 @@ export function TeamView({ adminMode = false }: { adminMode?: boolean }) {
               const multiplier = ic.activeDayAvg / enterpriseAvg;
               const bulletMax = Math.max(102, ic.activeDayAvg * 1.2);
               const bulletRows: Array<{ label: string; value: number; star?: boolean; benchmark?: boolean }> = [
-                { label: "일반 사용자 평균", value: 6 },
-                { label: "일반 사용자 상위 10%", value: 12 },
-                { label: "회사 도입 평균", value: 13, benchmark: true },
-                { label: "회사 도입 상위 10%", value: 30 },
-                { label: "전세계 상위 1% (추정)", value: 92 },
-                { label: "PRIMUS 팀", value: ic.activeDayAvg, star: true },
+                { label: t.teamView.industryUser, value: 6 },
+                { label: t.teamView.industryUserTop10, value: 12 },
+                { label: t.teamView.industryEnterpriseAvg, value: 13, benchmark: true },
+                { label: t.teamView.industryEnterpriseTop10, value: 30 },
+                { label: t.teamView.industryTop1, value: 92 },
+                { label: t.teamView.primusTeam, value: ic.activeDayAvg, star: true },
               ];
               return (
                 <div data-testid="team-card-headline" className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-emerald-500 rounded">
                   <div className="px-3 py-2 border-b border-neutral-800">
                     <span className="text-xs font-mono font-bold text-emerald-400 uppercase tracking-wider">
-                      Primus 팀 헤드라인 — 효율 점수 + 업계 비교 (최근 30일)
+                      {t.teamView.headlineTitle}
                     </span>
                   </div>
                   <div className="p-4 grid grid-cols-12 gap-x-6 gap-y-4 items-center">
@@ -794,8 +813,8 @@ export function TeamView({ adminMode = false }: { adminMode?: boolean }) {
                           ts.score >= 90 ? "text-emerald-400" :
                           ts.score >= 70 ? "text-lime-400" :
                           ts.score >= 40 ? "text-orange-400" : "text-rose-400"
-                        }`}>{scoreLabel(ts.score)}</span>
-                        <span className="text-neutral-500"> · 팀 평균 (10명)</span>
+                        }`}>{scoreLabel(ts.score, t)}</span>
+                        <span className="text-neutral-500">{tmpl(t.teamView.teamAvgN, { n: data.byEfficiency.length })}</span>
                       </div>
                       <span className="text-[10px] font-mono text-neutral-600 mt-0.5">
                         cache {ts.cacheHitPct.toFixed(1)}% · ${ts.costPerCall.toFixed(3)}/call
@@ -809,15 +828,15 @@ export function TeamView({ adminMode = false }: { adminMode?: boolean }) {
                         <span className="text-2xl font-mono text-emerald-400">x</span>
                       </div>
                       <span className="text-[11px] font-mono text-neutral-400 mt-1.5 text-center">
-                        회사 도입 평균 (${enterpriseAvg}) 대비
+                        {tmpl(t.teamView.vsEnterpriseAvg, { n: enterpriseAvg })}
                       </span>
                       <span className="text-[10px] font-mono text-emerald-300 mt-0.5">
-                        Claude Code 적극 활용 팀
+                        {t.teamView.activeUsageDescription}
                       </span>
                     </div>
                     <div data-testid="team-headline-bullet" className="col-span-12 sm:col-span-6">
                       <div className="text-[10px] font-mono text-neutral-500 mb-1.5 uppercase tracking-wider">
-                        $/active day 비교
+                        {t.teamView.perActiveDayCompare}
                       </div>
                       <div className="space-y-1 text-[11px] font-mono">
                         {bulletRows.map((row) => (
@@ -838,7 +857,7 @@ export function TeamView({ adminMode = false }: { adminMode?: boolean }) {
                         ))}
                       </div>
                       <p className="text-[9px] font-mono text-neutral-700 mt-2">
-                        as of 2026-05 · 출처 : Anthropic Claude Code 공식 통계 + 커뮤니티 헤비 사용자 보고
+                        {t.teamView.sourceFootnote}
                       </p>
                     </div>
                   </div>
@@ -858,12 +877,12 @@ export function TeamView({ adminMode = false }: { adminMode?: boolean }) {
                   <table className="w-full text-xs font-mono border-collapse table-fixed">
                     <thead>
                       <tr className="border-b border-neutral-800">
-                        <th className="text-left text-neutral-500 pb-2 pr-4 font-normal w-[24%]">멤버</th>
+                        <th className="text-left text-neutral-500 pb-2 pr-4 font-normal w-[24%]">{t.teamView.columnMember}</th>
                         <th className="text-right text-neutral-500 pb-2 px-3 font-normal w-[15%]">cache</th>
                         <th className="text-right text-neutral-500 pb-2 px-3 font-normal w-[15%]">1-shot</th>
                         <th className="text-right text-neutral-500 pb-2 px-3 font-normal w-[15%]">$/sess</th>
-                        <th className="text-right text-neutral-500 pb-2 px-3 font-normal w-[15%]" title="활성일 평균 total tokens (글로벌 10단계 anchor)">사용량</th>
-                        <th className="text-right text-neutral-500 pb-2 pl-3 font-normal w-[16%]">종합</th>
+                        <th className="text-right text-neutral-500 pb-2 px-3 font-normal w-[15%]" title={t.teamView.tooltipUsageAvgMy.split(":")[0]}>{t.teamView.columnUsage}</th>
+                        <th className="text-right text-neutral-500 pb-2 pl-3 font-normal w-[16%]">{t.teamView.columnOverall}</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -886,16 +905,16 @@ export function TeamView({ adminMode = false }: { adminMode?: boolean }) {
                         const isSelf = session?.user?.name === m.name;
                         // vs-팀-평균 tooltip 문자열 — 임원/리더 핵심 질문 "내가 팀 대비 어디?".
                         const cacheDelta = m.cacheHitPct - avgCache;
-                        const cacheTooltip = `팀 평균 ${avgCache.toFixed(1)}% · 내 ${m.cacheHitPct.toFixed(1)}% (${cacheDelta >= 0 ? "+" : ""}${cacheDelta.toFixed(1)}%p)`;
+                        const cacheTooltip = tmpl(t.teamView.tooltipTeamAvgMyValue, { avg: `${avgCache.toFixed(1)}%`, mine: `${m.cacheHitPct.toFixed(1)}%`, delta: `${cacheDelta >= 0 ? "+" : ""}${cacheDelta.toFixed(1)}%p` });
                         const oneShotPct = m.overallOneShot * 100;
                         const oneShotDelta = oneShotPct - avgOneShot * 100;
-                        const oneShotTooltip = `팀 평균 ${(avgOneShot * 100).toFixed(0)}% · 내 ${Math.round(oneShotPct)}% (${oneShotDelta >= 0 ? "+" : ""}${oneShotDelta.toFixed(0)}%p)`;
+                        const oneShotTooltip = tmpl(t.teamView.tooltipTeamAvgMyValue, { avg: `${(avgOneShot * 100).toFixed(0)}%`, mine: `${Math.round(oneShotPct)}%`, delta: `${oneShotDelta >= 0 ? "+" : ""}${oneShotDelta.toFixed(0)}%p` });
                         const costDelta = costPerSession - avgCostPS;
-                        const costTooltip = `팀 평균 $${avgCostPS.toFixed(2)} · 내 $${costPerSession.toFixed(2)} (${costDelta >= 0 ? "+" : ""}$${costDelta.toFixed(2)})`;
+                        const costTooltip = tmpl(t.teamView.tooltipTeamAvgMyValue, { avg: `$${avgCostPS.toFixed(2)}`, mine: `$${costPerSession.toFixed(2)}`, delta: `${costDelta >= 0 ? "+" : ""}$${costDelta.toFixed(2)}` });
                         const myTokenLvl = computeTokenLevel(m.avgDailyTokens);
                         const tokenTooltip = m.avgDailyTokens > 0
-                          ? `팀 평균 ${avgTokenLvl}/10 (${fmtTokens(avgTokensTeam)}) · 내 ${myTokenLvl}/10 (${fmtTokens(m.avgDailyTokens)})`
-                          : "활동 없음";
+                          ? tmpl(t.teamView.tooltipUsageAvgMy, { avgLvl: avgTokenLvl, avgTok: fmtTokens(avgTokensTeam), myLvl: myTokenLvl, myTok: fmtTokens(m.avgDailyTokens) })
+                          : t.grades.noActivity;
                         return (
                           <tr
                             key={m.userId}
@@ -912,8 +931,8 @@ export function TeamView({ adminMode = false }: { adminMode?: boolean }) {
                                   style={{ background: MEMBER_COLORS[i % MEMBER_COLORS.length] }}
                                 />
                                 <span className={isSelf ? "font-bold text-emerald-300" : ""}>{m.name}</span>
-                                {isSelf && <span className="text-[10px] font-mono text-emerald-400/80">(나)</span>}
-                                <SyncBadge lastSyncedAt={m.lastSyncedAt} userId={m.userId} />
+                                {isSelf && <span className="text-[10px] font-mono text-emerald-400/80">{t.teamView.selfMark}</span>}
+                                <SyncBadge lastSyncedAt={m.lastSyncedAt} userId={m.userId} m={t} />
                                 <CcusageMissingBadge missing={m.ccusageMissing} userId={m.userId} />
                               </span>
                             </td>
@@ -936,7 +955,7 @@ export function TeamView({ adminMode = false }: { adminMode?: boolean }) {
                             </GradeCell>
                             <td data-testid={`team-eff-overall-${m.userId}`} className="py-2.5 pl-3 text-right">
                               <span className="inline-flex items-center gap-1.5 justify-end">
-                                <GradePill grade={grade} />
+                                <GradePill grade={grade} m={t} />
                                 {score !== null && (
                                   <span className="text-[11px] font-mono text-neutral-400 tabular-nums w-7 text-right">{score}</span>
                                 )}
@@ -977,7 +996,7 @@ export function TeamView({ adminMode = false }: { adminMode?: boolean }) {
                           </div>
                           <span className="flex-1 text-neutral-300 truncate">{a.name}</span>
                           <span className="w-14 text-neutral-400 text-right">{a.totalTurns.toLocaleString()}</span>
-                          <span className="w-10 text-neutral-600 text-right">{a.memberCount}명</span>
+                          <span className="w-10 text-neutral-600 text-right">{tmpl(t.teamView.activitiesMembersCount, { n: a.memberCount })}</span>
                         </div>
                       ))}
                     </div>
@@ -1107,10 +1126,10 @@ export function TeamView({ adminMode = false }: { adminMode?: boolean }) {
                     <table className="w-full text-xs font-mono border-collapse">
                       <thead>
                         <tr className="border-b border-neutral-800">
-                          <th className="text-left text-neutral-500 pb-2 font-normal">멤버</th>
-                          <th className="text-right text-neutral-500 pb-2 px-3 font-normal">마지막 수신</th>
-                          <th className="text-right text-neutral-500 pb-2 px-3 font-normal" title="이번달 (UTC) 본 횟수">방문/달</th>
-                          <th className="text-right text-neutral-500 pb-2 px-3 font-normal" title="이번달 평균 체류">평균체류</th>
+                          <th className="text-left text-neutral-500 pb-2 font-normal">{t.teamView.planMember}</th>
+                          <th className="text-right text-neutral-500 pb-2 px-3 font-normal">{t.teamView.planLastReceived}</th>
+                          <th className="text-right text-neutral-500 pb-2 px-3 font-normal" title={t.teamView.planVisitsMonth}>{t.teamView.planVisitsMonth}</th>
+                          <th className="text-right text-neutral-500 pb-2 px-3 font-normal" title={t.teamView.planAvgDwell}>{t.teamView.planAvgDwell}</th>
                           <th className="w-12 text-right text-neutral-500 pb-2 pl-3 font-normal" />
                         </tr>
                       </thead>
@@ -1123,7 +1142,7 @@ export function TeamView({ adminMode = false }: { adminMode?: boolean }) {
                             return new Date(a.lastSyncedAt).getTime() - new Date(b.lastSyncedAt).getTime();
                           })
                           .map((m) => {
-                            const { timeClass, badge } = syncStyle(m.lastSyncedAt);
+                            const { timeClass, badge } = syncStyle(m.lastSyncedAt, t);
                             const dwellMin = Math.floor(m.avgDwellSec / 60);
                             const dwellSec = m.avgDwellSec % 60;
                             const dwellLabel = m.monthVisits > 0
@@ -1168,8 +1187,8 @@ export function TeamView({ adminMode = false }: { adminMode?: boolean }) {
                       <table className="w-full text-xs font-mono border-collapse">
                         <thead>
                           <tr className="border-b border-neutral-800">
-                            <th className="text-left text-neutral-500 pb-2 pr-3 font-normal">멤버</th>
-                            <th className="text-left text-neutral-500 pb-2 pr-3 font-normal">프로젝트</th>
+                            <th className="text-left text-neutral-500 pb-2 pr-3 font-normal">{t.teamView.planMember}</th>
+                            <th className="text-left text-neutral-500 pb-2 pr-3 font-normal">{t.teamView.columnProject}</th>
                             <th className="text-right text-neutral-500 pb-2 pr-3 font-normal">date</th>
                             <th className="text-right text-neutral-500 pb-2 pr-3 font-normal">calls</th>
                             <th className="text-right text-neutral-500 pb-2 font-normal">cost</th>
@@ -1226,7 +1245,7 @@ export function TeamView({ adminMode = false }: { adminMode?: boolean }) {
               return (
                 <div data-testid="team-card-daily-visits" className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-slate-500 rounded">
                   <div className="px-3 py-2 border-b border-neutral-800 flex items-center gap-2">
-                    <span className="text-xs font-mono font-bold text-slate-400 uppercase tracking-wider">일별 방문 (최근 30일)</span>
+                    <span className="text-xs font-mono font-bold text-slate-400 uppercase tracking-wider">{t.teamView.monthlyVisitsTitle}</span>
                     <AdminBadge />
                   </div>
                   <div className="p-3 overflow-x-auto">
@@ -1251,7 +1270,7 @@ export function TeamView({ adminMode = false }: { adminMode?: boolean }) {
                                   c >= 10 ? "text-cyan-400 font-bold" :
                                   "text-neutral-200"
                                 }`}
-                                title={`${grid.dates[i]}: ${c}회`}
+                                title={tmpl(t.teamView.visitsOfDay, { date: grid.dates[i], n: c })}
                               >
                                 {c === 0 ? "·" : c}
                               </td>
@@ -1277,7 +1296,7 @@ export function TeamView({ adminMode = false }: { adminMode?: boolean }) {
                         </tr>
                         {/* 월 표시 행 — 월 시작 셀에 "M월" 표시. */}
                         <tr>
-                          <td className="pr-3 py-0.5 text-[10px] text-neutral-500 text-right">월</td>
+                          <td className="pr-3 py-0.5 text-[10px] text-neutral-500 text-right">{t.teamView.monthRow}</td>
                           {grid.dates.map((d, i) => {
                             const isStart = isMonthStart(d);
                             const isFirst = i === 0;  // 윈도우 첫 셀 (월 중간 시작)
@@ -1286,7 +1305,7 @@ export function TeamView({ adminMode = false }: { adminMode?: boolean }) {
                                 isStart ? "text-amber-400 font-bold" :
                                 isFirst ? "text-neutral-500" : "text-neutral-700"
                               }`}>
-                                {isStart || isFirst ? `${parseInt(monthOf(d), 10)}월` : ""}
+                                {isStart || isFirst ? tmpl(t.teamView.monthLabel, { n: parseInt(monthOf(d), 10) }) : ""}
                               </td>
                             );
                           })}
