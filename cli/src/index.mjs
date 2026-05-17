@@ -1351,9 +1351,9 @@ function checkCodeburn() {
   }
 }
 async function installCodeburn() {
-  console.log("\uD83D\uDCE6 codeburn 최신 버전 설치 중...");
+  console.log("\uD83D\uDCE6 codeburn 0.9.7 (핀 버전) 설치 중...");
   try {
-    execSync("npm install -g codeburn@latest", { stdio: "inherit" });
+    execSync("npm install -g codeburn@0.9.7", { stdio: "inherit" });
     return true;
   } catch {
     return false;
@@ -1369,9 +1369,9 @@ function checkCcusage() {
   }
 }
 async function installCcusage() {
-  console.log("\uD83D\uDCE6 ccusage 최신 버전 설치 중...");
+  console.log("\uD83D\uDCE6 ccusage 19.0.2 (핀 버전) 설치 중...");
   try {
-    execSync("npm install -g ccusage@latest", { stdio: "inherit" });
+    execSync("npm install -g ccusage@19.0.2", { stdio: "inherit" });
     return true;
   } catch {
     return false;
@@ -1379,10 +1379,10 @@ async function installCcusage() {
 }
 async function ensureCcusage() {
   const hadBefore = checkCcusage();
-  console.log(hadBefore ? "\uD83D\uDCE6 ccusage @latest 업그레이드 시도..." : "⚠️  ccusage 미설치 — 최신 설치 시도...");
+  console.log(hadBefore ? "\uD83D\uDCE6 ccusage 19.0.2 (핀 버전) 강제 설치 시도..." : "⚠️  ccusage 미설치 — 최신 설치 시도...");
   const installed = await installCcusage();
   if (installed && checkCcusage()) {
-    console.log(`✅ ccusage 최신 버전 확인됨
+    console.log(`✅ ccusage 19.0.2 확인됨
 `);
     return true;
   }
@@ -1397,7 +1397,7 @@ async function ensureCcusage() {
   console.log("❌ ccusage 설치 실패");
   console.log("   → 토큰/비용 데이터가 수집되지 않습니다.");
   console.log("   → 수동 설치 후 repair 를 다시 실행하세요:");
-  console.log("       npm install -g ccusage@latest");
+  console.log("       npm install -g ccusage@19.0.2");
   console.log("       npx --yes github:eugene-eee-hongkyu/ai-usage-tracker repair");
   console.log(bar + `
 `);
@@ -1405,10 +1405,10 @@ async function ensureCcusage() {
 }
 async function ensureCodeburn() {
   const hadBefore = checkCodeburn();
-  console.log(hadBefore ? "\uD83D\uDCE6 codeburn @latest 업그레이드 시도..." : "⚠️  codeburn 미설치 — 최신 설치 시도...");
+  console.log(hadBefore ? "\uD83D\uDCE6 codeburn 0.9.7 (핀 버전) 강제 설치 시도..." : "⚠️  codeburn 미설치 — 최신 설치 시도...");
   const installed = await installCodeburn();
   if (installed && checkCodeburn()) {
-    console.log(`✅ codeburn 최신 버전 확인됨
+    console.log(`✅ codeburn 0.9.7 확인됨
 `);
     return true;
   }
@@ -1435,7 +1435,7 @@ async function runRepair() {
   const codeburnOk = await ensureCodeburn();
   if (!codeburnOk) {
     console.error("❌ codeburn 사용 불가 상태. 수동 설치 후 다시 시도하세요:");
-    console.error("   npm install -g codeburn@latest");
+    console.error("   npm install -g codeburn@0.9.7");
     process.exit(1);
   }
   const ccusageOk = await ensureCcusage();
@@ -1467,7 +1467,7 @@ async function runInit() {
   const codeburnOk = await ensureCodeburn();
   if (!codeburnOk) {
     console.error("❌ codeburn 설치 실패. 수동으로 설치 후 다시 시도하세요:");
-    console.error("   npm install -g codeburn@latest");
+    console.error("   npm install -g codeburn@0.9.7");
     process.exit(1);
   }
   const ccusageOk = await ensureCcusage();
