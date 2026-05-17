@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * SessionEnd hook entry point.
- * Installed to ~/.primus-usage-tracker/submit.mjs by `init`.
+ * Installed to ~/.z21labs/usage-tracker/submit.mjs by `init` (옛: ~/.primus-usage-tracker).
  * Calls codeburn for all periods and POSTs to /api/ingest.
  */
 
@@ -10,7 +10,12 @@ import { existsSync, readFileSync, writeFileSync, unlinkSync, appendFileSync, st
 import { join } from "path";
 import { homedir } from "os";
 
-const STABLE_DIR_EARLY = join(homedir(), ".primus-usage-tracker");
+// 새 위치 우선, 옛 위치 fallback (마이그 안 된 머신 대응)
+const NEW_STABLE_DIR = join(homedir(), ".z21labs", "usage-tracker");
+const LEGACY_STABLE_DIR = join(homedir(), ".primus-usage-tracker");
+const STABLE_DIR_EARLY = existsSync(NEW_STABLE_DIR) || !existsSync(LEGACY_STABLE_DIR)
+  ? NEW_STABLE_DIR
+  : LEGACY_STABLE_DIR;
 const SUBMIT_LOG = join(STABLE_DIR_EARLY, "submit.log");
 
 // 로그 파일 1MB 초과 시 truncate
@@ -31,7 +36,8 @@ const log = (msg) => {
 // _USAGE_TRACKER_DETACHED 없으면 자신을 detached 백그라운드로 재생성하고 즉시 종료.
 if (!process.env._USAGE_TRACKER_DETACHED) {
   log("self-detach (parent will exit)");
-  const child = spawn(process.execPath, [join(homedir(), ".primus-usage-tracker", "submit.mjs")], {
+  const submitInStable = join(STABLE_DIR_EARLY, "submit.mjs");
+  const child = spawn(process.execPath, [submitInStable], {
     detached: true,
     stdio: "ignore",
     env: { ...process.env, _USAGE_TRACKER_DETACHED: "1" },
@@ -49,11 +55,12 @@ log("=== submit.mjs start ===");
 log(`SYSTEM_TZ=${SYSTEM_TZ}, process.env.TZ=${process.env.TZ ?? "(unset)"}`);
 
 const SERVER_URL = process.env.USAGE_TRACKER_URL ?? "https://aiusage.z21labs.world";
-const KEYTAR_SERVICE = "primus-usage-tracker";
+const KEYTAR_SERVICE = "z21labs-usage-tracker";
+const LEGACY_KEYTAR_SERVICE = "primus-usage-tracker";
 const KEYTAR_ACCOUNT = "api-key";
 const PERIODS = ["today", "week", "month", "30days", "all"];
 
-const STABLE_DIR = join(homedir(), ".primus-usage-tracker");
+const STABLE_DIR = STABLE_DIR_EARLY;
 const LOCK_FILE = join(STABLE_DIR, "submit.lock");
 const LOCK_TTL = 90_000; // 90s — covers codeburn 60s timeout + margin
 
@@ -63,11 +70,15 @@ async function loadApiKey() {
     const { default: keytar } = await import("keytar");
     const key = await keytar.getPassword(KEYTAR_SERVICE, KEYTAR_ACCOUNT);
     if (key) return key;
+    const legacyKey = await keytar.getPassword(LEGACY_KEYTAR_SERVICE, KEYTAR_ACCOUNT);
+    if (legacyKey) return legacyKey;
   } catch {
     // keytar unavailable
   }
-  const fallbackPath = join(homedir(), ".primus-usage-key");
-  if (existsSync(fallbackPath)) return readFileSync(fallbackPath, "utf8").trim();
+  const newFile = join(homedir(), ".z21labs", "usage-key");
+  if (existsSync(newFile)) return readFileSync(newFile, "utf8").trim();
+  const legacyFile = join(homedir(), ".primus-usage-key");
+  if (existsSync(legacyFile)) return readFileSync(legacyFile, "utf8").trim();
   return null;
 }
 

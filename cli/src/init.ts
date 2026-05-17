@@ -10,17 +10,29 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const SERVER_URL = process.env.USAGE_TRACKER_URL ?? "https://aiusage.z21labs.world";
 export const CLI_VERSION = "0.2.0";
-const KEYTAR_SERVICE = "primus-usage-tracker";
+
+// === 새 (z21labs) ===
+const KEYTAR_SERVICE = "z21labs-usage-tracker";
 const KEYTAR_ACCOUNT = "api-key";
 const CLAUDE_SETTINGS_PATH = path.join(os.homedir(), ".claude", "settings.json");
-const STABLE_DIR = path.join(os.homedir(), ".primus-usage-tracker");
+const STABLE_DIR = path.join(os.homedir(), ".z21labs", "usage-tracker");
 const STABLE_SUBMIT = path.join(STABLE_DIR, "submit.mjs");
 const STABLE_HISTORICAL = path.join(STABLE_DIR, "historical.mjs");
-const API_KEY_FALLBACK = path.join(os.homedir(), ".primus-usage-key");
+const API_KEY_FALLBACK = path.join(os.homedir(), ".z21labs", "usage-key");
 const CLI_PORT = 9988;
 
+const LAUNCHD_LABEL = "world.z21labs.ai-usage-tracker.sync";
 const LAUNCHD_PLIST = process.platform === "darwin"
-  ? path.join(os.homedir(), "Library", "LaunchAgents", "com.primus.usage-tracker.daily.plist")
+  ? path.join(os.homedir(), "Library", "LaunchAgents", `${LAUNCHD_LABEL}.plist`)
+  : null;
+
+// === 옛 (primus) — read fallback 전용 ===
+const LEGACY_KEYTAR_SERVICE = "primus-usage-tracker";
+const LEGACY_STABLE_DIR = path.join(os.homedir(), ".primus-usage-tracker");
+const LEGACY_API_KEY_FALLBACK = path.join(os.homedir(), ".primus-usage-key");
+const LEGACY_LAUNCHD_LABEL = "com.primus.usage-tracker.daily";
+const LEGACY_LAUNCHD_PLIST = process.platform === "darwin"
+  ? path.join(os.homedir(), "Library", "LaunchAgents", `${LEGACY_LAUNCHD_LABEL}.plist`)
   : null;
 
 // Refuse to install/repair if (a) we're running as root or (b) any of our
@@ -44,12 +56,15 @@ function preflightOwnership(): void {
   }
 
   // (b) Refuse if existing files belong to another user (typically root from
-  // a prior elevated install attempt).
+  // a prior elevated install attempt). 옛 경로도 같이 체크 (마이그 안 된 환경 대응).
   const targets: Array<{ path: string; label: string }> = [
     { path: STABLE_DIR, label: STABLE_DIR },
     { path: API_KEY_FALLBACK, label: API_KEY_FALLBACK },
+    { path: LEGACY_STABLE_DIR, label: LEGACY_STABLE_DIR },
+    { path: LEGACY_API_KEY_FALLBACK, label: LEGACY_API_KEY_FALLBACK },
   ];
   if (LAUNCHD_PLIST) targets.push({ path: LAUNCHD_PLIST, label: LAUNCHD_PLIST });
+  if (LEGACY_LAUNCHD_PLIST) targets.push({ path: LEGACY_LAUNCHD_PLIST, label: LEGACY_LAUNCHD_PLIST });
 
   const wrong: Array<{ path: string; label: string; uid: number; isDir: boolean }> = [];
   for (const t of targets) {
@@ -166,7 +181,7 @@ function preflightGlobalPackages(): void {
   console.error("   롤백 방법:");
   console.error("     nvm use system            # 셸 1개만 옛 Node 로");
   console.error("     nvm alias default 20      # 기본을 다시 옛 버전으로");
-  console.error("     백업: ~/.primus-usage-tracker/zshrc.bak-{timestamp}");
+  console.error("     백업: ~/.z21labs/usage-tracker/zshrc.bak-{timestamp}");
   console.error(bar);
 
   const accept = promptYn("\n   지금 자동 복구를 진행할까요? [Y/n]: ");
@@ -228,8 +243,8 @@ async function saveApiKey(apiKey: string) {
     await keytar.setPassword(KEYTAR_SERVICE, KEYTAR_ACCOUNT, apiKey);
   }
   // submit.mjs는 standalone 실행 시 keytar node_modules가 없으므로 항상 파일에도 저장
-  const fallbackPath = path.join(os.homedir(), ".primus-usage-key");
-  fs.writeFileSync(fallbackPath, apiKey, { mode: 0o600 });
+  fs.mkdirSync(path.dirname(API_KEY_FALLBACK), { recursive: true });
+  fs.writeFileSync(API_KEY_FALLBACK, apiKey, { mode: 0o600 });
 }
 
 export async function loadApiKey(): Promise<string | null> {
@@ -237,10 +252,16 @@ export async function loadApiKey(): Promise<string | null> {
   if (keytar) {
     const key = await keytar.getPassword(KEYTAR_SERVICE, KEYTAR_ACCOUNT);
     if (key) return key;
+    // 옛 keytar service fallback (마이그레이션 안 된 머신 대응)
+    const legacyKey = await keytar.getPassword(LEGACY_KEYTAR_SERVICE, KEYTAR_ACCOUNT);
+    if (legacyKey) return legacyKey;
   }
-  const fallbackPath = path.join(os.homedir(), ".primus-usage-key");
-  if (fs.existsSync(fallbackPath)) {
-    return fs.readFileSync(fallbackPath, "utf8").trim();
+  if (fs.existsSync(API_KEY_FALLBACK)) {
+    return fs.readFileSync(API_KEY_FALLBACK, "utf8").trim();
+  }
+  // 옛 파일 fallback
+  if (fs.existsSync(LEGACY_API_KEY_FALLBACK)) {
+    return fs.readFileSync(LEGACY_API_KEY_FALLBACK, "utf8").trim();
   }
   return null;
 }
@@ -249,9 +270,11 @@ export async function deleteApiKey() {
   const keytar = await getKeytar() as { deletePassword: (s: string, a: string) => Promise<boolean> } | null;
   if (keytar) {
     await keytar.deletePassword(KEYTAR_SERVICE, KEYTAR_ACCOUNT);
+    // 옛 keytar 잔재도 같이 정리
+    try { await keytar.deletePassword(LEGACY_KEYTAR_SERVICE, KEYTAR_ACCOUNT); } catch { /* ignore */ }
   }
-  const fallbackPath = path.join(os.homedir(), ".primus-usage-key");
-  if (fs.existsSync(fallbackPath)) fs.unlinkSync(fallbackPath);
+  if (fs.existsSync(API_KEY_FALLBACK)) fs.unlinkSync(API_KEY_FALLBACK);
+  if (fs.existsSync(LEGACY_API_KEY_FALLBACK)) fs.unlinkSync(LEGACY_API_KEY_FALLBACK);
 }
 
 function openBrowser(url: string) {
@@ -307,9 +330,17 @@ function getApiKeyViaLocalServer(): Promise<string> {
 }
 
 function registerLaunchd(submitPath: string): void {
-  const label = "com.primus.usage-tracker.daily";
+  const label = LAUNCHD_LABEL;
   const plistDir = path.join(os.homedir(), "Library", "LaunchAgents");
   const plistPath = path.join(plistDir, `${label}.plist`);
+
+  // 옛 plist 잔재가 있으면 unload + 제거 (멱등)
+  if (LEGACY_LAUNCHD_PLIST && fs.existsSync(LEGACY_LAUNCHD_PLIST)) {
+    try {
+      execSync(`launchctl unload "${LEGACY_LAUNCHD_PLIST}"`, { stdio: "ignore" });
+    } catch { /* 이미 unload 됐을 수도 */ }
+    try { fs.unlinkSync(LEGACY_LAUNCHD_PLIST); } catch { /* ignore */ }
+  }
 
   const envPath = process.env.PATH ?? "/usr/bin:/bin:/usr/sbin:/sbin";
   const plist = `<?xml version="1.0" encoding="UTF-8"?>
@@ -352,7 +383,7 @@ function registerLaunchd(submitPath: string): void {
 }
 
 function registerWindowsTask(submitPath: string): void {
-  const taskName = "PrimusUsageTracker";
+  const taskName = "Z21labsUsageTracker";
   const wrapperPath = path.join(STABLE_DIR, "daily-sync.cmd");
   const xmlPath = path.join(STABLE_DIR, "task.xml");
 
@@ -598,8 +629,8 @@ export async function runRepair() {
   const ccusageOk = await ensureCcusage();
 
   // submit.mjs는 standalone 실행이라 keytar 없음 → 항상 파일에도 보장
-  const fallbackPath = path.join(os.homedir(), ".primus-usage-key");
-  fs.writeFileSync(fallbackPath, apiKey, { mode: 0o600 });
+  fs.mkdirSync(path.dirname(API_KEY_FALLBACK), { recursive: true });
+  fs.writeFileSync(API_KEY_FALLBACK, apiKey, { mode: 0o600 });
 
   fs.mkdirSync(STABLE_DIR, { recursive: true });
   fs.copyFileSync(path.join(__dirname, "submit.mjs"), STABLE_SUBMIT);

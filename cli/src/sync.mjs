@@ -16,14 +16,20 @@ import * as path from "path";
 import { fileURLToPath } from "url";
 var __dirname2 = path.dirname(fileURLToPath(import.meta.url));
 var SERVER_URL = process.env.USAGE_TRACKER_URL ?? "https://aiusage.z21labs.world";
-var KEYTAR_SERVICE = "primus-usage-tracker";
+var KEYTAR_SERVICE = "z21labs-usage-tracker";
 var KEYTAR_ACCOUNT = "api-key";
 var CLAUDE_SETTINGS_PATH = path.join(os.homedir(), ".claude", "settings.json");
-var STABLE_DIR = path.join(os.homedir(), ".primus-usage-tracker");
+var STABLE_DIR = path.join(os.homedir(), ".z21labs", "usage-tracker");
 var STABLE_SUBMIT = path.join(STABLE_DIR, "submit.mjs");
 var STABLE_HISTORICAL = path.join(STABLE_DIR, "historical.mjs");
-var API_KEY_FALLBACK = path.join(os.homedir(), ".primus-usage-key");
-var LAUNCHD_PLIST = process.platform === "darwin" ? path.join(os.homedir(), "Library", "LaunchAgents", "com.primus.usage-tracker.daily.plist") : null;
+var API_KEY_FALLBACK = path.join(os.homedir(), ".z21labs", "usage-key");
+var LAUNCHD_LABEL = "world.z21labs.ai-usage-tracker.sync";
+var LAUNCHD_PLIST = process.platform === "darwin" ? path.join(os.homedir(), "Library", "LaunchAgents", `${LAUNCHD_LABEL}.plist`) : null;
+var LEGACY_KEYTAR_SERVICE = "primus-usage-tracker";
+var LEGACY_STABLE_DIR = path.join(os.homedir(), ".primus-usage-tracker");
+var LEGACY_API_KEY_FALLBACK = path.join(os.homedir(), ".primus-usage-key");
+var LEGACY_LAUNCHD_LABEL = "com.primus.usage-tracker.daily";
+var LEGACY_LAUNCHD_PLIST = process.platform === "darwin" ? path.join(os.homedir(), "Library", "LaunchAgents", `${LEGACY_LAUNCHD_LABEL}.plist`) : null;
 async function getKeytar() {
   try {
     const kt = await import("keytar");
@@ -38,10 +44,15 @@ async function loadApiKey() {
     const key = await keytar.getPassword(KEYTAR_SERVICE, KEYTAR_ACCOUNT);
     if (key)
       return key;
+    const legacyKey = await keytar.getPassword(LEGACY_KEYTAR_SERVICE, KEYTAR_ACCOUNT);
+    if (legacyKey)
+      return legacyKey;
   }
-  const fallbackPath = path.join(os.homedir(), ".primus-usage-key");
-  if (fs.existsSync(fallbackPath)) {
-    return fs.readFileSync(fallbackPath, "utf8").trim();
+  if (fs.existsSync(API_KEY_FALLBACK)) {
+    return fs.readFileSync(API_KEY_FALLBACK, "utf8").trim();
+  }
+  if (fs.existsSync(LEGACY_API_KEY_FALLBACK)) {
+    return fs.readFileSync(LEGACY_API_KEY_FALLBACK, "utf8").trim();
   }
   return null;
 }

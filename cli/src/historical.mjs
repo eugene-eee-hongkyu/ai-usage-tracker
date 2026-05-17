@@ -20,7 +20,12 @@ const SERVER_URL = process.env.USAGE_TRACKER_URL ?? "https://aiusage.z21labs.wor
 const SYSTEM_TZ = Intl.DateTimeFormat().resolvedOptions().timeZone;
 const childEnv = { ...process.env, TZ: SYSTEM_TZ, CODEBURN_TZ: SYSTEM_TZ };
 
-const STABLE_DIR_EARLY = join(homedir(), ".primus-usage-tracker");
+// 새 위치 우선, 옛 위치 fallback
+const NEW_STABLE_DIR = join(homedir(), ".z21labs", "usage-tracker");
+const LEGACY_STABLE_DIR = join(homedir(), ".primus-usage-tracker");
+const STABLE_DIR_EARLY = existsSync(NEW_STABLE_DIR) || !existsSync(LEGACY_STABLE_DIR)
+  ? NEW_STABLE_DIR
+  : LEGACY_STABLE_DIR;
 const HISTORICAL_LOG = join(STABLE_DIR_EARLY, "historical.log");
 
 try { mkdirSync(STABLE_DIR_EARLY, { recursive: true }); } catch {}
@@ -39,8 +44,10 @@ const log = (msg) => {
 async function loadApiKey() {
   if (process.env.USAGE_TRACKER_API_KEY) return process.env.USAGE_TRACKER_API_KEY;
   try {
-    const fallbackPath = join(homedir(), ".primus-usage-key");
-    if (existsSync(fallbackPath)) return readFileSync(fallbackPath, "utf8").trim();
+    const newFile = join(homedir(), ".z21labs", "usage-key");
+    if (existsSync(newFile)) return readFileSync(newFile, "utf8").trim();
+    const legacyFile = join(homedir(), ".primus-usage-key");
+    if (existsSync(legacyFile)) return readFileSync(legacyFile, "utf8").trim();
   } catch {}
   return null;
 }

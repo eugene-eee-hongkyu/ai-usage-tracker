@@ -878,15 +878,21 @@ import { fileURLToPath } from "url";
 var __dirname2 = path.dirname(fileURLToPath(import.meta.url));
 var SERVER_URL = process.env.USAGE_TRACKER_URL ?? "https://aiusage.z21labs.world";
 var CLI_VERSION = "0.2.0";
-var KEYTAR_SERVICE = "primus-usage-tracker";
+var KEYTAR_SERVICE = "z21labs-usage-tracker";
 var KEYTAR_ACCOUNT = "api-key";
 var CLAUDE_SETTINGS_PATH = path.join(os.homedir(), ".claude", "settings.json");
-var STABLE_DIR = path.join(os.homedir(), ".primus-usage-tracker");
+var STABLE_DIR = path.join(os.homedir(), ".z21labs", "usage-tracker");
 var STABLE_SUBMIT = path.join(STABLE_DIR, "submit.mjs");
 var STABLE_HISTORICAL = path.join(STABLE_DIR, "historical.mjs");
-var API_KEY_FALLBACK = path.join(os.homedir(), ".primus-usage-key");
+var API_KEY_FALLBACK = path.join(os.homedir(), ".z21labs", "usage-key");
 var CLI_PORT = 9988;
-var LAUNCHD_PLIST = process.platform === "darwin" ? path.join(os.homedir(), "Library", "LaunchAgents", "com.primus.usage-tracker.daily.plist") : null;
+var LAUNCHD_LABEL = "world.z21labs.ai-usage-tracker.sync";
+var LAUNCHD_PLIST = process.platform === "darwin" ? path.join(os.homedir(), "Library", "LaunchAgents", `${LAUNCHD_LABEL}.plist`) : null;
+var LEGACY_KEYTAR_SERVICE = "primus-usage-tracker";
+var LEGACY_STABLE_DIR = path.join(os.homedir(), ".primus-usage-tracker");
+var LEGACY_API_KEY_FALLBACK = path.join(os.homedir(), ".primus-usage-key");
+var LEGACY_LAUNCHD_LABEL = "com.primus.usage-tracker.daily";
+var LEGACY_LAUNCHD_PLIST = process.platform === "darwin" ? path.join(os.homedir(), "Library", "LaunchAgents", `${LEGACY_LAUNCHD_LABEL}.plist`) : null;
 function preflightOwnership() {
   if (process.platform === "win32" || !process.getuid)
     return;
@@ -904,10 +910,14 @@ function preflightOwnership() {
   }
   const targets = [
     { path: STABLE_DIR, label: STABLE_DIR },
-    { path: API_KEY_FALLBACK, label: API_KEY_FALLBACK }
+    { path: API_KEY_FALLBACK, label: API_KEY_FALLBACK },
+    { path: LEGACY_STABLE_DIR, label: LEGACY_STABLE_DIR },
+    { path: LEGACY_API_KEY_FALLBACK, label: LEGACY_API_KEY_FALLBACK }
   ];
   if (LAUNCHD_PLIST)
     targets.push({ path: LAUNCHD_PLIST, label: LAUNCHD_PLIST });
+  if (LEGACY_LAUNCHD_PLIST)
+    targets.push({ path: LEGACY_LAUNCHD_PLIST, label: LEGACY_LAUNCHD_PLIST });
   const wrong = [];
   for (const t of targets) {
     if (!fs.existsSync(t.path))
@@ -1018,7 +1028,7 @@ function preflightGlobalPackages() {
   console.error("   롤백 방법:");
   console.error("     nvm use system            # 셸 1개만 옛 Node 로");
   console.error("     nvm alias default 20      # 기본을 다시 옛 버전으로");
-  console.error("     백업: ~/.primus-usage-tracker/zshrc.bak-{timestamp}");
+  console.error("     백업: ~/.z21labs/usage-tracker/zshrc.bak-{timestamp}");
   console.error(bar);
   const accept = promptYn(`
    지금 자동 복구를 진행할까요? [Y/n]: `);
@@ -1076,8 +1086,8 @@ async function saveApiKey(apiKey) {
   if (keytar) {
     await keytar.setPassword(KEYTAR_SERVICE, KEYTAR_ACCOUNT, apiKey);
   }
-  const fallbackPath = path.join(os.homedir(), ".primus-usage-key");
-  fs.writeFileSync(fallbackPath, apiKey, { mode: 384 });
+  fs.mkdirSync(path.dirname(API_KEY_FALLBACK), { recursive: true });
+  fs.writeFileSync(API_KEY_FALLBACK, apiKey, { mode: 384 });
 }
 async function loadApiKey() {
   const keytar = await getKeytar();
@@ -1085,10 +1095,15 @@ async function loadApiKey() {
     const key = await keytar.getPassword(KEYTAR_SERVICE, KEYTAR_ACCOUNT);
     if (key)
       return key;
+    const legacyKey = await keytar.getPassword(LEGACY_KEYTAR_SERVICE, KEYTAR_ACCOUNT);
+    if (legacyKey)
+      return legacyKey;
   }
-  const fallbackPath = path.join(os.homedir(), ".primus-usage-key");
-  if (fs.existsSync(fallbackPath)) {
-    return fs.readFileSync(fallbackPath, "utf8").trim();
+  if (fs.existsSync(API_KEY_FALLBACK)) {
+    return fs.readFileSync(API_KEY_FALLBACK, "utf8").trim();
+  }
+  if (fs.existsSync(LEGACY_API_KEY_FALLBACK)) {
+    return fs.readFileSync(LEGACY_API_KEY_FALLBACK, "utf8").trim();
   }
   return null;
 }
@@ -1096,10 +1111,14 @@ async function deleteApiKey() {
   const keytar = await getKeytar();
   if (keytar) {
     await keytar.deletePassword(KEYTAR_SERVICE, KEYTAR_ACCOUNT);
+    try {
+      await keytar.deletePassword(LEGACY_KEYTAR_SERVICE, KEYTAR_ACCOUNT);
+    } catch {}
   }
-  const fallbackPath = path.join(os.homedir(), ".primus-usage-key");
-  if (fs.existsSync(fallbackPath))
-    fs.unlinkSync(fallbackPath);
+  if (fs.existsSync(API_KEY_FALLBACK))
+    fs.unlinkSync(API_KEY_FALLBACK);
+  if (fs.existsSync(LEGACY_API_KEY_FALLBACK))
+    fs.unlinkSync(LEGACY_API_KEY_FALLBACK);
 }
 function openBrowser(url) {
   try {
@@ -1148,9 +1167,17 @@ function getApiKeyViaLocalServer() {
   });
 }
 function registerLaunchd(submitPath) {
-  const label = "com.primus.usage-tracker.daily";
+  const label = LAUNCHD_LABEL;
   const plistDir = path.join(os.homedir(), "Library", "LaunchAgents");
   const plistPath = path.join(plistDir, `${label}.plist`);
+  if (LEGACY_LAUNCHD_PLIST && fs.existsSync(LEGACY_LAUNCHD_PLIST)) {
+    try {
+      execSync(`launchctl unload "${LEGACY_LAUNCHD_PLIST}"`, { stdio: "ignore" });
+    } catch {}
+    try {
+      fs.unlinkSync(LEGACY_LAUNCHD_PLIST);
+    } catch {}
+  }
   const envPath = process.env.PATH ?? "/usr/bin:/bin:/usr/sbin:/sbin";
   const plist = `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -1194,7 +1221,7 @@ function registerLaunchd(submitPath) {
   }
 }
 function registerWindowsTask(submitPath) {
-  const taskName = "PrimusUsageTracker";
+  const taskName = "Z21labsUsageTracker";
   const wrapperPath = path.join(STABLE_DIR, "daily-sync.cmd");
   const xmlPath = path.join(STABLE_DIR, "task.xml");
   fs.writeFileSync(wrapperPath, `@echo off\r
@@ -1412,8 +1439,8 @@ async function runRepair() {
     process.exit(1);
   }
   const ccusageOk = await ensureCcusage();
-  const fallbackPath = path.join(os.homedir(), ".primus-usage-key");
-  fs.writeFileSync(fallbackPath, apiKey, { mode: 384 });
+  fs.mkdirSync(path.dirname(API_KEY_FALLBACK), { recursive: true });
+  fs.writeFileSync(API_KEY_FALLBACK, apiKey, { mode: 384 });
   fs.mkdirSync(STABLE_DIR, { recursive: true });
   fs.copyFileSync(path.join(__dirname2, "submit.mjs"), STABLE_SUBMIT);
   fs.copyFileSync(path.join(__dirname2, "historical.mjs"), STABLE_HISTORICAL);
@@ -1690,9 +1717,9 @@ import * as path2 from "path";
 var STABLE_DIR2 = path2.join(os2.homedir(), ".z21labs", "usage-tracker");
 var API_KEY_FALLBACK2 = path2.join(os2.homedir(), ".z21labs", "usage-key");
 var LAUNCHD_PLIST2 = process.platform === "darwin" ? path2.join(os2.homedir(), "Library", "LaunchAgents", "world.z21labs.ai-usage-tracker.sync.plist") : null;
-var LEGACY_STABLE_DIR = path2.join(os2.homedir(), ".primus-usage-tracker");
-var LEGACY_API_KEY_FALLBACK = path2.join(os2.homedir(), ".primus-usage-key");
-var LEGACY_LAUNCHD_PLIST = process.platform === "darwin" ? path2.join(os2.homedir(), "Library", "LaunchAgents", "com.primus.usage-tracker.daily.plist") : null;
+var LEGACY_STABLE_DIR2 = path2.join(os2.homedir(), ".primus-usage-tracker");
+var LEGACY_API_KEY_FALLBACK2 = path2.join(os2.homedir(), ".primus-usage-key");
+var LEGACY_LAUNCHD_PLIST2 = process.platform === "darwin" ? path2.join(os2.homedir(), "Library", "LaunchAgents", "com.primus.usage-tracker.daily.plist") : null;
 function safeExec(cmd) {
   try {
     return execSync2(cmd, { stdio: ["ignore", "pipe", "ignore"], encoding: "utf8" }).trim();
@@ -1720,7 +1747,7 @@ function detectNodeManager(nodePath) {
 function readLastSync() {
   const candidates = [
     path2.join(STABLE_DIR2, "submit.lock"),
-    path2.join(LEGACY_STABLE_DIR, "submit.lock")
+    path2.join(LEGACY_STABLE_DIR2, "submit.lock")
   ];
   for (const candidate of candidates) {
     if (fs2.existsSync(candidate)) {
@@ -1755,10 +1782,10 @@ function buildReport(cliVersion) {
   let launchdStatus = "n/a";
   if (LAUNCHD_PLIST2) {
     const newPresent = fs2.existsSync(LAUNCHD_PLIST2);
-    const legacyPresent = LEGACY_LAUNCHD_PLIST ? fs2.existsSync(LEGACY_LAUNCHD_PLIST) : false;
+    const legacyPresent = LEGACY_LAUNCHD_PLIST2 ? fs2.existsSync(LEGACY_LAUNCHD_PLIST2) : false;
     launchdStatus = newPresent || legacyPresent ? "registered" : "not_registered";
   }
-  const apiKeyStatus = fs2.existsSync(API_KEY_FALLBACK2) || fs2.existsSync(LEGACY_API_KEY_FALLBACK) ? "registered" : "not_registered";
+  const apiKeyStatus = fs2.existsSync(API_KEY_FALLBACK2) || fs2.existsSync(LEGACY_API_KEY_FALLBACK2) ? "registered" : "not_registered";
   const lastSyncIso = readLastSync();
   const issues = [];
   if (npmRootWritable === false) {
@@ -1872,12 +1899,12 @@ var NEW_API_KEY_FILE = path3.join(NEW_DATA_ROOT, "usage-key");
 var NEW_KEYTAR_SERVICE = "z21labs-usage-tracker";
 var NEW_LAUNCHD_LABEL = "world.z21labs.ai-usage-tracker.sync";
 var NEW_LAUNCHD_PLIST = process.platform === "darwin" ? path3.join(os3.homedir(), "Library", "LaunchAgents", `${NEW_LAUNCHD_LABEL}.plist`) : null;
-var LEGACY_STABLE_DIR2 = path3.join(os3.homedir(), ".primus-usage-tracker");
+var LEGACY_STABLE_DIR3 = path3.join(os3.homedir(), ".primus-usage-tracker");
 var LEGACY_API_KEY_FILE = path3.join(os3.homedir(), ".primus-usage-key");
-var LEGACY_KEYTAR_SERVICE = "primus-usage-tracker";
+var LEGACY_KEYTAR_SERVICE2 = "primus-usage-tracker";
 var LEGACY_KEYTAR_ACCOUNT = "api-key";
-var LEGACY_LAUNCHD_LABEL = "com.primus.usage-tracker.daily";
-var LEGACY_LAUNCHD_PLIST2 = process.platform === "darwin" ? path3.join(os3.homedir(), "Library", "LaunchAgents", `${LEGACY_LAUNCHD_LABEL}.plist`) : null;
+var LEGACY_LAUNCHD_LABEL2 = "com.primus.usage-tracker.daily";
+var LEGACY_LAUNCHD_PLIST3 = process.platform === "darwin" ? path3.join(os3.homedir(), "Library", "LaunchAgents", `${LEGACY_LAUNCHD_LABEL2}.plist`) : null;
 function safeMv(src, dst) {
   if (!fs3.existsSync(src))
     return "no-src";
@@ -1888,23 +1915,23 @@ function safeMv(src, dst) {
   return "moved";
 }
 function migrateDataDir(report, dryRun) {
-  if (!fs3.existsSync(LEGACY_STABLE_DIR2)) {
+  if (!fs3.existsSync(LEGACY_STABLE_DIR3)) {
     report.dataDir = fs3.existsSync(NEW_STABLE_DIR) ? "already-new" : "no-legacy";
     return;
   }
   if (fs3.existsSync(NEW_STABLE_DIR)) {
     report.dataDir = "skipped-both-exist";
-    report.notes.push(`옛 ${LEGACY_STABLE_DIR2} 와 새 ${NEW_STABLE_DIR} 모두 존재. 데이터 손실 우려로 자동 mv 건너뜀. 수동 정리 필요.`);
+    report.notes.push(`옛 ${LEGACY_STABLE_DIR3} 와 새 ${NEW_STABLE_DIR} 모두 존재. 데이터 손실 우려로 자동 mv 건너뜀. 수동 정리 필요.`);
     return;
   }
   if (dryRun) {
     report.dataDir = "migrated";
-    report.notes.push(`[dry-run] mv ${LEGACY_STABLE_DIR2} → ${NEW_STABLE_DIR}`);
+    report.notes.push(`[dry-run] mv ${LEGACY_STABLE_DIR3} → ${NEW_STABLE_DIR}`);
     return;
   }
   try {
     fs3.mkdirSync(NEW_DATA_ROOT, { recursive: true });
-    fs3.renameSync(LEGACY_STABLE_DIR2, NEW_STABLE_DIR);
+    fs3.renameSync(LEGACY_STABLE_DIR3, NEW_STABLE_DIR);
     report.dataDir = "migrated";
   } catch (e) {
     report.dataDir = "skipped-both-exist";
@@ -1945,7 +1972,7 @@ async function migrateKeytar(report, dryRun) {
     return;
   }
   try {
-    const legacyKey = await keytar.getPassword(LEGACY_KEYTAR_SERVICE, LEGACY_KEYTAR_ACCOUNT);
+    const legacyKey = await keytar.getPassword(LEGACY_KEYTAR_SERVICE2, LEGACY_KEYTAR_ACCOUNT);
     if (!legacyKey) {
       const newKey = await keytar.getPassword(NEW_KEYTAR_SERVICE, LEGACY_KEYTAR_ACCOUNT);
       report.keytar = newKey ? "already-new" : "no-legacy";
@@ -1953,17 +1980,17 @@ async function migrateKeytar(report, dryRun) {
     }
     const existingNew = await keytar.getPassword(NEW_KEYTAR_SERVICE, LEGACY_KEYTAR_ACCOUNT);
     if (existingNew && existingNew !== legacyKey) {
-      report.notes.push(`keytar 옛 서비스(${LEGACY_KEYTAR_SERVICE})와 새 서비스(${NEW_KEYTAR_SERVICE}) 키 값이 다름. 수동 검토 필요.`);
+      report.notes.push(`keytar 옛 서비스(${LEGACY_KEYTAR_SERVICE2})와 새 서비스(${NEW_KEYTAR_SERVICE}) 키 값이 다름. 수동 검토 필요.`);
       report.keytar = "error";
       return;
     }
     if (dryRun) {
       report.keytar = "migrated";
-      report.notes.push(`[dry-run] keytar ${LEGACY_KEYTAR_SERVICE} → ${NEW_KEYTAR_SERVICE} transfer`);
+      report.notes.push(`[dry-run] keytar ${LEGACY_KEYTAR_SERVICE2} → ${NEW_KEYTAR_SERVICE} transfer`);
       return;
     }
     await keytar.setPassword(NEW_KEYTAR_SERVICE, LEGACY_KEYTAR_ACCOUNT, legacyKey);
-    await keytar.deletePassword(LEGACY_KEYTAR_SERVICE, LEGACY_KEYTAR_ACCOUNT);
+    await keytar.deletePassword(LEGACY_KEYTAR_SERVICE2, LEGACY_KEYTAR_ACCOUNT);
     report.keytar = "migrated";
   } catch (e) {
     report.keytar = "error";
@@ -1971,11 +1998,11 @@ async function migrateKeytar(report, dryRun) {
   }
 }
 function migrateLaunchd(report, dryRun) {
-  if (process.platform !== "darwin" || !LEGACY_LAUNCHD_PLIST2 || !NEW_LAUNCHD_PLIST) {
+  if (process.platform !== "darwin" || !LEGACY_LAUNCHD_PLIST3 || !NEW_LAUNCHD_PLIST) {
     report.launchd = "n/a";
     return;
   }
-  const legacyExists = fs3.existsSync(LEGACY_LAUNCHD_PLIST2);
+  const legacyExists = fs3.existsSync(LEGACY_LAUNCHD_PLIST3);
   const newExists = fs3.existsSync(NEW_LAUNCHD_PLIST);
   if (!legacyExists) {
     report.launchd = newExists ? "already-new" : "no-legacy";
@@ -1983,16 +2010,16 @@ function migrateLaunchd(report, dryRun) {
   }
   if (dryRun) {
     report.launchd = "migrated";
-    report.notes.push(`[dry-run] launchctl unload ${LEGACY_LAUNCHD_LABEL} + rm ${LEGACY_LAUNCHD_PLIST2}` + (newExists ? "" : ` (새 plist 는 init/launcher 가 다음 실행 시 생성)`));
+    report.notes.push(`[dry-run] launchctl unload ${LEGACY_LAUNCHD_LABEL2} + rm ${LEGACY_LAUNCHD_PLIST3}` + (newExists ? "" : ` (새 plist 는 init/launcher 가 다음 실행 시 생성)`));
     return;
   }
   try {
     try {
-      execSync3(`launchctl unload "${LEGACY_LAUNCHD_PLIST2}"`, {
+      execSync3(`launchctl unload "${LEGACY_LAUNCHD_PLIST3}"`, {
         stdio: ["ignore", "ignore", "ignore"]
       });
     } catch {}
-    fs3.unlinkSync(LEGACY_LAUNCHD_PLIST2);
+    fs3.unlinkSync(LEGACY_LAUNCHD_PLIST3);
     report.launchd = "migrated";
     if (!newExists) {
       report.notes.push(`옛 plist 제거. 새 plist (${NEW_LAUNCHD_LABEL}) 는 다음 init/launcher 실행 시 자동 생성.`);

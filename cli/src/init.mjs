@@ -12,15 +12,21 @@ import { fileURLToPath } from "url";
 var __dirname2 = path.dirname(fileURLToPath(import.meta.url));
 var SERVER_URL = process.env.USAGE_TRACKER_URL ?? "https://aiusage.z21labs.world";
 var CLI_VERSION = "0.2.0";
-var KEYTAR_SERVICE = "primus-usage-tracker";
+var KEYTAR_SERVICE = "z21labs-usage-tracker";
 var KEYTAR_ACCOUNT = "api-key";
 var CLAUDE_SETTINGS_PATH = path.join(os.homedir(), ".claude", "settings.json");
-var STABLE_DIR = path.join(os.homedir(), ".primus-usage-tracker");
+var STABLE_DIR = path.join(os.homedir(), ".z21labs", "usage-tracker");
 var STABLE_SUBMIT = path.join(STABLE_DIR, "submit.mjs");
 var STABLE_HISTORICAL = path.join(STABLE_DIR, "historical.mjs");
-var API_KEY_FALLBACK = path.join(os.homedir(), ".primus-usage-key");
+var API_KEY_FALLBACK = path.join(os.homedir(), ".z21labs", "usage-key");
 var CLI_PORT = 9988;
-var LAUNCHD_PLIST = process.platform === "darwin" ? path.join(os.homedir(), "Library", "LaunchAgents", "com.primus.usage-tracker.daily.plist") : null;
+var LAUNCHD_LABEL = "world.z21labs.ai-usage-tracker.sync";
+var LAUNCHD_PLIST = process.platform === "darwin" ? path.join(os.homedir(), "Library", "LaunchAgents", `${LAUNCHD_LABEL}.plist`) : null;
+var LEGACY_KEYTAR_SERVICE = "primus-usage-tracker";
+var LEGACY_STABLE_DIR = path.join(os.homedir(), ".primus-usage-tracker");
+var LEGACY_API_KEY_FALLBACK = path.join(os.homedir(), ".primus-usage-key");
+var LEGACY_LAUNCHD_LABEL = "com.primus.usage-tracker.daily";
+var LEGACY_LAUNCHD_PLIST = process.platform === "darwin" ? path.join(os.homedir(), "Library", "LaunchAgents", `${LEGACY_LAUNCHD_LABEL}.plist`) : null;
 function preflightOwnership() {
   if (process.platform === "win32" || !process.getuid)
     return;
@@ -38,10 +44,14 @@ function preflightOwnership() {
   }
   const targets = [
     { path: STABLE_DIR, label: STABLE_DIR },
-    { path: API_KEY_FALLBACK, label: API_KEY_FALLBACK }
+    { path: API_KEY_FALLBACK, label: API_KEY_FALLBACK },
+    { path: LEGACY_STABLE_DIR, label: LEGACY_STABLE_DIR },
+    { path: LEGACY_API_KEY_FALLBACK, label: LEGACY_API_KEY_FALLBACK }
   ];
   if (LAUNCHD_PLIST)
     targets.push({ path: LAUNCHD_PLIST, label: LAUNCHD_PLIST });
+  if (LEGACY_LAUNCHD_PLIST)
+    targets.push({ path: LEGACY_LAUNCHD_PLIST, label: LEGACY_LAUNCHD_PLIST });
   const wrong = [];
   for (const t of targets) {
     if (!fs.existsSync(t.path))
@@ -152,7 +162,7 @@ function preflightGlobalPackages() {
   console.error("   롤백 방법:");
   console.error("     nvm use system            # 셸 1개만 옛 Node 로");
   console.error("     nvm alias default 20      # 기본을 다시 옛 버전으로");
-  console.error("     백업: ~/.primus-usage-tracker/zshrc.bak-{timestamp}");
+  console.error("     백업: ~/.z21labs/usage-tracker/zshrc.bak-{timestamp}");
   console.error(bar);
   const accept = promptYn(`
    지금 자동 복구를 진행할까요? [Y/n]: `);
@@ -210,8 +220,8 @@ async function saveApiKey(apiKey) {
   if (keytar) {
     await keytar.setPassword(KEYTAR_SERVICE, KEYTAR_ACCOUNT, apiKey);
   }
-  const fallbackPath = path.join(os.homedir(), ".primus-usage-key");
-  fs.writeFileSync(fallbackPath, apiKey, { mode: 384 });
+  fs.mkdirSync(path.dirname(API_KEY_FALLBACK), { recursive: true });
+  fs.writeFileSync(API_KEY_FALLBACK, apiKey, { mode: 384 });
 }
 async function loadApiKey() {
   const keytar = await getKeytar();
@@ -219,10 +229,15 @@ async function loadApiKey() {
     const key = await keytar.getPassword(KEYTAR_SERVICE, KEYTAR_ACCOUNT);
     if (key)
       return key;
+    const legacyKey = await keytar.getPassword(LEGACY_KEYTAR_SERVICE, KEYTAR_ACCOUNT);
+    if (legacyKey)
+      return legacyKey;
   }
-  const fallbackPath = path.join(os.homedir(), ".primus-usage-key");
-  if (fs.existsSync(fallbackPath)) {
-    return fs.readFileSync(fallbackPath, "utf8").trim();
+  if (fs.existsSync(API_KEY_FALLBACK)) {
+    return fs.readFileSync(API_KEY_FALLBACK, "utf8").trim();
+  }
+  if (fs.existsSync(LEGACY_API_KEY_FALLBACK)) {
+    return fs.readFileSync(LEGACY_API_KEY_FALLBACK, "utf8").trim();
   }
   return null;
 }
@@ -230,10 +245,14 @@ async function deleteApiKey() {
   const keytar = await getKeytar();
   if (keytar) {
     await keytar.deletePassword(KEYTAR_SERVICE, KEYTAR_ACCOUNT);
+    try {
+      await keytar.deletePassword(LEGACY_KEYTAR_SERVICE, KEYTAR_ACCOUNT);
+    } catch {}
   }
-  const fallbackPath = path.join(os.homedir(), ".primus-usage-key");
-  if (fs.existsSync(fallbackPath))
-    fs.unlinkSync(fallbackPath);
+  if (fs.existsSync(API_KEY_FALLBACK))
+    fs.unlinkSync(API_KEY_FALLBACK);
+  if (fs.existsSync(LEGACY_API_KEY_FALLBACK))
+    fs.unlinkSync(LEGACY_API_KEY_FALLBACK);
 }
 function openBrowser(url) {
   try {
@@ -282,9 +301,17 @@ function getApiKeyViaLocalServer() {
   });
 }
 function registerLaunchd(submitPath) {
-  const label = "com.primus.usage-tracker.daily";
+  const label = LAUNCHD_LABEL;
   const plistDir = path.join(os.homedir(), "Library", "LaunchAgents");
   const plistPath = path.join(plistDir, `${label}.plist`);
+  if (LEGACY_LAUNCHD_PLIST && fs.existsSync(LEGACY_LAUNCHD_PLIST)) {
+    try {
+      execSync(`launchctl unload "${LEGACY_LAUNCHD_PLIST}"`, { stdio: "ignore" });
+    } catch {}
+    try {
+      fs.unlinkSync(LEGACY_LAUNCHD_PLIST);
+    } catch {}
+  }
   const envPath = process.env.PATH ?? "/usr/bin:/bin:/usr/sbin:/sbin";
   const plist = `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -328,7 +355,7 @@ function registerLaunchd(submitPath) {
   }
 }
 function registerWindowsTask(submitPath) {
-  const taskName = "PrimusUsageTracker";
+  const taskName = "Z21labsUsageTracker";
   const wrapperPath = path.join(STABLE_DIR, "daily-sync.cmd");
   const xmlPath = path.join(STABLE_DIR, "task.xml");
   fs.writeFileSync(wrapperPath, `@echo off\r
@@ -546,8 +573,8 @@ async function runRepair() {
     process.exit(1);
   }
   const ccusageOk = await ensureCcusage();
-  const fallbackPath = path.join(os.homedir(), ".primus-usage-key");
-  fs.writeFileSync(fallbackPath, apiKey, { mode: 384 });
+  fs.mkdirSync(path.dirname(API_KEY_FALLBACK), { recursive: true });
+  fs.writeFileSync(API_KEY_FALLBACK, apiKey, { mode: 384 });
   fs.mkdirSync(STABLE_DIR, { recursive: true });
   fs.copyFileSync(path.join(__dirname2, "submit.mjs"), STABLE_SUBMIT);
   fs.copyFileSync(path.join(__dirname2, "historical.mjs"), STABLE_HISTORICAL);
