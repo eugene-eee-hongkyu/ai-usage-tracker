@@ -710,7 +710,10 @@ export function TeamView({ adminMode = false }: { adminMode?: boolean }) {
               {/* 일별 토큰 단가 (멤버별) — 멤버별 plan 가치 / 일별 토큰 × 1M */}
               <div data-testid="team-card-daily-unit-cost" className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-yellow-500 rounded">
                 <div className="px-3 py-2 border-b border-neutral-800 flex items-center justify-between flex-wrap gap-y-1">
-                  <span className="text-xs font-mono font-bold text-yellow-400 uppercase tracking-wider">{t.teamView.unitCostCardLabel}</span>
+                  <span className="text-xs font-mono font-bold text-yellow-400 uppercase tracking-wider">
+                    {t.teamView.unitCostCardLabel}
+                    <span className="ml-1.5 text-neutral-500 normal-case font-normal">(log)</span>
+                  </span>
                   <div className="flex flex-wrap gap-x-3 gap-y-1 justify-end">
                     {(data.memberUsage ?? []).filter((m) => m.monthlyPriceUsd).map((m) => {
                       const idx = (data.memberNames ?? []).indexOf(m.memberKey);
@@ -740,9 +743,8 @@ export function TeamView({ adminMode = false }: { adminMode?: boolean }) {
                         <XAxis dataKey="date" stroke="#525252" fontSize={10} interval="preserveStartEnd" />
                         <YAxis stroke="#525252" fontSize={10} scale="log" domain={[0.001, "auto"]} tickFormatter={(v) => {
                           const n = Number(v);
-                          if (n >= 1) return `$${n.toFixed(1)}`;
-                          if (n >= 0.01) return `$${n.toFixed(2)}`;
-                          return `$${n.toFixed(3)}`;
+                          // 자리수 통일 — $0.01 / $0.10 / $1.00 / $10.00 / $100.00 일관 정렬
+                          return n >= 0.01 ? `$${n.toFixed(2)}` : `$${n.toFixed(3)}`;
                         }} />
                         <Tooltip
                           contentStyle={{ background: "#0a0a0a", border: "1px solid #404040", fontSize: 11, fontFamily: "monospace" }}

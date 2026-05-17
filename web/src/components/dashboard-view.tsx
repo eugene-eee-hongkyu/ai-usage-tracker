@@ -1383,7 +1383,10 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
               "plan 활용 효율" 의 별도 metric 위계 강조. */}
           <div data-testid="dash-card-unit-cost" className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-emerald-500 rounded">
             <div className="px-3 py-2 border-b border-neutral-800">
-              <span className="text-xs font-mono font-bold text-emerald-400 uppercase tracking-wider">{t.dashboard.cards.unitCost}</span>
+              <span className="text-xs font-mono font-bold text-emerald-400 uppercase tracking-wider">
+                {t.dashboard.cards.unitCost}
+                <span className="ml-1.5 text-neutral-500 normal-case font-normal">(log)</span>
+              </span>
             </div>
             <div className="p-3">
               {(() => {
@@ -1410,9 +1413,8 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
                           domain={[0.001, "auto"]}
                           tickFormatter={(v) => {
                             const n = Number(v);
-                            if (n >= 1) return `$${n.toFixed(1)}`;
-                            if (n >= 0.01) return `$${n.toFixed(2)}`;
-                            return `$${n.toFixed(3)}`;
+                            // 자리수 통일 — $0.01 / $0.10 / $1.00 / $10.00 / $100.00 일관 정렬
+                            return n >= 0.01 ? `$${n.toFixed(2)}` : `$${n.toFixed(3)}`;
                           }}
                         />
                         <Tooltip
