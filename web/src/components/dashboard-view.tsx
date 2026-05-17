@@ -821,6 +821,24 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
     if (data?.user?.timezone) setUserTz(data.user.timezone);
   }, [data?.user?.timezone]);
 
+  // 로컬 모드 + 데이터 아직 없음 → 5초마다 자동 polling. sync 완료되어 overview 가
+  // 채워지면 polling 중단.
+  useEffect(() => {
+    if (!isLocalMode) return;
+    if (data?.overview) return;
+    const id = setInterval(() => {
+      fetch(apiUrl(period, weekOffset, monthOffset, dayOffset))
+        .then((r) => r.json())
+        .then((d) => {
+          if (d?.error) return;
+          if (d?.overview) setData(d);
+        })
+        .catch(() => {});
+    }, 5000);
+    return () => clearInterval(id);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isLocalMode, data?.overview, period, weekOffset, monthOffset, dayOffset, targetUserId]);
+
   const saveTz = async (tz: string) => {
     setUserTz(tz);
     setShowTzPicker(false);
@@ -892,6 +910,34 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
         </div>
       </div>
     );
+
+    // 로컬 모드 (.app 인스톨러) — 백그라운드 sync 가 자동 실행 중. 사용자는
+    // 아무 행동 안 해도 됨. 화면이 자동 폴링 → 데이터 도착하면 즉시 표시.
+    if (isLocalMode) {
+      return (
+        <div className="min-h-screen bg-neutral-950">
+          <header className="border-b border-neutral-800 px-4 py-3 flex items-center justify-between">
+            <span className="font-mono font-bold text-neutral-200">AI Usage Tracker</span>
+          </header>
+          <main className="max-w-md mx-auto px-4 py-20 text-center space-y-6">
+            <div className="flex items-center justify-center gap-3">
+              <div className="w-3 h-3 rounded-full bg-indigo-500 animate-pulse" />
+              <h1 className="text-xl font-bold text-neutral-100">데이터 수집 중</h1>
+            </div>
+            <p className="text-neutral-400 text-sm">
+              codeburn 과 ccusage 가 백그라운드에서 실행 중입니다.
+              <br />
+              보통 30초 ~ 1분 안에 자동으로 표시됩니다.
+            </p>
+            <p className="text-xs text-neutral-600 font-mono">
+              자동 새로고침 중… (5초마다)
+            </p>
+          </main>
+        </div>
+      );
+    }
+
+    // 서버 모드 (5명) — 외부 npx 명령으로 sync 안내
     const syncCmd = `npx github:${process.env.NEXT_PUBLIC_GITHUB_ORG ?? "eugene-eee-hongkyu"}/ai-usage-tracker sync`;
     return (
       <div className="min-h-screen bg-neutral-950">
