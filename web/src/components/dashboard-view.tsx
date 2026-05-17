@@ -919,16 +919,46 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
           <header className="border-b border-neutral-800 px-4 py-3 flex items-center justify-between">
             <span className="font-mono font-bold text-neutral-200">AI Usage Tracker</span>
           </header>
-          <main className="max-w-md mx-auto px-4 py-20 text-center space-y-6">
-            <div className="flex items-center justify-center gap-3">
-              <div className="w-3 h-3 rounded-full bg-indigo-500 animate-pulse" />
-              <h1 className="text-xl font-bold text-neutral-100">데이터 수집 중</h1>
+          <main className="max-w-md mx-auto px-4 py-20 text-center space-y-8">
+            {/* 브랜드 로고 (favicon.svg) 의 arc 를 회전시켜 progress spinner 로 활용 */}
+            <div className="flex justify-center">
+              <svg
+                width="96"
+                height="96"
+                viewBox="0 0 32 32"
+                xmlns="http://www.w3.org/2000/svg"
+                aria-label="로딩 중"
+              >
+                <rect x="2" y="2" width="28" height="28" rx="6" fill="#10b981" />
+                <circle
+                  cx="16"
+                  cy="16"
+                  r="9"
+                  fill="none"
+                  stroke="white"
+                  strokeWidth="3"
+                  strokeOpacity="0.3"
+                />
+                <g style={{ transformOrigin: "16px 16px", animation: "wizardSpin 1.2s linear infinite" }}>
+                  <path
+                    d="M 16 7 A 9 9 0 0 1 24.4 19.4"
+                    fill="none"
+                    stroke="white"
+                    strokeWidth="3"
+                    strokeLinecap="round"
+                  />
+                </g>
+              </svg>
+              <style>{`@keyframes wizardSpin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
             </div>
-            <p className="text-neutral-400 text-sm">
-              codeburn 과 ccusage 가 백그라운드에서 실행 중입니다.
-              <br />
-              보통 30초 ~ 1분 안에 자동으로 표시됩니다.
-            </p>
+            <div className="space-y-2">
+              <h1 className="text-xl font-bold text-neutral-100">데이터 수집 중</h1>
+              <p className="text-neutral-400 text-sm">
+                codeburn 과 ccusage 가 백그라운드에서 실행 중입니다.
+                <br />
+                보통 30초 ~ 1분 안에 자동으로 표시됩니다.
+              </p>
+            </div>
             <p className="text-xs text-neutral-600 font-mono">
               자동 새로고침 중… (5초마다)
             </p>
