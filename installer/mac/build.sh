@@ -1,4 +1,10 @@
 #!/usr/bin/env bash
+#
+# ⚠️ DEPRECATED — 옛 .pkg 인스톨러 빌드 (Phase 3.0~3.2).
+# 현 방식: .dmg (Electron) — `installer/electron/` 의 `npm run build` 로 대체.
+# 이 스크립트는 history 보존용으로만 남아 있고 더 이상 호출되지 않음.
+# installer/launcher.mjs 와 함께 차기 cleanup 사이클에 삭제 예정.
+#
 # mac .pkg 인스톨러 빌드.
 #
 # 출력: installer/mac/dist/ai-usage-tracker-<version>.pkg

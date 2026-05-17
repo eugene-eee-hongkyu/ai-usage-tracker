@@ -5,8 +5,12 @@ import * as path from "path";
 import { registerCommands } from "./commands";
 import { StatusBar } from "./statusBar";
 
-const STABLE_DIR = path.join(os.homedir(), ".primus-usage-tracker");
-const API_KEY_FALLBACK = path.join(os.homedir(), ".primus-usage-key");
+// Primus → z21labs 리네임 (단계 1~3). 새 경로 우선 + 옛 경로 fallback —
+// install.sh 의 migrate 가 옛 경로를 새 위치로 이동시키지만 옛 잔존 머신은 그대로.
+const STABLE_DIR_NEW = path.join(os.homedir(), ".z21labs", "usage-tracker");
+const STABLE_DIR_LEGACY = path.join(os.homedir(), ".primus-usage-tracker");
+const API_KEY_NEW = path.join(os.homedir(), ".z21labs", "usage-key");
+const API_KEY_LEGACY = path.join(os.homedir(), ".primus-usage-key");
 const FIRST_RUN_KEY = "aiUsageTracker.dismissedFirstRun";
 
 export function activate(context: vscode.ExtensionContext): void {
@@ -33,7 +37,9 @@ export function deactivate(): void {
 }
 
 export function isSetupComplete(): boolean {
-  return fs.existsSync(STABLE_DIR) && fs.existsSync(API_KEY_FALLBACK);
+  const hasStableDir = fs.existsSync(STABLE_DIR_NEW) || fs.existsSync(STABLE_DIR_LEGACY);
+  const hasApiKey = fs.existsSync(API_KEY_NEW) || fs.existsSync(API_KEY_LEGACY);
+  return hasStableDir && hasApiKey;
 }
 
 async function promptFirstRun(context: vscode.ExtensionContext): Promise<void> {

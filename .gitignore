@@ -46,7 +46,10 @@ installer/electron/cache/
 installer/electron/build-resources/cert.*
 
 # ── CLI 빌드 결과 ─────────────────────────────────
-# cli/bin/ 은 커밋 대상 (npx 실행용 번들)
+# cli/src/{index,sync,init}.mjs 는 commit 대상 — install.sh 가 호출하는
+# `npx github:eugene-eee-hongkyu/ai-usage-tracker init` 흐름이 GitHub repo 의
+# cli/package.json 의 `bin` (= ./src/index.mjs) 을 entry point 로 끌어씀.
+# 매 cli/src/*.ts 변경 후 `cd cli && bun run build` 결과를 함께 commit 할 것.
 
 # ── 하네스 내부 상태 ──────────────────────────────
 # Internal ops content lives in sibling repo `ai-usage-tracker-ops`.

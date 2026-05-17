@@ -97,11 +97,11 @@ http://localhost:3737    https://aiusage.z21labs.world
 (SQLite write)           (Supabase write, apiKey 필요)
 ```
 
-## Legacy 호환 (기존 5명)
+## Legacy 호환 (기존 5명 + Primus → z21labs 리네임 단계 1~3)
 
-- `~/.primus-usage-key` 발견 시 위저드가 자동으로 `local + company` 추천 → 클릭 한 번에 마이그레이션
-- 기존 launchd plist (`com.primus.usage-tracker.daily`) 그대로 유지 — 같은 sync 가 새 config.json 을 자동 사용
-- 새 launchd 안 만듦 (중복 sync 방지)
+- `~/.z21labs/usage-key` (현 표준) 또는 `~/.primus-usage-key` (옛 잔존) 발견 시 위저드가 자동으로 `local + company` 추천 → 클릭 한 번에 마이그레이션 (`web/src/app/api/config/status/route.ts` 가 새 path 우선 + 옛 fallback)
+- 기존 launchd plist (`com.primus.usage-tracker.daily.plist` legacy 또는 `world.z21labs.ai-usage-tracker.sync.plist` 현 표준) 그대로 유지 — 같은 sync 가 새 config.json 을 자동 사용
+- 새 launchd 안 만듦 (중복 sync 방지). 단 `installer/electron/main.js` 의 `ensureLaunchAgentMac` 은 새 plist 의 내용 (Node 경로 / PATH) 이 stale 하면 자동 regen
 - 사용자가 legacy 폐기 원하면 `launchctl unload …com.primus.usage-tracker.daily.plist; rm …plist`
 
 ## Codesign + Notarize (Apple Developer 받은 후)

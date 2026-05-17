@@ -1,4 +1,11 @@
 #!/usr/bin/env node
+//
+// ⚠️ DEPRECATED — 옛 .pkg/.msi 인스톨러 흐름 (Phase 3.0~3.2).
+// 현 방식: .dmg (Electron) — installer/electron/main.js 가 이 launcher 의 역할을
+// 대체 + Node/codeburn/ccusage 동봉 (v0.1.4 부터). 본 파일은 history 보존용으로만
+// 남아 있고 새 빌드에선 호출 안 됨. installer/mac/build.sh 와 함께 차기 cleanup
+// 사이클에 삭제 예정.
+//
 // .pkg/.msi 인스톨러 안의 launcher — 사용자가 앱 아이콘 더블클릭 시 실행되는 entry point.
 //
 //   1. ~/.usage-tracker/ 디렉토리 / SQLite 파일 / config.json 첫 실행 시 초기화
