@@ -1,6 +1,7 @@
 import type { Messages } from "./en";
+import type { DeepPartial } from "../index";
 
-export const zh: Messages = {
+export const zh: DeepPartial<Messages> = {
   brand: "AI Usage Tracker",
   nav: {
     personal: "个人",

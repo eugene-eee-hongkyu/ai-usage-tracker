@@ -15,6 +15,7 @@ export const dynamic = "force-dynamic";
 import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { getMessages, normalizeLocale } from "@/lib/i18n";
+import { LocaleSwitcher } from "@/components/locale-switcher";
 
 type Choice = "local" | "local_company" | "company";
 
@@ -123,7 +124,10 @@ function WizardInner() {
   return (
     <main className="min-h-screen bg-neutral-950 text-neutral-100">
       <div className="max-w-2xl mx-auto px-6 py-12">
-        <h1 className="text-2xl font-bold mb-2">{m.wizard.title}</h1>
+        <div className="flex items-start justify-between gap-3 mb-2">
+          <h1 className="text-2xl font-bold">{m.wizard.title}</h1>
+          <LocaleSwitcher variant="wizard" />
+        </div>
 
         <section className="mt-8 space-y-3">
           <h2 className="text-lg font-semibold">{m.wizard.step1.heading}</h2>

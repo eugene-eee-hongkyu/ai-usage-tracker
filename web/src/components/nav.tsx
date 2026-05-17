@@ -6,6 +6,7 @@ import { useSession, signOut } from "next-auth/react";
 import { Suspense, useState } from "react";
 import { useLocalModeInfo } from "@/lib/use-local-mode";
 import { useMessages } from "@/lib/use-i18n";
+import { LocaleSwitcher } from "@/components/locale-switcher";
 
 function NavInner() {
   const path = usePathname();
@@ -64,7 +65,8 @@ function NavInner() {
           )}
         </nav>
       </div>
-      <div className="relative shrink-0">
+      <div className="relative shrink-0 flex items-center gap-2">
+        <LocaleSwitcher variant="nav" />
         <button
           data-testid="nav-user-toggle"
           onClick={() => setOpen(!open)}

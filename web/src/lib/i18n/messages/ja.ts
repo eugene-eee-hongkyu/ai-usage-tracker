@@ -1,6 +1,7 @@
 import type { Messages } from "./en";
+import type { DeepPartial } from "../index";
 
-export const ja: Messages = {
+export const ja: DeepPartial<Messages> = {
   brand: "AI Usage Tracker",
   nav: {
     personal: "個人",
