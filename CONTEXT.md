@@ -92,10 +92,10 @@ NEXTAUTH_URL=http://localhost:3000
 ## 빌드 / 테스트
 
 ```bash
-pnpm install
-pnpm -w build         # 전체 워크스페이스
-pnpm --filter web dev # 개발 서버
-pnpm --filter web typecheck
+npm install
+npm run -w web build      # web workspace 빌드 (next build)
+npm run -w web dev        # 개발 서버
+npx -w web tsc --noEmit   # typecheck
 ```
 
 E2E: `docs/e2e-v2/` (framework v3.2 카피본)
