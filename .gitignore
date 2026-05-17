@@ -61,6 +61,15 @@ docs/D-2a.manager-self-interview.md
 docs/D-2b.user-interview-script.md
 docs/e2e-v2/phase0-prerequisites.md
 
+# ── ops 로 추가 이동된 내부 docs (2026-05-17) ──
+docs/03_A-2_프로세스를_화면으로_사용량대시보드_v6.md
+docs/03_A-2_프로세스를_화면으로_사용량대시보드_직행.md
+docs/05_B-1_로컬에서만들기_사용량대시보드_압축.md
+docs/C-1.qa-implementation-brief.md
+docs/D-3.install-guide.md
+docs/qa/
+docs/e2e-v2/
+
 # ── 테스트 / 커버리지 ─────────────────────────────
 coverage/
 
