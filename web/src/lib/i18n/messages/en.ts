@@ -18,6 +18,9 @@ export interface Messages {
     insufficient: string;  // 부족
     unused: string;        // 미활용
     current: string;       // ← 현재
+    needsWork: string;     // 개선 필요
+    noActivity: string;    // 활동 없음
+    noData: string;        // 데이터 없음
   };
   common: {
     period: string;
@@ -156,6 +159,105 @@ export interface Messages {
     unitCostAnchorWastedHeavy: string;     // plan 거의 안 씀 — API 직접 호출이 훨씬 쌈
     unitCostNoData: string;                // 데이터 없음
   };
+  gradeDescriptions: {
+    cacheHitExemplary: string;
+    cacheHitGood: string;
+    cacheHitModerate: string;
+    cacheHitInsufficient: string;
+    cacheHitWarning: string;
+    oneShotExemplary: string;
+    oneShotModerate: string;
+    oneShotWarning: string;
+    costExemplary: string;
+    costModerate: string;
+    costWarning: string;
+    tokenExemplary: string;
+    tokenGood: string;
+    tokenModerate: string;
+    tokenInsufficient: string;
+    tokenWarning: string;
+  };
+  dashboardView: {
+    chartLoading: string;
+    dataLoadFailed: string;
+    retry: string;
+    noDataYet: string;
+    previous: string;
+    daysAgoN: string;
+    dayLabel: string;
+    activeNDays: string;
+    lastReceived: string;
+    tzChangeTitle: string;
+    referenceFigures: string;
+    gradeCriteria: string;
+    explain: string;
+    moreUsage: string;
+    increase: string;
+    decrease: string;
+    optimize: string;
+    usage: string;
+    usageWithLevel: string;
+    activityHeatmapLabel: string;
+    todayMark: string;
+    noActivityShort: string;
+    streakLabel: string;
+    streakSkip: string;
+    weekTeamCacheRank: string;
+    rankOutOf: string;
+    rankMeTeam: string;
+    teamRankEmpty: string;
+    recent90dEfficiency: string;
+    gradeWarning: string;
+    gradeImprove: string;
+    gradeGood: string;
+    gradeExemplary: string;
+    legendLow: string;
+    legendHigh: string;
+    dayCellNoActivity: string;
+    dayCellScore: string;
+    dayCellCost: string;
+    todaySuffix: string;
+    activeBlocksEmpty: string;
+    patternCriteriaSuffix: string;
+    patternDisclaimer: string;
+    activeBlocks: string;
+    avgLength: string;
+    tokensPerMin: string;
+    longestBlock: string;
+    deltaWindowTitle: string;
+    lengthDistribution: string;
+    dwellHeatmapLabel: string;
+    dwellMonthVisits: string;
+    inProgressAt: string;
+    yesterdayN: string;
+    closeUpTrend: string;
+    openTrend: string;
+    efficiencyTodayLabel: string;
+    efficiencyAvgLabel: string;
+    efficiencyFormula: string;
+    patternImmersive: string;
+    patternDistributed: string;
+    patternBalanced: string;
+    patternSporadic: string;
+    patternImmersiveTooltip: string;
+    patternDistributedTooltip: string;
+    patternBalancedTooltip: string;
+    patternSporadicTooltip: string;
+    dayOffsetYesterday: string;
+    dayOffset2: string;
+    dayOffsetN: string;
+    weekOffsetLast: string;
+    weekOffsetN: string;
+    monthOffsetLast: string;
+    monthOffsetN: string;
+    weekdaySun: string;
+    weekdayMon: string;
+    weekdayTue: string;
+    weekdayWed: string;
+    weekdayThu: string;
+    weekdayFri: string;
+    weekdaySat: string;
+  };
   teamUsageHero: {
     powerLabel: string;             // ⚡ 팀 활용 지수
     powerSubtitle: string;          // Power Index 평균 · {period}
@@ -222,6 +324,9 @@ export const en: Messages = {
     insufficient: "Insufficient",
     unused: "Unused",
     current: "← current",
+    needsWork: "Needs work",
+    noActivity: "No activity",
+    noData: "No data",
   },
   common: {
     period: "Period",
@@ -364,6 +469,109 @@ export const en: Messages = {
     unitCostAnchorWasted10x: "10× more expensive than direct API",
     unitCostAnchorWastedHeavy: "Barely using the plan — direct API is much cheaper",
     unitCostNoData: "no data",
+  },
+  gradeDescriptions: {
+    cacheHitExemplary: "Claude Code internal benchmark",
+    cacheHitGood: "Good state",
+    cacheHitModerate: "Typical range",
+    cacheHitInsufficient: "Likely bloated CLAUDE.md",
+    cacheHitWarning: "Anthropic-level incident (SEV)",
+    oneShotExemplary: "Almost no retries. Clear context",
+    oneShotModerate: "Normal range for messy coding",
+    oneShotWarning: "Frequent Edit→Build→Edit loop",
+    costExemplary: "Routine session size",
+    costModerate: "Large work session — normal range",
+    costWarning: "Mega session — split or check efficiency",
+    tokenExemplary: "Heavy user. Power-user territory",
+    tokenGood: "Above Anthropic enterprise P90 (~$30/day)",
+    tokenModerate: "Anthropic avg ~ P90. Healthy activity",
+    tokenInsufficient: "Light usage or barely using",
+    tokenWarning: "Not used today",
+  },
+  dashboardView: {
+    chartLoading: "Loading chart…",
+    dataLoadFailed: "Failed to load data.",
+    retry: "Retry",
+    noDataYet: "No data yet.",
+    previous: "Earlier ▼",
+    daysAgoN: "{n}d ago",
+    dayLabel: "{n}d ago ({date})",
+    activeNDays: "Active {n} days",
+    lastReceived: "Last received",
+    tzChangeTitle: "Change timezone",
+    referenceFigures: "Reference",
+    gradeCriteria: "Grade criteria",
+    explain: "Explain",
+    moreUsage: "Use more",
+    increase: "Increase",
+    decrease: "Reduce",
+    optimize: "Optimize",
+    usage: "Usage",
+    usageWithLevel: "Usage ({lvl}/10)",
+    activityHeatmapLabel: "Activity heatmap ({weeks} weeks, by cost)",
+    todayMark: "today",
+    noActivityShort: "no activity",
+    streakLabel: "Current cache hit ≥ 90% Streak",
+    streakSkip: "Days with no activity are auto-skipped",
+    weekTeamCacheRank: "This week — team cache hit rank",
+    rankOutOf: "/ {n}",
+    rankMeTeam: "Me {self}% · Team {team}%",
+    teamRankEmpty: "No team rank data",
+    recent90dEfficiency: "Last 90 days — efficiency",
+    gradeWarning: "Warning",
+    gradeImprove: "Improve",
+    gradeGood: "Good",
+    gradeExemplary: "Exemplary",
+    legendLow: "Low",
+    legendHigh: "High",
+    dayCellNoActivity: "{date} · no activity",
+    dayCellScore: "{date} · {score} pts · {label}",
+    dayCellCost: "{date} · ${cost}",
+    todaySuffix: " · today",
+    activeBlocksEmpty: "Not enough data — shown once 5+ blocks accumulate.",
+    patternCriteriaSuffix: " criteria",
+    patternDisclaimer: "Pattern is for self-awareness, not good/bad.",
+    activeBlocks: "Active blocks",
+    avgLength: "Avg length",
+    tokensPerMin: "Tokens / min",
+    longestBlock: "Longest block",
+    deltaWindowTitle: "vs. previous same-length window",
+    lengthDistribution: "Length distribution",
+    dwellHeatmapLabel: "Dwell heatmap ({weeks} weeks, total minutes/day",
+    dwellMonthVisits: " · this month {n} visits · avg {time}",
+    inProgressAt: " (in progress · {hh}:{mm})",
+    yesterdayN: "Yesterday {n}",
+    closeUpTrend: "▲ Hide trend",
+    openTrend: "▼ Show {period} trend",
+    efficiencyTodayLabel: "Today's efficiency",
+    efficiencyAvgLabel: "{period} avg efficiency",
+    efficiencyFormula: "cache 42 + one-shot 18 + cost 10 + usage 30",
+    patternImmersive: "Immersive",
+    patternDistributed: "Distributed",
+    patternBalanced: "Balanced",
+    patternSporadic: "Sporadic",
+    patternImmersiveTooltip:
+      "Median 4h+ or 50%+ blocks ≥4h. Deep focus pattern — once started, fills nearly the entire 5h billing block.",
+    patternDistributedTooltip:
+      "Median <1h or 50%+ blocks <1h. Short, frequent sessions. Small work units or distributed work.",
+    patternBalancedTooltip:
+      "Median 1–4h with a mix of short and long blocks. Depth adjusted to task type.",
+    patternSporadicTooltip:
+      "Fewer than 10 active blocks. Occasional use — small sample size, lower reliability of other indicators.",
+    dayOffsetYesterday: "yesterday",
+    dayOffset2: "2 days ago",
+    dayOffsetN: "{n} days ago",
+    weekOffsetLast: "last week",
+    weekOffsetN: "{n} weeks ago",
+    monthOffsetLast: "last month",
+    monthOffsetN: "{n} months ago",
+    weekdaySun: "Sun",
+    weekdayMon: "Mon",
+    weekdayTue: "Tue",
+    weekdayWed: "Wed",
+    weekdayThu: "Thu",
+    weekdayFri: "Fri",
+    weekdaySat: "Sat",
   },
   teamUsageHero: {
     powerLabel: "⚡ Team Power Index",

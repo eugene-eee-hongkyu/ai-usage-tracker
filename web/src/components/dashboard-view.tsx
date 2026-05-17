@@ -16,6 +16,7 @@ import { useSession, signOut } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { useLocalMode } from "@/lib/use-local-mode";
 import { useMessages } from "@/lib/use-i18n";
+import type { Messages } from "@/lib/i18n";
 import { Nav } from "@/components/nav";
 import { AdminNav } from "@/components/admin-nav";
 import { CacheHitModal, OneShotRateModal, CostPerSessionModal, CallsPerSessionModal, CostPerCallModal, TokenVolumeModal } from "@/components/metric-modal";
@@ -37,7 +38,7 @@ const ScoreDrilldown = dynamic(
         className="bg-neutral-950 border-t border-neutral-800/60 px-4 py-4"
       >
         <div className="max-w-6xl mx-auto h-56 flex items-center justify-center">
-          <span className="text-xs font-mono text-neutral-600 animate-pulse">차트 로딩 중...</span>
+          <span className="text-xs font-mono text-neutral-600 animate-pulse">Loading chart…</span>
         </div>
       </div>
     ),
@@ -172,24 +173,31 @@ interface BlocksSummary {
   } | null;
 }
 
-const PATTERN_DESCRIPTIONS: Record<BlocksSummary["pattern"], { color: string; tooltip: string }> = {
-  "몰입형": {
-    color: "bg-violet-500/15 text-violet-300 border-violet-500/40",
-    tooltip: "median 4h+ 또는 4h+ 블록 비율 50% 이상. 한 번 시작하면 5h 빌링 블록을 거의 꽉 채우는 깊은 집중 패턴.",
-  },
-  "분산형": {
-    color: "bg-emerald-500/15 text-emerald-300 border-emerald-500/40",
-    tooltip: "median 1h 미만 또는 1h 미만 블록 비율 50% 이상. 짧게 자주 사용하는 패턴. 작업 단위가 작거나 분산적.",
-  },
-  "균형형": {
-    color: "bg-sky-500/15 text-sky-300 border-sky-500/40",
-    tooltip: "median 1~4h, 짧은 블록과 긴 블록이 섞인 패턴. 작업 종류에 따라 깊이 조절.",
-  },
-  "단발형": {
-    color: "bg-neutral-500/15 text-neutral-400 border-neutral-500/40",
-    tooltip: "활성 블록 10개 미만. 가끔만 사용하는 패턴. 표본이 적어 다른 지표 신뢰도 낮음.",
-  },
+// pattern type literal 은 internal identifier — 화면 표시 시 i18n 변환.
+const PATTERN_COLORS: Record<BlocksSummary["pattern"], string> = {
+  "몰입형": "bg-violet-500/15 text-violet-300 border-violet-500/40",
+  "분산형": "bg-emerald-500/15 text-emerald-300 border-emerald-500/40",
+  "균형형": "bg-sky-500/15 text-sky-300 border-sky-500/40",
+  "단발형": "bg-neutral-500/15 text-neutral-400 border-neutral-500/40",
 };
+
+function patternLabel(p: BlocksSummary["pattern"], m: Messages): string {
+  switch (p) {
+    case "몰입형": return m.dashboardView.patternImmersive;
+    case "분산형": return m.dashboardView.patternDistributed;
+    case "균형형": return m.dashboardView.patternBalanced;
+    case "단발형": return m.dashboardView.patternSporadic;
+  }
+}
+
+function patternTooltip(p: BlocksSummary["pattern"], m: Messages): string {
+  switch (p) {
+    case "몰입형": return m.dashboardView.patternImmersiveTooltip;
+    case "분산형": return m.dashboardView.patternDistributedTooltip;
+    case "균형형": return m.dashboardView.patternBalancedTooltip;
+    case "단발형": return m.dashboardView.patternSporadicTooltip;
+  }
+}
 
 function TrendArrow({ pct }: { pct: number | null }) {
   if (pct === null) return <span className="text-neutral-700">─</span>;
@@ -229,19 +237,23 @@ interface EfficiencyScoreSectionProps {
   periodScore: number | null;
 }
 
-// period 별 게이지 라벨 — 다른 카드 (DAILY ACTIVITY / COST / BY MODEL ...) 가 모두
-// period-aware 로 움직이는데 이 게이지만 오늘 고정이면 인지 부조화. period 반영.
-function gaugeLabel(period: Period): string {
-  switch (period) {
-    case "today":  return "오늘 효율";
-    case "8days":  return "8일 평균 효율";
-    case "month":  return "이번달 평균 효율";
-    case "30days": return "30일 평균 효율";
-    case "all":    return "전체 평균 효율";
-  }
+// period 별 게이지 라벨 — period 라벨 (i18n) + 평균 효율 suffix 조합.
+function gaugeLabel(period: Period, m: Messages): string {
+  if (period === "today") return m.dashboardView.efficiencyTodayLabel;
+  const label = period === "8days" ? m.common.eightDays
+    : period === "month" ? m.common.thisMonth
+    : period === "30days" ? m.common.thirtyDays
+    : m.common.all;
+  return m.dashboardView.efficiencyAvgLabel.replace("{period}", label);
+}
+
+// {key} 치환 헬퍼.
+function tmpl(template: string, vars: Record<string, string | number>): string {
+  return template.replace(/\{(\w+)\}/g, (_, k) => String(vars[k] ?? ""));
 }
 
 function EfficiencyScoreSection({ score, period, periodScore }: EfficiencyScoreSectionProps) {
+  const { m } = useMessages();
   const calData = score.daily.map((d) => ({
     date: d.date,
     count: d.score ?? 0,
@@ -258,7 +270,7 @@ function EfficiencyScoreSection({ score, period, periodScore }: EfficiencyScoreS
     const y = score.yesterday;
     const d = score.delta;
     if (y === null) return null;
-    const yLabel = <span className="text-neutral-400">어제 {y}</span>;
+    const yLabel = <span className="text-neutral-400">{tmpl(m.dashboardView.yesterdayN, { n: y })}</span>;
     if (d === null) return yLabel;
     const deltaLabel = d > 0
       ? <span className="text-emerald-400">▲ +{d}</span>
@@ -269,13 +281,13 @@ function EfficiencyScoreSection({ score, period, periodScore }: EfficiencyScoreS
   })();
 
   // 라벨 — period=today 면 진행 중 시각, 그 외는 period 이름만.
-  const labelMain = gaugeLabel(period);
+  const labelMain = gaugeLabel(period, m);
   const labelSuffix = (() => {
     if (period !== "today") return "";
     const now = new Date();
     const hh = String(now.getHours()).padStart(2, "0");
     const mm = String(now.getMinutes()).padStart(2, "0");
-    return ` (진행 중 · ${hh}:${mm})`;
+    return tmpl(m.dashboardView.inProgressAt, { hh, mm });
   })();
 
   // 게이지 표시값 = period 평균. 8일 / 30일 선택하면 그 기간 평균 점수.
@@ -302,19 +314,25 @@ function EfficiencyScoreSection({ score, period, periodScore }: EfficiencyScoreS
     <>
       <ScoreGauge score={displayScore} />
       <div className="mt-1.5 flex items-center gap-1.5 text-[11px] font-mono">
-        <span className={`font-bold ${scoreColor(displayScore)}`}>{scoreLabel(displayScore)}</span>
+        <span className={`font-bold ${scoreColor(displayScore)}`}>{scoreLabel(displayScore, m)}</span>
         {referenceNode && <span className="text-neutral-500">·</span>}
         {referenceNode}
       </div>
-      <span className="text-[10px] font-mono text-neutral-600 mt-0.5">cache 42 + one-shot 18 + cost 10 + 사용량 30</span>
-      {drilldownAvailable && (
-        <span
-          data-testid="score-drilldown-hint"
-          className="mt-1 text-[10px] font-mono text-sky-400/70 group-hover:text-sky-300 transition-colors"
-        >
-          {open ? "▲ 추이 닫기" : `▼ ${period === "8days" ? "8일" : period === "month" ? "이번달" : period === "30days" ? "30일" : "전체"} 추이 보기`}
-        </span>
-      )}
+      <span className="text-[10px] font-mono text-neutral-600 mt-0.5">{m.dashboardView.efficiencyFormula}</span>
+      {drilldownAvailable && (() => {
+        const periodLabel = period === "8days" ? m.common.eightDays
+          : period === "month" ? m.common.thisMonth
+          : period === "30days" ? m.common.thirtyDays
+          : m.common.all;
+        return (
+          <span
+            data-testid="score-drilldown-hint"
+            className="mt-1 text-[10px] font-mono text-sky-400/70 group-hover:text-sky-300 transition-colors"
+          >
+            {open ? m.dashboardView.closeUpTrend : tmpl(m.dashboardView.openTrend, { period: periodLabel })}
+          </span>
+        );
+      })()}
     </>
   );
 
@@ -349,7 +367,7 @@ function EfficiencyScoreSection({ score, period, periodScore }: EfficiencyScoreS
             {/* Streak */}
             <div data-testid="score-streak">
               <span className="text-[10px] font-mono text-neutral-500 uppercase tracking-wider block mb-1">
-                현재 cache hit ≥ 90% Streak
+                {m.dashboardView.streakLabel}
               </span>
               <div className="flex items-center gap-3">
                 <span className="text-3xl leading-none">🔥</span>
@@ -358,18 +376,18 @@ function EfficiencyScoreSection({ score, period, periodScore }: EfficiencyScoreS
                     <span className={`text-2xl font-mono font-bold leading-none ${score.streak >= 7 ? "text-orange-400" : score.streak >= 1 ? "text-neutral-200" : "text-neutral-600"}`}>
                       {score.streak}
                     </span>
-                    <span className="text-xs font-mono text-neutral-500">일</span>
+                    <span className="text-xs font-mono text-neutral-500">{m.common.daysShort}</span>
                   </div>
-                  <span className="text-[10px] font-mono text-neutral-500 mt-0.5">활동 없는 날 자동 보류</span>
+                  <span className="text-[10px] font-mono text-neutral-500 mt-0.5">{m.dashboardView.streakSkip}</span>
                 </div>
               </div>
             </div>
 
-            {/* 팀 랭크 */}
+            {/* Team rank */}
             {score.teamRank ? (
               <div data-testid="score-team-rank">
                 <span className="text-[10px] font-mono text-neutral-500 uppercase tracking-wider block mb-1">
-                  이번주 팀 cache hit 랭크
+                  {m.dashboardView.weekTeamCacheRank}
                 </span>
                 <div className="flex items-center gap-3">
                   <span className="text-3xl leading-none">{rankMedal(score.teamRank.position) || "🏅"}</span>
@@ -378,10 +396,10 @@ function EfficiencyScoreSection({ score, period, periodScore }: EfficiencyScoreS
                       <span className="text-2xl font-mono font-bold leading-none text-sky-300">
                         {score.teamRank.position}
                       </span>
-                      <span className="text-xs font-mono text-neutral-500">/ {score.teamRank.total}명</span>
+                      <span className="text-xs font-mono text-neutral-500">{tmpl(m.dashboardView.rankOutOf, { n: score.teamRank.total })}</span>
                     </div>
                     <span className="text-[10px] font-mono text-neutral-500 mt-0.5">
-                      나 {score.teamRank.selfCacheHitPct.toFixed(1)}% · 팀 {score.teamRank.teamAvgCacheHitPct.toFixed(1)}%
+                      {tmpl(m.dashboardView.rankMeTeam, { self: score.teamRank.selfCacheHitPct.toFixed(1), team: score.teamRank.teamAvgCacheHitPct.toFixed(1) })}
                     </span>
                   </div>
                 </div>
@@ -389,39 +407,37 @@ function EfficiencyScoreSection({ score, period, periodScore }: EfficiencyScoreS
             ) : (
               <div className="flex items-center gap-3 opacity-60">
                 <span className="text-3xl leading-none">🏅</span>
-                <span className="text-[11px] font-mono text-neutral-600">팀 랭크 데이터 없음</span>
+                <span className="text-[11px] font-mono text-neutral-600">{m.dashboardView.teamRankEmpty}</span>
               </div>
             )}
           </div>
 
-          {/* 잔디 (6 cols) — F-pattern 우측, 데이터로 dead space 채움 */}
+          {/* Grass (6 cols) */}
           <div data-testid="score-grass" className="col-span-12 sm:col-span-6 flex flex-col gap-1">
             <div className="flex items-center justify-between">
-              <span className="text-[10px] font-mono text-neutral-500 uppercase tracking-wider">최근 90일 효율</span>
+              <span className="text-[10px] font-mono text-neutral-500 uppercase tracking-wider">{m.dashboardView.recent90dEfficiency}</span>
               <div className="flex items-center gap-2.5 text-[10px] font-mono text-neutral-500">
-                <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm" style={{ background: theme.dark[1] }} />경고</span>
-                <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm" style={{ background: theme.dark[2] }} />개선</span>
-                <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm" style={{ background: theme.dark[3] }} />양호</span>
-                <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm" style={{ background: theme.dark[4] }} />탁월</span>
+                <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm" style={{ background: theme.dark[1] }} />{m.dashboardView.gradeWarning}</span>
+                <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm" style={{ background: theme.dark[2] }} />{m.dashboardView.gradeImprove}</span>
+                <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm" style={{ background: theme.dark[3] }} />{m.dashboardView.gradeGood}</span>
+                <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm" style={{ background: theme.dark[4] }} />{m.dashboardView.gradeExemplary}</span>
               </div>
             </div>
             <ActivityCalendar
               data={calData}
               colorScheme="dark"
               theme={theme}
-              labels={{ legend: { less: "낮음", more: "탁월" } }}
+              labels={{ legend: { less: m.dashboardView.legendLow, more: m.dashboardView.legendHigh } }}
               showWeekdayLabels
               blockSize={10}
               blockMargin={2}
               showTotalCount={false}
               renderColorLegend={() => <></>}
               renderBlock={(block, activity) => {
-                // 셀 hover 시 native SVG <title> tooltip 으로 그 날 점수 + 등급.
-                // 색만 보면 "왜 이 색?" 모호한 거 해결. 별도 라이브러리 의존 0.
                 const inactive = activity.level === 0;
                 const label = inactive
-                  ? `${activity.date} · 활동 없음`
-                  : `${activity.date} · ${activity.count}점 · ${scoreLabel(activity.count)}`;
+                  ? tmpl(m.dashboardView.dayCellNoActivity, { date: activity.date })
+                  : tmpl(m.dashboardView.dayCellScore, { date: activity.date, score: activity.count, label: scoreLabel(activity.count, m) });
                 return React.cloneElement(block, {}, <title>{label}</title>);
               }}
             />
@@ -436,9 +452,15 @@ function EfficiencyScoreSection({ score, period, periodScore }: EfficiencyScoreS
   );
 }
 
-const PERIOD_LABELS: Record<Period, string> = {
-  today: "오늘", "8days": "8일", month: "이번달", "30days": "30일", all: "전체",
-};
+function periodLabel(p: Period, m: Messages): string {
+  switch (p) {
+    case "today":  return m.common.today;
+    case "8days":  return m.common.eightDays;
+    case "month":  return m.common.thisMonth;
+    case "30days": return m.common.thirtyDays;
+    case "all":    return m.common.all;
+  }
+}
 
 function formatPath(path: string): string {
   if (!path) return "";
@@ -453,57 +475,71 @@ function formatPath(path: string): string {
 
 function fmt$(n: number) { return `$${n.toFixed(2)}`; }
 
-type GradeLevel = "탁월" | "양호" | "보통" | "부족" | "경고";
+// Grade 식별자는 영어로 통일 — DOM 노출 시 m.grades[g] 로 변환.
+type GradeLevel = "exemplary" | "good" | "moderate" | "insufficient" | "warning";
 const GRADE_STYLES: Record<GradeLevel, string> = {
-  "탁월": "bg-emerald-500/15 text-emerald-400 border-emerald-500/40",
-  "양호": "bg-green-500/15 text-green-400 border-green-500/40",
-  "보통": "bg-yellow-500/15 text-yellow-400 border-yellow-500/40",
-  "부족": "bg-orange-500/15 text-orange-400 border-orange-500/40",
-  "경고": "bg-red-500/15 text-red-400 border-red-500/40",
+  exemplary:    "bg-emerald-500/15 text-emerald-400 border-emerald-500/40",
+  good:         "bg-green-500/15 text-green-400 border-green-500/40",
+  moderate:     "bg-yellow-500/15 text-yellow-400 border-yellow-500/40",
+  insufficient: "bg-orange-500/15 text-orange-400 border-orange-500/40",
+  warning:      "bg-red-500/15 text-red-400 border-red-500/40",
 };
 
 const GRADE_TOOLTIP_CLS: Record<GradeLevel, string> = {
-  "탁월": "bg-emerald-950/60 text-emerald-300",
-  "양호": "bg-green-950/60 text-green-300",
-  "보통": "bg-yellow-950/60 text-yellow-300",
-  "부족": "bg-orange-950/60 text-orange-300",
-  "경고": "bg-red-950/60 text-red-300",
+  exemplary:    "bg-emerald-950/60 text-emerald-300",
+  good:         "bg-green-950/60 text-green-300",
+  moderate:     "bg-yellow-950/60 text-yellow-300",
+  insufficient: "bg-orange-950/60 text-orange-300",
+  warning:      "bg-red-950/60 text-red-300",
 };
 
-const CACHE_ROWS: [GradeLevel, string, string][] = [
-  ["탁월", "96%+",    "Claude Code 본사 내부 기준"],
-  ["양호", "90~95%",  "좋은 상태"],
-  ["보통", "80~89%",  "일반적인 수준"],
-  ["부족", "60~79%",  "CLAUDE.md 비대 의심"],
-  ["경고", "<60%",    "본사 기준 사고(SEV) 수준"],
-];
-// one-shot rate: codeburn 공식 anchor (90% "right first try" / 30% "retry loop")
-// 기준 3단계. 80% 위 = 진짜 우수, 40~80% = messy 코딩 정상 범위 (행동 변경 권유 안 함),
-// 40% 미만 = Edit→Build→Edit 루프 신호 (codeburn 30% 명시 문제선 + 약간 margin).
-const ONESHOT_ROWS: [GradeLevel, string, string][] = [
-  ["탁월", "80%+",    "코드 retry 거의 없음. 명확한 컨텍스트"],
-  ["보통", "40~79%",  "messy 코딩의 정상 범위"],
-  ["경고", "<40%",    "Edit→Build→Edit 루프 자주 발생"],
-];
-// cost/session: 외부 anchor 약함 (Anthropic baseline $6-8/세션 + $13/active day).
-// 5단계는 거짓 정밀. 3단계로 단순화 — one-shot 과 동일한 정책 (anchor 약하면 coarse).
-const COST_ROWS: [GradeLevel, string, string][] = [
-  ["탁월", "<$25",     "일상적 세션 크기"],
-  ["보통", "$25~100",  "큰 작업 세션. 정상 범위"],
-  ["경고", "$100+",    "거대 세션. 분리 또는 효율 점검"],
-];
-// 사용량 (total tokens/day): 외부 anchor 3개 (Anthropic median/P90/enterprise P90) 로
-// 10단계 calibrated. Verdent + power user 데이터로 보간 검증.
-// 점수 환산: level × 3 (max 30, daily score 의 30% 비중).
-const TOKEN_ROWS: [GradeLevel, string, string][] = [
-  ["탁월", "8/10+ (≥150M/day)",  "Heavy 사용자. Power user 영역"],
-  ["양호", "6~7/10 (40~150M)",   "Anthropic enterprise P90 (~$30/day) 이상"],
-  ["보통", "3~5/10 (8~40M)",     "Anthropic 평균~P90 사이. 정상 활성"],
-  ["부족", "1~2/10 (≤8M)",       "라이트 사용 또는 거의 안 씀"],
-  ["경고", "0/10 (0 tokens)",    "오늘 안 씀"],
-];
+function gradeLabel(g: GradeLevel, m: Messages): string {
+  switch (g) {
+    case "exemplary":    return m.grades.exemplary;
+    case "good":         return m.grades.good;
+    case "moderate":     return m.grades.moderate;
+    case "insufficient": return m.grades.insufficient;
+    case "warning":      return m.grades.warning;
+  }
+}
 
-function MiniGradeTable({ title, rows, current }: { title: string; rows: [GradeLevel, string, string][]; current: GradeLevel }) {
+function cacheRows(m: Messages): [GradeLevel, string, string][] {
+  return [
+    ["exemplary",    "96%+",   m.gradeDescriptions.cacheHitExemplary],
+    ["good",         "90~95%", m.gradeDescriptions.cacheHitGood],
+    ["moderate",     "80~89%", m.gradeDescriptions.cacheHitModerate],
+    ["insufficient", "60~79%", m.gradeDescriptions.cacheHitInsufficient],
+    ["warning",      "<60%",   m.gradeDescriptions.cacheHitWarning],
+  ];
+}
+
+function oneshotRows(m: Messages): [GradeLevel, string, string][] {
+  return [
+    ["exemplary", "80%+",   m.gradeDescriptions.oneShotExemplary],
+    ["moderate",  "40~79%", m.gradeDescriptions.oneShotModerate],
+    ["warning",   "<40%",   m.gradeDescriptions.oneShotWarning],
+  ];
+}
+
+function costRows(m: Messages): [GradeLevel, string, string][] {
+  return [
+    ["exemplary", "<$25",    m.gradeDescriptions.costExemplary],
+    ["moderate",  "$25~100", m.gradeDescriptions.costModerate],
+    ["warning",   "$100+",   m.gradeDescriptions.costWarning],
+  ];
+}
+
+function tokenRows(m: Messages): [GradeLevel, string, string][] {
+  return [
+    ["exemplary",    "8/10+ (≥150M/day)",  m.gradeDescriptions.tokenExemplary],
+    ["good",         "6~7/10 (40~150M)",   m.gradeDescriptions.tokenGood],
+    ["moderate",     "3~5/10 (8~40M)",     m.gradeDescriptions.tokenModerate],
+    ["insufficient", "1~2/10 (≤8M)",       m.gradeDescriptions.tokenInsufficient],
+    ["warning",      "0/10 (0 tokens)",    m.gradeDescriptions.tokenWarning],
+  ];
+}
+
+function MiniGradeTable({ title, rows, current, m }: { title: string; rows: [GradeLevel, string, string][]; current: GradeLevel; m: Messages }) {
   return (
     <div>
       <p className="text-[10px] font-mono text-slate-400 font-semibold mb-1">{title}</p>
@@ -512,7 +548,7 @@ function MiniGradeTable({ title, rows, current }: { title: string; rows: [GradeL
           key={g}
           className={`flex items-center gap-1.5 px-1 py-0.5 rounded text-[10px] font-mono ${g === current ? GRADE_TOOLTIP_CLS[g] + " font-bold" : "text-slate-600"}`}
         >
-          <span className="w-7 shrink-0">{g}</span>
+          <span className="w-7 shrink-0">{gradeLabel(g, m)}</span>
           <span className="w-20 shrink-0 text-[9px]">{range}</span>
           <span className="text-[9px] opacity-70 truncate">{desc}</span>
           {g === current && <span className="ml-auto text-[8px] shrink-0 opacity-50">←</span>}
@@ -523,33 +559,29 @@ function MiniGradeTable({ title, rows, current }: { title: string; rows: [GradeL
 }
 
 function cacheHitGrade(v: number): GradeLevel {
-  if (v >= 96) return "탁월";
-  if (v >= 90) return "양호";
-  if (v >= 80) return "보통";
-  if (v >= 60) return "부족";
-  return "경고";
+  if (v >= 96) return "exemplary";
+  if (v >= 90) return "good";
+  if (v >= 80) return "moderate";
+  if (v >= 60) return "insufficient";
+  return "warning";
 }
 function oneShotGrade(v: number): GradeLevel {
-  if (v >= 80) return "탁월";
-  if (v >= 40) return "보통";
-  return "경고";
+  if (v >= 80) return "exemplary";
+  if (v >= 40) return "moderate";
+  return "warning";
 }
 function costGrade(v: number): GradeLevel {
-  if (v < 25) return "탁월";
-  if (v < 100) return "보통";
-  return "경고";
+  if (v < 25) return "exemplary";
+  if (v < 100) return "moderate";
+  return "warning";
 }
-// calls/session, cost/call, output/input — 외부 anchor 없음. 등급 미표시.
-// 값만 노출. 추세 (후속 PR) 로 변화 인지.
-
-// Token level (0-10) → 5-level grade 매핑 (배지 색깔용).
-// 8-10: 탁월 / 6-7: 양호 / 3-5: 보통 / 1-2: 부족 / 0: 경고
+// Token level (0-10) → 5-level grade 매핑.
 function tokenLevelToGrade(level: number): GradeLevel {
-  if (level >= 8) return "탁월";
-  if (level >= 6) return "양호";
-  if (level >= 3) return "보통";
-  if (level >= 1) return "부족";
-  return "경고";
+  if (level >= 8) return "exemplary";
+  if (level >= 6) return "good";
+  if (level >= 3) return "moderate";
+  if (level >= 1) return "insufficient";
+  return "warning";
 }
 function fmtTokensShort(n: number): string {
   if (n >= 1_000_000_000) return `${(n / 1_000_000_000).toFixed(1)}B`;
@@ -564,12 +596,12 @@ function fmtTokensShort(n: number): string {
 // 했는데 source 불일치로 ~5점 차이 발생 (91/탁월 vs 양호 버그). periodScore 사용으로 해결.
 function badgeGradeFromScore(score: number | null): GradeLevel {
   // scoreLabel 의 5단계 와 일치 (90/75/55/35).
-  if (score === null) return "경고";
-  if (score >= 90) return "탁월";
-  if (score >= 75) return "양호";
-  if (score >= 55) return "보통";
-  if (score >= 35) return "부족";
-  return "경고";
+  if (score === null) return "warning";
+  if (score >= 90) return "exemplary";
+  if (score >= 75) return "good";
+  if (score >= 55) return "moderate";
+  if (score >= 35) return "insufficient";
+  return "warning";
 }
 
 function fmtSyncedAt(ts: string | null, tz: string): string {
@@ -601,10 +633,11 @@ function fmtMinutes(n: number): string {
   return m === 0 ? `${h}h` : `${h}h ${m}m`;
 }
 
-function fmtBlockDate(iso: string): string {
+function fmtBlockDate(iso: string, m: Messages): string {
   const dt = new Date(iso);
   if (isNaN(dt.getTime())) return "";
-  const wd = ["일", "월", "화", "수", "목", "금", "토"][dt.getDay()];
+  const dv = m.dashboardView;
+  const wd = [dv.weekdaySun, dv.weekdayMon, dv.weekdayTue, dv.weekdayWed, dv.weekdayThu, dv.weekdayFri, dv.weekdaySat][dt.getDay()];
   return `${dt.getMonth() + 1}/${dt.getDate()} (${wd})`;
 }
 
@@ -626,12 +659,20 @@ function formatDayLabel(periodStart: string): string {
   return `${parseInt(m)}/${parseInt(d)}`;
 }
 
-const DAY_OFFSET_LABELS: Record<number, string> = {
-  1: "어제", 2: "그제", 3: "3일전", 4: "4일전", 5: "5일전", 6: "6일전", 7: "7일전",
-};
+function dayOffsetLabel(i: number, m: Messages): string {
+  const dv = m.dashboardView;
+  if (i === 1) return dv.dayOffsetYesterday;
+  if (i === 2) return dv.dayOffset2;
+  return tmpl(dv.dayOffsetN, { n: i });
+}
 
-const WEEK_OFFSET_LABEL = (i: number) => i === 1 ? "지난주" : `${i}주전`;
-const MONTH_OFFSET_LABEL = (i: number) => i === 1 ? "지난달" : `${i}달전`;
+function weekOffsetLabel(i: number, m: Messages): string {
+  return i === 1 ? m.dashboardView.weekOffsetLast : tmpl(m.dashboardView.weekOffsetN, { n: i });
+}
+
+function monthOffsetLabel(i: number, m: Messages): string {
+  return i === 1 ? m.dashboardView.monthOffsetLast : tmpl(m.dashboardView.monthOffsetN, { n: i });
+}
 
 function formatDateRange(start: string | null, end: string | null): string {
   if (!start || !end) return "";
@@ -886,7 +927,7 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
     <div className="min-h-screen bg-neutral-950">
       <NavComponent />
       <div data-testid="dash-fetch-error" className="flex flex-col items-center justify-center h-64 gap-4">
-        <p className="text-neutral-400 font-mono text-sm">데이터를 불러오지 못했습니다.</p>
+        <p className="text-neutral-400 font-mono text-sm">{t.dashboardView.dataLoadFailed}</p>
         <button
           data-testid="dash-retry"
           onClick={() => {
@@ -896,7 +937,7 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
             });
           }}
           className="px-4 py-1.5 bg-neutral-800 rounded text-sm text-neutral-200 hover:bg-neutral-700 font-mono"
-        >재시도</button>
+        >{t.dashboardView.retry}</button>
       </div>
     </div>
   );
@@ -919,7 +960,7 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
       <div className="min-h-screen bg-neutral-950">
         <NavComponent />
         <div className="flex items-center justify-center h-64">
-          <p className="text-neutral-500 font-mono text-sm">아직 데이터가 없습니다.</p>
+          <p className="text-neutral-500 font-mono text-sm">{t.dashboardView.noDataYet}</p>
         </div>
       </div>
     );
@@ -1066,7 +1107,7 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
                 setDayOffset(0);
               }}
               className={`w-16 text-center py-1 rounded text-xs font-mono transition-colors ${period === p && !(p === "8days" && weekOffset > 0) && !(p === "month" && monthOffset > 0) && !(p === "today" && dayOffset > 0) ? "bg-indigo-600 text-white" : "bg-neutral-800 text-neutral-400 hover:text-neutral-200"}`}
-            >{PERIOD_LABELS[p]}</button>
+            >{periodLabel(p, t)}</button>
           ))}
           {period === "today" && (data.availableSnapshots?.daily?.length ?? 0) > 0 && (
             <select
@@ -1075,10 +1116,10 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
               onChange={(e) => setDayOffset(Number(e.target.value))}
               className={`text-xs font-mono border rounded px-2 py-1 cursor-pointer focus:outline-none ${dayOffset > 0 ? "bg-indigo-600 text-white border-indigo-500" : "bg-neutral-800 text-neutral-400 border-neutral-700 hover:text-neutral-200"}`}
             >
-              <option value={0}>이전 ▼</option>
+              <option value={0}>{t.dashboardView.previous}</option>
               {data.availableSnapshots!.daily!.slice(0, 7).map((s, i) => (
                 <option key={s.periodStart} value={i + 1}>
-                  {`${DAY_OFFSET_LABELS[i + 1] ?? `${i + 1}일전`} (${formatDayLabel(s.periodStart)})`}
+                  {`${dayOffsetLabel(i + 1, t)} (${formatDayLabel(s.periodStart)})`}
                 </option>
               ))}
             </select>
@@ -1090,10 +1131,10 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
               onChange={(e) => setWeekOffset(Number(e.target.value))}
               className={`text-xs font-mono border rounded px-2 py-1 cursor-pointer focus:outline-none ${weekOffset > 0 ? "bg-indigo-600 text-white border-indigo-500" : "bg-neutral-800 text-neutral-400 border-neutral-700 hover:text-neutral-200"}`}
             >
-              <option value={0}>이전 ▼</option>
+              <option value={0}>{t.dashboardView.previous}</option>
               {data.availableSnapshots!.weekly.slice(0, 5).map((s, i) => (
                 <option key={s.periodStart} value={i + 1}>
-                  {`${WEEK_OFFSET_LABEL(i + 1)} (${formatWeekRange(s.periodStart)})`}
+                  {`${weekOffsetLabel(i + 1, t)} (${formatWeekRange(s.periodStart)})`}
                 </option>
               ))}
             </select>
@@ -1105,10 +1146,10 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
               onChange={(e) => setMonthOffset(Number(e.target.value))}
               className={`text-xs font-mono border rounded px-2 py-1 cursor-pointer focus:outline-none ${monthOffset > 0 ? "bg-indigo-600 text-white border-indigo-500" : "bg-neutral-800 text-neutral-400 border-neutral-700 hover:text-neutral-200"}`}
             >
-              <option value={0}>이전 ▼</option>
+              <option value={0}>{t.dashboardView.previous}</option>
               {data.availableSnapshots!.monthly.slice(0, 6).map((s, i) => (
                 <option key={s.periodStart} value={i + 1}>
-                  {`${MONTH_OFFSET_LABEL(i + 1)} (${formatMonthLabel(s.periodStart)})`}
+                  {`${monthOffsetLabel(i + 1, t)} (${formatMonthLabel(s.periodStart)})`}
                 </option>
               ))}
             </select>
@@ -1141,7 +1182,7 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
           activeDays={data.powerIndex.activeDays}
           avgDailyTokens={data.powerIndex.avgDailyTokens}
           periodDays={data.planHealth?.periodDays ?? 30}
-          periodLabel={PERIOD_LABELS[period]}
+          periodLabel={periodLabel(period, t)}
           declaredTier={data.user.planTier ?? null}
           declaredTierLabel={data.planHealth?.declaredLimits?.label ?? null}
           priceForPeriod={data.planHealth?.priceForPeriod ?? null}
@@ -1176,7 +1217,7 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
           <span className="text-sm"><span className="text-emerald-400 font-bold">{ov.cacheHitPct.toFixed(1)}%</span><span className="text-neutral-500 ml-1 text-xs">cache hit</span></span>
           <span className="text-sm"><span className="text-violet-400 font-bold">{Math.round(ov.oneShotRate * 100)}%</span><span className="text-neutral-500 ml-1 text-xs">1-shot</span></span>
           <span className="text-neutral-600 text-xs self-center ml-auto flex items-center gap-3">
-            <span>활성 {ov.activeDays}일</span>
+            <span>{tmpl(t.dashboardView.activeNDays, { n: ov.activeDays })}</span>
             {data.snapshot ? (
               <span className="text-amber-400">
                 📌 captured {fmtSyncedAt(data.snapshot.capturedAt, userTz)} {tzAbbr(userTz)}
@@ -1186,13 +1227,13 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
               </span>
             ) : !viewOnly ? (
               <span className="relative">
-                마지막 수신{" "}
+                {t.dashboardView.lastReceived}{" "}
                 <span className="text-neutral-500">{fmtSyncedAt(data.user.lastSyncedAt, userTz)}</span>{" "}
                 <button
                   data-testid="dash-tz-btn"
                   onClick={() => setShowTzPicker((v) => !v)}
                   className="text-neutral-600 hover:text-neutral-300 text-[10px] font-mono border border-neutral-700 hover:border-neutral-500 rounded px-1 py-0.5 transition-colors"
-                  title="타임존 변경"
+                  title={t.dashboardView.tzChangeTitle}
                 >{tzAbbr(userTz)}</button>
                 {showTzPicker && (
                   <div data-testid="dash-tz-list" className="absolute right-0 top-full mt-1 z-50 bg-neutral-900 border border-neutral-700 rounded-lg shadow-xl w-64 py-1 text-left">
@@ -1208,7 +1249,7 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
               </span>
             ) : (
               <span className="text-neutral-500">
-                마지막 수신 {fmtSyncedAt(data.user.lastSyncedAt, userTz)}
+                {t.dashboardView.lastReceived} {fmtSyncedAt(data.user.lastSyncedAt, userTz)}
               </span>
             )}
           </span>
@@ -1416,16 +1457,16 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
                 return (
                   <div className="relative group/grade">
                     <span data-testid="dash-grade-overall" className={`text-xs font-mono font-bold px-2 py-0.5 rounded border cursor-default ${GRADE_STYLES[grade]}`}>
-                      {grade}
+                      {gradeLabel(grade, t)}
                     </span>
-                    {grade !== "양호" && (
+                    {grade !== "good" && (
                       <div className="absolute right-0 top-full mt-1 z-50 opacity-0 invisible group-hover/grade:opacity-100 group-hover/grade:visible transition-all duration-100 bg-slate-900 border border-slate-700 rounded-lg shadow-2xl p-3 w-[580px]">
-                        <p className="text-[10px] font-mono text-slate-500 mb-2.5 uppercase tracking-wider">등급 기준</p>
+                        <p className="text-[10px] font-mono text-slate-500 mb-2.5 uppercase tracking-wider">{t.dashboardView.gradeCriteria}</p>
                         <div className="grid grid-cols-2 gap-3">
-                          <MiniGradeTable title="Cache hit" rows={CACHE_ROWS} current={cacheHitGrade(ov.cacheHitPct)} />
-                          <MiniGradeTable title="One-shot rate" rows={ONESHOT_ROWS} current={oneShotGrade(Math.round(ov.oneShotRate * 100))} />
-                          <MiniGradeTable title="Cost / session" rows={COST_ROWS} current={costGrade(costPs)} />
-                          <MiniGradeTable title={`사용량 (${computeTokenLevel(ov.avgDailyTokens)}/10)`} rows={TOKEN_ROWS} current={tokenLevelToGrade(computeTokenLevel(ov.avgDailyTokens))} />
+                          <MiniGradeTable m={t} title="Cache hit" rows={cacheRows(t)} current={cacheHitGrade(ov.cacheHitPct)} />
+                          <MiniGradeTable m={t} title="One-shot rate" rows={oneshotRows(t)} current={oneShotGrade(Math.round(ov.oneShotRate * 100))} />
+                          <MiniGradeTable m={t} title="Cost / session" rows={costRows(t)} current={costGrade(costPs)} />
+                          <MiniGradeTable m={t} title={tmpl(t.dashboardView.usageWithLevel, { lvl: computeTokenLevel(ov.avgDailyTokens) })} rows={tokenRows(t)} current={tokenLevelToGrade(computeTokenLevel(ov.avgDailyTokens))} />
                         </div>
                       </div>
                     )}
@@ -1441,10 +1482,9 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
               {(() => {
                 const costPerSession = ov.sessions > 0 ? ov.cost / ov.sessions : 0;
                 const callsPerSession = ov.sessions > 0 ? Math.round(ov.calls / ov.sessions) : 0;
-                const BAD: GradeLevel[] = ["보통", "부족", "경고"];
+                const BAD: GradeLevel[] = ["moderate", "insufficient", "warning"];
                 const isBad = (g: GradeLevel) => BAD.includes(g);
                 const tokenLvl = computeTokenLevel(ov.avgDailyTokens);
-                // 등급 메트릭 (4) — 외부 anchor 기반 행동 가이드.
                 const gradedRows = [
                   {
                     tid: "cache",
@@ -1452,11 +1492,11 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
                     value: `${ov.cacheHitPct.toFixed(1)}%`,
                     color: "text-emerald-400",
                     grade: cacheHitGrade(ov.cacheHitPct),
-                    gradeRows: CACHE_ROWS,
+                    gradeRows: cacheRows(t),
                     gradeTitle: "Cache hit",
                     onDesc: () => setShowCacheModal(true),
                     onAct: () => setShowCacheMethodsModal(true),
-                    actLabel: "늘리는법",
+                    actLabel: t.dashboardView.increase,
                   },
                   {
                     tid: "oneshot",
@@ -1464,11 +1504,11 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
                     value: `${Math.round(ov.oneShotRate * 100)}%`,
                     color: "text-violet-400",
                     grade: oneShotGrade(Math.round(ov.oneShotRate * 100)),
-                    gradeRows: ONESHOT_ROWS,
+                    gradeRows: oneshotRows(t),
                     gradeTitle: "One-shot rate",
                     onDesc: () => setShowOneShotModal(true),
                     onAct: () => setShowOneShotMethodsModal(true),
-                    actLabel: "늘리는법",
+                    actLabel: t.dashboardView.increase,
                   },
                   {
                     tid: "cost-session",
@@ -1476,27 +1516,25 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
                     value: ov.sessions > 0 ? fmt$(costPerSession) : "$0.00",
                     color: "text-yellow-400",
                     grade: costGrade(costPerSession),
-                    gradeRows: COST_ROWS,
+                    gradeRows: costRows(t),
                     gradeTitle: "Cost / session",
                     onDesc: () => setShowCostModal(true),
                     onAct: () => setShowCostMethodsModal(true),
-                    actLabel: "줄이는법",
+                    actLabel: t.dashboardView.decrease,
                   },
                   {
                     tid: "tokens",
-                    label: "사용량",
-                    // 팀 EFFICIENCY 와 동일 포맷 — level primary, abs value secondary.
+                    label: t.dashboardView.usage,
                     value: ov.avgDailyTokens > 0 ? `${tokenLvl}/10 · ${fmtTokensShort(ov.avgDailyTokens)}` : "0",
                     color: "text-cyan-400",
                     grade: tokenLevelToGrade(tokenLvl),
-                    gradeRows: TOKEN_ROWS,
-                    gradeTitle: `사용량 (${tokenLvl}/10)`,
+                    gradeRows: tokenRows(t),
+                    gradeTitle: tmpl(t.dashboardView.usageWithLevel, { lvl: tokenLvl }),
                     onDesc: () => setShowTokenModal(true),
                     onAct: () => setShowTokenModal(true),
-                    actLabel: "더 쓰는법",
+                    actLabel: t.dashboardView.moreUsage,
                   },
                 ];
-                // 참고 수치 (2) — 외부 anchor 없음, diagnostic 용.
                 const referenceRows = [
                   {
                     tid: "calls-session",
@@ -1508,7 +1546,7 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
                     gradeTitle: "",
                     onDesc: () => setShowCallsModal(true),
                     onAct: () => setShowCallsMethodsModal(true),
-                    actLabel: "최적화",
+                    actLabel: t.dashboardView.optimize,
                   },
                   {
                     tid: "cost-call",
@@ -1520,7 +1558,7 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
                     gradeTitle: "",
                     onDesc: () => setShowCostCallModal(true),
                     onAct: () => setShowCostCallMethodsModal(true),
-                    actLabel: "줄이는법",
+                    actLabel: t.dashboardView.decrease,
                   },
                 ];
                 type MetricRow = (typeof gradedRows)[number] | (typeof referenceRows)[number];
@@ -1528,16 +1566,16 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
                   <div key={label} data-testid={`dash-metric-${tid}`} className="flex items-center text-xs py-0.5 gap-2">
                     <span className="text-neutral-400 w-28 shrink-0">{label}</span>
                     <span className="flex gap-1 shrink-0 w-24">
-                      <TipBtn testid={`dash-tip-${tid}-desc`} label="설명" onClick={onDesc} variant="explain" />
+                      <TipBtn testid={`dash-tip-${tid}-desc`} label={t.dashboardView.explain} onClick={onDesc} variant="explain" />
                       {grade && isBad(grade) && <TipBtn testid={`dash-tip-${tid}-act`} label={actLabel} onClick={onAct} />}
                     </span>
                     <div className="ml-auto flex items-center gap-2">
                       <span className={`font-bold ${color}`}>{value}</span>
                       {grade && gradeRows ? (
                         <div className="relative group/mbadge">
-                          <span data-testid={`dash-metric-${tid}-grade`} className={`text-[10px] font-mono font-bold px-1.5 py-0.5 rounded border w-14 text-center block cursor-default ${GRADE_STYLES[grade]}`}>{grade}</span>
+                          <span data-testid={`dash-metric-${tid}-grade`} className={`text-[10px] font-mono font-bold px-1.5 py-0.5 rounded border w-14 text-center block cursor-default ${GRADE_STYLES[grade]}`}>{gradeLabel(grade, t)}</span>
                           <div className="absolute right-0 top-full mt-1 z-50 opacity-0 invisible group-hover/mbadge:opacity-100 group-hover/mbadge:visible transition-all duration-100 bg-slate-900 border border-slate-700 rounded-lg shadow-2xl p-3 w-72">
-                            <MiniGradeTable title={gradeTitle} rows={gradeRows} current={grade} />
+                            <MiniGradeTable m={t} title={gradeTitle} rows={gradeRows} current={grade} />
                           </div>
                         </div>
                       ) : (
@@ -1551,7 +1589,7 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
                     {gradedRows.map(renderRow)}
                     {/* 시각 그룹 분리 — 등급 (행동 가이드) vs 참고 (diagnostic). */}
                     <div className="mt-2 pt-1.5 border-t border-neutral-800/60 flex items-center">
-                      <span className="text-[9px] font-mono text-neutral-600 uppercase tracking-wider">참고 수치</span>
+                      <span className="text-[9px] font-mono text-neutral-600 uppercase tracking-wider">{t.dashboardView.referenceFigures}</span>
                     </div>
                     {referenceRows.map(renderRow)}
                   </>
@@ -1580,7 +1618,7 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
             return (
               <div data-testid="dash-card-activity-heatmap" className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-indigo-500 rounded">
                 <div className="px-3 py-2 border-b border-neutral-800">
-                  <span data-testid="dash-heatmap-activity" className="text-xs font-mono font-bold text-indigo-400 uppercase tracking-wider">활동 히트맵 ({Math.round((data.heatmapDaily ?? []).length / 7)}주, 비용 기준)</span>
+                  <span data-testid="dash-heatmap-activity" className="text-xs font-mono font-bold text-indigo-400 uppercase tracking-wider">{tmpl(t.dashboardView.activityHeatmapLabel, { weeks: Math.round((data.heatmapDaily ?? []).length / 7) })}</span>
                 </div>
                 <div className="p-3">
                   <ActivityCalendar
@@ -1598,8 +1636,8 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
                       const isToday = activity.date === todayKey;
                       const cost = activity.count / 100; // calData 에서 *100 했던 거 복원
                       const label = activity.level === 0
-                        ? `${activity.date} · 활동 없음${isToday ? " · 오늘" : ""}`
-                        : `${activity.date} · $${cost.toFixed(2)}${isToday ? " · 오늘" : ""}`;
+                        ? `${tmpl(t.dashboardView.dayCellNoActivity, { date: activity.date })}${isToday ? t.dashboardView.todaySuffix : ""}`
+                        : `${tmpl(t.dashboardView.dayCellCost, { date: activity.date, cost: cost.toFixed(2) })}${isToday ? t.dashboardView.todaySuffix : ""}`;
                       return isToday
                         ? React.cloneElement(block, { stroke: "#fbbf24", strokeWidth: 1.5 }, <title>{label}</title>)
                         : React.cloneElement(block, {}, <title>{label}</title>);
@@ -1874,15 +1912,15 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
                   <div className="relative group/pattern">
                     <span
                       data-testid="dash-active-blocks-pattern"
-                      className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded border cursor-help ${PATTERN_DESCRIPTIONS[data.blocks.pattern].color}`}
+                      className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded border cursor-help ${PATTERN_COLORS[data.blocks.pattern]}`}
                     >
-                      {data.blocks.pattern} <span className="opacity-60">ⓘ</span>
+                      {patternLabel(data.blocks.pattern, t)} <span className="opacity-60">ⓘ</span>
                     </span>
                     <div className="absolute right-0 top-full mt-1 z-50 opacity-0 invisible group-hover/pattern:opacity-100 group-hover/pattern:visible transition-all duration-100 bg-slate-900 border border-slate-700 rounded-lg shadow-2xl p-3 w-72 text-left">
-                      <p className="text-[10px] font-mono text-slate-500 mb-1.5 uppercase tracking-wider">{data.blocks.pattern} 기준</p>
-                      <p className="text-xs font-mono text-slate-300 leading-relaxed">{PATTERN_DESCRIPTIONS[data.blocks.pattern].tooltip}</p>
+                      <p className="text-[10px] font-mono text-slate-500 mb-1.5 uppercase tracking-wider">{patternLabel(data.blocks.pattern, t)}{t.dashboardView.patternCriteriaSuffix}</p>
+                      <p className="text-xs font-mono text-slate-300 leading-relaxed">{patternTooltip(data.blocks.pattern, t)}</p>
                       <p className="text-[10px] font-mono text-slate-500 mt-2 pt-2 border-t border-slate-800">
-                        패턴 분류는 자기 인식 용도. 좋고 나쁨이 아닙니다.
+                        {t.dashboardView.patternDisclaimer}
                       </p>
                     </div>
                   </div>
@@ -1890,56 +1928,56 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
               </div>
               <div className="p-3">
                 {data.blocks.tooFewData ? (
-                  <p data-testid="dash-active-blocks-empty" className="text-neutral-500 text-xs font-mono">데이터 부족 — 블록 5개 이상 누적되면 표시됩니다.</p>
+                  <p data-testid="dash-active-blocks-empty" className="text-neutral-500 text-xs font-mono">{t.dashboardView.activeBlocksEmpty}</p>
                 ) : (
                   <>
                     <div className="space-y-1.5 text-xs font-mono">
                       <div className="flex justify-between items-center gap-2">
-                        <span className="text-neutral-400 shrink-0">활성 블록</span>
+                        <span className="text-neutral-400 shrink-0">{t.dashboardView.activeBlocks}</span>
                         <span className="flex-1 text-right">
                           <span className="text-neutral-200">{data.blocks.count}</span>
-                          <span className="text-neutral-500"> ({data.blocks.activeDays}일)</span>
+                          <span className="text-neutral-500"> ({data.blocks.activeDays}{t.common.daysShort})</span>
                         </span>
-                        <span className="w-20 text-right text-[10px]" title="직전 동일 길이 윈도우 대비">
+                        <span className="w-20 text-right text-[10px]" title={t.dashboardView.deltaWindowTitle}>
                           {data.blocks.trend?.hasPrevData
                             ? <TrendArrow pct={data.blocks.trend.countDeltaPct} />
                             : <span className="text-neutral-700">─</span>}
                         </span>
                       </div>
                       <div className="flex justify-between items-center gap-2">
-                        <span className="text-neutral-400 shrink-0">평균 길이</span>
+                        <span className="text-neutral-400 shrink-0">{t.dashboardView.avgLength}</span>
                         <span className="flex-1 text-right">
                           <span className="text-neutral-200">{fmtMinutes(data.blocks.avgMinutes)}</span>
                           <span className="text-neutral-500"> (median {fmtMinutes(data.blocks.medianMinutes)})</span>
                         </span>
-                        <span className="w-20 text-right text-[10px]" title="직전 동일 길이 윈도우 대비">
+                        <span className="w-20 text-right text-[10px]" title={t.dashboardView.deltaWindowTitle}>
                           {data.blocks.trend?.hasPrevData
                             ? <TrendArrow pct={data.blocks.trend.avgMinutesDeltaPct} />
                             : <span className="text-neutral-700">─</span>}
                         </span>
                       </div>
                       <div className="flex justify-between items-center gap-2">
-                        <span className="text-neutral-400 shrink-0">분당 토큰</span>
+                        <span className="text-neutral-400 shrink-0">{t.dashboardView.tokensPerMin}</span>
                         <span className="flex-1 text-right text-sky-400">{fmtTokens(data.blocks.tokensPerMinute)}</span>
-                        <span className="w-20 text-right text-[10px]" title="직전 동일 길이 윈도우 대비">
+                        <span className="w-20 text-right text-[10px]" title={t.dashboardView.deltaWindowTitle}>
                           {data.blocks.trend?.hasPrevData
                             ? <TrendArrow pct={data.blocks.trend.tokensPerMinuteDeltaPct} />
                             : <span className="text-neutral-700">─</span>}
                         </span>
                       </div>
                       <div className="flex justify-between items-center gap-2">
-                        <span className="text-neutral-400 shrink-0">최장 블록</span>
+                        <span className="text-neutral-400 shrink-0">{t.dashboardView.longestBlock}</span>
                         <span className="flex-1 text-right">
                           <span className="text-neutral-200">{fmtMinutes(data.blocks.maxMinutes)}</span>
                           {data.blocks.longestStartedAt && (
-                            <span className="text-neutral-500"> ({fmtBlockDate(data.blocks.longestStartedAt)})</span>
+                            <span className="text-neutral-500"> ({fmtBlockDate(data.blocks.longestStartedAt, t)})</span>
                           )}
                         </span>
                         <span className="w-20 text-right text-neutral-700 text-[10px]">─</span>
                       </div>
                     </div>
                     <div className="mt-3 pt-3 border-t border-neutral-800">
-                      <p className="text-[10px] text-neutral-500 mb-2 uppercase tracking-wider">길이 분포</p>
+                      <p className="text-[10px] text-neutral-500 mb-2 uppercase tracking-wider">{t.dashboardView.lengthDistribution}</p>
                       <div className="space-y-1 text-[11px] font-mono">
                         {(() => {
                           const dist = data.blocks.distribution;
@@ -2002,8 +2040,8 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
               <div data-testid="dash-card-dwell-heatmap" className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-amber-500 rounded">
                 <div className="px-3 py-2 border-b border-neutral-800">
                   <span data-testid="dash-heatmap-dwell" className="text-xs font-mono font-bold text-amber-400 uppercase tracking-wider">
-                    체류 히트맵 ({Math.round(rows.length / 7)}주, 일별 총 분
-                    {monthVisitsTotal > 0 && ` · 이번달 ${monthVisitsTotal}회 방문 · 평균 ${avgMinSec}`})
+                    {tmpl(t.dashboardView.dwellHeatmapLabel, { weeks: Math.round(rows.length / 7) })}
+                    {monthVisitsTotal > 0 && tmpl(t.dashboardView.dwellMonthVisits, { n: monthVisitsTotal, time: avgMinSec })})
                   </span>
                 </div>
                 <div className="p-3">
