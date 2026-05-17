@@ -180,9 +180,27 @@ function triggerFirstSync(syncPath, configPath) {
   }
   const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
   const syncLog = openSync(path.join(DATA_DIR, "sync.log"), "a");
+  // GUI launch 환경의 PATH 는 빈약 (`/usr/bin:/bin` 만). codeburn/ccusage 가
+  // brew/npm 글로벌 (/opt/homebrew/bin, /usr/local/bin, nvm) 에 있어 그 경로
+  // 명시 보강. nvm 사용자도 흔하므로 ~/.nvm/versions/node/*/bin 도 포함.
+  const homeNvm = path.join(homedir(), ".nvm", "versions", "node");
+  let nvmBins = "";
+  try {
+    const versions = require("fs").readdirSync(homeNvm).filter((v) => v.startsWith("v"));
+    nvmBins = versions.map((v) => path.join(homeNvm, v, "bin")).join(":");
+  } catch {}
+  const enrichedPath = [
+    nvmBins,
+    "/opt/homebrew/bin",
+    "/usr/local/bin",
+    process.env.PATH || "/usr/bin:/bin",
+  ]
+    .filter(Boolean)
+    .join(":");
   const proc = spawn(nodeBin, [syncPath], {
     env: {
       ...process.env,
+      PATH: enrichedPath,
       USAGE_TRACKER_CONFIG: configPath,
       TZ: tz,
     },
@@ -203,9 +221,19 @@ function ensureLaunchAgentMac(syncPath, configPath) {
   }
   const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
   const logPath = path.join(DATA_DIR, "sync.log");
-  // ProgramArguments 에 사용자 시스템 node 가 필요 — Electron 안의 node 가 아니라
-  // 시스템 node 가 cli/sync.mjs 를 실행해야 ccusage / codeburn spawn 가능.
-  const nodePath = "/usr/local/bin/node";
+  // ProgramArguments 에 사용자 시스템 node 가 필요. findSystemNode 가 찾은 path
+  // 사용 — 사용자별 brew/nvm 위치 다를 수 있음.
+  const nodePath = findSystemNode() || "/usr/local/bin/node";
+  // launchd 의 기본 PATH 가 빈약해 codeburn/ccusage 못 찾음. 보강.
+  const homeNvm = path.join(homedir(), ".nvm", "versions", "node");
+  let nvmBins = "";
+  try {
+    const versions = require("fs").readdirSync(homeNvm).filter((v) => v.startsWith("v"));
+    nvmBins = versions.map((v) => path.join(homeNvm, v, "bin")).join(":");
+  } catch {}
+  const launchdPath = [nvmBins, "/opt/homebrew/bin", "/usr/local/bin", "/usr/bin", "/bin"]
+    .filter(Boolean)
+    .join(":");
   const plist = `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
@@ -225,6 +253,8 @@ function ensureLaunchAgentMac(syncPath, configPath) {
     <string>${tz}</string>
     <key>USAGE_TRACKER_CONFIG</key>
     <string>${configPath}</string>
+    <key>PATH</key>
+    <string>${launchdPath}</string>
   </dict>
   <key>StandardOutPath</key>
   <string>${logPath}</string>
