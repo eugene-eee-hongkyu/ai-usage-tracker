@@ -234,6 +234,18 @@ function startServer(port) {
   const out = openSync(LOG_FILE, "a");
   const err = openSync(LOG_FILE, "a");
 
+  // Next.js standalone server 가 spawn 의 process.env 를 module-load 시점 평가에
+  // 즉시 반영 못 하는 케이스가 있어 (특히 DATABASE_KIND 같이 module top-level 에서
+  // 확인되는 값), .env 파일로 함께 주입. .env 는 standalone cwd 에서 next-server 가
+  // 자동 로드. 사용자별로 다른 SQLITE_PATH 등이 들어가야 하므로 매 실행마다 갱신.
+  const envFile = path.join(STANDALONE_DIR, ".env");
+  const envBody =
+    `DATABASE_KIND=sqlite\n` +
+    `SQLITE_PATH=${SQLITE_PATH}\n` +
+    `NEXTAUTH_SECRET=${secret}\n` +
+    `NEXTAUTH_URL=http://localhost:${port}\n`;
+  writeFileSync(envFile, envBody, { mode: 0o600 });
+
   // Electron 안의 환경변수 leak 방지 — child 에는 standalone 에 필요한 것만 전달.
   const childEnv = Object.fromEntries(
     Object.entries(process.env).filter(
@@ -241,7 +253,10 @@ function startServer(port) {
     )
   );
 
-  serverProc = spawn(nodeBin, [STANDALONE_SERVER], {
+  // Node 20.6+ 의 --env-file flag — Next.js standalone 의 module-load 시점
+  // 환경변수 누락 우회. spawn 의 env 도 함께 전달 (PORT/HOSTNAME 등 next-server
+  // 본체에 필요한 변수).
+  serverProc = spawn(nodeBin, ["--env-file=" + envFile, STANDALONE_SERVER], {
     env: {
       ...childEnv,
       DATABASE_KIND: "sqlite",

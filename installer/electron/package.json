@@ -8,7 +8,7 @@
   "license": "MIT",
   "scripts": {
     "start": "electron .",
-    "build:web": "cd ../../web && npm run build && cp -R public .next/standalone/public && cp -R .next/static .next/standalone/.next/static",
+    "build:web": "cd ../../web && NEXT_PUBLIC_LOCAL_MODE=1 npm run build",
     "stage": "node ./scripts/stage.js",
     "pack": "electron-builder --dir",
     "dist": "electron-builder",

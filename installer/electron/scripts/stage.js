@@ -42,6 +42,17 @@ cpSync(PUBLIC_SRC, path.join(WEB_OUT, "public"), { recursive: true });
 console.log("==> drizzle-sqlite → staged/web/drizzle-sqlite");
 cpSync(MIGRATIONS_SRC, path.join(WEB_OUT, "drizzle-sqlite"), { recursive: true });
 
+// Vercel CLI 가 web/.env.production 에 빈 시크릿 placeholder 를 만들어 두는데,
+// standalone build 가 이걸 자동 포함시키면 dotenv 가 우리 spawn 환경변수와 충돌
+// (특히 DATABASE_URL="" 빈 값 등). Electron 환경에서는 main.js 가 모든 env 책임.
+for (const f of [".env.production", ".env.local"]) {
+  const p = path.join(WEB_OUT, f);
+  if (existsSync(p)) {
+    rmSync(p);
+    console.log(`==> ${f} 제거 (Electron 환경에서는 main.js 의 spawn env 가 우선)`);
+  }
+}
+
 console.log("==> cli/src/*.mjs → staged/cli");
 for (const file of ["sync.mjs", "index.mjs", "init.mjs"]) {
   const src = path.join(CLI_SRC, file);
