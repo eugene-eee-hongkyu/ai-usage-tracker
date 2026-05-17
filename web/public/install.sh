@@ -124,18 +124,18 @@ if [ -n "$OTHER_MGR" ]; then
   echo "⚠️  $OTHER_MGR 가 감지되었습니다"
   echo ""
   echo "    nvm 자동 설치를 건너뜁니다 (버전 매니저 중복 충돌 방지)."
-  echo "    수동으로 Node 22 를 설치한 뒤 다시 실행해주세요:"
+  echo "    Node 20 또는 22 설치 후 다시 실행해주세요 (둘 다 동작):"
   echo ""
   case "$OTHER_MGR" in
     asdf)
-      echo "       asdf install nodejs 22.11.0"
+      echo "       asdf install nodejs 22.11.0     # 또는 20.x"
       echo "       asdf global nodejs 22.11.0"
       ;;
     volta)
-      echo "       volta install node@22"
+      echo "       volta install node@22           # 또는 node@20"
       ;;
     fnm)
-      echo "       fnm install 22"
+      echo "       fnm install 22                  # 또는 20"
       echo "       fnm default 22"
       ;;
   esac
@@ -241,26 +241,23 @@ else
 fi
 
 # ============================================================
-# Pass 4 — Node 버전 가드 (codeburn ≥ 0.9.7 은 Node 22+ 권장)
+# Pass 4 — Node 버전 정보 (info only)
 # ============================================================
-# 현재는 codeburn 0.9.7 이 Node 20 에서 advisory 로만 경고하고 실제 동작은
-# 함. 다만 다음 codeburn major 가 진짜로 Node 22+ 기능 쓰면 break 가능.
-# 명시적으로 안내해서 사용자가 미리 인지하도록.
+# 본 repo 는 검증된 핀 버전 정책 — codeburn@0.9.7 / ccusage@19.0.2 사용.
+# 이 두 버전은 Node 18 / 20 / 22 모두에서 동작 검증됨 (codeburn 0.9.9+ 의
+# Node 22 strict runtime check 와 무관). 즉 Node 업그레이드 권장 없음.
 
 NODE_MAJOR=$(node -v 2>/dev/null | sed -E 's/^v([0-9]+).*$/\1/')
-if [ -n "$NODE_MAJOR" ] && [ "$NODE_MAJOR" -lt 22 ]; then
+if [ -n "$NODE_MAJOR" ] && [ "$NODE_MAJOR" -lt 18 ]; then
   echo ""
   echo "$BAR"
-  echo "⚠️  Node $NODE_MAJOR 감지 — codeburn 0.9.7+ 는 Node 22 이상 권장"
+  echo "⚠️  Node $NODE_MAJOR 감지 — Node 18 이상 필요"
   echo ""
-  echo "    현재는 동작하지만 다음 codeburn major 에서 break 될 수 있습니다."
-  echo "    여유 있을 때 Node 22 로 업그레이드 권장:"
+  echo "    Node 18 / 20 / 22 모두 검증됨. 아무거나 설치하면 됩니다:"
   echo ""
-  echo "       nvm install 22"
-  echo "       nvm alias default 22"
+  echo "       nvm install 20    # 또는 22"
+  echo "       nvm alias default 20"
   echo ""
-  echo "    (자동 업그레이드는 의도적으로 안 함 — 다른 프로젝트의 Node 의존성"
-  echo "     영향 줄 수 있어 사용자 판단으로 진행)"
   echo "$BAR"
   echo ""
 fi

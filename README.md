@@ -171,7 +171,7 @@ npm run dev --workspace=web
 ### 환경변수 (로컬)
 
 ```
-DATABASE_URL=postgresql://postgres:postgres@localhost:5432/primus_usage
+DATABASE_URL=postgresql://postgres:postgres@localhost:5432/z21_usage
 NEXTAUTH_SECRET=local-secret
 NEXTAUTH_URL=http://localhost:3000
 GITHUB_CLIENT_ID=...
@@ -187,6 +187,25 @@ Claude Code의 `SessionEnd` hook이 발화될 때마다 `ccusage export --json`�
 - 인증: `x-api-key` 헤더 (SHA-256 해시 검증)
 - 저장: `user_snapshots` 테이블에 사용자당 1행 upsert
 - `raw_json` 필드에 원본 JSON 전체를 보존해 기간 필터링 및 신규 지표 추가가 용이합니다
+
+---
+
+## 외부 의존성 핀 정책
+
+본 repo 는 외부 CLI (`codeburn`, `ccusage`) 의 자동 `@latest` 업그레이드로 인한 호환성 사고를 차단하기 위해 **검증된 핀 버전**만 사용합니다.
+
+| 패키지 | 핀 버전 | 검증 환경 | 비고 |
+|---|---|---|---|
+| `codeburn` | `0.9.7` | Node 18 / 20 / 22 | `0.9.9+` 부터 Node 22+ strict runtime check 추가 → 회피 |
+| `ccusage` | `19.0.2` | Node 18 / 20 / 22 | `19.x` 가 daily row 키 `date` → `period` breaking change. dashboard 측 `date ?? period` fallback 으로 옛/새 버전 모두 호환 |
+
+신 버전 검증 후 의도적 commit 으로만 핀 갱신:
+1. 본 repo 사용자 1대에서 신 버전 install + sync → dashboard 정상 확인
+2. `cli/src/init.ts` 의 핀 값 변경 + commit
+3. `npx ... repair` 한 줄로 팀원 머신 일괄 갱신
+
+이전 사고 사례:
+- `2026-05-17`: `install.sh` 의 `codeburn@latest` 가 0.9.7 → 0.9.9 강제 업그레이드. Node 20 strict check 로 codeburn 5 period 모두 fail. 동시에 `ccusage@latest` 가 18.x → 19.0.2 로 schema 깨뜨려 dashboard daily activity / unit cost 빈 상태. 핀 도입으로 재발 차단.
 
 ---
 
