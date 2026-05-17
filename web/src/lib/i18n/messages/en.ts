@@ -224,6 +224,58 @@ export interface Messages {
     causeCostCall: string;
     causeTokenVolume: string;
   };
+  setupPage: {
+    greeting: string;
+    sub: string;
+    fetchErrorTitle: string;
+    fetchErrorBody: string;
+    fetchRetry: string;
+    tzHeader: string;
+    tzLead: string;
+    tzSaved: string;
+    step1: string;
+    step1Title: string;
+    step1Sub: string;
+    runCmdLine: string;
+    copyLabel: string;
+    copiedLabel: string;
+    browserOpens: string;
+    manualNode: string;
+    step2Title: string;
+    stepHook: string;
+    stepFirstSession: string;
+    waitingNote: string;
+    installDone: string;
+    goDashboard: string;
+    troubleshoot: string;
+    osTerminalMac: string;
+    osTerminalWin: string;
+  };
+  memberProfile: {
+    teamRanking: string;
+    backToTeamRanking: string;
+    notFound: string;
+    badId: string;
+    profileSuffix: string;
+    noDataYet: string;
+    noDataHint: string;
+    loading: string;
+    totalCost: string;
+    sessionsCount: string;
+    sessionsUnit: string;
+    streakDaysUnit: string;
+    activityHeatmap4w: string;
+    topProjects: string;
+    sessionsCountUnit: string;
+  };
+  login: {
+    tagline: string;
+    teamOnly: string;
+    errorDomain: string;
+    errorOther: string;
+    githubStart: string;
+    googleStart: string;
+  };
   privacy: {
     banner: string;
     bannerEm1: string;
@@ -793,6 +845,58 @@ export const en: Messages = {
     causeOneShot: "One-shot rate",
     causeCostCall: "Cost / call",
     causeTokenVolume: "Total usage",
+  },
+  setupPage: {
+    greeting: "Hi {name} 👋",
+    sub: "Install once and collection starts automatically",
+    fetchErrorTitle: "⚠ Failed to check setup status",
+    fetchErrorBody: "Check your network/session and try again.",
+    fetchRetry: "Retry",
+    tzHeader: "Timezone setting",
+    tzLead: "Used for dashboard timestamps. We auto-detected your timezone.",
+    tzSaved: "✓ Saved",
+    step1: "Step 1 — One-shot install",
+    step1Title: "Open your {term} and run the command below",
+    step1Sub: "If Node.js is missing it's installed first, then Tracker init.",
+    runCmdLine: "Run command",
+    copyLabel: "Copy",
+    copiedLabel: "✓ Copied",
+    browserOpens: "Browser opens → log in → done.",
+    manualNode: "Already have Node.js (manual)",
+    step2Title: "Step 2 — Waiting to auto-complete",
+    stepHook: "Hook registered",
+    stepFirstSession: "First data received",
+    waitingNote: "Auto-checked after you run the command above.",
+    installDone: "✓ Install complete",
+    goDashboard: "Open dashboard →",
+    troubleshoot: "Not working? Troubleshoot →",
+    osTerminalMac: "terminal",
+    osTerminalWin: "PowerShell",
+  },
+  memberProfile: {
+    teamRanking: "← Team ranking",
+    backToTeamRanking: "Back to team ranking",
+    notFound: "⚠ Member not found",
+    badId: "The ID may be incorrect.",
+    profileSuffix: " profile",
+    noDataYet: "No data yet",
+    noDataHint: "Data is collected automatically after the user finishes their first Claude Code session.",
+    loading: "Loading…",
+    totalCost: "Total cost",
+    sessionsCount: "Sessions",
+    sessionsUnit: " sessions",
+    streakDaysUnit: " days",
+    activityHeatmap4w: "Activity heatmap (4 weeks, by cost)",
+    topProjects: "Top projects",
+    sessionsCountUnit: " sessions",
+  },
+  login: {
+    tagline: "See at a glance how much and how well you're using AI coding tools",
+    teamOnly: "Team members only",
+    errorDomain: "Email domain not allowed.",
+    errorOther: "An error occurred during login.",
+    githubStart: "Continue with GitHub",
+    googleStart: "Continue with Google",
   },
   privacy: {
     banner: "🔒 This tool only collects",
