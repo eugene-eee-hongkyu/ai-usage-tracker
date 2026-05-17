@@ -159,6 +159,132 @@ export interface Messages {
     unitCostAnchorWastedHeavy: string;     // plan 거의 안 씀 — API 직접 호출이 훨씬 쌈
     unitCostNoData: string;                // 데이터 없음
   };
+  metricModal: {
+    common: {
+      what: string;        // {label}이란
+      howTo: string;       // 올리는 방법 / 줄이는 방법
+      grade: string;       // 등급
+      gradeForSonnet: string; // 등급 (Sonnet 기준)
+      reference: string;   // 참고
+      methodsTitle: string; // {label} {action}
+      detailsTitle: string; // {label} 상세
+      sourceCamp: string;
+      currentSession: string; // 현재 N% 는 ...
+      noteCacheNonStandard: string;
+    };
+    cacheHit: {
+      label: string;
+      definition: string;
+      definitionCacheLine: string;
+      definitionExplain: string;
+      formula: string;
+      currentExplain: string;
+      claudeBenchNote: string;
+      methodsLead: string;
+      step1: string;
+      step2: string;
+      step3: string;
+      step4: string;
+      step5: string;
+      grade1: string;
+      grade2: string;
+      grade3: string;
+      grade4: string;
+      grade5: string;
+    };
+    oneShot: {
+      label: string;
+      def1: string;
+      def2: string;
+      formula: string;
+      def3: string;
+      methodsLead: string;
+      step1: string;
+      step2: string;
+      step3: string;
+      step4: string;
+      step5: string;
+      grade1: string;
+      grade2: string;
+      grade3: string;
+      gradeFootnote: string;
+    };
+    costSession: {
+      label: string;
+      def1: string;
+      formulaLine: string;
+      formulaVal: string;
+      def2: string;
+      methodsLead: string;
+      step1: string;
+      step2: string;
+      step3: string;
+      step4: string;
+      step5: string;
+      grade1: string;
+      grade2: string;
+      grade3: string;
+      gradeFootnote: string;
+    };
+    costCall: {
+      label: string;
+      def1: string;
+      formulaLine: string;
+      formulaVal: string;
+      def2: string;
+      step1: string;
+      step2: string;
+      step3: string;
+      step4: string;
+      step5: string;
+      referenceBody: string;
+    };
+    tokenVolume: {
+      titleTpl: string;
+      label: string;
+      def1: string;
+      def2Title: string;
+      def2: string;
+      gradesTitle: string;
+      gradesLead: string;
+      row10: string;
+      row9: string;
+      row8: string;
+      row7: string;
+      row6: string;
+      row5: string;
+      row4: string;
+      row3: string;
+      row2: string;
+      row1: string;
+      row0: string;
+      footnote: string;
+    };
+    callsPerSession: {
+      label: string;
+      def1: string;
+      formulaLine: string;
+      formulaVal: string;
+      goodDirTitle: string;
+      goodDirLead: string;
+      highBadTitle: string;
+      highBadItems: string[];
+      lowBadTitle: string;
+      lowBadItems: string[];
+      goodRange: string;
+      methodsLead: string;
+      stepHigh: string;
+      stepLow: string;
+      stepOneShot: string;
+      stepClaudeMd: string;
+      stepDeclare: string;
+      referenceBody: string;
+      seeAlsoTitle: string;
+      seeAlso1: string;
+      seeAlso2: string;
+      seeAlso3: string;
+    };
+  };
   teamView: {
     loadFailed: string;
     retry: string;
@@ -523,6 +649,193 @@ export const en: Messages = {
     unitCostAnchorWasted10x: "10× more expensive than direct API",
     unitCostAnchorWastedHeavy: "Barely using the plan — direct API is much cheaper",
     unitCostNoData: "no data",
+  },
+  metricModal: {
+    common: {
+      what: "What is {label}",
+      howTo: "How to improve",
+      grade: "Grades",
+      gradeForSonnet: "Grades (Sonnet baseline)",
+      reference: "Reference",
+      methodsTitle: "How to improve {label}",
+      detailsTitle: "{label} details",
+      sourceCamp: "Claude Code Camp — How prompt caching actually works",
+      currentSession:
+        "{val}% means \"{val}% of total input was processed at 1/10 the price.\" Claude Code engineers say a normal session is around 96%; a cache-hit dip is treated as an incident (SEV). {goodNote}",
+      noteCacheNonStandard:
+        "※ Some tools (e.g. codeburn) exclude cache writes from the denominator and show numbers near 100%. This tool uses the Anthropic-standard formula.",
+    },
+    cacheHit: {
+      label: "Cache hit",
+      definition:
+        "Every Claude Code message resends the system prompt + CLAUDE.md + tool defs + the whole conversation so far — typically 50K–100K tokens per turn.",
+      definitionCacheLine:
+        "Most of that is identical to the previous turn (system prompt, CLAUDE.md, prior conversation). The API lets you mark sections as \"cached for next call\" and the cached read price is",
+      definitionExplain: "1/10 of the normal input price",
+      formula: "Cache hit = cache reads ÷ (cache reads + cache writes + new input)",
+      currentExplain:
+        "If your cache hit is high you're paying ~10% for most of your tokens.",
+      claudeBenchNote: "Normal session is ~96% in Anthropic's own dashboards.",
+      methodsLead:
+        "Cache compares messages from the start byte-for-byte. A single-byte change invalidates the cache → you pay full price. The whole job is to keep the message prefix stable.",
+      step1:
+        "**Stabilize CLAUDE.md** — short, rarely changing. Put volatile content (current sprint) at the bottom; stable content (tech stack) at the top.",
+      step2:
+        "**One session = one task** — three short separate sessions cost less in total than 50 turns jumping around in one session.",
+      step3:
+        "**Don't pause more than 5 minutes** — cache TTL is 5 minutes. Bathroom break → cache expired → expensive first message.",
+      step4:
+        "**Don't add/remove MCP tools mid-session** — tool defs sit early in the cache; changing them invalidates everything after.",
+      step5:
+        "**Don't switch models mid-session** — Sonnet ↔ Opus swap breaks the cache.",
+      grade1: "Claude Code internal benchmark",
+      grade2: "Good state",
+      grade3: "Typical level",
+      grade4: "Likely bloated CLAUDE.md",
+      grade5: "Anthropic-level incident (SEV)",
+    },
+    oneShot: {
+      label: "One-shot rate",
+      def1:
+        "When Claude Code rewrites or edits code (Edit / Write / MultiEdit), each call lands as either **first-try success** or **retry**.",
+      def2:
+        "Failures: target text slightly off, indentation wrong, conflict because another edit already moved things, bad syntax in a new file. After a failure Claude re-reads and retries — **extra tokens + extra time**.",
+      formula: "One-shot rate = first-try successful edits ÷ total edit calls",
+      def3:
+        "Cache hit and cost show \"how much you spent\"; one-shot rate shows \"how accurately Claude wrote.\" Retry loops burn tokens without producing output — there are reports of 90K tokens burned in retry loops in a single session. **The most direct indicator of AI-usage skill.**",
+      methodsLead:
+        "For Claude to one-shot it needs **enough context + clear instructions**. Both are decided by you.",
+      step1:
+        "**Make Claude read enough before editing** — \"Read this file end-to-end, study the structure, then refactor X to pattern Y\" beats \"Refactor this function.\" Guessing → retries.",
+      step2:
+        "**Remove ambiguity** — \"Make it cleaner\" is a guess. \"Replace this function's try-catch with a Result-typed return\" lands in one shot.",
+      step3:
+        "**Split large changes into stages** — \"1) interface, 2) implementation, 3) tests\" beats \"rewrite this whole file.\" Each stage's one-shot goes up.",
+      step4:
+        "**Pin coding conventions in CLAUDE.md** — indent, naming, import order. No guessing → first-try success up.",
+      step5:
+        "**Re-read after external changes** — if you git pulled or a teammate touched the same file, say \"Re-read the latest file before working.\" Otherwise Claude works from a stale view → conflicts → retries.",
+      grade1: "Almost no retries — clear context",
+      grade2: "Normal range for messy coding",
+      grade3: "Frequent Edit→Build→Edit loops",
+      gradeFootnote: "Based on codeburn official anchors (90% / 30%) — 3 levels.",
+    },
+    costSession: {
+      label: "Cost / session",
+      def1:
+        "A session starts with `claude` and ends at `/exit` or when the terminal closes. A new `claude` starts a new session.",
+      formulaLine: "Cost / session = total cost ÷ session count",
+      formulaVal: "${totalCost} ÷ {sessions} = **${value} per session**",
+      def2:
+        "Total tokens or total cost just mean \"used a lot.\" Cost / session is the most direct \"average cost to finish one unit of work.\" If this number drops over time, you're getting better at using Claude.",
+      methodsLead:
+        "The longer a session, the more conversation history is re-sent every message. **Cutting sessions to the right size is the whole job.**",
+      step1:
+        "**Cut sessions at work units** — saving a worklog, committing, opening a PR — those are session-end signals. If the next task doesn't need the previous context, always start a new session. Going from 12 sessions/week to 30–40/week is normal.",
+      step2:
+        "**At 70% context, start wrapping up** — auto-compact at 95% is itself expensive. Wrap up before auto-compact triggers and start a new session. Check `/context` regularly.",
+      step3:
+        "**Diet CLAUDE.md** — a 5KB CLAUDE.md is 5K tokens per message. A 100-message session burns 500K tokens just on CLAUDE.md. Keep only the essentials.",
+      step4:
+        "**Use Haiku for simple work** — finding files, simple commands, short reads. Haiku is 1/10 the price. Claude Code won't auto-pick it — switch manually with `/model haiku`.",
+      step5:
+        "**Don't resume the same work within 5 min of ending a session** — the cache is still alive within 5 minutes, so continuing the existing session is cheaper. Resuming after a cut within 5 min builds the cache twice.",
+      grade1: "Routine session size",
+      grade2: "Large work session — normal range",
+      grade3: "Mega session — split it or check efficiency",
+      gradeFootnote:
+        "Opus ≈ 5× of these. External anchors are weak — only 3 levels.",
+    },
+    costCall: {
+      label: "Cost / call",
+      def1:
+        "Average cost per API call. Each user message or tool invocation by Claude is one API call.",
+      formulaLine: "Cost / call = total cost ÷ total calls",
+      formulaVal: "${totalCost} ÷ {totalCalls} = **${value} per call**",
+      def2:
+        "While cache hit answers \"did I use the cache well\" and cost/session answers \"is my work unit right-sized,\" cost/call is the direct signal of **model choice and context size**. Same session, Opus is 5× Sonnet; bigger context scales linearly.",
+      step1:
+        "**Stay on Sonnet** — Opus only for hard design / refactoring / debugging. Simple edits / search / lookups are fine on Sonnet at 1/5 the price.",
+      step2:
+        "**Use Haiku for simple tasks** — listing files, short snippets, simple questions. Switch with `/model haiku`. 1/4 of Sonnet.",
+      step3:
+        "**Diet CLAUDE.md** — sent in full every call. 5KB = 5K fixed tokens per call. Keep only the essentials; split the rest to separate files.",
+      step4:
+        "**Keep cache hit up** — cache reads cost 1/10 of normal input. High cache hit → lower cost/call at the same context size.",
+      step5:
+        "**Trim MCP tools** — registered MCP tools send their defs every call. Disable the ones you don't use often.",
+      referenceBody:
+        "Cost / call is the combined signal of model choice and context size. No external anchor, so no grade — the BY MODEL card + cache hit grade already cover it. Use this value diagnostically and watch its trend.",
+    },
+    tokenVolume: {
+      titleTpl: "Usage {level}/10 · daily avg {tokens} tokens",
+      label: "Usage",
+      def1:
+        "**Daily-average total tokens** processed by Claude Code (cache reads included). Claude Code is 90%+ cache reads — using cache well naturally produces a big number.",
+      def2Title: "Why this is part of the efficiency score",
+      def2:
+        "Pure efficiency (cache · one-shot · cost) makes \"using nothing\" look optimal. Usage is weighted 30% so actual activity counts. Same efficiency but lower usage → lower score → nudges you to actually use it.",
+      gradesTitle: "10 levels (global anchors)",
+      gradesLead:
+        "Calibrated against Anthropic official + Verdent + power-user data. Reference model: Sonnet 4.6 + average cache utilization (~$1 ≈ 1.3M total tokens).",
+      row10: "Extreme (~$240+/day)",
+      row9: "Power-user territory",
+      row8: "Very heavy (~$120/day)",
+      row7: "Verdent heavy top (~$60/day)",
+      row6: "★ Anthropic enterprise P90 (~$30/day)",
+      row5: "Verdent medium top (~$20/day)",
+      row4: "★ Anthropic P90 (individual) (~$12/day)",
+      row3: "★ Anthropic average (~$6/day)",
+      row2: "Light starter (~$2/day)",
+      row1: "Barely using",
+      row0: "Not using",
+      footnote: "★ = externally validated anchor. Others are interpolated.",
+    },
+    callsPerSession: {
+      label: "Calls per session",
+      def1:
+        "How many Claude API calls within one session. One user message can trigger many calls as Claude invokes tools. **Turns or tool calls in a session.**",
+      formulaLine: "Calls per session = total calls ÷ sessions",
+      formulaVal: "{totalCalls} ÷ {sessions} = **{value} per session**",
+      goodDirTitle: "Direction is ambiguous — yes, both extremes are bad",
+      goodDirLead:
+        "Unlike cache hit or one-shot, this metric isn't \"higher is better\" or \"lower is better.\" **Both too high and too low are bad.** Confusing is normal.",
+      highBadTitle: "When higher is bad",
+      highBadItems: [
+        "Stuck in a retry loop (paired with low one-shot)",
+        "Claude lacks context and re-reads the same file 5 times",
+        "Multiple tasks mixed in one long session",
+        "Vague instructions → Claude meanders",
+      ],
+      lowBadTitle: "When lower is bad",
+      lowBadItems: [
+        "Barely using Claude, writing yourself (not leveraging the tool)",
+        "Single quick question then done (no automation benefit)",
+        "Sessions too small — every session builds fresh context (cache wasted)",
+      ],
+      goodRange: "**Sweet spot: 30–80 calls per session.** Within that, you're fine.",
+      methodsLead:
+        "Don't tune calls/session directly. Make sessions match the work unit and the metric lands in the sweet spot on its own.",
+      stepHigh:
+        "**If too high (100+ calls)** — sessions are too long. Apply the cost/session playbook — cut at work units, wrap up at 70% context, one session = one task.",
+      stepLow:
+        "**If too low (under 10 calls)** — you're not leveraging Claude enough. Switch from \"I'll write this part myself\" to \"refactor this to pattern X\" — delegate work.",
+      stepOneShot:
+        "**Calls in range but one-shot low** — call count is fine but retry rate is high. Apply the one-shot playbook (more context + clearer instructions).",
+      stepClaudeMd:
+        "**Pin work patterns in CLAUDE.md** — \"Read before Edit,\" \"Auto-run tests.\" When Claude repeats the same pattern, call counts stabilize.",
+      stepDeclare:
+        "**Declare scope at session start** — \"Today only implement feature X, end when done.\" Claude stays in scope. Prevents infinite drift.",
+      referenceBody:
+        "Both extremes are bad, so no external anchor and no grade. Sweet spot is roughly 30–80 calls per session, but the normal range varies a lot by task type.",
+      seeAlsoTitle: "Check alongside",
+      seeAlso1:
+        "• Low one-shot + high calls → retry loop. The worst signal.",
+      seeAlso2:
+        "• Normal one-shot, high calls → big task. Consider splitting.",
+      seeAlso3:
+        "• Low calls + high cost/session → too much packed per call. Context strain.",
+    },
   },
   teamView: {
     loadFailed: "Failed to load team data.",

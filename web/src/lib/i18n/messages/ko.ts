@@ -165,6 +165,188 @@ export const ko: DeepPartial<Messages> = {
     unitCostAnchorWastedHeavy: "plan 거의 안 씀 — API 직접 호출이 훨씬 쌈",
     unitCostNoData: "데이터 없음",
   },
+  metricModal: {
+    common: {
+      what: "{label}이란",
+      howTo: "올리는 방법",
+      grade: "등급",
+      gradeForSonnet: "등급 (Sonnet 기준)",
+      reference: "참고",
+      methodsTitle: "{label} {action}",
+      detailsTitle: "{label} 상세",
+      sourceCamp: "Claude Code Camp — How prompt caching actually works",
+      currentSession:
+        "현재 {val}%는 \"전체 입력의 {val}%를 1/10 가격으로 처리했다\"는 뜻. Claude Code 엔지니어가 말하길 정상 세션은 96% 정도 나오고, cache hit이 떨어지면 사고(SEV)로 본다고 합니다. {goodNote}",
+      noteCacheNonStandard:
+        "※ codeburn 등 일부 도구는 캐시 쓰기를 분모에서 빼서 100%에 가까운 값을 표시하기도 합니다. 본 도구는 Anthropic 표준 공식 사용.",
+    },
+    cacheHit: {
+      label: "Cache hit",
+      definition:
+        "Claude Code가 메시지를 보낼 때마다 시스템 프롬프트 + CLAUDE.md + 도구 정의 + 지금까지의 대화 전체를 매번 다시 전송합니다. 평균 한 번에 5만~10만 토큰.",
+      definitionCacheLine:
+        "이 중 대부분은 이전 메시지와 똑같은 부분(시스템 프롬프트, CLAUDE.md, 이전 대화). API에 \"이거 캐시해놓고 다음엔 꺼내 써\"라고 표시할 수 있고, 꺼내 쓰는 가격이",
+      definitionExplain: "정상가의 1/10",
+      formula: "Cache hit = 캐시 읽기 ÷ (캐시 읽기 + 캐시 쓰기 + 새 입력)",
+      currentExplain:
+        "cache hit이 높을수록 대부분 토큰을 ~10% 가격으로 처리한 것.",
+      claudeBenchNote: "Anthropic 내부 대시보드 기준 정상 세션 ~96%.",
+      methodsLead:
+        "캐시는 메시지 시작 부분을 통째로 비교합니다. 1바이트라도 다르면 캐시 무효화 → 풀 가격. 시작 부분을 안정적으로 유지하는 게 전부.",
+      step1:
+        "**CLAUDE.md 안정화** — 짧게 + 자주 안 바꾸기. 자주 바뀌는 내용(이번 스프린트)은 맨 아래로, 안 바뀌는 내용(테크 스택)은 맨 위로.",
+      step2:
+        "**한 세션 = 한 작업** — 분리된 짧은 세션 3개가 한 세션에서 이리저리 옮겨다니는 50턴보다 총 비용이 적음.",
+      step3:
+        "**5분 이상 쉬지 말기** — 캐시 TTL이 5분. 화장실 다녀오면 캐시 만료 → 첫 메시지 비쌈.",
+      step4:
+        "**MCP 도구 자주 추가/제거 안 하기** — 도구 정의가 캐시 앞쪽에 있어서 바뀌면 그 뒤 전부 무효화.",
+      step5: "**세션 중 모델 바꾸지 말기** — Sonnet ↔ Opus 전환은 캐시 깸.",
+      grade1: "Claude Code 본사 내부 기준",
+      grade2: "좋은 상태",
+      grade3: "일반적인 수준",
+      grade4: "CLAUDE.md 비대 의심",
+      grade5: "본사 기준 사고(SEV) 수준",
+    },
+    oneShot: {
+      label: "One-shot rate",
+      def1:
+        "Claude Code가 코드를 고치거나 새로 쓸 때 사용하는 도구가 있습니다 (Edit, Write, MultiEdit). 이 도구가 호출되면 결과는 둘 중 하나: **첫 시도에 성공** 또는 **실패해서 재시도**.",
+      def2:
+        "실패 사례: 파일에서 찾으려는 텍스트가 미세하게 달라서 못 찾음, 들여쓰기 안 맞음, 이미 다른 곳을 수정해서 충돌남, 잘못된 문법으로 새 파일 작성. 실패하면 Claude가 다시 읽고 다시 시도 → **토큰 추가 소비 + 시간 추가 소비**.",
+      formula: "One-shot rate = 첫 시도 성공 edit 수 ÷ 전체 edit 호출 수",
+      def3:
+        "cache hit이나 비용은 \"얼마나 들었나\"를 보여주지만, one-shot rate는 \"Claude가 얼마나 정확하게 작성했나\"를 보여줍니다. retry 루프에 빠지면 토큰만 태우고 결과 안 나옴 — 보고된 케이스로 90K 토큰을 retry로 태우는 세션이 있을 정도. **AI 활용 능력의 가장 직접적인 지표.**",
+      methodsLead:
+        "Claude가 한 번에 정확하게 작성하려면 **충분한 컨텍스트 + 명확한 지시**가 필요. 두 축 다 사용자가 결정.",
+      step1:
+        "**수정 전에 충분히 읽게 하기** — \"이 함수 리팩토링해줘\"보다 \"이 파일 다 읽고 전체 구조 본 다음에 함수 X를 Y 패턴으로 리팩토링해줘\"가 정확. Claude가 추측 시도하면 retry 늘어남.",
+      step2:
+        "**모호한 지시 제거** — \"이거 좀 깔끔하게\" 같은 건 Claude가 추측. \"이 함수의 try-catch를 Result 타입 리턴으로 바꿔줘\" 같은 구체적 지시는 한 번에 됨.",
+      step3:
+        "**큰 변경은 단계 분리** — \"전체 파일 새로 짜줘\"보다 \"1단계: 인터페이스만 정의 / 2단계: 구현 / 3단계: 테스트\". 각 단계 one-shot rate ↑.",
+      step4:
+        "**CLAUDE.md에 코딩 컨벤션 명시** — 들여쓰기·네이밍·import 순서. Claude가 추측 안 하고 명시된 거 따름 → 첫 시도 성공률 ↑.",
+      step5:
+        "**외부 변경 후엔 재읽기** — git pull 했거나 다른 사람이 같은 파일 만졌다면 \"최신 파일 다시 읽고 작업해줘\". 안 하면 옛날 컨텍스트로 작성 → 충돌 → retry.",
+      grade1: "코드 retry 거의 없음. 명확한 컨텍스트",
+      grade2: "messy 코딩의 정상 범위",
+      grade3: "Edit→Build→Edit 루프 자주 발생",
+      gradeFootnote: "codeburn 공식 anchor (90% / 30%) 기반 3단계.",
+    },
+    costSession: {
+      label: "세션당 비용",
+      def1:
+        "`claude` 명령으로 시작하고 `/exit` 또는 터미널을 닫으면 세션 종료. 새 `claude` 명령은 새 세션.",
+      formulaLine: "세션당 비용 = 총 비용 ÷ 세션 수",
+      formulaVal: "${totalCost} ÷ {sessions} = **세션당 ${value}**",
+      def2:
+        "토큰 총합이나 총 비용은 \"많이 썼다\"는 뜻이지 \"잘 썼다\"는 뜻이 아닙니다. 세션당 비용은 \"한 작업 단위 끝내는 데 평균 얼마 들었나\"를 보여주는 가장 직접적인 지표. 시간이 지나면서 이 수치가 줄면 Claude를 더 잘 쓰게 된 것.",
+      methodsLead:
+        "한 세션이 길어질수록 매 메시지마다 재전송되는 대화 히스토리가 누적됩니다. **세션을 적정 단위로 끊는 게 전부.**",
+      step1:
+        "**작업 단위로 세션 끊기** — worklog 저장·커밋·PR 같은 마무리 시점이 새 세션 신호. 다음 작업이 이전 컨텍스트 필요 없으면 무조건 새 세션. 12 세션/주가 30~40 세션/주가 되는 게 정상.",
+      step2:
+        "**컨텍스트 70% 넘으면 마무리 모드** — 95% 도달해 auto-compact 발동되면 compact 작업 자체가 큰 비용. compact 트리거 전에 작업 마무리 + 새 세션. `/context` 명령으로 수시 체크.",
+      step3:
+        "**CLAUDE.md 다이어트** — 5KB CLAUDE.md면 매 메시지마다 5천 토큰. 100 메시지 세션이면 500K 토큰이 CLAUDE.md만으로 발생. 핵심만 남기기.",
+      step4:
+        "**단순 작업은 Haiku로** — 파일 찾기·간단 명령·짧은 읽기는 Haiku가 1/10 가격. Claude Code가 자동 선택은 안 해서 `/model haiku`로 수동 지정.",
+      step5:
+        "**세션 종료 후 5분 안에 같은 작업 재개하지 않기** — 5분 안이면 캐시 살아있어서 기존 세션 이어가는 게 쌈. 끊었다 5분 안에 재개하면 두 번 캐시 만들기.",
+      grade1: "일상적 세션 크기",
+      grade2: "큰 작업 세션. 정상 범위",
+      grade3: "거대 세션. 분리 또는 효율 점검",
+      gradeFootnote: "Opus는 약 5배로 환산. 외부 anchor가 약해 3단계로 단순화.",
+    },
+    costCall: {
+      label: "Cost / call",
+      def1:
+        "API 호출 한 번의 평균 비용. 사용자가 메시지를 보내거나 Claude가 도구를 실행할 때마다 한 번의 API 호출이 발생합니다.",
+      formulaLine: "Cost / call = 총 비용 ÷ 총 호출 수",
+      formulaVal: "${totalCost} ÷ {totalCalls} = **호출당 ${value}**",
+      def2:
+        "Cache hit은 \"캐시를 잘 썼나\"를, Cost / session은 \"작업 단위가 적당한가\"를 보지만, Cost / call은 \"모델 선택과 컨텍스트 크기\"의 직접 신호입니다. 같은 세션이라도 Opus를 쓰면 Sonnet 대비 5배, 컨텍스트가 크면 비례해서 올라갑니다.",
+      step1:
+        "**Sonnet 위주 사용** — Opus는 정말 어려운 설계·리팩토링·디버깅에만. 단순 파일 편집·검색·정보 조회는 Sonnet이 충분하고 비용은 1/5.",
+      step2:
+        "**단순 작업은 Haiku로** — 파일 목록 보기, 짧은 코드 조각 작성, 간단한 질문은 `/model haiku`로 전환. Sonnet 대비 1/4.",
+      step3:
+        "**CLAUDE.md 다이어트** — 매 호출마다 CLAUDE.md 전체가 전송됨. 5KB라면 호출당 5천 토큰 고정 비용. 핵심만 남기고 나머지는 별도 파일로 분리.",
+      step4:
+        "**cache hit 유지** — cache read는 일반 input의 1/10 가격. cache hit가 높으면 같은 컨텍스트 크기에서도 cost / call이 낮아짐.",
+      step5:
+        "**MCP 도구 정리** — 등록된 MCP 도구가 많으면 도구 정의가 매 호출마다 전송됨. 자주 안 쓰는 MCP는 비활성화.",
+      referenceBody:
+        "Cost / call 은 모델 선택과 컨텍스트 크기의 종합 신호. 외부 anchor 가 없어 등급은 부착하지 않으며, 모델 사용 분포 (BY MODEL 카드) + Cache hit 등급으로 이미 represented. 값은 진단/추세 용으로 활용.",
+    },
+    tokenVolume: {
+      titleTpl: "사용량 {level}/10 · 일평균 {tokens} tokens",
+      label: "사용량",
+      def1:
+        "Claude Code 가 처리한 **일평균 총 토큰 수** (cache reads 포함). Claude Code 는 토큰의 90%+ 가 cache reads 라 cache 잘 활용하면 자동으로 큰 숫자.",
+      def2Title: "왜 효율 점수에 들어있나",
+      def2:
+        "효율 (cache·one-shot·cost) 만 보면 \"안 쓰는 사람이 가장 효율적\" 이 됨. 사용량 30% 가중치로 실제 활용도도 점수에 반영. 같은 효율이라도 적게 쓰면 점수 낮음 → 쓰도록 유도.",
+      gradesTitle: "10단계 (글로벌 anchor 기반)",
+      gradesLead:
+        "Anthropic 공식 + Verdent + Power user 케이스 데이터로 calibrated. 기준값은 Sonnet 4.6 + 평균 cache 활용 가정 (~$1 ≈ 1.3M total tokens).",
+      row10: "극한 (~$240+/day)",
+      row9: "Power user 영역",
+      row8: "매우 헤비 (~$120/day)",
+      row7: "Verdent heavy 상단 (~$60/day)",
+      row6: "★ Anthropic enterprise P90 (~$30/day)",
+      row5: "Verdent medium 상단 (~$20/day)",
+      row4: "★ Anthropic P90 (개인) (~$12/day)",
+      row3: "★ Anthropic 평균 (~$6/day)",
+      row2: "라이트 시작 (~$2/day)",
+      row1: "거의 안 씀",
+      row0: "안 씀",
+      footnote: "★ = 외부 검증 anchor. 나머지는 보간.",
+    },
+    callsPerSession: {
+      label: "Calls per session",
+      def1:
+        "한 세션 안에서 Claude API를 몇 번 호출했나. 사용자가 메시지 한 번 보내면 Claude가 도구 여러 개 부르면서 여러 번 API 호출함. **한 세션의 turn 수 또는 도구 호출 횟수**를 의미.",
+      formulaLine: "Calls per session = 총 calls ÷ 세션 수",
+      formulaVal: "{totalCalls} ÷ {sessions} = **세션당 {value}회**",
+      goodDirTitle: "좋은 방향이 어디인가 — 솔직히 말하면 양면성 있음",
+      goodDirLead:
+        "이 지표는 cache hit이나 one-shot rate처럼 \"높을수록 좋다\" 또는 \"낮을수록 좋다\"가 명확하지 않습니다. **너무 높아도 안 좋고 너무 낮아도 안 좋음.** 헷갈리는 게 정상.",
+      highBadTitle: "높을수록 안 좋은 경우",
+      highBadItems: [
+        "retry 루프에 빠짐 (one-shot rate 낮음과 동반)",
+        "Claude가 컨텍스트 부족해서 같은 파일 5번 읽음",
+        "한 세션에 여러 작업 섞여서 길게 끔",
+        "사용자가 명확한 지시 안 줘서 Claude가 헤맴",
+      ],
+      lowBadTitle: "낮을수록 안 좋은 경우",
+      lowBadItems: [
+        "Claude를 거의 안 쓰고 직접 작성 (도구로서 활용 안 함)",
+        "단순한 한 번 질문하고 끝 (자동화 가치 못 살림)",
+        "너무 잘게 세션 쪼개서 매번 컨텍스트 새로 만듦 (캐시 효율 ↓)",
+      ],
+      goodRange: "**적정 범위: 세션당 30~80 calls.** 이 안에 들면 OK.",
+      methodsLead:
+        "calls per session 자체를 직접 조정하지 말고, **세션이 한 작업 단위에 정확히 들어맞도록** 만들면 자연스럽게 적정 범위에 들어감.",
+      stepHigh:
+        "**너무 높다면 (100+ calls)** — 세션이 너무 김. cost per session 대책 그대로 적용 — 작업 단위 끊기, 컨텍스트 70% 넘으면 마무리, 한 세션 = 한 작업 원칙.",
+      stepLow:
+        "**너무 낮다면 (10 미만 calls)** — Claude를 충분히 활용 못 하고 있음. \"이 부분 직접 작성해\" 대신 \"이 패턴으로 리팩토링해줘\"로 작업 위임 전환.",
+      stepOneShot:
+        "**calls 적정인데 one-shot rate 낮다면** — calls 수는 정상인데 retry 비율이 높은 것. one-shot rate 올리는 방법 적용 (충분한 컨텍스트 + 명확한 지시).",
+      stepClaudeMd:
+        "**CLAUDE.md에 작업 패턴 박기** — \"Read 먼저 후 Edit\", \"테스트 자동 실행\" 같은 룰을 CLAUDE.md에 명시. Claude가 같은 패턴 반복하면 calls 수가 안정됨.",
+      stepDeclare:
+        "**세션 시작 시 작업 범위 선언** — \"오늘은 X 기능만 구현. 끝나면 종료\" 식으로 시작하면 Claude가 그 범위 안에서 작업. 무한 늘어지는 거 방지.",
+      referenceBody:
+        "너무 높아도 안 좋고 너무 낮아도 안 좋아 외부 anchor 없음. 등급은 부착하지 않습니다. 적정 범위는 대략 세션당 30~80 calls 이지만 작업 유형에 따라 정상 범위가 크게 변동.",
+      seeAlsoTitle: "같이 봐야 하는 지표",
+      seeAlso1: "• one-shot rate 낮으면서 calls 높음 → retry 루프. 가장 나쁜 신호",
+      seeAlso2: "• one-shot rate 정상인데 calls 높음 → 큰 작업. 분리 검토",
+      seeAlso3: "• calls 낮으면서 cost per session 높음 → 한 번에 너무 많이 처리. 컨텍스트 부담",
+    },
+  },
   teamView: {
     loadFailed: "팀 데이터를 불러오지 못했습니다.",
     retry: "다시 시도",

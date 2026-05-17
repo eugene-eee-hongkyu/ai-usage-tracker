@@ -1,17 +1,43 @@
 "use client";
 
 import { useEffect } from "react";
+import { useMessages } from "@/lib/use-i18n";
+import type { Messages } from "@/lib/i18n";
 
-type GradeLevel = "탁월" | "양호" | "보통" | "부족" | "경고";
+// 5단계 grade — internal identifier 영어.
+type GradeLevel = "exemplary" | "good" | "moderate" | "insufficient" | "warning";
 type GradeRow = { grade: GradeLevel; range: string; label: string };
 
 const GRADE_ROW_COLORS: Record<GradeLevel, { bg: string; gradeText: string; contentText: string }> = {
-  "탁월": { bg: "bg-emerald-950/60", gradeText: "text-emerald-300", contentText: "text-emerald-200" },
-  "양호": { bg: "bg-green-950/60",   gradeText: "text-green-300",   contentText: "text-green-200" },
-  "보통": { bg: "bg-yellow-950/60",  gradeText: "text-yellow-300",  contentText: "text-yellow-200" },
-  "부족": { bg: "bg-orange-950/60",  gradeText: "text-orange-300",  contentText: "text-orange-200" },
-  "경고": { bg: "bg-red-950/60",     gradeText: "text-red-300",     contentText: "text-red-200" },
+  exemplary:    { bg: "bg-emerald-950/60", gradeText: "text-emerald-300", contentText: "text-emerald-200" },
+  good:         { bg: "bg-green-950/60",   gradeText: "text-green-300",   contentText: "text-green-200" },
+  moderate:     { bg: "bg-yellow-950/60",  gradeText: "text-yellow-300",  contentText: "text-yellow-200" },
+  insufficient: { bg: "bg-orange-950/60",  gradeText: "text-orange-300",  contentText: "text-orange-200" },
+  warning:      { bg: "bg-red-950/60",     gradeText: "text-red-300",     contentText: "text-red-200" },
 };
+
+function gradeLabel(g: GradeLevel, m: Messages): string {
+  switch (g) {
+    case "exemplary":    return m.grades.exemplary;
+    case "good":         return m.grades.good;
+    case "moderate":     return m.grades.moderate;
+    case "insufficient": return m.grades.insufficient;
+    case "warning":      return m.grades.warning;
+  }
+}
+
+function tmpl(template: string, vars: Record<string, string | number>): string {
+  return template.replace(/\{(\w+)\}/g, (_, k) => String(vars[k] ?? ""));
+}
+
+// Bold-marked text **like this** 를 <strong> 로 변환. 다른 markdown 은 무시.
+// 산문에 강조 한두 개 박는 용도.
+function renderBold(text: string): React.ReactNode[] {
+  const parts = text.split(/\*\*(.+?)\*\*/g);
+  return parts.map((p, i) =>
+    i % 2 === 1 ? <strong key={i} className="text-slate-300">{p}</strong> : p
+  );
+}
 
 function ModalShell({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
   useEffect(() => {
@@ -53,14 +79,14 @@ function Section({ title, children }: { title: string; children: React.ReactNode
   );
 }
 
-function GradeTable({ rows, currentGrade }: { rows: GradeRow[]; currentGrade: GradeLevel }) {
+function GradeTable({ rows, currentGrade, m }: { rows: GradeRow[]; currentGrade: GradeLevel; m: Messages }) {
   return (
     <table className="w-full text-xs border-collapse">
       <thead>
         <tr className="text-slate-600">
-          <th className="text-left py-1.5 w-20 font-normal">등급</th>
-          <th className="text-left py-1.5 w-28 font-normal">범위</th>
-          <th className="text-left py-1.5 font-normal">설명</th>
+          <th className="text-left py-1.5 w-20 font-normal">{m.common.grade}</th>
+          <th className="text-left py-1.5 w-28 font-normal">{m.common.range}</th>
+          <th className="text-left py-1.5 font-normal">{m.common.description}</th>
         </tr>
       </thead>
       <tbody>
@@ -70,11 +96,11 @@ function GradeTable({ rows, currentGrade }: { rows: GradeRow[]; currentGrade: Gr
           return (
             <tr key={row.grade} className={cur ? style.bg : ""}>
               <td className={`py-1.5 pl-2 rounded-l font-bold ${cur ? style.gradeText : "text-slate-500"}`}>
-                {row.grade}
+                {gradeLabel(row.grade, m)}
               </td>
               <td className={`py-1.5 ${cur ? style.contentText : "text-slate-400"}`}>{row.range}</td>
               <td className={`py-1.5 pr-2 rounded-r ${cur ? `${style.contentText} font-medium` : "text-slate-500"}`}>
-                {row.label}{cur && <span className={`ml-1.5 ${style.gradeText}`}>← 현재</span>}
+                {row.label}{cur && <span className={`ml-1.5 ${style.gradeText}`}>{m.grades.current}</span>}
               </td>
             </tr>
           );
@@ -108,102 +134,91 @@ function Ref({ href, children }: { href: string; children: React.ReactNode }) {
 }
 
 function cacheHitGrade(v: number): GradeLevel {
-  if (v >= 96) return "탁월";
-  if (v >= 90) return "양호";
-  if (v >= 80) return "보통";
-  if (v >= 60) return "부족";
-  return "경고";
+  if (v >= 96) return "exemplary";
+  if (v >= 90) return "good";
+  if (v >= 80) return "moderate";
+  if (v >= 60) return "insufficient";
+  return "warning";
 }
 
 function oneShotGrade(v: number): GradeLevel {
-  if (v >= 80) return "탁월";
-  if (v >= 40) return "보통";
-  return "경고";
+  if (v >= 80) return "exemplary";
+  if (v >= 40) return "moderate";
+  return "warning";
 }
 
 function costPerSessionGrade(v: number): GradeLevel {
-  if (v < 25) return "탁월";
-  if (v < 100) return "보통";
-  return "경고";
+  if (v < 25) return "exemplary";
+  if (v < 100) return "moderate";
+  return "warning";
 }
 
-// calls/session, cost/call, output/input — 외부 anchor 없음 → 등급 미부착.
-// 모달은 "설명" 만 노출 (등급 섹션 제거).
-
 export function CacheHitModal({ value, onClose, methodsOnly = false }: { value: number; onClose: () => void; methodsOnly?: boolean }) {
+  const { m } = useMessages();
   const grade = cacheHitGrade(value);
+  const label = m.metricModal.cacheHit.label;
+  const title = methodsOnly
+    ? tmpl(m.metricModal.common.methodsTitle, { label, action: m.metricModal.common.howTo })
+    : tmpl(m.metricModal.common.detailsTitle, { label });
+  const goodNote = value >= 90
+    ? <strong className="text-slate-300">{value.toFixed(1)}% — {m.grades.exemplary}.</strong>
+    : null;
 
   return (
-    <ModalShell title={methodsOnly ? "Cache hit 올리는 방법" : "Cache hit 상세"} onClose={onClose}>
+    <ModalShell title={title} onClose={onClose}>
       {!methodsOnly && (
-        <Section title="Cache hit이란">
+        <Section title={tmpl(m.metricModal.common.what, { label })}>
           <p className="text-slate-400 leading-relaxed text-xs">
-            Claude Code가 메시지를 보낼 때마다 시스템 프롬프트 + CLAUDE.md + 도구 정의 + 지금까지의 대화 전체를 매번 다시 전송합니다.
-            평균 한 번에 5만~10만 토큰.
+            {m.metricModal.cacheHit.definition}
           </p>
           <p className="text-slate-400 leading-relaxed text-xs">
-            이 중 대부분은 이전 메시지와 똑같은 부분(시스템 프롬프트, CLAUDE.md, 이전 대화).
-            API에 &ldquo;이거 캐시해놓고 다음엔 꺼내 써&rdquo;라고 표시할 수 있고,{" "}
-            <strong className="text-slate-300">꺼내 쓰는 가격이 정상가의 1/10</strong>.
+            {m.metricModal.cacheHit.definitionCacheLine}{" "}
+            <strong className="text-slate-300">{m.metricModal.cacheHit.definitionExplain}</strong>.
           </p>
           <div className="bg-slate-800 rounded px-3 py-2 text-xs text-slate-300 font-mono leading-relaxed">
-            Cache hit = 캐시 읽기 ÷ (캐시 읽기 + 캐시 쓰기 + 새 입력)
+            {m.metricModal.cacheHit.formula}
           </div>
           <p className="text-slate-400 leading-relaxed text-xs">
-            현재 {value.toFixed(1)}%는 &ldquo;전체 입력의 {value.toFixed(1)}%를 1/10 가격으로 처리했다&rdquo;는 뜻.
-            Claude Code 엔지니어가 말하길 정상 세션은 96% 정도 나오고, cache hit이 떨어지면 사고(SEV)로 본다고 합니다.{" "}
-            {value >= 90 && <strong className="text-slate-300">{value.toFixed(1)}%는 매우 좋은 상태입니다.</strong>}{" "}
-            <Ref href="https://www.claudecodecamp.com/p/how-prompt-caching-actually-works-in-claude-code">출처</Ref>
+            {tmpl(m.metricModal.common.currentSession, { val: value.toFixed(1), goodNote: "" })
+              .split("{goodNote}")[0]}
+            {goodNote}{" "}
+            <Ref href="https://www.claudecodecamp.com/p/how-prompt-caching-actually-works-in-claude-code">{m.common.source}</Ref>
           </p>
           <p className="text-slate-600 text-[10px] leading-relaxed">
-            ※ codeburn 등 일부 도구는 캐시 쓰기를 분모에서 빼서 100%에 가까운 값을 표시하기도 합니다. 본 도구는 Anthropic 표준 공식 사용.
+            {m.metricModal.common.noteCacheNonStandard}
           </p>
         </Section>
       )}
 
-      <Section title="올리는 방법">
+      <Section title={m.metricModal.common.howTo}>
         <p className="text-xs text-slate-500 mb-2">
-          캐시는 메시지 시작 부분을 통째로 비교합니다. 1바이트라도 다르면 캐시 무효화 → 풀 가격.{" "}
-          <strong className="text-slate-400">시작 부분을 안정적으로 유지</strong>하는 게 전부.
+          {m.metricModal.cacheHit.methodsLead}
         </p>
         <div className="space-y-2.5">
-          <Step n={1}>
-            <strong className="text-slate-300">CLAUDE.md 안정화</strong> — 짧게 + 자주 안 바꾸기.
-            자주 바뀌는 내용(이번 스프린트)은 맨 아래로, 안 바뀌는 내용(테크 스택)은 맨 위로.
-          </Step>
-          <Step n={2}>
-            <strong className="text-slate-300">한 세션 = 한 작업</strong> — 분리된 짧은 세션 3개가
-            한 세션에서 이리저리 옮겨다니는 50턴보다 총 비용이 적음.
-          </Step>
-          <Step n={3}>
-            <strong className="text-slate-300">5분 이상 쉬지 말기</strong> — 캐시 TTL이 5분.
-            화장실 다녀오면 캐시 만료 → 첫 메시지 비쌈.
-          </Step>
-          <Step n={4}>
-            <strong className="text-slate-300">MCP 도구 자주 추가/제거 안 하기</strong> — 도구 정의가 캐시 앞쪽에 있어서
-            바뀌면 그 뒤 전부 무효화.
-          </Step>
-          <Step n={5}>
-            <strong className="text-slate-300">세션 중 모델 바꾸지 말기</strong> — Sonnet ↔ Opus 전환은 캐시 깸.
-          </Step>
+          <Step n={1}>{renderBold(m.metricModal.cacheHit.step1)}</Step>
+          <Step n={2}>{renderBold(m.metricModal.cacheHit.step2)}</Step>
+          <Step n={3}>{renderBold(m.metricModal.cacheHit.step3)}</Step>
+          <Step n={4}>{renderBold(m.metricModal.cacheHit.step4)}</Step>
+          <Step n={5}>{renderBold(m.metricModal.cacheHit.step5)}</Step>
         </div>
       </Section>
 
       {!methodsOnly && (
-        <Section title="등급">
+        <Section title={m.metricModal.common.grade}>
           <GradeTable
+            m={m}
             rows={[
-              { grade: "탁월", range: "96%+",     label: "Claude Code 본사 내부 기준" },
-              { grade: "양호", range: "90~95%",   label: "좋은 상태" },
-              { grade: "보통", range: "80~89%",   label: "일반적인 수준" },
-              { grade: "부족", range: "60~79%",   label: "CLAUDE.md 비대 의심" },
-              { grade: "경고", range: "60% 미만", label: "본사 기준 사고(SEV) 수준" },
+              { grade: "exemplary",    range: "96%+",     label: m.metricModal.cacheHit.grade1 },
+              { grade: "good",         range: "90~95%",   label: m.metricModal.cacheHit.grade2 },
+              { grade: "moderate",     range: "80~89%",   label: m.metricModal.cacheHit.grade3 },
+              { grade: "insufficient", range: "60~79%",   label: m.metricModal.cacheHit.grade4 },
+              { grade: "warning",      range: "<60%",     label: m.metricModal.cacheHit.grade5 },
             ]}
             currentGrade={grade}
           />
           <p className="text-xs text-slate-600 mt-2">
             <Ref href="https://www.claudecodecamp.com/p/how-prompt-caching-actually-works-in-claude-code">
-              Claude Code Camp — How prompt caching actually works
+              {m.metricModal.common.sourceCamp}
             </Ref>
           </p>
         </Section>
@@ -213,75 +228,49 @@ export function CacheHitModal({ value, onClose, methodsOnly = false }: { value: 
 }
 
 export function OneShotRateModal({ value, onClose, methodsOnly = false }: { value: number; onClose: () => void; methodsOnly?: boolean }) {
+  const { m } = useMessages();
   const grade = oneShotGrade(value);
+  const label = m.metricModal.oneShot.label;
+  const title = methodsOnly
+    ? tmpl(m.metricModal.common.methodsTitle, { label, action: m.metricModal.common.howTo })
+    : tmpl(m.metricModal.common.detailsTitle, { label });
 
   return (
-    <ModalShell title={methodsOnly ? "One-shot rate 올리는 방법" : "One-shot rate 상세"} onClose={onClose}>
+    <ModalShell title={title} onClose={onClose}>
       {!methodsOnly && (
-        <Section title="One-shot rate란">
-          <p className="text-slate-400 leading-relaxed text-xs">
-            Claude Code가 코드를 고치거나 새로 쓸 때 사용하는 도구가 있습니다 (Edit, Write, MultiEdit).
-            이 도구가 호출되면 결과는 둘 중 하나: <strong className="text-slate-300">첫 시도에 성공</strong> 또는{" "}
-            <strong className="text-slate-300">실패해서 재시도</strong>.
-          </p>
-          <p className="text-slate-400 leading-relaxed text-xs">
-            실패 사례: 파일에서 찾으려는 텍스트가 미세하게 달라서 못 찾음, 들여쓰기 안 맞음, 이미 다른 곳을 수정해서
-            충돌남, 잘못된 문법으로 새 파일 작성. 실패하면 Claude가 다시 읽고 다시 시도 →{" "}
-            <strong className="text-slate-300">토큰 추가 소비 + 시간 추가 소비</strong>.
-          </p>
+        <Section title={tmpl(m.metricModal.common.what, { label })}>
+          <p className="text-slate-400 leading-relaxed text-xs">{renderBold(m.metricModal.oneShot.def1)}</p>
+          <p className="text-slate-400 leading-relaxed text-xs">{renderBold(m.metricModal.oneShot.def2)}</p>
           <div className="bg-slate-800 rounded px-3 py-2 text-xs text-slate-300 font-mono leading-relaxed">
-            One-shot rate = 첫 시도 성공 edit 수 ÷ 전체 edit 호출 수
+            {m.metricModal.oneShot.formula}
           </div>
-          <p className="text-slate-400 leading-relaxed text-xs">
-            cache hit이나 비용은 &ldquo;얼마나 들었나&rdquo;를 보여주지만, one-shot rate는{" "}
-            <strong className="text-slate-300">&ldquo;Claude가 얼마나 정확하게 작성했나&rdquo;</strong>를 보여줍니다.
-            retry 루프에 빠지면 토큰만 태우고 결과 안 나옴 — 보고된 케이스로 90K 토큰을 retry로 태우는 세션이 있을 정도.
-            <strong className="text-slate-300"> AI 활용 능력의 가장 직접적인 지표.</strong>
-          </p>
+          <p className="text-slate-400 leading-relaxed text-xs">{renderBold(m.metricModal.oneShot.def3)}</p>
         </Section>
       )}
 
-      <Section title="올리는 방법">
-        <p className="text-xs text-slate-500 mb-2">
-          Claude가 한 번에 정확하게 작성하려면{" "}
-          <strong className="text-slate-400">충분한 컨텍스트 + 명확한 지시</strong>가 필요. 두 축 다 사용자가 결정.
-        </p>
+      <Section title={m.metricModal.common.howTo}>
+        <p className="text-xs text-slate-500 mb-2">{renderBold(m.metricModal.oneShot.methodsLead)}</p>
         <div className="space-y-2.5">
-          <Step n={1}>
-            <strong className="text-slate-300">수정 전에 충분히 읽게 하기</strong> — &ldquo;이 함수 리팩토링해줘&rdquo;보다
-            &ldquo;이 파일 다 읽고 전체 구조 본 다음에 함수 X를 Y 패턴으로 리팩토링해줘&rdquo;가 정확.
-            Claude가 추측 시도하면 retry 늘어남.
-          </Step>
-          <Step n={2}>
-            <strong className="text-slate-300">모호한 지시 제거</strong> — &ldquo;이거 좀 깔끔하게&rdquo; 같은 건 Claude가 추측.
-            &ldquo;이 함수의 try-catch를 Result 타입 리턴으로 바꿔줘&rdquo; 같은 구체적 지시는 한 번에 됨.
-          </Step>
-          <Step n={3}>
-            <strong className="text-slate-300">큰 변경은 단계 분리</strong> — &ldquo;전체 파일 새로 짜줘&rdquo;보다
-            &ldquo;1단계: 인터페이스만 정의 / 2단계: 구현 / 3단계: 테스트&rdquo;. 각 단계 one-shot rate ↑.
-          </Step>
-          <Step n={4}>
-            <strong className="text-slate-300">CLAUDE.md에 코딩 컨벤션 명시</strong> — 들여쓰기·네이밍·import 순서.
-            Claude가 추측 안 하고 명시된 거 따름 → 첫 시도 성공률 ↑.
-          </Step>
-          <Step n={5}>
-            <strong className="text-slate-300">외부 변경 후엔 재읽기</strong> — git pull 했거나 다른 사람이 같은 파일
-            만졌다면 &ldquo;최신 파일 다시 읽고 작업해줘&rdquo;. 안 하면 옛날 컨텍스트로 작성 → 충돌 → retry.
-          </Step>
+          <Step n={1}>{renderBold(m.metricModal.oneShot.step1)}</Step>
+          <Step n={2}>{renderBold(m.metricModal.oneShot.step2)}</Step>
+          <Step n={3}>{renderBold(m.metricModal.oneShot.step3)}</Step>
+          <Step n={4}>{renderBold(m.metricModal.oneShot.step4)}</Step>
+          <Step n={5}>{renderBold(m.metricModal.oneShot.step5)}</Step>
         </div>
       </Section>
 
       {!methodsOnly && (
-        <Section title="등급">
+        <Section title={m.metricModal.common.grade}>
           <GradeTable
+            m={m}
             rows={[
-              { grade: "탁월", range: "80%+",     label: "코드 retry 거의 없음. 명확한 컨텍스트" },
-              { grade: "보통", range: "40~79%",   label: "messy 코딩의 정상 범위" },
-              { grade: "경고", range: "40% 미만", label: "Edit→Build→Edit 루프 자주 발생" },
+              { grade: "exemplary", range: "80%+",   label: m.metricModal.oneShot.grade1 },
+              { grade: "moderate",  range: "40~79%", label: m.metricModal.oneShot.grade2 },
+              { grade: "warning",   range: "<40%",   label: m.metricModal.oneShot.grade3 },
             ]}
             currentGrade={grade}
           />
-          <p className="text-xs text-slate-600 mt-2">codeburn 공식 anchor (90% / 30%) 기반 3단계.</p>
+          <p className="text-xs text-slate-600 mt-2">{m.metricModal.oneShot.gradeFootnote}</p>
         </Section>
       )}
     </ModalShell>
@@ -301,75 +290,59 @@ export function CostPerSessionModal({
   onClose: () => void;
   methodsOnly?: boolean;
 }) {
+  const { m } = useMessages();
   const grade = costPerSessionGrade(value);
+  const label = m.metricModal.costSession.label;
+  const title = methodsOnly
+    ? tmpl(m.metricModal.common.methodsTitle, { label, action: m.metricModal.common.howTo })
+    : tmpl(m.metricModal.common.detailsTitle, { label });
 
   return (
-    <ModalShell title={methodsOnly ? "세션당 비용 줄이는 방법" : "세션당 비용 상세"} onClose={onClose}>
+    <ModalShell title={title} onClose={onClose}>
       {!methodsOnly && (
-        <Section title="세션당 비용이란">
+        <Section title={tmpl(m.metricModal.common.what, { label })}>
           <p className="text-slate-400 leading-relaxed text-xs">
-            <Mono>claude</Mono> 명령으로 시작하고 <Mono>/exit</Mono> 또는 터미널을 닫으면 세션 종료.
-            새 <Mono>claude</Mono> 명령은 새 세션.
+            <Mono>claude</Mono> · <Mono>/exit</Mono> · <Mono>claude</Mono>{" "}
+            {m.metricModal.costSession.def1}
           </p>
           <div className="bg-slate-800 rounded px-3 py-2 text-xs font-mono leading-relaxed">
-            <span className="text-slate-400">세션당 비용 = 총 비용 ÷ 세션 수</span>
+            <span className="text-slate-400">{m.metricModal.costSession.formulaLine}</span>
             <br />
             <span className="text-slate-300">
-              ${totalCost.toFixed(2)} ÷ {sessionsCount} ={" "}
-              <strong className="text-indigo-300">세션당 ${value.toFixed(2)}</strong>
+              {renderBold(tmpl(m.metricModal.costSession.formulaVal, {
+                totalCost: totalCost.toFixed(2),
+                sessions: sessionsCount,
+                value: value.toFixed(2),
+              }))}
             </span>
           </div>
-          <p className="text-slate-400 leading-relaxed text-xs">
-            토큰 총합이나 총 비용은 &ldquo;많이 썼다&rdquo;는 뜻이지 &ldquo;잘 썼다&rdquo;는 뜻이 아닙니다.
-            세션당 비용은{" "}
-            <strong className="text-slate-300">&ldquo;한 작업 단위 끝내는 데 평균 얼마 들었나&rdquo;</strong>를 보여주는
-            가장 직접적인 지표. 시간이 지나면서 이 수치가 줄면 Claude를 더 잘 쓰게 된 것.
-          </p>
+          <p className="text-slate-400 leading-relaxed text-xs">{m.metricModal.costSession.def2}</p>
         </Section>
       )}
 
-      <Section title="줄이는 방법">
-        <p className="text-xs text-slate-500 mb-2">
-          한 세션이 길어질수록 매 메시지마다 재전송되는 대화 히스토리가 누적됩니다.{" "}
-          <strong className="text-slate-400">세션을 적정 단위로 끊는 게 전부.</strong>
-        </p>
+      <Section title={m.metricModal.common.howTo}>
+        <p className="text-xs text-slate-500 mb-2">{renderBold(m.metricModal.costSession.methodsLead)}</p>
         <div className="space-y-2.5">
-          <Step n={1}>
-            <strong className="text-slate-300">작업 단위로 세션 끊기</strong> — worklog 저장·커밋·PR 같은
-            마무리 시점이 새 세션 신호. 다음 작업이 이전 컨텍스트 필요 없으면 무조건 새 세션.
-            12 세션/주가 30~40 세션/주가 되는 게 정상.
-          </Step>
-          <Step n={2}>
-            <strong className="text-slate-300">컨텍스트 70% 넘으면 마무리 모드</strong> — 95% 도달해
-            auto-compact 발동되면 compact 작업 자체가 큰 비용. compact 트리거 전에 작업 마무리 + 새 세션.
-            <Mono>/context</Mono> 명령으로 수시 체크.
-          </Step>
-          <Step n={3}>
-            <strong className="text-slate-300">CLAUDE.md 다이어트</strong> — 5KB CLAUDE.md면 매 메시지마다 5천 토큰.
-            100 메시지 세션이면 500K 토큰이 CLAUDE.md만으로 발생. 핵심만 남기기.
-          </Step>
-          <Step n={4}>
-            <strong className="text-slate-300">단순 작업은 Haiku로</strong> — 파일 찾기·간단 명령·짧은 읽기는
-            Haiku가 1/10 가격. Claude Code가 자동 선택은 안 해서 <Mono>/model haiku</Mono>로 수동 지정.
-          </Step>
-          <Step n={5}>
-            <strong className="text-slate-300">세션 종료 후 5분 안에 같은 작업 재개하지 않기</strong> — 5분 안이면
-            캐시 살아있어서 기존 세션 이어가는 게 쌈. 끊었다 5분 안에 재개하면 두 번 캐시 만들기.
-          </Step>
+          <Step n={1}>{renderBold(m.metricModal.costSession.step1)}</Step>
+          <Step n={2}>{renderBold(m.metricModal.costSession.step2)} (<Mono>/context</Mono>)</Step>
+          <Step n={3}>{renderBold(m.metricModal.costSession.step3)}</Step>
+          <Step n={4}>{renderBold(m.metricModal.costSession.step4)} (<Mono>/model haiku</Mono>)</Step>
+          <Step n={5}>{renderBold(m.metricModal.costSession.step5)}</Step>
         </div>
       </Section>
 
       {!methodsOnly && (
-        <Section title="등급 (Sonnet 기준)">
+        <Section title={m.metricModal.common.gradeForSonnet}>
           <GradeTable
+            m={m}
             rows={[
-              { grade: "탁월", range: "$25 미만",  label: "일상적 세션 크기" },
-              { grade: "보통", range: "$25~100",   label: "큰 작업 세션. 정상 범위" },
-              { grade: "경고", range: "$100+",     label: "거대 세션. 분리 또는 효율 점검" },
+              { grade: "exemplary", range: "<$25",    label: m.metricModal.costSession.grade1 },
+              { grade: "moderate",  range: "$25~100", label: m.metricModal.costSession.grade2 },
+              { grade: "warning",   range: "$100+",   label: m.metricModal.costSession.grade3 },
             ]}
             currentGrade={grade}
           />
-          <p className="text-xs text-slate-600 mt-2">Opus는 약 5배로 환산. 외부 anchor가 약해 3단계로 단순화.</p>
+          <p className="text-xs text-slate-600 mt-2">{m.metricModal.costSession.gradeFootnote}</p>
         </Section>
       )}
     </ModalShell>
@@ -389,66 +362,50 @@ export function CostPerCallModal({
   onClose: () => void;
   methodsOnly?: boolean;
 }) {
+  const { m } = useMessages();
+  const label = m.metricModal.costCall.label;
+  const title = methodsOnly
+    ? tmpl(m.metricModal.common.methodsTitle, { label, action: m.metricModal.common.howTo })
+    : tmpl(m.metricModal.common.detailsTitle, { label });
+
   return (
-    <ModalShell title={methodsOnly ? "Cost / call 줄이는 방법" : "Cost / call 상세"} onClose={onClose}>
+    <ModalShell title={title} onClose={onClose}>
       {!methodsOnly && (
-        <Section title="Cost / call이란">
-          <p className="text-slate-400 leading-relaxed text-xs">
-            API 호출 한 번의 평균 비용. 사용자가 메시지를 보내거나 Claude가 도구를 실행할 때마다 한 번의 API
-            호출이 발생합니다.
-          </p>
+        <Section title={tmpl(m.metricModal.common.what, { label })}>
+          <p className="text-slate-400 leading-relaxed text-xs">{m.metricModal.costCall.def1}</p>
           <div className="bg-slate-800 rounded px-3 py-2 text-xs font-mono leading-relaxed">
-            <span className="text-slate-400">Cost / call = 총 비용 ÷ 총 호출 수</span>
+            <span className="text-slate-400">{m.metricModal.costCall.formulaLine}</span>
             <br />
             <span className="text-slate-300">
-              ${totalCost.toFixed(2)} ÷ {totalCalls.toLocaleString()} ={" "}
-              <strong className="text-indigo-300">호출당 ${value.toFixed(3)}</strong>
+              {renderBold(tmpl(m.metricModal.costCall.formulaVal, {
+                totalCost: totalCost.toFixed(2),
+                totalCalls: totalCalls.toLocaleString(),
+                value: value.toFixed(3),
+              }))}
             </span>
           </div>
-          <p className="text-slate-400 leading-relaxed text-xs">
-            Cache hit은 &ldquo;캐시를 잘 썼나&rdquo;를, Cost / session은 &ldquo;작업 단위가 적당한가&rdquo;를 보지만,
-            Cost / call은 <strong className="text-slate-300">&ldquo;모델 선택과 컨텍스트 크기&rdquo;</strong>의 직접 신호입니다.
-            같은 세션이라도 Opus를 쓰면 Sonnet 대비 5배, 컨텍스트가 크면 비례해서 올라갑니다.
-          </p>
+          <p className="text-slate-400 leading-relaxed text-xs">{m.metricModal.costCall.def2}</p>
         </Section>
       )}
-      <Section title="줄이는 방법">
+      <Section title={m.metricModal.common.howTo}>
         <div className="space-y-2.5">
-          <Step n={1}>
-            <strong className="text-slate-300">Sonnet 위주 사용</strong> — Opus는 정말 어려운 설계·리팩토링·디버깅에만.
-            단순 파일 편집·검색·정보 조회는 Sonnet이 충분하고 비용은 1/5.
-          </Step>
-          <Step n={2}>
-            <strong className="text-slate-300">단순 작업은 Haiku로</strong> — 파일 목록 보기, 짧은 코드 조각 작성,
-            간단한 질문은 <Mono>/model haiku</Mono>로 전환. Sonnet 대비 1/4.
-          </Step>
-          <Step n={3}>
-            <strong className="text-slate-300">CLAUDE.md 다이어트</strong> — 매 호출마다 CLAUDE.md 전체가 전송됨.
-            5KB라면 호출당 5천 토큰 고정 비용. 핵심만 남기고 나머지는 별도 파일로 분리.
-          </Step>
-          <Step n={4}>
-            <strong className="text-slate-300">cache hit 유지</strong> — cache read는 일반 input의 1/10 가격.
-            cache hit가 높으면 같은 컨텍스트 크기에서도 cost / call이 낮아짐.
-          </Step>
-          <Step n={5}>
-            <strong className="text-slate-300">MCP 도구 정리</strong> — 등록된 MCP 도구가 많으면 도구 정의가
-            매 호출마다 전송됨. 자주 안 쓰는 MCP는 비활성화.
-          </Step>
+          <Step n={1}>{renderBold(m.metricModal.costCall.step1)}</Step>
+          <Step n={2}>{renderBold(m.metricModal.costCall.step2)} (<Mono>/model haiku</Mono>)</Step>
+          <Step n={3}>{renderBold(m.metricModal.costCall.step3)}</Step>
+          <Step n={4}>{renderBold(m.metricModal.costCall.step4)}</Step>
+          <Step n={5}>{renderBold(m.metricModal.costCall.step5)}</Step>
         </div>
       </Section>
       {!methodsOnly && (
-        <Section title="참고">
+        <Section title={m.metricModal.common.reference}>
           <p className="text-xs text-slate-500 leading-relaxed">
-            Cost / call 은 모델 선택과 컨텍스트 크기의 종합 신호. 외부 anchor 가 없어 등급은 부착하지 않으며,
-            모델 사용 분포 (BY MODEL 카드) + Cache hit 등급으로 이미 represented. 값은 진단/추세 용으로 활용.
+            {m.metricModal.costCall.referenceBody}
           </p>
         </Section>
       )}
     </ModalShell>
   );
 }
-
-// OutputInputRatioModal 제거 — 메트릭 자체를 카드에서 빼서 사용처 없음.
 
 export function TokenVolumeModal({
   level,
@@ -459,41 +416,39 @@ export function TokenVolumeModal({
   avgDailyTokens: number;
   onClose: () => void;
 }) {
+  const { m } = useMessages();
   const tokensFmt = avgDailyTokens >= 1_000_000
     ? `${(avgDailyTokens / 1_000_000).toFixed(1)}M`
     : `${(avgDailyTokens / 1_000).toFixed(1)}K`;
+  const title = tmpl(m.metricModal.tokenVolume.titleTpl, { level, tokens: tokensFmt });
+  const label = m.metricModal.tokenVolume.label;
+
+  const rows = [
+    { lvl: 10, range: "> 300M",   note: m.metricModal.tokenVolume.row10 },
+    { lvl: 9,  range: "≤ 300M",   note: m.metricModal.tokenVolume.row9 },
+    { lvl: 8,  range: "≤ 150M",   note: m.metricModal.tokenVolume.row8 },
+    { lvl: 7,  range: "≤  80M",   note: m.metricModal.tokenVolume.row7 },
+    { lvl: 6,  range: "≤  40M",   note: m.metricModal.tokenVolume.row6 },
+    { lvl: 5,  range: "≤  25M",   note: m.metricModal.tokenVolume.row5 },
+    { lvl: 4,  range: "≤  15M",   note: m.metricModal.tokenVolume.row4 },
+    { lvl: 3,  range: "≤   8M",   note: m.metricModal.tokenVolume.row3 },
+    { lvl: 2,  range: "≤   3M",   note: m.metricModal.tokenVolume.row2 },
+    { lvl: 1,  range: "≤   1M",   note: m.metricModal.tokenVolume.row1 },
+    { lvl: 0,  range: "0",        note: m.metricModal.tokenVolume.row0 },
+  ];
+
   return (
-    <ModalShell title={`사용량 ${level}/10 · 일평균 ${tokensFmt} tokens`} onClose={onClose}>
-      <Section title="사용량이란">
+    <ModalShell title={title} onClose={onClose}>
+      <Section title={tmpl(m.metricModal.common.what, { label })}>
+        <p className="text-slate-400 leading-relaxed text-xs">{renderBold(m.metricModal.tokenVolume.def1)}</p>
         <p className="text-slate-400 leading-relaxed text-xs">
-          Claude Code 가 처리한 <strong className="text-slate-300">일평균 총 토큰 수</strong> (cache reads 포함).
-          Claude Code 는 토큰의 90%+ 가 cache reads 라 cache 잘 활용하면 자동으로 큰 숫자.
-        </p>
-        <p className="text-slate-400 leading-relaxed text-xs">
-          <strong className="text-slate-300">왜 효율 점수에 들어있나</strong> — 효율 (cache·one-shot·cost) 만 보면
-          &ldquo;안 쓰는 사람이 가장 효율적&rdquo; 이 됨. 사용량 30% 가중치로 실제 활용도도 점수에 반영. 같은
-          효율이라도 적게 쓰면 점수 낮음 → 쓰도록 유도.
+          <strong className="text-slate-300">{m.metricModal.tokenVolume.def2Title}</strong> — {m.metricModal.tokenVolume.def2}
         </p>
       </Section>
-      <Section title="10단계 (글로벌 anchor 기반)">
-        <p className="text-xs text-slate-500 mb-2">
-          Anthropic 공식 + Verdent + Power user 케이스 데이터로 calibrated.
-          기준값은 Sonnet 4.6 + 평균 cache 활용 가정 (~$1 ≈ 1.3M total tokens).
-        </p>
+      <Section title={m.metricModal.tokenVolume.gradesTitle}>
+        <p className="text-xs text-slate-500 mb-2">{m.metricModal.tokenVolume.gradesLead}</p>
         <div className="space-y-0.5 text-xs font-mono">
-          {[
-            { lvl: 10, range: "> 300M",   note: "극한 (~$240+/day)" },
-            { lvl: 9,  range: "≤ 300M",   note: "Power user 영역" },
-            { lvl: 8,  range: "≤ 150M",   note: "매우 헤비 (~$120/day)" },
-            { lvl: 7,  range: "≤  80M",   note: "Verdent heavy 상단 (~$60/day)" },
-            { lvl: 6,  range: "≤  40M",   note: "★ Anthropic enterprise P90 (~$30/day)" },
-            { lvl: 5,  range: "≤  25M",   note: "Verdent medium 상단 (~$20/day)" },
-            { lvl: 4,  range: "≤  15M",   note: "★ Anthropic P90 (개인) (~$12/day)" },
-            { lvl: 3,  range: "≤   8M",   note: "★ Anthropic 평균 (~$6/day)" },
-            { lvl: 2,  range: "≤   3M",   note: "라이트 시작 (~$2/day)" },
-            { lvl: 1,  range: "≤   1M",   note: "거의 안 씀" },
-            { lvl: 0,  range: "0",        note: "안 씀" },
-          ].map((r) => (
+          {rows.map((r) => (
             <div key={r.lvl} className={`flex gap-2 px-2 py-1 rounded ${r.lvl === level ? "bg-cyan-950/60 text-cyan-200 font-bold" : "text-slate-500"}`}>
               <span className="w-12 shrink-0">{r.lvl}/10</span>
               <span className="w-20 shrink-0">{r.range}</span>
@@ -501,7 +456,7 @@ export function TokenVolumeModal({
             </div>
           ))}
         </div>
-        <p className="text-xs text-slate-600 mt-2">★ = 외부 검증 anchor. 나머지는 보간.</p>
+        <p className="text-xs text-slate-600 mt-2">{m.metricModal.tokenVolume.footnote}</p>
       </Section>
     </ModalShell>
   );
@@ -520,104 +475,77 @@ export function CallsPerSessionModal({
   onClose: () => void;
   methodsOnly?: boolean;
 }) {
+  const { m } = useMessages();
+  const label = m.metricModal.callsPerSession.label;
+  const title = methodsOnly
+    ? tmpl(m.metricModal.common.methodsTitle, { label, action: m.metricModal.common.howTo })
+    : tmpl(m.metricModal.common.detailsTitle, { label });
+
   return (
-    <ModalShell title={methodsOnly ? "Calls per session 최적화 방법" : "Calls per session 상세"} onClose={onClose}>
+    <ModalShell title={title} onClose={onClose}>
       {!methodsOnly && (
         <>
-          <Section title="Calls per session이란">
-            <p className="text-slate-400 leading-relaxed text-xs">
-              한 세션 안에서 Claude API를 몇 번 호출했나. 사용자가 메시지 한 번 보내면 Claude가 도구 여러 개
-              부르면서 여러 번 API 호출함.{" "}
-              <strong className="text-slate-300">한 세션의 turn 수 또는 도구 호출 횟수</strong>를 의미.
-            </p>
+          <Section title={tmpl(m.metricModal.common.what, { label })}>
+            <p className="text-slate-400 leading-relaxed text-xs">{renderBold(m.metricModal.callsPerSession.def1)}</p>
             <div className="bg-slate-800 rounded px-3 py-2 text-xs font-mono leading-relaxed">
-              <span className="text-slate-400">Calls per session = 총 calls ÷ 세션 수</span>
+              <span className="text-slate-400">{m.metricModal.callsPerSession.formulaLine}</span>
               <br />
               <span className="text-slate-300">
-                {callsTotal.toLocaleString()} ÷ {sessionsCount} ={" "}
-                <strong className="text-indigo-300">세션당 {value}회</strong>
+                {renderBold(tmpl(m.metricModal.callsPerSession.formulaVal, {
+                  totalCalls: callsTotal.toLocaleString(),
+                  sessions: sessionsCount,
+                  value,
+                }))}
               </span>
             </div>
           </Section>
 
-          <Section title="좋은 방향이 어디인가 — 솔직히 말하면 양면성 있음">
-            <p className="text-slate-400 leading-relaxed text-xs">
-              이 지표는 cache hit이나 one-shot rate처럼 &ldquo;높을수록 좋다&rdquo; 또는 &ldquo;낮을수록 좋다&rdquo;가
-              명확하지 않습니다. <strong className="text-slate-300">너무 높아도 안 좋고 너무 낮아도 안 좋음.</strong>{" "}
-              헷갈리는 게 정상.
-            </p>
+          <Section title={m.metricModal.callsPerSession.goodDirTitle}>
+            <p className="text-slate-400 leading-relaxed text-xs">{renderBold(m.metricModal.callsPerSession.goodDirLead)}</p>
             <div className="space-y-3">
               <div>
-                <p className="text-xs font-semibold text-red-400 mb-1">높을수록 안 좋은 경우</p>
+                <p className="text-xs font-semibold text-red-400 mb-1">{m.metricModal.callsPerSession.highBadTitle}</p>
                 <ul className="space-y-0.5 text-xs text-slate-500 list-disc list-inside">
-                  <li>retry 루프에 빠짐 (one-shot rate 낮음과 동반)</li>
-                  <li>Claude가 컨텍스트 부족해서 같은 파일 5번 읽음</li>
-                  <li>한 세션에 여러 작업 섞여서 길게 끔</li>
-                  <li>사용자가 명확한 지시 안 줘서 Claude가 헤맴</li>
+                  {m.metricModal.callsPerSession.highBadItems.map((it: string, i: number) => <li key={i}>{it}</li>)}
                 </ul>
               </div>
               <div>
-                <p className="text-xs font-semibold text-yellow-400 mb-1">낮을수록 안 좋은 경우</p>
+                <p className="text-xs font-semibold text-yellow-400 mb-1">{m.metricModal.callsPerSession.lowBadTitle}</p>
                 <ul className="space-y-0.5 text-xs text-slate-500 list-disc list-inside">
-                  <li>Claude를 거의 안 쓰고 직접 작성 (도구로서 활용 안 함)</li>
-                  <li>단순한 한 번 질문하고 끝 (자동화 가치 못 살림)</li>
-                  <li>너무 잘게 세션 쪼개서 매번 컨텍스트 새로 만듦 (캐시 효율 ↓)</li>
+                  {m.metricModal.callsPerSession.lowBadItems.map((it: string, i: number) => <li key={i}>{it}</li>)}
                 </ul>
               </div>
             </div>
-            <p className="text-xs text-slate-500 mt-1">
-              <strong className="text-slate-400">적정 범위: 세션당 30~80 calls.</strong> 이 안에 들면 OK.
-            </p>
+            <p className="text-xs text-slate-500 mt-1">{renderBold(m.metricModal.callsPerSession.goodRange)}</p>
           </Section>
         </>
       )}
 
-      <Section title="좋게 하는 방법">
-        <p className="text-xs text-slate-500 mb-2">
-          calls per session 자체를 직접 조정하지 말고,{" "}
-          <strong className="text-slate-400">세션이 한 작업 단위에 정확히 들어맞도록</strong> 만들면
-          자연스럽게 적정 범위에 들어감.
-        </p>
+      <Section title={m.metricModal.common.howTo}>
+        <p className="text-xs text-slate-500 mb-2">{renderBold(m.metricModal.callsPerSession.methodsLead)}</p>
         <div className="space-y-2.5">
           {((): React.ReactNode[] => {
             const steps: React.ReactNode[] = [];
-            if (value >= 100) steps.push(
-              <><strong className="text-slate-300">너무 높다면 (100+ calls)</strong> — 세션이 너무 김.
-              cost per session 대책 그대로 적용 — 작업 단위 끊기, 컨텍스트 70% 넘으면 마무리,
-              한 세션 = 한 작업 원칙.</>
-            );
-            if (value < 10) steps.push(
-              <><strong className="text-slate-300">너무 낮다면 (10 미만 calls)</strong> — Claude를 충분히 활용 못 하고 있음.
-              &ldquo;이 부분 직접 작성해&rdquo; 대신 &ldquo;이 패턴으로 리팩토링해줘&rdquo;로 작업 위임 전환.</>
-            );
-            steps.push(
-              <><strong className="text-slate-300">calls 적정인데 one-shot rate 낮다면</strong> — calls 수는 정상인데
-              retry 비율이 높은 것. one-shot rate 올리는 방법 적용 (충분한 컨텍스트 + 명확한 지시).</>
-            );
-            steps.push(
-              <><strong className="text-slate-300">CLAUDE.md에 작업 패턴 박기</strong> — &ldquo;Read 먼저 후 Edit&rdquo;,
-              &ldquo;테스트 자동 실행&rdquo; 같은 룰을 CLAUDE.md에 명시. Claude가 같은 패턴 반복하면 calls 수가 안정됨.</>
-            );
-            steps.push(
-              <><strong className="text-slate-300">세션 시작 시 작업 범위 선언</strong> — &ldquo;오늘은 X 기능만 구현. 끝나면 종료&rdquo;
-              식으로 시작하면 Claude가 그 범위 안에서 작업. 무한 늘어지는 거 방지.</>
-            );
+            if (value >= 100) steps.push(renderBold(m.metricModal.callsPerSession.stepHigh));
+            if (value < 10)   steps.push(renderBold(m.metricModal.callsPerSession.stepLow));
+            steps.push(renderBold(m.metricModal.callsPerSession.stepOneShot));
+            steps.push(renderBold(m.metricModal.callsPerSession.stepClaudeMd));
+            steps.push(renderBold(m.metricModal.callsPerSession.stepDeclare));
             return steps.map((content, i) => <Step key={i} n={i + 1}>{content}</Step>);
           })()}
         </div>
       </Section>
 
       {!methodsOnly && (
-        <Section title="참고">
+        <Section title={m.metricModal.common.reference}>
           <p className="text-xs text-slate-500 leading-relaxed mb-2">
-            너무 높아도 안 좋고 너무 낮아도 안 좋아 외부 anchor 없음. 등급은 부착하지 않습니다.
-            적정 범위는 대략 세션당 30~80 calls 이지만 작업 유형에 따라 정상 범위가 크게 변동.
+            {m.metricModal.callsPerSession.referenceBody}
           </p>
           <div className="mt-3 space-y-1 text-xs text-slate-600">
-            <p className="font-semibold text-slate-500">같이 봐야 하는 지표</p>
-            <p>• one-shot rate 낮으면서 calls 높음 → retry 루프. 가장 나쁜 신호</p>
-            <p>• one-shot rate 정상인데 calls 높음 → 큰 작업. 분리 검토</p>
-            <p>• calls 낮으면서 cost per session 높음 → 한 번에 너무 많이 처리. 컨텍스트 부담</p>
+            <p className="font-semibold text-slate-500">{m.metricModal.callsPerSession.seeAlsoTitle}</p>
+            <p>{m.metricModal.callsPerSession.seeAlso1}</p>
+            <p>{m.metricModal.callsPerSession.seeAlso2}</p>
+            <p>{m.metricModal.callsPerSession.seeAlso3}</p>
           </div>
         </Section>
       )}
