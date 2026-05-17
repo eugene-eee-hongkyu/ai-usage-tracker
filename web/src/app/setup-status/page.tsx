@@ -1,5 +1,7 @@
 "use client";
 
+export const dynamic = "force-dynamic";
+
 import { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
@@ -272,7 +274,7 @@ export default function SetupStatusPage() {
               <div className="mt-2 ml-4 space-y-1 text-slate-400 text-xs">
                 {en ? (
                   <>
-                    <p>Verify Windows Claude Code's SessionEnd hook support manually.</p>
+                    <p>Verify Windows Claude Code&apos;s SessionEnd hook support manually.</p>
                     <p>Settings file location: <code className="text-slate-300">%APPDATA%\Claude\settings.json</code></p>
                     <p>Check hooks.SessionEnd is present; if not, run the CLI again.</p>
                   </>
