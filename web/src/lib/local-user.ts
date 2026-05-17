@@ -8,9 +8,22 @@
 // 호출되지만 ensureLocalUser 는 IS_LOCAL_MODE 가 아닐 때 호출되지 않음.
 
 import { eq } from "drizzle-orm";
+import { userInfo } from "os";
 import { db, users, IS_LOCAL_MODE } from "./db";
 
 export const LOCAL_USER_ID = 1;
+
+// 시스템 사용자 이름 우선, 환경변수 override 도 허용.
+function defaultLocalName(): string {
+  if (process.env.LOCAL_USER_NAME) return process.env.LOCAL_USER_NAME;
+  try {
+    const u = userInfo();
+    if (u?.username) return u.username;
+  } catch {
+    // sandbox / restricted env 폴백
+  }
+  return "Local User";
+}
 
 export async function ensureLocalUser() {
   const existing = await db.select().from(users).where(eq(users.id, LOCAL_USER_ID)).limit(1);
@@ -19,7 +32,7 @@ export async function ensureLocalUser() {
   await db.insert(users).values({
     id: LOCAL_USER_ID,
     email: process.env.LOCAL_USER_EMAIL ?? "local@usage-tracker.local",
-    name: process.env.LOCAL_USER_NAME ?? "Local User",
+    name: defaultLocalName(),
     timezone: process.env.LOCAL_USER_TIMEZONE ?? null,
   });
 
