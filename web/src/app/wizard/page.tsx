@@ -13,8 +13,8 @@ export const dynamic = "force-dynamic";
 //   4. /dashboard 로 이동
 
 import { Suspense, useEffect, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
-import { getMessages, normalizeLocale } from "@/lib/i18n";
+import { useRouter } from "next/navigation";
+import { useMessages } from "@/lib/use-i18n";
 import { LocaleSwitcher } from "@/components/locale-switcher";
 
 type Choice = "local" | "local_company" | "company";
@@ -39,9 +39,7 @@ export default function WizardPage() {
 
 function WizardInner() {
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const locale = normalizeLocale(searchParams.get("locale"));
-  const m = getMessages(locale);
+  const { locale, m } = useMessages();
 
   const [status, setStatus] = useState<StatusResponse | null>(null);
   const [choice, setChoice] = useState<Choice>("local");
@@ -98,24 +96,34 @@ function WizardInner() {
 
   if (phase === "loading") {
     return (
-      <main className="min-h-screen flex items-center justify-center bg-neutral-950 text-neutral-100">
-        <p className="text-sm text-neutral-500">…</p>
+      <main className="min-h-screen bg-neutral-950 text-neutral-100">
+        <div className="max-w-2xl mx-auto px-6 py-12 flex items-start justify-end">
+          <LocaleSwitcher variant="wizard" />
+        </div>
+        <div className="flex items-center justify-center -mt-12">
+          <p className="text-sm text-neutral-500">…</p>
+        </div>
       </main>
     );
   }
 
   if (phase === "error") {
     return (
-      <main className="min-h-screen flex items-center justify-center bg-neutral-950 text-neutral-100 p-6">
-        <div className="max-w-md text-center space-y-4">
-          <h1 className="text-xl font-bold text-red-400">{m.wizard.error}</h1>
-          <p className="text-sm font-mono text-neutral-400 break-all">{errorMsg}</p>
-          <button
-            onClick={() => location.reload()}
-            className="px-4 py-2 bg-neutral-800 hover:bg-neutral-700 rounded"
-          >
-            {m.wizard.actions.retry}
-          </button>
+      <main className="min-h-screen bg-neutral-950 text-neutral-100">
+        <div className="max-w-2xl mx-auto px-6 py-12 flex items-start justify-end">
+          <LocaleSwitcher variant="wizard" />
+        </div>
+        <div className="flex items-center justify-center p-6 -mt-12">
+          <div className="max-w-md text-center space-y-4">
+            <h1 className="text-xl font-bold text-red-400">{m.wizard.error}</h1>
+            <p className="text-sm font-mono text-neutral-400 break-all">{errorMsg}</p>
+            <button
+              onClick={() => location.reload()}
+              className="px-4 py-2 bg-neutral-800 hover:bg-neutral-700 rounded"
+            >
+              {m.wizard.actions.retry}
+            </button>
+          </div>
         </div>
       </main>
     );

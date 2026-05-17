@@ -3,9 +3,14 @@
 // nav / wizard 우측 상단에 붙는 언어 토글.
 // click 시 locale 전환 → localStorage 저장 + URL ?locale 동기화 + reload (use-i18n.setLocale).
 //
-// 표시 라벨: KO / EN / 日 / 中 — 항상 4개 다 노출 (compact toggle).
-// 활성 locale 은 강조 색.
+// 표시 라벨: KO / EN / 日 / 中 — 항상 4개 다 노출.
+//
+// hydration mismatch 회피: SSR 시점엔 navigator/localStorage 가 없어서 locale 이 'en' 으로 계산되지만
+// client 시점엔 navigator.language (예: 'ko-KR') 가 잡혀 'ko' 가 됨 → aria-pressed mismatch 로
+// hydration error 발생 → click handler 등 인터랙션이 죽는다.
+// 해결: mount 전까진 어떤 button 도 pressed 로 두지 않음 (전부 inactive 렌더). mount 후 실제 locale 반영.
 
+import { useEffect, useState } from "react";
 import { useMessages } from "@/lib/use-i18n";
 
 const LOCALE_LABELS: Record<string, string> = {
@@ -22,6 +27,9 @@ interface Props {
 }
 
 export function LocaleSwitcher({ variant = "nav" }: Props) {
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+
   const { locale, setLocale, supported } = useMessages();
 
   const bg = variant === "wizard" ? "bg-neutral-900 border-neutral-800" : "bg-slate-800/60 border-slate-700";
@@ -40,7 +48,7 @@ export function LocaleSwitcher({ variant = "nav" }: Props) {
       className={`inline-flex items-center rounded border ${bg} overflow-hidden text-xs font-mono`}
     >
       {ORDER.filter((l) => supported.includes(l)).map((l) => {
-        const isActive = l === locale;
+        const isActive = mounted && l === locale;
         return (
           <button
             key={l}
