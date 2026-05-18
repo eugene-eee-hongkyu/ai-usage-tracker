@@ -4,9 +4,10 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build && node scripts/flatten-standalone.mjs",
+    "build": "node scripts/check-schema-sync.mjs && next build && node scripts/flatten-standalone.mjs",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "check:schema-sync": "node scripts/check-schema-sync.mjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.4.1",

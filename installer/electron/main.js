@@ -157,7 +157,6 @@ function isFirstRun() {
 }
 
 async function ensureSqliteSchema() {
-  if (existsSync(SQLITE_PATH)) return;
   if (!existsSync(MIGRATIONS_DIR)) {
     log(`migrations 디렉토리 없음 (${MIGRATIONS_DIR}) — SQLite 초기화 건너뜀`);
     return;
@@ -167,8 +166,25 @@ async function ensureSqliteSchema() {
     .sort();
   if (sqlFiles.length === 0) return;
 
-  // 시스템 sqlite3 (mac/linux 기본 포함) 사용. windows 는 sqlite3 동봉 필요 (Phase 3.5).
+  // 적용된 마이그 추적 — drizzle 의 __drizzle_migrations 대신 단순 파일 list.
+  // 신규 사용자: SQLITE_PATH 없음 → 모든 마이그 적용.
+  // 기존 사용자: SQLITE_PATH 있지만 .migrations-applied 없음 → admin-v1 시점까지
+  //   적용된 걸로 marking (LOCAL_MODE 의 첫 .dmg release 가 admin-v1 포함).
+  // 후속: 새 마이그가 추가될 때만 그 파일 적용.
+  const APPLIED_FILE = path.join(DATA_DIR, ".migrations-applied");
+  let applied = new Set();
+  if (existsSync(APPLIED_FILE)) {
+    applied = new Set(readFileSync(APPLIED_FILE, "utf8").split("\n").filter(Boolean));
+  } else if (existsSync(SQLITE_PATH)) {
+    // legacy 사용자 — 0000, 0001 까지 적용된 SQLite 라고 가정 (.dmg v0.1.x 시점).
+    applied = new Set(["0000_redundant_xavin.sql", "0001_admin_v1.sql"]);
+    writeFileSync(APPLIED_FILE, [...applied].join("\n") + "\n", { mode: 0o600 });
+    log(`기존 SQLite 발견 — legacy 마이그 마킹 (0000, 0001 적용됨으로 간주)`);
+  }
+  // 신규: applied=빈 set, 모든 마이그 적용.
+
   for (const f of sqlFiles) {
+    if (applied.has(f)) continue;
     const sqlPath = path.join(MIGRATIONS_DIR, f);
     log(`migration 적용: ${f}`);
     const proc = spawn("sqlite3", [SQLITE_PATH], {
@@ -178,6 +194,8 @@ async function ensureSqliteSchema() {
     proc.stdin.end();
     const code = await new Promise((res) => proc.on("close", res));
     if (code !== 0) throw new Error(`migration ${f} 실패 (exit ${code})`);
+    applied.add(f);
+    writeFileSync(APPLIED_FILE, [...applied].join("\n") + "\n", { mode: 0o600 });
   }
 }
 
@@ -639,6 +657,69 @@ function loadCloudDashboard(locale) {
   rebuildAppMenu(locale);
 }
 
+/**
+ * Cloud 의 NextAuth session 살아있는지 확인. cookie 가 default partition 에 보존되어
+ * 있으면 Electron 의 net.request 가 자동으로 헤더 포함. 그래서 단순 fetch 가 아니라
+ * Electron 의 session 직접 사용해 cookie 전달.
+ *
+ * 반환:
+ *   true  — session 200 + user.id 존재 (자동 cloud 진입)
+ *   false — 비로그인 / 네트워크 실패 / timeout (5초) / 응답 unexpected
+ *
+ * fallback 원칙: 모든 실패는 false → Local Dashboard. 사용자가 명시 Cmd+2 로 override 가능.
+ */
+async function checkCloudSession() {
+  return new Promise((resolve) => {
+    const url = new URL("/api/auth/session", CLOUD_URL.replace(/\/dashboard\/?$/, ""));
+    let settled = false;
+    const finish = (result) => {
+      if (settled) return;
+      settled = true;
+      resolve(result);
+    };
+    const timer = setTimeout(() => {
+      log("cloud session check timeout (5s) — local fallback");
+      finish(false);
+    }, 5000);
+
+    try {
+      const { net } = require("electron");
+      const req = net.request({ method: "GET", url: url.toString(), useSessionCookies: true });
+      let body = "";
+      req.on("response", (res) => {
+        if (res.statusCode !== 200) {
+          clearTimeout(timer);
+          log(`cloud session check status ${res.statusCode} — local fallback`);
+          return finish(false);
+        }
+        res.on("data", (chunk) => { body += chunk.toString(); });
+        res.on("end", () => {
+          clearTimeout(timer);
+          try {
+            const json = JSON.parse(body || "{}");
+            const loggedIn = !!(json.user && (json.user.id || json.user.email));
+            log(`cloud session check: user=${loggedIn ? "active" : "none"}`);
+            finish(loggedIn);
+          } catch {
+            log("cloud session check parse error — local fallback");
+            finish(false);
+          }
+        });
+      });
+      req.on("error", (err) => {
+        clearTimeout(timer);
+        log(`cloud session check error: ${err.message} — local fallback`);
+        finish(false);
+      });
+      req.end();
+    } catch (e) {
+      clearTimeout(timer);
+      log(`cloud session check 예외: ${e.message} — local fallback`);
+      finish(false);
+    }
+  });
+}
+
 function rebuildAppMenu(locale) {
   const isMac = process.platform === "darwin";
   const template = [
@@ -735,21 +816,33 @@ async function main() {
   ensureLaunchAgentMac(syncPath, CONFIG_FILE);
 
   const locale = normalizeLocale(app.getLocale());
-  const path0 = firstRun ? "/wizard" : "/dashboard";
-  const url = `http://localhost:${serverPort}${path0}?locale=${locale}`;
+
+  // Phase 4.2 — 자동 모드 결정.
+  // cloud session 살아있으면 자동 Cloud Dashboard 진입. 그 외 (비로그인 / 네트워크
+  // 실패 / timeout) Local Dashboard. 사용자 의도: "OAuth 후 cloud, 그 전 local".
+  // 사용자가 명시적으로 Cmd+1/Cmd+2 토글하면 override.
+  const cloudSessionActive = await checkCloudSession();
+
+  const initialUrl = cloudSessionActive
+    ? `${CLOUD_URL}?locale=${locale}`
+    : `http://localhost:${serverPort}${firstRun ? "/wizard" : "/dashboard"}?locale=${locale}`;
+  const initialTitle = cloudSessionActive
+    ? "AI Usage Tracker — Cloud"
+    : "AI Usage Tracker — Local";
 
   mainWindow = new BrowserWindow({
     width: 1280,
     height: 800,
-    title: "AI Usage Tracker — Local",
+    title: initialTitle,
     backgroundColor: "#0a0a0a",
     webPreferences: {
       contextIsolation: true,
       nodeIntegration: false,
     },
   });
-  mainWindow.loadURL(url);
-  currentMode = "local";
+  mainWindow.loadURL(initialUrl);
+  currentMode = cloudSessionActive ? "cloud" : "local";
+  log(`초기 모드: ${currentMode} (cloud session active: ${cloudSessionActive})`);
   rebuildAppMenu(locale);
 
   // window.open() / target=_blank: OAuth provider 도메인은 in-window 허용 (popup 모드

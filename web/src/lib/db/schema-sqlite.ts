@@ -28,6 +28,13 @@ import { sql } from "drizzle-orm";
 // schema 일관성 위해 보유. 단 LOCAL_MODE 는 1인용이라 사실상 row 1개 + role='admin'
 // 고정. invitations/join_requests/audit_logs/api_tokens 테이블은 cloud 전용이라
 // SQLite 에 추가 안 함 (admin UI 자체가 LOCAL_MODE 에서 hidden).
+//
+// Phase 4.2 (M6a/c) — multi-tenant 도입. teams + team_members 신설.
+// LOCAL_MODE 는 single-user 라 사실상 team 1개 ("Local", id=1) 고정. 다만 schema
+// 일관성 + 코드 분기 최소화 위해 PG schema 와 동등하게 보유.
+//
+// SQLite 마이그: drizzle-sqlite/0002_multi_tenant.sql + 0003_audit_platform_flag.sql.
+// timestamp_ms (ms epoch) 모드 그대로 — created_at 등 PG 의 timestamp 와 등가.
 export const users = sqliteTable("users", {
   id: integer("id", { mode: "number" }).primaryKey({ autoIncrement: true }),
   githubId: text("github_id").unique(),
@@ -47,6 +54,47 @@ export const users = sqliteTable("users", {
   lastSyncedAt: integer("last_synced_at", { mode: "timestamp_ms" }),
 });
 
+// Phase 4.2 M6a — teams + team_members. LOCAL_MODE 는 single-team ("Local", id=1).
+export const teams = sqliteTable(
+  "teams",
+  {
+    id: integer("id", { mode: "number" }).primaryKey({ autoIncrement: true }),
+    name: text("name").notNull(),
+    slug: text("slug").notNull(),
+    ownerId: integer("owner_id", { mode: "number" }).notNull(),
+    createdAt: integer("created_at", { mode: "timestamp_ms" })
+      .notNull()
+      .default(sql`(unixepoch() * 1000)`),
+    deletedAt: integer("deleted_at", { mode: "timestamp_ms" }),
+  },
+  (t) => ({
+    slugUniq: uniqueIndex("teams_slug_uniq").on(t.slug),
+    ownerIdx: index("teams_owner_idx").on(t.ownerId),
+  })
+);
+
+export const teamMembers = sqliteTable(
+  "team_members",
+  {
+    id: integer("id", { mode: "number" }).primaryKey({ autoIncrement: true }),
+    teamId: integer("team_id", { mode: "number" })
+      .notNull()
+      .references(() => teams.id),
+    userId: integer("user_id", { mode: "number" })
+      .notNull()
+      .references(() => users.id),
+    role: text("role").notNull().default("member"),
+    joinedAt: integer("joined_at", { mode: "timestamp_ms" })
+      .notNull()
+      .default(sql`(unixepoch() * 1000)`),
+    deletedAt: integer("deleted_at", { mode: "timestamp_ms" }),
+  },
+  (t) => ({
+    teamUserUniq: uniqueIndex("team_members_team_user_uniq").on(t.teamId, t.userId),
+    userIdx: index("team_members_user_idx").on(t.userId),
+  })
+);
+
 export const userSnapshots = sqliteTable(
   "user_snapshots",
   {
@@ -54,6 +102,9 @@ export const userSnapshots = sqliteTable(
     userId: integer("user_id", { mode: "number" })
       .notNull()
       .references(() => users.id),
+    teamId: integer("team_id", { mode: "number" })
+      .notNull()
+      .references(() => teams.id),
     rawJson: text("raw_json", { mode: "json" }).notNull(),
     totalCost: real("total_cost").notNull().default(0),
     sessionsCount: integer("sessions_count", { mode: "number" }).notNull().default(0),
@@ -71,7 +122,8 @@ export const userSnapshots = sqliteTable(
       .default(sql`(unixepoch() * 1000)`),
   },
   (t) => ({
-    userUniq: uniqueIndex("user_snapshots_user_uniq").on(t.userId),
+    userTeamUniq: uniqueIndex("user_snapshots_user_team_uniq").on(t.userId, t.teamId),
+    teamIdx: index("user_snapshots_team_idx").on(t.teamId),
   })
 );
 
@@ -82,6 +134,9 @@ export const periodSnapshots = sqliteTable(
     userId: integer("user_id", { mode: "number" })
       .notNull()
       .references(() => users.id),
+    teamId: integer("team_id", { mode: "number" })
+      .notNull()
+      .references(() => teams.id),
     periodType: text("period_type").notNull(),
     periodStart: text("period_start").notNull(),
     capturedAt: integer("captured_at", { mode: "timestamp_ms" })
@@ -90,7 +145,8 @@ export const periodSnapshots = sqliteTable(
     rawJson: text("raw_json", { mode: "json" }).notNull(),
   },
   (t) => ({
-    uniq: uniqueIndex("period_snapshots_uniq").on(t.userId, t.periodType, t.periodStart),
+    uniq: uniqueIndex("period_snapshots_uniq").on(t.userId, t.teamId, t.periodType, t.periodStart),
+    teamIdx: index("period_snapshots_team_idx").on(t.teamId),
   })
 );
 
@@ -101,6 +157,9 @@ export const userBlocks = sqliteTable(
     userId: integer("user_id", { mode: "number" })
       .notNull()
       .references(() => users.id),
+    teamId: integer("team_id", { mode: "number" })
+      .notNull()
+      .references(() => teams.id),
     blockId: text("block_id").notNull(),
     startedAt: integer("started_at", { mode: "timestamp_ms" }).notNull(),
     endedAt: integer("ended_at", { mode: "timestamp_ms" }).notNull(),
@@ -114,8 +173,9 @@ export const userBlocks = sqliteTable(
       .default(sql`(unixepoch() * 1000)`),
   },
   (t) => ({
-    userBlockUniq: uniqueIndex("user_blocks_user_block_uniq").on(t.userId, t.blockId),
+    userTeamBlockUniq: uniqueIndex("user_blocks_user_team_block_uniq").on(t.userId, t.teamId, t.blockId),
     userStartedIdx: index("user_blocks_user_started_idx").on(t.userId, t.startedAt),
+    teamIdx: index("user_blocks_team_idx").on(t.teamId),
   })
 );
 
@@ -126,11 +186,15 @@ export const dailyVisits = sqliteTable(
     userId: integer("user_id", { mode: "number" })
       .notNull()
       .references(() => users.id),
+    teamId: integer("team_id", { mode: "number" })
+      .notNull()
+      .references(() => teams.id),
     date: text("date").notNull(),
     count: integer("count", { mode: "number" }).notNull().default(0),
     totalDwellSeconds: integer("total_dwell_seconds", { mode: "number" }).notNull().default(0),
   },
   (t) => ({
-    userDateUniq: uniqueIndex("daily_visits_user_date_uniq").on(t.userId, t.date),
+    userTeamDateUniq: uniqueIndex("daily_visits_user_team_date_uniq").on(t.userId, t.teamId, t.date),
+    teamIdx: index("daily_visits_team_idx").on(t.teamId),
   })
 );
