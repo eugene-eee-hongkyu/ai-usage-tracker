@@ -112,6 +112,32 @@ function promptYn(question, defaultYes = true) {
   const lower = ans.toLowerCase();
   return lower === "y" || lower === "yes";
 }
+function runInstallShAndExit() {
+  const bar = "═".repeat(60);
+  console.log("");
+  console.log("\uD83D\uDCE6 install.sh 자동 실행 중 (nvm + Node 22 + 자동 init)...");
+  console.log("");
+  try {
+    execSync(`curl -fsSL ${SERVER_URL}/install.sh | bash`, { stdio: "inherit" });
+  } catch {
+    console.error("");
+    console.error("❌ 자동 복구 실패. 수동 절차:");
+    console.error(`   curl -fsSL ${SERVER_URL}/install.sh | bash`);
+    console.error(`   npx --yes github:eugene-eee-hongkyu/ai-usage-tracker repair`);
+    process.exit(1);
+  }
+  console.log("");
+  console.log(bar);
+  console.log("✅ 환경 설정 완료");
+  console.log("");
+  console.log("   현재 셸은 아직 옛 PATH 를 보고 있습니다. 새 Node 적용:");
+  console.log("     1. 터미널 새 창 (⌘N) 열고 repair 재실행 — 권장");
+  console.log("     2. 또는 현재 셸에서: exec $SHELL -l");
+  console.log("        그 다음: npx --yes github:eugene-eee-hongkyu/ai-usage-tracker repair");
+  console.log(bar);
+  console.log("");
+  process.exit(0);
+}
 function preflightNodeVersion() {
   const major = parseInt((process.versions.node ?? "0").split(".")[0], 10);
   if (!Number.isFinite(major) || major >= 22)
@@ -126,17 +152,27 @@ function preflightNodeVersion() {
   console.error("     - codeburn / ccusage 런타임 오작동 위험");
   console.error("     - launchd 가 매 2시간마다 silent 실패 가능");
   console.error("");
-  console.error("   권장 복구:");
-  console.error("     nvm install 22");
-  console.error("     nvm use 22");
-  console.error("     nvm alias default 22");
-  console.error("     # 그 다음 다시 install / repair");
+  console.error("   자동 복구 가능:");
+  console.error("     - nvm 설치 (~/.nvm/ 안에만, 시스템 Node 그대로 보존)");
+  console.error("     - Node 22 설치 + 기본값으로 설정");
+  console.error("     - ~/.zshrc 자동 백업 후 nvm 라인 추가");
+  console.error("");
+  console.error("   롤백 방법:");
+  console.error("     nvm use system          # 셸 1개만 옛 Node 로");
+  console.error(`     nvm alias default ${major}    # 기본을 다시 옛 버전으로`);
   console.error(bar);
-  const proceed = promptYn(`
-   그래도 Node ${major} 로 강행할까요? [y/N]: `, false);
-  if (!proceed) {
+  const autoFix = promptYn(`
+   지금 자동 복구할까요? [Y/n]: `, true);
+  if (autoFix) {
+    runInstallShAndExit();
+  }
+  const forceProceed = promptYn(`
+   자동 복구 건너뜀. 그래도 Node ${major} 로 강행할까요? [y/N]: `, false);
+  if (!forceProceed) {
     console.error(`
-   중단됨. Node 22 로 전환 후 다시 시도하세요.`);
+   중단됨. 수동 복구:`);
+    console.error("     nvm install 22 && nvm use 22 && nvm alias default 22");
+    console.error("     npx --yes github:eugene-eee-hongkyu/ai-usage-tracker repair");
     process.exit(1);
   }
   console.warn(`
@@ -198,30 +234,7 @@ function preflightGlobalPackages() {
   const accept = promptYn(`
    지금 자동 복구를 진행할까요? [Y/n]: `);
   if (accept) {
-    console.log("");
-    console.log("\uD83D\uDCE6 install.sh 자동 실행 중...");
-    console.log("");
-    try {
-      execSync(`curl -fsSL ${SERVER_URL}/install.sh | bash`, { stdio: "inherit" });
-    } catch {
-      console.error("");
-      console.error("❌ 자동 복구 실패. 수동 절차를 따라주세요:");
-      console.error(`   sudo npm uninstall -g codeburn ccusage`);
-      console.error(`   curl -fsSL ${SERVER_URL}/install.sh | bash`);
-      console.error(`   npx --yes github:eugene-eee-hongkyu/ai-usage-tracker repair`);
-      process.exit(1);
-    }
-    console.log("");
-    console.log(bar);
-    console.log("✅ 환경 설정 완료");
-    console.log("");
-    console.log("   현재 셸은 아직 옛 PATH 를 보고 있습니다. 새 Node 적용:");
-    console.log("     1. 터미널 새 창 (⌘N) 열고 repair 재실행 — 권장");
-    console.log("     2. 현재 셸에서: exec $SHELL -l");
-    console.log("        그 다음: npx --yes github:eugene-eee-hongkyu/ai-usage-tracker repair");
-    console.log(bar);
-    console.log("");
-    process.exit(0);
+    runInstallShAndExit();
   }
   console.error("");
   console.error("   자동 복구를 건너뜁니다. 수동 절차:");
