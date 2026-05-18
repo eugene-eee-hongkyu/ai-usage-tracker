@@ -112,31 +112,76 @@ function promptYn(question, defaultYes = true) {
   const lower = ans.toLowerCase();
   return lower === "y" || lower === "yes";
 }
-function runInstallShAndExit() {
+function installNvmNode22AndExit() {
   const bar = "═".repeat(60);
-  console.log("");
-  console.log("\uD83D\uDCE6 install.sh 자동 실행 중 (nvm + Node 22 + 자동 init)...");
-  console.log("");
+  const nvmDir = process.env.NVM_DIR || path.join(os.homedir(), ".nvm");
+  const nvmSh = path.join(nvmDir, "nvm.sh");
+  if (!fs.existsSync(nvmSh)) {
+    console.log("");
+    console.log("\uD83D\uDCE6 nvm 설치 중...");
+    try {
+      execSync("curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.1/install.sh | bash", { stdio: "inherit" });
+    } catch {
+      console.error(`
+❌ nvm 설치 실패. 네트워크 또는 권한 문제일 수 있음.`);
+      process.exit(1);
+    }
+  } else {
+    console.log("✅ nvm 이미 설치됨 — Node 22 추가만 진행");
+  }
+  console.log(`
+\uD83D\uDCE6 Node 22 설치 + default 전환 중...`);
   try {
-    execSync(`curl -fsSL ${SERVER_URL}/install.sh | bash`, { stdio: "inherit" });
+    execSync(`bash -c 'export NVM_DIR="${nvmDir}" && . "${nvmSh}" && nvm install 22 && nvm alias default 22'`, { stdio: "inherit" });
   } catch {
-    console.error("");
-    console.error("❌ 자동 복구 실패. 수동 절차:");
-    console.error(`   curl -fsSL ${SERVER_URL}/install.sh | bash`);
-    console.error(`   npx --yes github:eugene-eee-hongkyu/ai-usage-tracker repair`);
+    console.error(`
+❌ nvm install 22 실패.`);
+    console.error("   수동 시도: nvm install 22 && nvm alias default 22");
     process.exit(1);
   }
+  ensureNvmInShellRc(nvmDir);
+  console.log(`
+` + bar);
+  console.log("✅ Node 22 설치 완료");
   console.log("");
-  console.log(bar);
-  console.log("✅ 환경 설정 완료");
+  console.log("   이 셸의 PATH 는 아직 옛 Node 20 을 가리킵니다. 새 셸에서:");
   console.log("");
-  console.log("   현재 셸은 아직 옛 PATH 를 보고 있습니다. 새 Node 적용:");
-  console.log("     1. 터미널 새 창 (⌘N) 열고 repair 재실행 — 권장");
-  console.log("     2. 또는 현재 셸에서: exec $SHELL -l");
-  console.log("        그 다음: npx --yes github:eugene-eee-hongkyu/ai-usage-tracker repair");
-  console.log(bar);
+  console.log("     ⌘N (터미널 새 창)");
+  console.log("     node -v                  # v22.x.x 확인");
+  console.log("     npx --yes github:eugene-eee-hongkyu/ai-usage-tracker repair");
   console.log("");
+  console.log("   롤백:");
+  console.log("     nvm alias default 20     # + 새 셸");
+  console.log(bar + `
+`);
   process.exit(0);
+}
+function ensureNvmInShellRc(nvmDir) {
+  const home = os.homedir();
+  const rcFiles = [".zshrc", ".bashrc", ".bash_profile"].map((f) => path.join(home, f));
+  const nvmBlock = `
+# nvm (added by ai-usage-tracker)
+export NVM_DIR="${nvmDir}"
+[ -s "$NVM_DIR/nvm.sh" ] && \\. "$NVM_DIR/nvm.sh"
+[ -s "$NVM_DIR/bash_completion" ] && \\. "$NVM_DIR/bash_completion"
+`;
+  for (const rc of rcFiles) {
+    if (!fs.existsSync(rc))
+      continue;
+    const content = fs.readFileSync(rc, "utf8");
+    if (content.includes("NVM_DIR"))
+      continue;
+    const ts = Date.now();
+    const backup = path.join(STABLE_DIR, `${path.basename(rc)}.bak-${ts}`);
+    try {
+      fs.mkdirSync(STABLE_DIR, { recursive: true });
+      fs.copyFileSync(rc, backup);
+      fs.appendFileSync(rc, nvmBlock);
+      console.log(`   ✓ ${rc} 에 nvm 라인 추가 (백업: ${backup})`);
+    } catch (e) {
+      console.warn(`   ⚠️  ${rc} 갱신 실패:`, e.message);
+    }
+  }
 }
 function preflightNodeVersion() {
   const major = parseInt((process.versions.node ?? "0").split(".")[0], 10);
@@ -178,7 +223,7 @@ function preflightNodeVersion() {
   const autoFix = promptYn(`
    지금 자동 복구할까요? [Y/n]: `, true);
   if (autoFix) {
-    runInstallShAndExit();
+    installNvmNode22AndExit();
   }
   const forceProceed = promptYn(`
    자동 복구 건너뜀. 그래도 Node ${major} 로 강행할까요? [y/N]: `, false);
@@ -248,7 +293,7 @@ function preflightGlobalPackages() {
   const accept = promptYn(`
    지금 자동 복구를 진행할까요? [Y/n]: `);
   if (accept) {
-    runInstallShAndExit();
+    installNvmNode22AndExit();
   }
   console.error("");
   console.error("   자동 복구를 건너뜁니다. 수동 절차:");
