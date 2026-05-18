@@ -27,6 +27,9 @@ export const ja: DeepPartial<Messages> = {
       myCost: "コスト推移",
       unitCost: "日別トークン単価 ($ / 1M)",
       unitCostHint: "低いほど plan を有効活用 · アクティビティがない日は線が途切れる · log scale",
+      apiUnitCost: "API 換算単価 ($ / 1M)",
+      apiUnitCostHint: "Anthropic API 直接呼び出し換算 · plan 節約効果",
+      planTierMissing: "Plan tier 未入力 — 上の plan-health カードで選択",
     },
     syncNeeded: {
       title: "sync needed",

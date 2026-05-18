@@ -92,6 +92,9 @@ export const ko: DeepPartial<Messages> = {
       myCost: "내 비용",
       unitCost: "일별 토큰 단가 ($ / 1M)",
       unitCostHint: "낮을수록 plan 잘 활용 · 활동 없는 날은 line 끊김 · log scale",
+      apiUnitCost: "API 환산 단가 ($ / 1M)",
+      apiUnitCostHint: "Anthropic API 직접 호출 환산 · plan 절약 효과",
+      planTierMissing: "Plan tier 미입력 — 위 plan-health 카드에서 선택",
     },
     syncNeeded: {
       title: "sync needed",

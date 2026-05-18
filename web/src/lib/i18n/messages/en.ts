@@ -90,6 +90,9 @@ export interface Messages {
       myCost: string;
       unitCost: string;
       unitCostHint: string;
+      apiUnitCost: string;
+      apiUnitCostHint: string;
+      planTierMissing: string;
     };
     syncNeeded: {
       title: string;
@@ -717,6 +720,9 @@ export const en: Messages = {
       myCost: "My Cost",
       unitCost: "Daily Unit Cost ($ / 1M)",
       unitCostHint: "Lower = better plan utilization · No-activity days break the line · log scale",
+      apiUnitCost: "API-equivalent Unit Cost ($ / 1M)",
+      apiUnitCostHint: "Anthropic API direct-call equivalent · shows plan savings",
+      planTierMissing: "Plan tier not set — select it in the plan-health card above",
     },
     syncNeeded: {
       title: "sync needed",

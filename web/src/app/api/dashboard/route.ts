@@ -931,6 +931,18 @@ export async function GET(req: NextRequest) {
   const powerAvgDailyTokens = effectiveActiveDays > 0 ? totalWindowTokens / effectiveActiveDays : 0;
   const powerIndexValue = computePowerIndex(powerActiveDays, powerAvgDailyTokens, periodDays);
 
+  // 일별 토큰 단가 (plan amortized) — team route 의 dailyUnitCostByMember 와 동일 공식.
+  // = (monthlyPrice/30) / 일별 토큰 × 1M. tier 미입력·추정 모두 포함, UI 에서 isEstimatedTier 로 시각 구분.
+  // ccusage 의 daily 토큰 기반 (dailyTokens 와 동일 date 키).
+  const usdPerDay = monthlyPriceUsd !== null ? monthlyPriceUsd / 30 : null;
+  const dailyPlanUnitCost = dailyTokens.map((d) => ({
+    date: d.date,
+    unitCost:
+      usdPerDay !== null && d.totalTokens > 0
+        ? (usdPerDay / d.totalTokens) * 1_000_000
+        : null,
+  }));
+
   return NextResponse.json({
     user: { name: user[0].name, lastSyncedAt: user[0].lastSyncedAt, timezone: user[0].timezone ?? null, planTier: user[0].planTier ?? null },
     overview: {
@@ -970,6 +982,7 @@ export async function GET(req: NextRequest) {
     },
     daily,
     dailyTokens,
+    dailyPlanUnitCost,
     heatmapDaily,
     visitDaily,
     activities,

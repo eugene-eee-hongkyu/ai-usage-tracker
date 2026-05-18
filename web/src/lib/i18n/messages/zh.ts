@@ -27,6 +27,9 @@ export const zh: DeepPartial<Messages> = {
       myCost: "我的成本",
       unitCost: "每日 Token 单价 ($ / 1M)",
       unitCostHint: "越低代表 plan 使用越高效 · 无活动日折线断开 · log scale",
+      apiUnitCost: "API 折算单价 ($ / 1M)",
+      apiUnitCostHint: "Anthropic API 直接调用折算 · 体现 plan 节省效果",
+      planTierMissing: "Plan tier 未填写 — 请在上方 plan-health 卡片中选择",
     },
     syncNeeded: {
       title: "sync needed",

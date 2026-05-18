@@ -3,8 +3,6 @@
 import React, { useEffect, useState } from "react";
 import {
   ResponsiveContainer,
-  AreaChart,
-  Area,
   LineChart,
   Line,
   CartesianGrid,
@@ -117,6 +115,7 @@ interface DashboardData {
   overview: Overview | null;
   daily: DailyRow[];
   dailyTokens?: DailyTokenRow[];
+  dailyPlanUnitCost?: Array<{ date: string; unitCost: number | null }>;
   heatmapDaily?: Array<{ date: string; cost: number }>;
   visitDaily?: Array<{ date: string; visitCount: number; dwellSec: number }>;
   activities: Activity[];
@@ -1336,56 +1335,14 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
           </div>
         </div>
 
-        {/* Row 1.5: 코스트 추세 (area) + 일별 토큰 단가 ($/1M, log).
-            추세선 형태로 보기 — 위 Row 1 의 bar 와 보완. team-view 의
-            BY MEMBER / 일별 토큰 단가 카드와 동일 시각화 패턴. */}
+        {/* Row 1.5: 일별 토큰 단가 (plan amortized, emerald) + API 환산 단가 (amber).
+            team-view 의 BY MEMBER / 일별 토큰 단가 카드와 동일 공식·시각 패턴.
+            이전: 코스트 추세 (Daily Cost 와 중복) + 일별 단가 (API 환산 공식).
+            변경: 코스트 추세 삭제 + plan amortized 신규 + API 환산은 별도 카드로 분리. */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
 
-          {/* 내 코스트 추세 (area) — Daily Cost (yellow) 의 trend 시리즈.
-              살짝 짙은 amber 로 연속성 + 차별화. */}
-          <div data-testid="dash-card-cost-trend" className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-amber-500 rounded">
-            <div className="px-3 py-2 border-b border-neutral-800">
-              <span className="text-xs font-mono font-bold text-amber-400 uppercase tracking-wider">{t.dashboard.cards.myCost}</span>
-            </div>
-            <div className="p-3">
-              {chartData.length === 0 ? (
-                <p className="text-neutral-600 text-xs font-mono">no data</p>
-              ) : (
-                <ResponsiveContainer width="100%" height={160}>
-                  <AreaChart data={chartData} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
-                    <defs>
-                      <linearGradient id="fillCostAmber" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="#f59e0b" stopOpacity={0.35} />
-                        <stop offset="100%" stopColor="#f59e0b" stopOpacity={0} />
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#1f2937" />
-                    <XAxis dataKey="date" stroke="#525252" fontSize={10} interval="preserveStartEnd" />
-                    <YAxis
-                      stroke="#525252"
-                      fontSize={10}
-                      tickFormatter={(v) => `$${Math.round(Number(v))}`}
-                    />
-                    <Tooltip
-                      contentStyle={{ background: "#0a0a0a", border: "1px solid #404040", fontSize: 11, fontFamily: "monospace" }}
-                      formatter={(v) => [`$${Number(v).toFixed(2)}`, "cost"]}
-                    />
-                    <Area
-                      type="monotone"
-                      dataKey="cost"
-                      stroke="#f59e0b"
-                      strokeWidth={1.75}
-                      fill="url(#fillCostAmber)"
-                      dot={false}
-                    />
-                  </AreaChart>
-                </ResponsiveContainer>
-              )}
-            </div>
-          </div>
-
-          {/* 일별 토큰 단가 ($/1M tokens) — log scale. 브랜드 emerald 로
-              "plan 활용 효율" 의 별도 metric 위계 강조. */}
+          {/* 일별 토큰 단가 (plan amortized) — (monthlyPrice/30) / 일별 토큰 × 1M.
+              팀 화면의 BY MEMBER 카드와 동일 공식. emerald = plan 활용 효율 컨셉. */}
           <div data-testid="dash-card-unit-cost" className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-emerald-500 rounded">
             <div className="px-3 py-2 border-b border-neutral-800">
               <span className="text-xs font-mono font-bold text-emerald-400 uppercase tracking-wider">
@@ -1395,20 +1352,22 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
             </div>
             <div className="p-3">
               {(() => {
-                // 일별 unit cost = cost × 1_000_000 / totalTokens. 토큰 0 인 날은 null (line 끊김).
-                const unitCostData = chartData.map((d) => {
-                  const tokens = tokenMap[d.date] ?? 0;
-                  const unitCost = tokens > 0 ? (d.cost * 1_000_000) / tokens : null;
-                  return { date: d.date, unitCost };
-                });
-                const hasData = unitCostData.some((u) => u.unitCost != null);
+                const planUnitCostData = (data.dailyPlanUnitCost ?? []).map((row) => ({
+                  date: row.date.slice(5),
+                  unitCost: row.unitCost,
+                }));
+                const hasData = planUnitCostData.some((u) => u.unitCost != null);
                 if (!hasData) {
-                  return <p className="text-neutral-600 text-xs font-mono">no data</p>;
+                  return (
+                    <p className="text-neutral-600 text-xs font-mono">
+                      {t.dashboard.cards.planTierMissing}
+                    </p>
+                  );
                 }
                 return (
                   <>
                     <ResponsiveContainer width="100%" height={160}>
-                      <LineChart data={unitCostData} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
+                      <LineChart data={planUnitCostData} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
                         <CartesianGrid strokeDasharray="3 3" stroke="#1f2937" />
                         <XAxis dataKey="date" stroke="#525252" fontSize={10} interval="preserveStartEnd" />
                         <YAxis
@@ -1418,7 +1377,6 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
                           domain={[0.001, "auto"]}
                           tickFormatter={(v) => {
                             const n = Number(v);
-                            // 자리수 통일 — $0.01 / $0.10 / $1.00 / $10.00 / $100.00 일관 정렬
                             return n >= 0.01 ? `$${n.toFixed(2)}` : `$${n.toFixed(3)}`;
                           }}
                         />
@@ -1443,6 +1401,70 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
                     </ResponsiveContainer>
                     <p className="text-[10px] font-mono text-neutral-600 mt-1.5">
                       {t.dashboard.cards.unitCostHint}
+                    </p>
+                  </>
+                );
+              })()}
+            </div>
+          </div>
+
+          {/* API 환산 단가 — ccusage API cost × 1M / 토큰. plan 가입 안 했을 때
+              들었을 비용 환산. amber = plan 절약 효과 / cost saving 컨셉. */}
+          <div data-testid="dash-card-api-unit-cost" className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-amber-500 rounded">
+            <div className="px-3 py-2 border-b border-neutral-800">
+              <span className="text-xs font-mono font-bold text-amber-400 uppercase tracking-wider">
+                {t.dashboard.cards.apiUnitCost}
+                <span className="ml-1.5 text-neutral-500 normal-case font-normal">(log)</span>
+              </span>
+            </div>
+            <div className="p-3">
+              {(() => {
+                const apiUnitCostData = chartData.map((d) => {
+                  const tokens = tokenMap[d.date] ?? 0;
+                  const unitCost = tokens > 0 ? (d.cost * 1_000_000) / tokens : null;
+                  return { date: d.date, unitCost };
+                });
+                const hasData = apiUnitCostData.some((u) => u.unitCost != null);
+                if (!hasData) {
+                  return <p className="text-neutral-600 text-xs font-mono">no data</p>;
+                }
+                return (
+                  <>
+                    <ResponsiveContainer width="100%" height={160}>
+                      <LineChart data={apiUnitCostData} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#1f2937" />
+                        <XAxis dataKey="date" stroke="#525252" fontSize={10} interval="preserveStartEnd" />
+                        <YAxis
+                          stroke="#525252"
+                          fontSize={10}
+                          scale="log"
+                          domain={[0.001, "auto"]}
+                          tickFormatter={(v) => {
+                            const n = Number(v);
+                            return n >= 0.01 ? `$${n.toFixed(2)}` : `$${n.toFixed(3)}`;
+                          }}
+                        />
+                        <Tooltip
+                          contentStyle={{ background: "#0a0a0a", border: "1px solid #404040", fontSize: 11, fontFamily: "monospace" }}
+                          formatter={(v) => {
+                            if (v == null) return ["—", "api unit cost"];
+                            const n = Number(v);
+                            const s = n >= 1 ? `$${n.toFixed(2)}` : n >= 0.01 ? `$${n.toFixed(3)}` : `$${n.toFixed(4)}`;
+                            return [`${s} / 1M`, "api unit cost"];
+                          }}
+                        />
+                        <Line
+                          type="monotone"
+                          dataKey="unitCost"
+                          stroke="#f59e0b"
+                          strokeWidth={1.75}
+                          dot={false}
+                          connectNulls={false}
+                        />
+                      </LineChart>
+                    </ResponsiveContainer>
+                    <p className="text-[10px] font-mono text-neutral-600 mt-1.5">
+                      {t.dashboard.cards.apiUnitCostHint}
                     </p>
                   </>
                 );
