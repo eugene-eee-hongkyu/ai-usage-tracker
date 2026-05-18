@@ -100,6 +100,7 @@ export default function AdminSettingsPage() {
 
   return (
     <div className="space-y-8">
+      <TeamsOverviewSection />
       <CreateTeamSection />
       {/* 권한 부여 */}
       <section className="bg-slate-900 border border-slate-800 rounded-lg p-5 space-y-3">
@@ -216,6 +217,101 @@ export default function AdminSettingsPage() {
         </select>
       </section>
     </div>
+  );
+}
+
+interface TeamRow {
+  id: number;
+  name: string;
+  slug: string;
+  ownerId: number;
+  createdAt: string;
+  deletedAt: string | null;
+  memberCount?: number;
+  members?: Array<{ userId: number; email: string; name: string; role: string }>;
+}
+
+// Phase 4.2 M6b — 모든 팀 리스트 + 각 팀 멤버 표시. Owner only.
+// "내 팀" + "내가 만든 다른 팀들" 한 화면에서 관리.
+function TeamsOverviewSection() {
+  const [data, setData] = useState<TeamRow[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  const fetchTeams = useCallback(async () => {
+    setLoading(true);
+    try {
+      const r = await fetch("/api/admin/teams?include=members");
+      if (!r.ok) return;
+      const d = (await r.json()) as { teams: TeamRow[] };
+      setData(d.teams);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void fetchTeams();
+  }, [fetchTeams]);
+
+  return (
+    <section className="bg-slate-900 border border-slate-800 rounded-lg p-5 space-y-3">
+      <header>
+        <h2 className="text-sm font-bold text-slate-200">팀 현황 (Owner only)</h2>
+        <p className="text-xs text-slate-500 mt-1">
+          현재 존재하는 팀 + 각 팀의 멤버 리스트. Phase 4.2 M6a 마이그에서 기존 5명은 자동으로 iskra.world 팀의 멤버로
+          backfill 됨.
+        </p>
+      </header>
+      {loading && <p className="text-sm text-slate-500">불러오는 중...</p>}
+      {!loading && data.length === 0 && <p className="text-sm text-slate-500">팀이 없음.</p>}
+      {!loading && data.length > 0 && (
+        <div className="space-y-3">
+          {data.map((t) => (
+            <div key={t.id} className="bg-slate-950 border border-slate-800 rounded p-3 space-y-2">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-sm font-semibold text-slate-100">
+                    {t.name}{" "}
+                    <span className="text-xs text-slate-500 font-mono">#{t.id} · {t.slug}</span>
+                  </p>
+                  <p className="text-xs text-slate-500">
+                    생성: {new Date(t.createdAt).toLocaleDateString("ko")} · 멤버 {t.memberCount ?? 0}명
+                    {t.deletedAt && (
+                      <span className="text-amber-400 ml-2">● 삭제됨 ({new Date(t.deletedAt).toLocaleDateString("ko")})</span>
+                    )}
+                  </p>
+                </div>
+              </div>
+              {t.members && t.members.length > 0 && (
+                <div className="space-y-1">
+                  {t.members.map((m) => (
+                    <div
+                      key={m.userId}
+                      className="flex items-center justify-between text-xs text-slate-300 px-2 py-1"
+                    >
+                      <span>
+                        {m.name} <span className="text-slate-500">({m.email})</span>
+                      </span>
+                      <span
+                        className={`px-2 py-0.5 rounded font-mono ${
+                          m.role === "owner"
+                            ? "bg-amber-900/40 text-amber-300"
+                            : m.role === "admin"
+                            ? "bg-indigo-900/40 text-indigo-300"
+                            : "bg-slate-800 text-slate-400"
+                        }`}
+                      >
+                        {m.role}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </section>
   );
 }
 

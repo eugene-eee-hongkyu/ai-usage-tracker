@@ -15,11 +15,11 @@
 // LOCAL_MODE 차단 (.dmg 는 single-tenant single-user).
 
 import { NextRequest, NextResponse } from "next/server";
-import { db, teams, invitations, users, IS_LOCAL_MODE } from "@/lib/db";
+import { db, teams, teamMembers, invitations, users, IS_LOCAL_MODE } from "@/lib/db";
 import { requireOwner } from "@/lib/auth-guards";
 import { writeAudit } from "@/lib/audit";
 import { sendInvitation } from "@/lib/email";
-import { eq, and, isNull } from "drizzle-orm";
+import { eq, and, isNull, inArray } from "drizzle-orm";
 import crypto from "crypto";
 
 export const dynamic = "force-dynamic";
@@ -171,10 +171,13 @@ export async function POST(req: NextRequest) {
   });
 }
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   if (IS_LOCAL_MODE) return NextResponse.json({ error: "local_mode" }, { status: 403 });
   const guard = await requireOwner();
   if (guard.error) return guard.error;
+
+  const url = new URL(req.url);
+  const includeMembers = url.searchParams.get("include") === "members";
 
   const rows = await db
     .select({
@@ -188,5 +191,45 @@ export async function GET() {
     .from(teams)
     .orderBy(teams.id);
 
-  return NextResponse.json({ teams: rows });
+  if (!includeMembers) {
+    return NextResponse.json({ teams: rows });
+  }
+
+  // 멤버 + 멤버 수 포함. team_members JOIN users.
+  if (rows.length === 0) return NextResponse.json({ teams: [] });
+  const teamIds = rows.map((r) => r.id);
+  const memberRows = await db
+    .select({
+      teamId: teamMembers.teamId,
+      userId: teamMembers.userId,
+      role: teamMembers.role,
+      joinedAt: teamMembers.joinedAt,
+      email: users.email,
+      name: users.name,
+    })
+    .from(teamMembers)
+    .leftJoin(users, eq(teamMembers.userId, users.id))
+    .where(and(inArray(teamMembers.teamId, teamIds), isNull(teamMembers.deletedAt)));
+
+  const byTeam = new Map<number, typeof memberRows>();
+  for (const m of memberRows) {
+    if (!byTeam.has(m.teamId)) byTeam.set(m.teamId, []);
+    byTeam.get(m.teamId)!.push(m);
+  }
+
+  const teamsWithMembers = rows.map((t) => {
+    const members = byTeam.get(t.id) ?? [];
+    return {
+      ...t,
+      memberCount: members.length,
+      members: members.map((m) => ({
+        userId: m.userId,
+        email: m.email ?? "(deleted)",
+        name: m.name ?? "(deleted)",
+        role: m.role,
+      })),
+    };
+  });
+
+  return NextResponse.json({ teams: teamsWithMembers });
 }
