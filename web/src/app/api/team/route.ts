@@ -268,12 +268,15 @@ export async function GET(req: NextRequest) {
         };
       }
 
-      // ccusage daily tokens — sum by dates that appear in this period's daily array
+      // ccusage daily tokens — sum by dates that appear in this period's daily array.
+      // ccusage 19.x 에서 row 키가 'date' → 'period' 로 breaking change. 한 팀 안에
+      // 옛/새 형식 사용자 섞일 수 있으므로 normalize. (dashboard route 와 동일 패턴)
       const periodDates = new Set((d.daily ?? []).map((day) => day.date));
-      const ccusageDaily =
+      const ccusageDaily = (
         ((snap.rawJson as Record<string, unknown>).ccusageDaily as
-          | { daily?: Array<{ date?: string; totalTokens?: number }> }
-          | undefined)?.daily ?? [];
+          | { daily?: Array<{ date?: string; period?: string; totalTokens?: number }> }
+          | undefined)?.daily ?? []
+      ).map((r) => ({ ...r, date: r.date ?? r.period }));
       const totalTokens = ccusageDaily
         .filter((row) => row.date && periodDates.has(row.date))
         .reduce((s, row) => s + (row.totalTokens ?? 0), 0);
