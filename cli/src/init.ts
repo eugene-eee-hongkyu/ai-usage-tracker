@@ -329,6 +329,28 @@ function getApiKeyViaLocalServer(): Promise<string> {
   });
 }
 
+// plist 의 ProgramArguments 에 박을 node 경로 선택.
+// nvm 내부 (~/.nvm/versions/node/vX/bin/node) 는 사용자가 node 버전 바꾸거나 nvm
+// 끄면 깨지므로, 시스템 영구 경로 우선. 없으면 process.execPath fallback.
+//   priority: homebrew (arm/intel) → system → npm prefix → process.execPath
+function findStableNodePath(): string {
+  const candidates = [
+    "/opt/homebrew/bin/node",  // Apple Silicon Homebrew
+    "/usr/local/bin/node",     // Intel Homebrew / 시스템 install
+  ];
+  for (const c of candidates) {
+    if (fs.existsSync(c)) return c;
+  }
+  // npm prefix bin 도 후보 — codeburn/ccusage 가 이미 설치된 prefix 라 안정적
+  try {
+    const npmPrefix = execSync("npm config get prefix", { encoding: "utf8" }).trim();
+    const npmNode = path.join(npmPrefix, "bin", "node");
+    if (fs.existsSync(npmNode)) return npmNode;
+  } catch { /* ignore */ }
+  // 마지막: 지금 실행 중인 node (nvm 일 수 있음 — 깨질 위험 있지만 fallback)
+  return process.execPath;
+}
+
 function registerLaunchd(submitPath: string): void {
   const label = LAUNCHD_LABEL;
   const plistDir = path.join(os.homedir(), "Library", "LaunchAgents");
@@ -342,6 +364,11 @@ function registerLaunchd(submitPath: string): void {
     try { fs.unlinkSync(LEGACY_LAUNCHD_PLIST); } catch { /* ignore */ }
   }
 
+  const nodePath = findStableNodePath();
+  if (nodePath !== process.execPath) {
+    console.log("📍 plist node 경로: " + nodePath + " (nvm 의존성 회피)");
+  }
+
   const envPath = process.env.PATH ?? "/usr/bin:/bin:/usr/sbin:/sbin";
   const plist = `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -351,7 +378,7 @@ function registerLaunchd(submitPath: string): void {
   <string>${label}</string>
   <key>ProgramArguments</key>
   <array>
-    <string>${process.execPath}</string>
+    <string>${nodePath}</string>
     <string>${submitPath}</string>
   </array>
   <key>EnvironmentVariables</key>
@@ -368,11 +395,6 @@ function registerLaunchd(submitPath: string): void {
 </dict>
 </plist>`;
 
-  // launchctl 은 성공해도 종료코드 0 인데 실제론 service 가 안 올라오는 케이스가 있다
-  // (이미 같은 label 이 disabled list 에 있거나, plist 권한/형식 미스). 그래서
-  // bootstrap 직후 `print` 로 실제 로드 됐는지 verify 하고, 모든 단계의 stderr 를
-  // 노출한다. 과거 silent catch 로 "✅ 등록 완료" 메시지만 떴는데 실제 launchctl
-  // list 엔 없는 case 가 있어서 6개월 째 자동 동기화가 안 도는 사용자 발생.
   const uid = (() => {
     try {
       return execSync("id -u", { encoding: "utf8" }).trim();
@@ -391,9 +413,20 @@ function registerLaunchd(submitPath: string): void {
     return;
   }
 
-  // 기존 service 가 떠 있으면 bootout (없으면 silent — 이건 정상이라 무시).
-  spawnSync("launchctl", ["bootout", gui, plistPath], { stdio: "ignore" });
-  spawnSync("launchctl", ["bootout", `${gui}/${label}`], { stdio: "ignore" });
+  // 멱등 등록: 이미 로드된 service 가 있으면 명시적 bootout 후 새 plist 로 bootstrap.
+  // macOS Tahoe (26.x) 부터 중복 bootstrap 시 `5: Input/output error` 응답 — 사용자
+  // 머신에서 실재 확인. bootout stderr 도 캡쳐해서 진짜 실패 시 노출.
+  const alreadyLoaded = spawnSync("launchctl", ["print", `${gui}/${label}`], { stdio: "ignore" }).status === 0;
+  if (alreadyLoaded) {
+    const out = spawnSync("launchctl", ["bootout", `${gui}/${label}`], { encoding: "utf8" });
+    if (out.status !== 0) {
+      const errMsg = ((out.stderr ?? "") + (out.stdout ?? "")).trim();
+      console.log("⚠️  기존 service bootout 실패 (exit " + out.status + ")");
+      if (errMsg) console.log("    stderr:", errMsg);
+      console.log("    수동 처리: launchctl bootout " + gui + "/" + label);
+      return;
+    }
+  }
 
   try {
     fs.writeFileSync(plistPath, plist);
@@ -421,6 +454,11 @@ function registerLaunchd(submitPath: string): void {
     console.log("    수동 검증: launchctl list | grep " + label);
     return;
   }
+
+  // 첫 실행 즉시 트리거 — daily.log 한 줄 박혀 사용자가 등록 정상을 즉시 확인 가능.
+  // -p 는 path 도메인 이름으로 service 지정. exit code 무시 (service 가 곧장 실행 안 돼도
+  // 다음 StartInterval 에서 도므로 치명적 아님).
+  spawnSync("launchctl", ["kickstart", "-p", `${gui}/${label}`], { stdio: "ignore" });
 
   console.log("✅ 자동 동기화 등록 완료 (2시간마다, launchd. sleep 시 wake 즉시 catch-up)");
 }

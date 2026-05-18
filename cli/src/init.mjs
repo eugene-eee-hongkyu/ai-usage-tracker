@@ -300,6 +300,23 @@ function getApiKeyViaLocalServer() {
     }, 300000);
   });
 }
+function findStableNodePath() {
+  const candidates = [
+    "/opt/homebrew/bin/node",
+    "/usr/local/bin/node"
+  ];
+  for (const c of candidates) {
+    if (fs.existsSync(c))
+      return c;
+  }
+  try {
+    const npmPrefix = execSync("npm config get prefix", { encoding: "utf8" }).trim();
+    const npmNode = path.join(npmPrefix, "bin", "node");
+    if (fs.existsSync(npmNode))
+      return npmNode;
+  } catch {}
+  return process.execPath;
+}
 function registerLaunchd(submitPath) {
   const label = LAUNCHD_LABEL;
   const plistDir = path.join(os.homedir(), "Library", "LaunchAgents");
@@ -312,6 +329,10 @@ function registerLaunchd(submitPath) {
       fs.unlinkSync(LEGACY_LAUNCHD_PLIST);
     } catch {}
   }
+  const nodePath = findStableNodePath();
+  if (nodePath !== process.execPath) {
+    console.log("\uD83D\uDCCD plist node 경로: " + nodePath + " (nvm 의존성 회피)");
+  }
   const envPath = process.env.PATH ?? "/usr/bin:/bin:/usr/sbin:/sbin";
   const plist = `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -321,7 +342,7 @@ function registerLaunchd(submitPath) {
   <string>${label}</string>
   <key>ProgramArguments</key>
   <array>
-    <string>${process.execPath}</string>
+    <string>${nodePath}</string>
     <string>${submitPath}</string>
   </array>
   <key>EnvironmentVariables</key>
@@ -354,8 +375,18 @@ function registerLaunchd(submitPath) {
     console.log("⚠️  LaunchAgents 디렉토리 생성 실패:", e.message);
     return;
   }
-  spawnSync("launchctl", ["bootout", gui, plistPath], { stdio: "ignore" });
-  spawnSync("launchctl", ["bootout", `${gui}/${label}`], { stdio: "ignore" });
+  const alreadyLoaded = spawnSync("launchctl", ["print", `${gui}/${label}`], { stdio: "ignore" }).status === 0;
+  if (alreadyLoaded) {
+    const out = spawnSync("launchctl", ["bootout", `${gui}/${label}`], { encoding: "utf8" });
+    if (out.status !== 0) {
+      const errMsg = ((out.stderr ?? "") + (out.stdout ?? "")).trim();
+      console.log("⚠️  기존 service bootout 실패 (exit " + out.status + ")");
+      if (errMsg)
+        console.log("    stderr:", errMsg);
+      console.log("    수동 처리: launchctl bootout " + gui + "/" + label);
+      return;
+    }
+  }
   try {
     fs.writeFileSync(plistPath, plist);
   } catch (e) {
@@ -380,6 +411,7 @@ function registerLaunchd(submitPath) {
     console.log("    수동 검증: launchctl list | grep " + label);
     return;
   }
+  spawnSync("launchctl", ["kickstart", "-p", `${gui}/${label}`], { stdio: "ignore" });
   console.log("✅ 자동 동기화 등록 완료 (2시간마다, launchd. sleep 시 wake 즉시 catch-up)");
 }
 function registerWindowsTask(submitPath) {
