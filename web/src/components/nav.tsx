@@ -86,9 +86,9 @@ function NavInner() {
             >
               {m.nav.logout}
             </button>
-            {(session?.user as { isAdmin?: boolean } | undefined)?.isAdmin && (
+            {session?.user?.isAdmin && (
               <Link
-                href={withLocale("/admin/team")}
+                href={withLocale("/admin/users")}
                 data-testid="nav-admin"
                 onClick={() => setOpen(false)}
                 className="block px-4 py-2 text-sm text-amber-300 hover:bg-slate-700 border-t border-slate-700 w-full text-left"

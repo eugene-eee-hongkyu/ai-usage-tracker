@@ -85,18 +85,41 @@ export const authOptions: NextAuthOptions = {
     },
     async session({ session }) {
       if (session.user?.email) {
+        // admin-v1: role/permissions/suspended_at/deleted_at 함께 fetch. 모든 권한 가드
+        // (server `requireRole` / client `usePermissions`) 가 session 객체만 읽으면 되도록.
         const row = await db
-          .select({ id: users.id })
+          .select({
+            id: users.id,
+            role: users.role,
+            permissions: users.permissions,
+            suspendedAt: users.suspendedAt,
+            deletedAt: users.deletedAt,
+          })
           .from(users)
           .where(eq(users.email, session.user.email))
           .limit(1);
         if (row[0]) {
-          (session.user as typeof session.user & { id: number }).id = row[0].id;
+          const u = session.user as typeof session.user & {
+            id: number;
+            role: string;
+            permissions: { membershipAdmin?: boolean; billingAdmin?: boolean };
+            suspendedAt: Date | null;
+            deletedAt: Date | null;
+            isOwner: boolean;
+            isAdmin: boolean;
+          };
+          u.id = row[0].id;
+          u.role = row[0].role;
+          u.permissions = (row[0].permissions ?? {}) as typeof u.permissions;
+          u.suspendedAt = row[0].suspendedAt;
+          u.deletedAt = row[0].deletedAt;
+          // Owner = ADMIN_EMAIL env 화이트리스트. permissions 분리와 별개의 최상위 권한.
+          u.isOwner = isAdmin(session.user.email);
+          // isAdmin = Owner OR (membership_admin OR billing_admin 권한 보유). nav 의 어드민
+          // 메뉴 노출 조건. 세부 가드는 permissions 로.
+          u.isAdmin =
+            u.isOwner || !!u.permissions?.membershipAdmin || !!u.permissions?.billingAdmin;
         }
-        // nav / setup 등 client component 에서 admin 분기 위해 session 에 박음.
-        // isAdmin 은 ADMIN_EMAIL env 기반 — 서버 callback 이라 안전.
-        (session.user as typeof session.user & { isAdmin: boolean }).isAdmin =
-          isAdmin(session.user.email);
       }
       return session;
     },
