@@ -4,6 +4,7 @@ import GoogleProvider from "next-auth/providers/google";
 import CredentialsProvider from "next-auth/providers/credentials";
 import { db, users } from "@/lib/db";
 import { eq } from "drizzle-orm";
+import { isAdmin } from "@/lib/admin";
 
 // e2e Credentials provider — NODE_ENV='test' 또는 Z21_E2E_AUTH=1 일 때만 활성
 // (옛 PRIMUS_E2E_AUTH 도 fallback — 마이그레이션 안정 후 제거)
@@ -92,6 +93,10 @@ export const authOptions: NextAuthOptions = {
         if (row[0]) {
           (session.user as typeof session.user & { id: number }).id = row[0].id;
         }
+        // nav / setup 등 client component 에서 admin 분기 위해 session 에 박음.
+        // isAdmin 은 ADMIN_EMAIL env 기반 — 서버 callback 이라 안전.
+        (session.user as typeof session.user & { isAdmin: boolean }).isAdmin =
+          isAdmin(session.user.email);
       }
       return session;
     },

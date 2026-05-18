@@ -9,6 +9,7 @@ export const ko: DeepPartial<Messages> = {
     team: "팀",
     setup: "셋업",
     logout: "로그아웃",
+    admin: "어드민",
   },
   about: {
     title: "버전 정보",

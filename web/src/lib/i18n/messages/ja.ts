@@ -8,6 +8,7 @@ export const ja: DeepPartial<Messages> = {
     team: "チーム",
     setup: "セットアップ",
     logout: "ログアウト",
+    admin: "管理者",
   },
   about: {
     title: "バージョン情報",

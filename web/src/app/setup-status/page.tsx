@@ -7,7 +7,6 @@ import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { Nav } from "@/components/nav";
 import Link from "next/link";
-import { isAdmin } from "@/lib/admin";
 import { useLocalMode } from "@/lib/use-local-mode";
 import { useMessages } from "@/lib/use-i18n";
 
@@ -298,17 +297,6 @@ export default function SetupStatusPage() {
           </div>
         )}
 
-        {isAdmin(session?.user?.email ?? "") && (
-          <div className="pt-4 border-t border-slate-800 flex justify-center">
-            <Link
-              href="/admin/team"
-              data-testid="setup-go-admin"
-              className="inline-flex items-center gap-2 px-4 py-2 text-sm font-mono text-amber-300 border border-amber-500/40 bg-amber-500/10 hover:bg-amber-500/20 rounded-lg transition-colors"
-            >
-              {en ? "Go to admin →" : "어드민으로 이동 →"}
-            </Link>
-          </div>
-        )}
       </main>
     </div>
   );

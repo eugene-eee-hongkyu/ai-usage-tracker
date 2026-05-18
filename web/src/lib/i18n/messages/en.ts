@@ -7,6 +7,7 @@ export interface Messages {
     team: string;
     setup: string;
     logout: string;
+    admin: string;
   };
   about: {
     title: string;        // ⓘ aria-label
@@ -628,6 +629,7 @@ export const en: Messages = {
     team: "Team",
     setup: "Setup",
     logout: "Logout",
+    admin: "Admin",
   },
   about: {
     title: "Version info",

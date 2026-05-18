@@ -8,6 +8,7 @@ export const zh: DeepPartial<Messages> = {
     team: "团队",
     setup: "设置",
     logout: "登出",
+    admin: "管理员",
   },
   about: {
     title: "版本信息",
