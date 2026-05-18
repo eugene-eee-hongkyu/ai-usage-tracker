@@ -1009,6 +1009,20 @@ function preflightNodeVersion() {
   if (!Number.isFinite(major) || major >= 22)
     return;
   const bar = "═".repeat(60);
+  if (process.env.AIUSAGE_FROM_INSTALL_SH === "1") {
+    console.error(`
+` + bar);
+    console.error(`❌ install.sh 의 nvm install 22 후에도 Node ${process.versions.node} 로 실행됨`);
+    console.error("");
+    console.error("   원인: nvm use 22 가 npx 의 PATH 에 적용되지 않았음.");
+    console.error("   수동 복구:");
+    console.error("     1. 터미널 새 창 (⌘N) 열기");
+    console.error("     2. node -v  ← v22.x.x 확인");
+    console.error("     3. npx --yes github:eugene-eee-hongkyu/ai-usage-tracker repair");
+    console.error(bar + `
+`);
+    process.exit(1);
+  }
   console.error(`
 ` + bar);
   console.error(`⚠️  Node ${process.versions.node} 감지 — codeburn / ccusage 는 Node 22 이상 필요`);

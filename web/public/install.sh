@@ -221,17 +221,34 @@ if [ -z "${SKIP_NVM:-}" ] && command -v node >/dev/null 2>&1; then
 fi
 
 # ============================================================
-# Pass 3 — Node 미설치 시 nvm 으로 자동 설치 (다른 매니저 없을 때만)
+# Pass 3 — Node 미설치 또는 < 22 이면 nvm 으로 Node 22 자동 설치/전환
 # ============================================================
-if ! command -v node >/dev/null 2>&1; then
+# 핀 정책: codeburn@0.9.7 (ink 7 → engines >=22) / ccusage@19.0.2 (>=22) 라
+# Node 22+ 필수. 기존엔 "있으면 통과" 했지만 그러면 init 의 preflight 가 다시
+# 거부 → install.sh 가 npx init 또 호출하는 무한 루프 발생. 명시적 22 가드.
+NODE_MAJOR=$(node -v 2>/dev/null | sed -E 's/^v([0-9]+).*$/\1/' || echo "")
+NEEDS_NVM=0
+if ! command -v node >/dev/null 2>&1; then NEEDS_NVM=1
+elif [ -z "$NODE_MAJOR" ]; then NEEDS_NVM=1
+elif [ "$NODE_MAJOR" -lt 22 ]; then NEEDS_NVM=1
+fi
+
+if [ "$NEEDS_NVM" = "1" ]; then
   if [ -n "${SKIP_NVM:-}" ]; then
-    echo "❌ Node 미설치 + 다른 버전 매니저($OTHER_MGR) 존재"
-    echo "   위 매니저 절차로 Node 22 설치 후 다시 실행하세요."
+    echo "❌ Node $NODE_MAJOR 감지 + 다른 버전 매니저($OTHER_MGR) 존재"
+    echo "   위 매니저 절차로 Node 22 설치 + default 변경 후 다시 실행하세요."
     exit 1
   fi
-  echo "📦 Node.js 가 없습니다. nvm 으로 설치합니다..."
+  if command -v node >/dev/null 2>&1; then
+    echo "📦 Node $NODE_MAJOR 감지 — Node 22 (LTS) 로 자동 전환합니다..."
+  else
+    echo "📦 Node.js 가 없습니다. nvm 으로 설치합니다..."
+  fi
   echo ""
-  curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.1/install.sh | bash
+  # nvm 자체는 이미 있으면 재설치 안 함
+  if [ ! -d "${NVM_DIR:-$HOME/.nvm}" ]; then
+    curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.1/install.sh | bash
+  fi
   export NVM_DIR="$HOME/.nvm"
   # shellcheck disable=SC1091
   [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
@@ -239,31 +256,9 @@ if ! command -v node >/dev/null 2>&1; then
   nvm use 22
   nvm alias default 22 >/dev/null 2>&1 || true
   echo ""
-  echo "✅ Node.js 설치 완료 ($(node -v))"
+  echo "✅ Node $(node -v) 활성화 (nvm default)"
 else
   echo "✅ Node.js 확인됨 ($(node -v))"
-fi
-
-# ============================================================
-# Pass 4 — Node 버전 정보 (info only)
-# ============================================================
-# 본 repo 는 검증된 핀 버전 정책 — codeburn@0.9.7 / ccusage@19.0.2 사용.
-# 이 두 버전은 Node 18 / 20 / 22 모두에서 동작 검증됨 (codeburn 0.9.9+ 의
-# Node 22 strict runtime check 와 무관). 즉 Node 업그레이드 권장 없음.
-
-NODE_MAJOR=$(node -v 2>/dev/null | sed -E 's/^v([0-9]+).*$/\1/')
-if [ -n "$NODE_MAJOR" ] && [ "$NODE_MAJOR" -lt 18 ]; then
-  echo ""
-  echo "$BAR"
-  echo "⚠️  Node $NODE_MAJOR 감지 — Node 18 이상 필요"
-  echo ""
-  echo "    Node 18 / 20 / 22 모두 검증됨. 아무거나 설치하면 됩니다:"
-  echo ""
-  echo "       nvm install 20    # 또는 22"
-  echo "       nvm alias default 20"
-  echo ""
-  echo "$BAR"
-  echo ""
 fi
 
 echo ""
@@ -278,4 +273,7 @@ echo "📥 Usage Tracker init 실행..."
 echo ""
 
 # Run init via npx
-npx --yes --ignore-cache "$REPO" init
+# AIUSAGE_FROM_INSTALL_SH=1: init 의 preflightNodeVersion 안전장치. 만약 nvm
+# 분기가 어떤 이유로든 Node 22 적용 실패면, init 이 자동 복구 prompt 재호출
+# 하지 않고 즉시 명확한 에러 출력 후 종료 (무한 루프 차단).
+AIUSAGE_FROM_INSTALL_SH=1 npx --yes --ignore-cache "$REPO" init
