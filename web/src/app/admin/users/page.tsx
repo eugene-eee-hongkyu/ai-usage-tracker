@@ -331,14 +331,24 @@ export default function AdminUsersPage() {
                         <span className="text-xs text-slate-600">(본인)</span>
                       ) : (
                         <div className="inline-flex gap-1">
-                          {isActive && (
+                          {!isDeleted && (
                             <>
-                              <button
-                                onClick={() => patchUser(u.id, { action: "suspend" })}
-                                className="px-2 py-0.5 bg-slate-700 hover:bg-slate-600 text-slate-300 text-xs rounded"
-                              >
-                                Suspend
-                              </button>
+                              {isActive && (
+                                <button
+                                  onClick={() => patchUser(u.id, { action: "suspend" })}
+                                  className="px-2 py-0.5 bg-slate-700 hover:bg-slate-600 text-slate-300 text-xs rounded"
+                                >
+                                  Suspend
+                                </button>
+                              )}
+                              {u.suspendedAt && (
+                                <button
+                                  onClick={() => patchUser(u.id, { action: "unsuspend" })}
+                                  className="px-2 py-0.5 bg-emerald-900/60 hover:bg-emerald-900 text-emerald-300 text-xs rounded"
+                                >
+                                  Unsuspend
+                                </button>
+                              )}
                               <button
                                 onClick={() => setDeleteModal(u)}
                                 className="px-2 py-0.5 bg-red-900/60 hover:bg-red-900 text-red-300 text-xs rounded"
@@ -346,14 +356,6 @@ export default function AdminUsersPage() {
                                 Delete
                               </button>
                             </>
-                          )}
-                          {u.suspendedAt && !isDeleted && (
-                            <button
-                              onClick={() => patchUser(u.id, { action: "unsuspend" })}
-                              className="px-2 py-0.5 bg-emerald-900/60 hover:bg-emerald-900 text-emerald-300 text-xs rounded"
-                            >
-                              Unsuspend
-                            </button>
                           )}
                           {isDeleted && inGrace && (
                             <button
