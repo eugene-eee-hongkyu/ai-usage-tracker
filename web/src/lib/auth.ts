@@ -5,6 +5,7 @@ import CredentialsProvider from "next-auth/providers/credentials";
 import { db, users } from "@/lib/db";
 import { eq } from "drizzle-orm";
 import { isAdmin } from "@/lib/admin";
+import { writeAudit } from "@/lib/audit";
 
 // e2e Credentials provider — NODE_ENV='test' 또는 Z21_E2E_AUTH=1 일 때만 활성
 // (옛 PRIMUS_E2E_AUTH 도 fallback — 마이그레이션 안정 후 제거)
@@ -58,6 +59,7 @@ export const authOptions: NextAuthOptions = {
   callbacks: {
     async signIn({ user, account, profile }) {
       const email = user.email ?? "";
+      const provider = account?.provider ?? "unknown";
 
       try {
         const existing = await db
@@ -69,8 +71,28 @@ export const authOptions: NextAuthOptions = {
         // 기존 사용자 — 도메인 화이트리스트 무관 통과 (이미 가입한 사람)
         if (existing.length > 0) {
           const u = existing[0];
-          if (u.deletedAt) return `/login?error=deleted`;
-          if (u.suspendedAt) return `/login?error=suspended`;
+          if (u.deletedAt) {
+            await writeAudit({
+              actorUserId: u.id,
+              actorType: "user",
+              action: "auth.rejected.deleted",
+              targetType: "user",
+              targetId: u.id,
+              metadata: { email, provider },
+            });
+            return `/login?error=deleted`;
+          }
+          if (u.suspendedAt) {
+            await writeAudit({
+              actorUserId: u.id,
+              actorType: "user",
+              action: "auth.rejected.suspended",
+              targetType: "user",
+              targetId: u.id,
+              metadata: { email, provider },
+            });
+            return `/login?error=suspended`;
+          }
           return true;
         }
 
@@ -101,30 +123,74 @@ export const authOptions: NextAuthOptions = {
               .update(invitations)
               .set({ cancelledAt: new Date() })
               .where(eq(invitations.id, invite[0].id));
+            await writeAudit({
+              actorUserId: null,
+              actorType: "system",
+              action: "invitation.expired",
+              targetType: "invitation",
+              targetId: invite[0].id,
+              metadata: { email, provider },
+            });
             return `/login?error=invitation_expired`;
           }
           // 자동 가입 + invitation accept (도메인 우회)
-          await db.insert(users).values({
-            githubId: String((profile as Record<string, unknown>)?.id ?? account?.providerAccountId),
-            email,
-            name: user.name ?? email.split("@")[0],
-            avatarUrl: user.image ?? null,
-            role: invite[0].role,
-            permissions: invite[0].permissions,
-          });
+          const inserted = await db
+            .insert(users)
+            .values({
+              githubId: String((profile as Record<string, unknown>)?.id ?? account?.providerAccountId),
+              email,
+              name: user.name ?? email.split("@")[0],
+              avatarUrl: user.image ?? null,
+              role: invite[0].role,
+              permissions: invite[0].permissions,
+            })
+            .returning({ id: users.id });
           await db
             .update(invitations)
             .set({ acceptedAt: new Date() })
             .where(eq(invitations.id, invite[0].id));
+          const newUserId = inserted[0]?.id ?? null;
+          await writeAudit({
+            actorUserId: newUserId,
+            actorType: "user",
+            action: "user.create.via_invite",
+            targetType: "user",
+            targetId: newUserId,
+            metadata: { email, provider, role: invite[0].role, invitationId: invite[0].id },
+          });
+          await writeAudit({
+            actorUserId: newUserId,
+            actorType: "user",
+            action: "invitation.accept",
+            targetType: "invitation",
+            targetId: invite[0].id,
+            metadata: { email, provider, newUserId },
+          });
           return true;
         }
 
         // invitation 없는 신규 사용자만 도메인 화이트리스트 적용
         if (!isEmailAllowed(email)) {
+          await writeAudit({
+            actorUserId: null,
+            actorType: "system",
+            action: "auth.rejected.domain",
+            targetType: null,
+            targetId: null,
+            metadata: { email, provider },
+          });
           return `/login?error=domain`;
         }
 
         // 도메인 통과한 self-signup 신규자 — /join 으로 redirect (가입 신청 form).
+        await writeAudit({
+          actorUserId: null,
+          actorType: "system",
+          action: "auth.signup.redirect_join",
+          targetType: null,
+          targetId: null,
+          metadata: { email, provider, name: user.name ?? null },
+        });
         return `/join?email=${encodeURIComponent(email)}&name=${encodeURIComponent(user.name ?? "")}`;
       } catch (err) {
         console.error("[auth] signIn DB error:", err);

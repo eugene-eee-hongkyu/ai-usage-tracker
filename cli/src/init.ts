@@ -368,18 +368,61 @@ function registerLaunchd(submitPath: string): void {
 </dict>
 </plist>`;
 
+  // launchctl 은 성공해도 종료코드 0 인데 실제론 service 가 안 올라오는 케이스가 있다
+  // (이미 같은 label 이 disabled list 에 있거나, plist 권한/형식 미스). 그래서
+  // bootstrap 직후 `print` 로 실제 로드 됐는지 verify 하고, 모든 단계의 stderr 를
+  // 노출한다. 과거 silent catch 로 "✅ 등록 완료" 메시지만 떴는데 실제 launchctl
+  // list 엔 없는 case 가 있어서 6개월 째 자동 동기화가 안 도는 사용자 발생.
+  const uid = (() => {
+    try {
+      return execSync("id -u", { encoding: "utf8" }).trim();
+    } catch (e) {
+      console.log("⚠️  uid 조회 실패 — launchd 등록 건너뜀:", (e as Error).message);
+      return null;
+    }
+  })();
+  if (!uid) return;
+  const gui = `gui/${uid}`;
+
   try {
-    const uid = execSync("id -u", { encoding: "utf8" }).trim();
-    const gui = `gui/${uid}`;
     fs.mkdirSync(plistDir, { recursive: true });
-    try { execSync(`launchctl bootout ${gui} "${plistPath}"`, { stdio: "ignore" }); } catch {}
-    try { execSync(`launchctl bootout ${gui}/${label}`, { stdio: "ignore" }); } catch {}
-    fs.writeFileSync(plistPath, plist);
-    execSync(`launchctl bootstrap ${gui} "${plistPath}"`, { stdio: "ignore" });
-    console.log("✅ 자동 동기화 등록 완료 (2시간마다, launchd. sleep 시 wake 즉시 catch-up)");
-  } catch {
-    console.log("⚠️  일간 자동 동기화 등록 실패 (선택 사항, 수동으로 등록 가능)");
+  } catch (e) {
+    console.log("⚠️  LaunchAgents 디렉토리 생성 실패:", (e as Error).message);
+    return;
   }
+
+  // 기존 service 가 떠 있으면 bootout (없으면 silent — 이건 정상이라 무시).
+  spawnSync("launchctl", ["bootout", gui, plistPath], { stdio: "ignore" });
+  spawnSync("launchctl", ["bootout", `${gui}/${label}`], { stdio: "ignore" });
+
+  try {
+    fs.writeFileSync(plistPath, plist);
+  } catch (e) {
+    console.log(`⚠️  plist 파일 작성 실패 (${plistPath}):`, (e as Error).message);
+    return;
+  }
+
+  const bootstrap = spawnSync("launchctl", ["bootstrap", gui, plistPath], { encoding: "utf8" });
+  const bootstrapStderr = ((bootstrap.stderr ?? "") + (bootstrap.stdout ?? "")).trim();
+  if (bootstrap.status !== 0) {
+    console.log("⚠️  launchctl bootstrap 실패 (exit " + bootstrap.status + ")");
+    if (bootstrapStderr) console.log("    stderr:", bootstrapStderr);
+    console.log("    plist 파일은 생성됨:", plistPath);
+    console.log("    수동 시도: launchctl bootstrap " + gui + " \"" + plistPath + "\"");
+    return;
+  }
+
+  // bootstrap 종료코드 0 이어도 실제 load 검증.
+  const verify = spawnSync("launchctl", ["print", `${gui}/${label}`], { encoding: "utf8" });
+  if (verify.status !== 0) {
+    console.log("⚠️  bootstrap 종료코드 0 인데 service 가 launchd 에 안 보임");
+    console.log("    launchctl print stderr:", ((verify.stderr ?? "") + (verify.stdout ?? "")).trim());
+    console.log("    plist 파일은 생성됨:", plistPath);
+    console.log("    수동 검증: launchctl list | grep " + label);
+    return;
+  }
+
+  console.log("✅ 자동 동기화 등록 완료 (2시간마다, launchd. sleep 시 wake 즉시 catch-up)");
 }
 
 function registerWindowsTask(submitPath: string): void {
