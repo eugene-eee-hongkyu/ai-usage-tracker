@@ -95,12 +95,14 @@ export async function POST(req: NextRequest) {
     .returning({ id: invitations.id });
 
   await writeAudit({
+    teamId: effectiveTeamId,
     actorUserId: guard.user.id,
     action: "invitation.create",
     targetType: "invitation",
     targetId: inserted[0].id,
     metadata: { email, role, permissions, expiresAt: expiresAt.toISOString() },
     ip: req.headers.get("x-forwarded-for") ?? null,
+    actorIsPlatformOwner: effectiveTeamId !== guard.user.currentTeamId,
   });
 
   // Resend 발송 — DNS verify 안 됐으면 fail silently. UI 에 메일 발송 실패 표시 가능하도록 응답에 포함.
@@ -189,12 +191,14 @@ export async function DELETE(req: NextRequest) {
   }
 
   await writeAudit({
+    teamId: effectiveTeamId,
     actorUserId: guard.user.id,
     action: "invitation.cancel",
     targetType: "invitation",
     targetId: id,
     metadata: { email: result[0].email },
     ip: req.headers.get("x-forwarded-for") ?? null,
+    actorIsPlatformOwner: effectiveTeamId !== guard.user.currentTeamId,
   });
 
   return NextResponse.json({ ok: true });

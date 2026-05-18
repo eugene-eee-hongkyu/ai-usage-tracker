@@ -68,6 +68,7 @@ export async function GET(req: NextRequest) {
       metadata: auditLogs.metadata,
       ip: auditLogs.ip,
       createdAt: auditLogs.createdAt,
+      actorIsPlatformOwner: auditLogs.actorIsPlatformOwner,
       actorEmail: users.email,
       actorName: users.name,
     })

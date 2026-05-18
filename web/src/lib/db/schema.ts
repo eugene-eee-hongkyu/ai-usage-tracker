@@ -4,6 +4,7 @@ import {
   text,
   integer,
   bigint,
+  boolean,
   real,
   timestamp,
   jsonb,
@@ -207,6 +208,9 @@ export const auditLogs = pgTable(
     targetId: integer("target_id"),
     metadata: jsonb("metadata").notNull().default(sql`'{}'::jsonb`),
     ip: inet("ip"),
+    // Phase 4.2 M6c: platform owner 의 view-as 모드에서 발생한 액션 표시.
+    // hash chain 에는 포함 안 됨 (별도 SET 으로 추가 — 마이그 0006).
+    actorIsPlatformOwner: boolean("actor_is_platform_owner").notNull().default(false),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   },
   (t) => ({
@@ -214,6 +218,7 @@ export const auditLogs = pgTable(
     actionIdx: index("audit_logs_action_idx").on(t.action),
     createdAtIdx: index("audit_logs_created_at_idx").on(t.createdAt),
     teamIdx: index("audit_logs_team_idx").on(t.teamId),
+    platformIdx: index("audit_logs_platform_idx").on(t.actorIsPlatformOwner),
   })
 );
 

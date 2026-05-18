@@ -43,6 +43,7 @@ export async function POST(req: NextRequest) {
     targetId: teamId,
     metadata: { teamName: team[0].name, slug: team[0].slug, fromTeamId: guard.user.currentTeamId },
     ip: req.headers.get("x-forwarded-for") ?? null,
+    actorIsPlatformOwner: true,
   });
 
   const res = NextResponse.json({ ok: true, teamId, teamName: team[0].name });

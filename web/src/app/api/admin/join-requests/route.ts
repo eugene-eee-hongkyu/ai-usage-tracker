@@ -96,12 +96,14 @@ export async function PATCH(req: NextRequest) {
     .where(eq(joinRequests.id, id));
 
   await writeAudit({
+    teamId: effectiveTeamId,
     actorUserId: guard.user.id,
     action: `join_request.${decision}`,
     targetType: "join_request",
     targetId: id,
     metadata: { email: existing[0].email, note: note ?? null },
     ip: req.headers.get("x-forwarded-for") ?? null,
+    actorIsPlatformOwner: effectiveTeamId !== guard.user.currentTeamId,
   });
 
   // 승인 시 사용자에게 알림 이메일

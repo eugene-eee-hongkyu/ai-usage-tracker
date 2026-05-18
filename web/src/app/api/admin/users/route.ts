@@ -187,12 +187,14 @@ export async function PATCH(req: NextRequest) {
   }
 
   await writeAudit({
+    teamId: effectiveTeamId,
     actorUserId: guard.user.id,
     action: `user.${action}`,
     targetType: "user",
     targetId: id,
     metadata: { targetEmail: target[0].email, role, permissions },
     ip: req.headers.get("x-forwarded-for") ?? null,
+    actorIsPlatformOwner: effectiveTeamId !== guard.user.currentTeamId,
   });
 
   return NextResponse.json({ ok: true });

@@ -21,6 +21,10 @@ interface WriteAuditParams {
   targetId?: number | null;
   metadata?: Record<string, unknown>;
   ip?: string | null;
+  // Phase 4.2 M6c — platform owner 의 view-as 모드에서 발생한 액션.
+  // 호출자가 effectiveTeamId !== actor.currentTeamId 로 판정해 박는다.
+  // hash chain input 에는 포함 안 됨 (옛 chain 보존).
+  actorIsPlatformOwner?: boolean;
 }
 
 export async function writeAudit(p: WriteAuditParams): Promise<void> {
@@ -34,6 +38,7 @@ export async function writeAudit(p: WriteAuditParams): Promise<void> {
       targetId: p.targetId ?? null,
       metadata: p.metadata ?? {},
       ip: p.ip ?? null,
+      actorIsPlatformOwner: p.actorIsPlatformOwner ?? false,
       // prev_hash + row_hash 는 DB trigger 가 자동
       rowHash: "",  // trigger 가 overwrite. NOT NULL 제약 우회용 빈 문자열.
     });
