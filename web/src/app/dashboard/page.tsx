@@ -14,7 +14,7 @@ export default function DashboardPage() {
       <PolicyBanner />
       <DashboardView />
       <div className="bg-neutral-950 px-4 pb-12">
-        <div className="max-w-7xl mx-auto">
+        <div className="max-w-6xl mx-auto">
           <TransparencyCard />
         </div>
       </div>
