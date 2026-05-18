@@ -22,8 +22,9 @@ web/next-env.d.ts
 web/tsconfig.tsbuildinfo
 cli/tsconfig.tsbuildinfo
 
-# ── Drizzle 마이그레이션 생성물 ───────────────────
-web/drizzle/             # drizzle-kit generate 결과 (재생성 가능)
+# ── Drizzle 마이그레이션 ────────────────────────
+# drizzle/*.sql + drizzle/meta/_journal.json 모두 tracked — 팀이 동일한 마이그 상태 공유.
+# (이전 패턴 'web/drizzle/' 는 inline 주석 때문에 broken 이었고 SQL 만 강제 add 되어 있었음.)
 
 # ── 로컬 단독 모드 SQLite 데이터 ──────────────────
 web/*.sqlite3
