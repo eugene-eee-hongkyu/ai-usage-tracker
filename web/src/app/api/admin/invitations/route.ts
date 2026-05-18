@@ -5,10 +5,11 @@
 // LOCAL_MODE 차단 (.dmg 는 1인용, admin 기능 없음).
 
 import { NextRequest, NextResponse } from "next/server";
-import { db, invitations, users, IS_LOCAL_MODE } from "@/lib/db";
+import { db, invitations, users, teamMembers, IS_LOCAL_MODE } from "@/lib/db";
 import { requireMembershipAdmin } from "@/lib/auth-guards";
 import { writeAudit } from "@/lib/audit";
 import { sendInvitation } from "@/lib/email";
+import { getEffectiveTeamId } from "@/lib/effective-team";
 import { eq, and, isNull } from "drizzle-orm";
 import crypto from "crypto";
 
@@ -20,6 +21,9 @@ export async function POST(req: NextRequest) {
   if (IS_LOCAL_MODE) return NextResponse.json({ error: "local_mode" }, { status: 403 });
   const guard = await requireMembershipAdmin();
   if (guard.error) return guard.error;
+
+  const effectiveTeamId = await getEffectiveTeamId({ user: guard.user }, req);
+  if (!effectiveTeamId) return NextResponse.json({ error: "no_team" }, { status: 403 });
 
   const body = await req.json().catch(() => ({}));
   const { email, role = "member", permissions = {}, locale = "ko" } = body as {
@@ -33,22 +37,41 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "invalid_email" }, { status: 400 });
   }
 
-  // 이미 가입된 사용자 — 초대 불요
+  // 이미 effectiveTeam 의 멤버인지 확인 — 다른 팀 user 라도 같은 메일은 invitation 가능
+  // (한 user N팀 정책 유지). 같은 팀 멤버면 거부.
   const existing = await db
     .select({ id: users.id })
     .from(users)
     .where(eq(users.email, email))
     .limit(1);
   if (existing[0]) {
-    return NextResponse.json({ error: "user_already_exists", userId: existing[0].id }, { status: 409 });
+    const sameTeamMembership = await db
+      .select({ id: teamMembers.id })
+      .from(teamMembers)
+      .where(
+        and(
+          eq(teamMembers.teamId, effectiveTeamId),
+          eq(teamMembers.userId, existing[0].id),
+          isNull(teamMembers.deletedAt)
+        )
+      )
+      .limit(1);
+    if (sameTeamMembership[0]) {
+      return NextResponse.json({ error: "user_already_in_team", userId: existing[0].id }, { status: 409 });
+    }
   }
 
-  // pending 초대 있으면 중복 방지 (cancel 하지 않은 것)
+  // pending 초대 있으면 중복 방지 (effectiveTeam 안에서만)
   const pending = await db
     .select({ id: invitations.id })
     .from(invitations)
     .where(
-      and(eq(invitations.email, email), isNull(invitations.acceptedAt), isNull(invitations.cancelledAt))
+      and(
+        eq(invitations.teamId, effectiveTeamId),
+        eq(invitations.email, email),
+        isNull(invitations.acceptedAt),
+        isNull(invitations.cancelledAt)
+      )
     )
     .limit(1);
   if (pending[0]) {
@@ -61,7 +84,7 @@ export async function POST(req: NextRequest) {
   const inserted = await db
     .insert(invitations)
     .values({
-      teamId: guard.user.currentTeamId,
+      teamId: effectiveTeamId,
       email,
       invitedBy: guard.user.id,
       token,
@@ -72,12 +95,14 @@ export async function POST(req: NextRequest) {
     .returning({ id: invitations.id });
 
   await writeAudit({
+    teamId: effectiveTeamId,
     actorUserId: guard.user.id,
     action: "invitation.create",
     targetType: "invitation",
     targetId: inserted[0].id,
     metadata: { email, role, permissions, expiresAt: expiresAt.toISOString() },
     ip: req.headers.get("x-forwarded-for") ?? null,
+    actorIsPlatformOwner: effectiveTeamId !== guard.user.currentTeamId,
   });
 
   // Resend 발송 — DNS verify 안 됐으면 fail silently. UI 에 메일 발송 실패 표시 가능하도록 응답에 포함.
@@ -101,6 +126,9 @@ export async function GET(req: NextRequest) {
   const guard = await requireMembershipAdmin();
   if (guard.error) return guard.error;
 
+  const effectiveTeamId = await getEffectiveTeamId({ user: guard.user }, req);
+  if (!effectiveTeamId) return NextResponse.json({ error: "no_team" }, { status: 403 });
+
   const url = new URL(req.url);
   const statusFilter = url.searchParams.get("status") ?? "pending";  // pending | accepted | cancelled | all
 
@@ -117,6 +145,7 @@ export async function GET(req: NextRequest) {
       createdAt: invitations.createdAt,
     })
     .from(invitations)
+    .where(eq(invitations.teamId, effectiveTeamId))
     .orderBy(invitations.createdAt);
 
   const filtered = rows.filter((r) => {
@@ -137,6 +166,9 @@ export async function DELETE(req: NextRequest) {
   const guard = await requireMembershipAdmin();
   if (guard.error) return guard.error;
 
+  const effectiveTeamId = await getEffectiveTeamId({ user: guard.user }, req);
+  if (!effectiveTeamId) return NextResponse.json({ error: "no_team" }, { status: 403 });
+
   const url = new URL(req.url);
   const id = parseInt(url.searchParams.get("id") ?? "", 10);
   if (!id) return NextResponse.json({ error: "id_required" }, { status: 400 });
@@ -144,7 +176,14 @@ export async function DELETE(req: NextRequest) {
   const result = await db
     .update(invitations)
     .set({ cancelledAt: new Date() })
-    .where(and(eq(invitations.id, id), isNull(invitations.acceptedAt), isNull(invitations.cancelledAt)))
+    .where(
+      and(
+        eq(invitations.id, id),
+        eq(invitations.teamId, effectiveTeamId),
+        isNull(invitations.acceptedAt),
+        isNull(invitations.cancelledAt)
+      )
+    )
     .returning({ id: invitations.id, email: invitations.email });
 
   if (result.length === 0) {
@@ -152,12 +191,14 @@ export async function DELETE(req: NextRequest) {
   }
 
   await writeAudit({
+    teamId: effectiveTeamId,
     actorUserId: guard.user.id,
     action: "invitation.cancel",
     targetType: "invitation",
     targetId: id,
     metadata: { email: result[0].email },
     ip: req.headers.get("x-forwarded-for") ?? null,
+    actorIsPlatformOwner: effectiveTeamId !== guard.user.currentTeamId,
   });
 
   return NextResponse.json({ ok: true });

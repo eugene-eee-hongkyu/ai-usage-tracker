@@ -21,6 +21,8 @@ interface AuditRow {
   createdAt: string;
   actorEmail: string | null;
   actorName: string | null;
+  // Phase 4.2 M6c — platform owner viewAs 모드에서 발생한 액션 표시.
+  actorIsPlatformOwner?: boolean;
 }
 
 interface AuditResp {
@@ -183,7 +185,12 @@ export default function AdminAuditPage() {
             </thead>
             <tbody>
               {data.auditLogs.map((r) => (
-                <tr key={r.id} className="border-b border-slate-800 last:border-0">
+                <tr
+                  key={r.id}
+                  className={`border-b border-slate-800 last:border-0 ${
+                    r.actorIsPlatformOwner ? "bg-orange-950/20" : ""
+                  }`}
+                >
                   <td className="px-4 py-2 text-slate-500 font-mono text-xs">{r.id}</td>
                   <td className="px-4 py-2 text-slate-400 text-xs">
                     {new Date(r.createdAt).toLocaleString("ko")}
@@ -193,7 +200,14 @@ export default function AdminAuditPage() {
                       <span className="text-xs text-slate-500">system</span>
                     ) : r.actorEmail ? (
                       <div>
-                        <p className="text-slate-200 text-xs">{r.actorName}</p>
+                        <p className="text-slate-200 text-xs">
+                          {r.actorName}
+                          {r.actorIsPlatformOwner && (
+                            <span className="ml-1.5 px-1.5 py-0.5 rounded text-[10px] bg-orange-900/60 text-orange-200 font-mono">
+                              platform
+                            </span>
+                          )}
+                        </p>
                         <p className="text-slate-500 text-xs">{r.actorEmail}</p>
                       </div>
                     ) : (

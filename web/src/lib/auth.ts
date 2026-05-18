@@ -2,10 +2,12 @@ import type { NextAuthOptions } from "next-auth";
 import GithubProvider from "next-auth/providers/github";
 import GoogleProvider from "next-auth/providers/google";
 import CredentialsProvider from "next-auth/providers/credentials";
-import { db, users, teamMembers } from "@/lib/db";
+import { cookies } from "next/headers";
+import { db, users, teamMembers, teams } from "@/lib/db";
 import { eq, and, isNull, asc } from "drizzle-orm";
 import { isAdmin } from "@/lib/admin";
 import { writeAudit } from "@/lib/audit";
+import { PLATFORM_VIEW_AS_COOKIE } from "@/lib/effective-team";
 
 // e2e Credentials provider — NODE_ENV='test' 또는 Z21_E2E_AUTH=1 일 때만 활성
 // (옛 PRIMUS_E2E_AUTH 도 fallback — 마이그레이션 안정 후 제거)
@@ -125,6 +127,7 @@ export const authOptions: NextAuthOptions = {
               .set({ cancelledAt: new Date() })
               .where(eq(invitations.id, invite[0].id));
             await writeAudit({
+              teamId: invite[0].teamId,
               actorUserId: null,
               actorType: "system",
               action: "invitation.expired",
@@ -161,6 +164,7 @@ export const authOptions: NextAuthOptions = {
             });
           }
           await writeAudit({
+            teamId: invite[0].teamId,
             actorUserId: newUserId,
             actorType: "user",
             action: "user.create.via_invite",
@@ -169,6 +173,7 @@ export const authOptions: NextAuthOptions = {
             metadata: { email, provider, role: invite[0].role, invitationId: invite[0].id, teamId: invite[0].teamId },
           });
           await writeAudit({
+            teamId: invite[0].teamId,
             actorUserId: newUserId,
             actorType: "user",
             action: "invitation.accept",
@@ -242,6 +247,8 @@ export const authOptions: NextAuthOptions = {
             isOwner: boolean;
             isAdmin: boolean;
             currentTeamId: number | null;
+            viewAsTeamId: number | null;
+            viewAsTeamName: string | null;
           };
           u.id = row[0].id;
           u.role = row[0].role;
@@ -255,6 +262,32 @@ export const authOptions: NextAuthOptions = {
           // 메뉴 노출 조건. 세부 가드는 permissions 로.
           u.isAdmin =
             u.isOwner || !!u.permissions?.membershipAdmin || !!u.permissions?.billingAdmin;
+
+          // Phase 4.2 (M6c): platform owner 의 view-as 상태를 session 에 노출.
+          // client 헤더 띠가 useSession() 으로 viewAsTeamName 표시. cookie 는 httpOnly.
+          u.viewAsTeamId = null;
+          u.viewAsTeamName = null;
+          if (u.isOwner) {
+            try {
+              const viewAsRaw = cookies().get(PLATFORM_VIEW_AS_COOKIE)?.value;
+              if (viewAsRaw) {
+                const viewAsId = parseInt(viewAsRaw, 10);
+                if (viewAsId && !Number.isNaN(viewAsId) && viewAsId !== currentTeamId) {
+                  const viewTeam = await db
+                    .select({ id: teams.id, name: teams.name })
+                    .from(teams)
+                    .where(and(eq(teams.id, viewAsId), isNull(teams.deletedAt)))
+                    .limit(1);
+                  if (viewTeam[0]) {
+                    u.viewAsTeamId = viewTeam[0].id;
+                    u.viewAsTeamName = viewTeam[0].name;
+                  }
+                }
+              }
+            } catch {
+              // cookies() 가 동기 context 외에서 실패하는 경우 — 무시. viewAs null.
+            }
+          }
         }
       }
       return session;

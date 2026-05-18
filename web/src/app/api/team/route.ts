@@ -3,8 +3,9 @@ export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import { db, userSnapshots, users, dailyVisits, userBlocks, IS_LOCAL_MODE } from "@/lib/db";
+import { db, userSnapshots, users, dailyVisits, userBlocks, teamMembers, IS_LOCAL_MODE } from "@/lib/db";
 import { getAuthedEmail } from "@/lib/local-user";
+import { getEffectiveTeamId } from "@/lib/effective-team";
 import {
   analyzePlanHealth,
   summarizeTeamPlans,
@@ -14,7 +15,7 @@ import {
 } from "@/lib/plan-health";
 import { computeEfficiencyScore, computeDailyEfficiencyScore, computePowerIndex } from "@/lib/rules";
 import { isAdmin } from "@/lib/admin";
-import { gte } from "drizzle-orm";
+import { and, eq, gte, isNull, inArray } from "drizzle-orm";
 
 type Period = "today" | "month" | "8days" | "30days" | "all";
 
@@ -118,10 +119,42 @@ export async function GET(req: NextRequest) {
   if (!authedEmail)
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
 
+  // team 격리. owner 면 viewAs cookie, 일반 user 는 currentTeamId. LOCAL_MODE 는 null.
+  const effectiveTeamId = IS_LOCAL_MODE
+    ? null
+    : await getEffectiveTeamId(session, req);
+  if (!IS_LOCAL_MODE && !effectiveTeamId) {
+    return NextResponse.json({ error: "no_team" }, { status: 403 });
+  }
+
   const period = (req.nextUrl.searchParams.get("period") ?? "all") as Period;
 
-  const allUsers = await db.select().from(users);
-  const allSnaps = await db.select().from(userSnapshots);
+  // 멤버 list — effectiveTeam 의 멤버만. user_snapshots / user_blocks / daily_visits
+  // 도 모두 team-scoped (team_id 컬럼 NOT NULL).
+  const teamMemberIdRows = IS_LOCAL_MODE
+    ? []
+    : await db
+        .select({ userId: teamMembers.userId })
+        .from(teamMembers)
+        .where(and(eq(teamMembers.teamId, effectiveTeamId!), isNull(teamMembers.deletedAt)));
+  const teamMemberIds = teamMemberIdRows.map((r) => r.userId);
+  const allUsers = IS_LOCAL_MODE
+    ? await db.select().from(users)
+    : teamMemberIds.length > 0
+      ? await db.select().from(users).where(inArray(users.id, teamMemberIds))
+      : [];
+  const userSnapTeamScope = IS_LOCAL_MODE ? undefined : eq(userSnapshots.teamId, effectiveTeamId!);
+  const dailyVisitsTeamScope = IS_LOCAL_MODE ? undefined : eq(dailyVisits.teamId, effectiveTeamId!);
+  const userBlocksTeamScope = IS_LOCAL_MODE ? undefined : eq(userBlocks.teamId, effectiveTeamId!);
+
+  const allSnaps = IS_LOCAL_MODE
+    ? await db.select().from(userSnapshots)
+    : teamMemberIds.length > 0
+      ? await db
+          .select()
+          .from(userSnapshots)
+          .where(and(inArray(userSnapshots.userId, teamMemberIds), userSnapTeamScope))
+      : [];
 
   const snapMap = new Map(allSnaps.map((s) => [s.userId, s]));
 
@@ -135,7 +168,7 @@ export async function GET(req: NextRequest) {
       dwell: dailyVisits.totalDwellSeconds,
     })
     .from(dailyVisits)
-    .where(gte(dailyVisits.date, monthStart));
+    .where(and(gte(dailyVisits.date, monthStart), dailyVisitsTeamScope));
   const visitAgg = new Map<number, { count: number; dwell: number }>();
   for (const r of visitsThisMonth) {
     const cur = visitAgg.get(r.userId) ?? { count: 0, dwell: 0 };
@@ -151,7 +184,7 @@ export async function GET(req: NextRequest) {
   const visits30d = await db
     .select({ userId: dailyVisits.userId, date: dailyVisits.date, count: dailyVisits.count })
     .from(dailyVisits)
-    .where(gte(dailyVisits.date, visit30StartYmd));
+    .where(and(gte(dailyVisits.date, visit30StartYmd), dailyVisitsTeamScope));
   const visit30AggByUser = new Map<number, Record<string, number>>();
   for (const r of visits30d) {
     if (!visit30AggByUser.has(r.userId)) visit30AggByUser.set(r.userId, {});
@@ -185,7 +218,7 @@ export async function GET(req: NextRequest) {
           totalTokens: userBlocks.totalTokens,
         })
         .from(userBlocks)
-        .where(gte(userBlocks.startedAt, blocksWindowStart))
+        .where(and(gte(userBlocks.startedAt, blocksWindowStart), userBlocksTeamScope))
     : [];
   const blocksAgg = new Map<number, { totalMinutes: number; totalTokens: number; count: number }>();
   for (const r of blockRows) {
@@ -462,7 +495,7 @@ export async function GET(req: NextRequest) {
       startedAt: userBlocks.startedAt,
     })
     .from(userBlocks)
-    .where(gte(userBlocks.startedAt, planBlocksWindowStart));
+    .where(and(gte(userBlocks.startedAt, planBlocksWindowStart), userBlocksTeamScope));
   const planBlocksByUser = new Map<number, Array<{ totalTokens: number; startedAt: Date }>>();
   for (const r of planBlockRows) {
     const arr = planBlocksByUser.get(r.userId) ?? [];
@@ -476,7 +509,7 @@ export async function GET(req: NextRequest) {
   const cost30dRows = await db
     .select({ userId: userBlocks.userId, costUsd: userBlocks.costUsd })
     .from(userBlocks)
-    .where(gte(userBlocks.startedAt, cost30dWindowStart));
+    .where(and(gte(userBlocks.startedAt, cost30dWindowStart), userBlocksTeamScope));
   const monthlyCostByUser = new Map<number, number>();
   for (const r of cost30dRows) {
     monthlyCostByUser.set(r.userId, (monthlyCostByUser.get(r.userId) ?? 0) + Number(r.costUsd ?? 0));
