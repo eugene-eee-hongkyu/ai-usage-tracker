@@ -127,15 +127,21 @@ function promptYn(question: string, defaultYes = true): boolean {
 // 한 번에. preflightGlobalPackages 와 preflightNodeVersion 둘 다 같은 흐름 호출.
 function runInstallShAndExit(): never {
   const bar = "═".repeat(60);
+  const isWindows = process.platform === "win32";
+  const cmd = isWindows
+    ? `powershell -NoProfile -Command "irm ${SERVER_URL}/install.ps1 | iex"`
+    : `curl -fsSL ${SERVER_URL}/install.sh | bash`;
+  const installer = isWindows ? "install.ps1 (PowerShell)" : "install.sh";
+
   console.log("");
-  console.log("📦 install.sh 자동 실행 중 (nvm + Node 22 + 자동 init)...");
+  console.log(`📦 ${installer} 자동 실행 중 (Node 22 + 자동 init)...`);
   console.log("");
   try {
-    execSync(`curl -fsSL ${SERVER_URL}/install.sh | bash`, { stdio: "inherit" });
+    execSync(cmd, { stdio: "inherit" });
   } catch {
     console.error("");
     console.error("❌ 자동 복구 실패. 수동 절차:");
-    console.error(`   curl -fsSL ${SERVER_URL}/install.sh | bash`);
+    console.error(`   ${cmd}`);
     console.error(`   npx --yes github:eugene-eee-hongkyu/ai-usage-tracker repair`);
     process.exit(1);
   }
@@ -143,10 +149,16 @@ function runInstallShAndExit(): never {
   console.log(bar);
   console.log("✅ 환경 설정 완료");
   console.log("");
-  console.log("   현재 셸은 아직 옛 PATH 를 보고 있습니다. 새 Node 적용:");
-  console.log("     1. 터미널 새 창 (⌘N) 열고 repair 재실행 — 권장");
-  console.log("     2. 또는 현재 셸에서: exec $SHELL -l");
-  console.log("        그 다음: npx --yes github:eugene-eee-hongkyu/ai-usage-tracker repair");
+  if (isWindows) {
+    console.log("   현재 셸은 옛 PATH 를 볼 수 있습니다. 새 Node 적용:");
+    console.log("     1. PowerShell 새 창 열고 repair 재실행 — 권장");
+    console.log("        npx --yes github:eugene-eee-hongkyu/ai-usage-tracker repair");
+  } else {
+    console.log("   현재 셸은 아직 옛 PATH 를 보고 있습니다. 새 Node 적용:");
+    console.log("     1. 터미널 새 창 (⌘N) 열고 repair 재실행 — 권장");
+    console.log("     2. 또는 현재 셸에서: exec $SHELL -l");
+    console.log("        그 다음: npx --yes github:eugene-eee-hongkyu/ai-usage-tracker repair");
+  }
   console.log(bar);
   console.log("");
   process.exit(0);
@@ -161,20 +173,27 @@ function preflightNodeVersion(): void {
   if (!Number.isFinite(major) || major >= 22) return;
 
   const bar = "═".repeat(60);
+  const isWindows = process.platform === "win32";
 
-  // 무한 루프 가드: install.sh 가 nvm install 22 한 후 npx init 을 호출할 때
-  // AIUSAGE_FROM_INSTALL_SH=1 박는다. 그런데도 여기 도달했다는 건 install.sh
-  // 의 nvm use 가 같은 process 의 PATH 에 안 묻은 케이스 — 자동 복구 prompt
-  // 재호출 시 무한 루프. 안전장치로 즉시 명확한 에러 출력 후 종료.
+  // 무한 루프 가드: install.sh/ps1 가 Node 22 활성 후 npx init 을 호출할 때
+  // AIUSAGE_FROM_INSTALL_SH=1 박는다. 그런데도 여기 도달했다는 건 nvm use /
+  // winget 의 PATH 적용이 npx 까지 안 묻은 케이스 — 자동 복구 prompt 재호출
+  // 시 무한 루프. 안전장치로 즉시 명확한 에러 출력 후 종료.
   if (process.env.AIUSAGE_FROM_INSTALL_SH === "1") {
     console.error("\n" + bar);
-    console.error(`❌ install.sh 의 nvm install 22 후에도 Node ${process.versions.node} 로 실행됨`);
+    console.error(`❌ Node 22 자동 설치 후에도 Node ${process.versions.node} 로 실행됨`);
     console.error("");
-    console.error("   원인: nvm use 22 가 npx 의 PATH 에 적용되지 않았음.");
+    console.error("   원인: 새 Node binary 가 npx 의 PATH 에 적용되지 않았음.");
     console.error("   수동 복구:");
-    console.error("     1. 터미널 새 창 (⌘N) 열기");
-    console.error("     2. node -v  ← v22.x.x 확인");
-    console.error("     3. npx --yes github:eugene-eee-hongkyu/ai-usage-tracker repair");
+    if (isWindows) {
+      console.error("     1. PowerShell 새 창 열기");
+      console.error("     2. node -v  ← v22.x.x 확인");
+      console.error("     3. npx --yes github:eugene-eee-hongkyu/ai-usage-tracker repair");
+    } else {
+      console.error("     1. 터미널 새 창 (⌘N) 열기");
+      console.error("     2. node -v  ← v22.x.x 확인");
+      console.error("     3. npx --yes github:eugene-eee-hongkyu/ai-usage-tracker repair");
+    }
     console.error(bar + "\n");
     process.exit(1);
   }
@@ -184,16 +203,25 @@ function preflightNodeVersion(): void {
   console.error("   이대로 install 하면:");
   console.error("     - npm EBADENGINE 경고 (install 자체는 됨)");
   console.error("     - codeburn / ccusage 런타임 오작동 위험");
-  console.error("     - launchd 가 매 2시간마다 silent 실패 가능");
+  console.error("     - 자동 동기화 (launchd / Task Scheduler) 가 silent 실패 가능");
   console.error("");
   console.error("   자동 복구 가능:");
-  console.error("     - nvm 설치 (~/.nvm/ 안에만, 시스템 Node 그대로 보존)");
-  console.error("     - Node 22 설치 + 기본값으로 설정");
-  console.error("     - ~/.zshrc 자동 백업 후 nvm 라인 추가");
+  if (isWindows) {
+    console.error("     - winget 으로 Node.js LTS (v22) 설치/업그레이드");
+    console.error("     - 기존 Node 그대로 보존 (LTS 만 추가/갱신)");
+  } else {
+    console.error("     - nvm 설치 (~/.nvm/ 안에만, 시스템 Node 그대로 보존)");
+    console.error("     - Node 22 설치 + 기본값으로 설정");
+    console.error("     - ~/.zshrc 자동 백업 후 nvm 라인 추가");
+  }
   console.error("");
   console.error("   롤백 방법:");
-  console.error("     nvm use system          # 셸 1개만 옛 Node 로");
-  console.error(`     nvm alias default ${major}    # 기본을 다시 옛 버전으로`);
+  if (isWindows) {
+    console.error("     winget 으로 옛 Node LTS 재설치 또는 제어판 → 프로그램 제거");
+  } else {
+    console.error("     nvm use system          # 셸 1개만 옛 Node 로");
+    console.error(`     nvm alias default ${major}    # 기본을 다시 옛 버전으로`);
+  }
   console.error(bar);
 
   const autoFix = promptYn("\n   지금 자동 복구할까요? [Y/n]: ", true);
@@ -204,7 +232,12 @@ function preflightNodeVersion(): void {
   const forceProceed = promptYn(`\n   자동 복구 건너뜀. 그래도 Node ${major} 로 강행할까요? [y/N]: `, false);
   if (!forceProceed) {
     console.error("\n   중단됨. 수동 복구:");
-    console.error("     nvm install 22 && nvm use 22 && nvm alias default 22");
+    if (isWindows) {
+      console.error("     winget upgrade OpenJS.NodeJS.LTS");
+      console.error("     # 또는 https://nodejs.org/ko/download 에서 LTS 직접 설치");
+    } else {
+      console.error("     nvm install 22 && nvm use 22 && nvm alias default 22");
+    }
     console.error("     npx --yes github:eugene-eee-hongkyu/ai-usage-tracker repair");
     process.exit(1);
   }
