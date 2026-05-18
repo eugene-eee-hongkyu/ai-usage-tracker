@@ -127,6 +127,7 @@ export const authOptions: NextAuthOptions = {
               .set({ cancelledAt: new Date() })
               .where(eq(invitations.id, invite[0].id));
             await writeAudit({
+              teamId: invite[0].teamId,
               actorUserId: null,
               actorType: "system",
               action: "invitation.expired",
@@ -163,6 +164,7 @@ export const authOptions: NextAuthOptions = {
             });
           }
           await writeAudit({
+            teamId: invite[0].teamId,
             actorUserId: newUserId,
             actorType: "user",
             action: "user.create.via_invite",
@@ -171,6 +173,7 @@ export const authOptions: NextAuthOptions = {
             metadata: { email, provider, role: invite[0].role, invitationId: invite[0].id, teamId: invite[0].teamId },
           });
           await writeAudit({
+            teamId: invite[0].teamId,
             actorUserId: newUserId,
             actorType: "user",
             action: "invitation.accept",
