@@ -1,11 +1,12 @@
 // /admin/settings — Owner only.
-// 권한 부여 + 비활성 사용자 alert + 데이터 보관 기간 (Phase 4.2 에서 활성).
+// 권한 부여 (적용 버튼 + Owner 본인 제외) + 비활성 사용자 alert + 데이터 보관 기간 (Phase 4.2 에서 활성).
 
 "use client";
 
 export const dynamic = "force-dynamic";
 
 import { useEffect, useState, useCallback } from "react";
+import { useSession } from "next-auth/react";
 
 interface UserRow {
   id: number;
@@ -23,10 +24,17 @@ interface InactiveUser {
   createdAt: string;
 }
 
+type Draft = { m: boolean; b: boolean };
+
 export default function AdminSettingsPage() {
+  const { data: session } = useSession();
+  const selfId = (session?.user as { id?: number } | undefined)?.id;
+
   const [activeUsers, setActiveUsers] = useState<UserRow[]>([]);
   const [inactive, setInactive] = useState<InactiveUser[]>([]);
   const [loading, setLoading] = useState(false);
+  const [drafts, setDrafts] = useState<Record<number, Draft>>({});
+  const [savingId, setSavingId] = useState<number | null>(null);
 
   const fetchAll = useCallback(async () => {
     setLoading(true);
@@ -35,8 +43,18 @@ export default function AdminSettingsPage() {
         fetch("/api/admin/users?status=active&page=1").then((r) => r.json()),
         fetch("/api/admin/inactive-users").then((r) => r.json()),
       ]);
-      setActiveUsers((u as { users: UserRow[] }).users);
+      const users = (u as { users: UserRow[] }).users;
+      setActiveUsers(users);
       setInactive((i as { inactiveUsers: InactiveUser[] }).inactiveUsers);
+      // draft 를 서버 값으로 동기화 (적용 후 reload + dirty 초기화 효과)
+      const initial: Record<number, Draft> = {};
+      for (const usr of users) {
+        initial[usr.id] = {
+          m: !!usr.permissions?.membershipAdmin,
+          b: !!usr.permissions?.billingAdmin,
+        };
+      }
+      setDrafts(initial);
     } finally {
       setLoading(false);
     }
@@ -46,19 +64,39 @@ export default function AdminSettingsPage() {
     void fetchAll();
   }, [fetchAll]);
 
-  async function updatePermissions(u: UserRow, perms: { membershipAdmin: boolean; billingAdmin: boolean }) {
-    const r = await fetch(`/api/admin/users?id=${u.id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "role_update", role: u.role, permissions: perms }),
-    });
-    if (!r.ok) {
-      const data = (await r.json().catch(() => ({}))) as { error?: string };
-      alert(`실패: ${data.error}`);
-      return;
+  const isDirty = (u: UserRow): boolean => {
+    const d = drafts[u.id];
+    if (!d) return false;
+    return d.m !== !!u.permissions?.membershipAdmin || d.b !== !!u.permissions?.billingAdmin;
+  };
+
+  async function applyOne(u: UserRow) {
+    const d = drafts[u.id];
+    if (!d) return;
+    setSavingId(u.id);
+    try {
+      const r = await fetch(`/api/admin/users?id=${u.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "role_update",
+          role: u.role,
+          permissions: { membershipAdmin: d.m, billingAdmin: d.b },
+        }),
+      });
+      if (!r.ok) {
+        const data = (await r.json().catch(() => ({}))) as { error?: string };
+        alert(`실패: ${data.error}`);
+        return;
+      }
+      await fetchAll();
+    } finally {
+      setSavingId(null);
     }
-    await fetchAll();
   }
+
+  // Owner 본인은 변경 불가 — 리스트에서 제외 (ADMIN_EMAIL env 기반이라 UI 토글 무의미).
+  const editableUsers = activeUsers.filter((u) => u.id !== selfId);
 
   return (
     <div className="space-y-8">
@@ -67,50 +105,61 @@ export default function AdminSettingsPage() {
         <header>
           <h2 className="text-sm font-bold text-slate-200">권한 관리 (Owner only)</h2>
           <p className="text-xs text-slate-500 mt-1">
-            각 사용자에게 Membership-Admin / Billing-Admin 권한 부여. Owner 는 ADMIN_EMAIL env
-            기반 (UI 변경 불가).
+            각 사용자에게 Membership-Admin / Billing-Admin 권한 부여. 체크 후 <strong>적용</strong> 버튼.
+            Owner (본인) 는 ADMIN_EMAIL env 기반이라 UI 변경 불가 — 리스트에서 제외됨.
           </p>
         </header>
         {loading && <p className="text-sm text-slate-500">불러오는 중...</p>}
-        {!loading && (
+        {!loading && editableUsers.length === 0 && (
+          <p className="text-sm text-slate-500">권한 부여 가능한 사용자가 없음.</p>
+        )}
+        {!loading && editableUsers.length > 0 && (
           <div className="space-y-1">
-            {activeUsers.map((u) => (
-              <div
-                key={u.id}
-                className="flex items-center gap-3 bg-slate-950 border border-slate-800 rounded px-3 py-2"
-              >
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm text-slate-200">{u.name}</p>
-                  <p className="text-xs text-slate-500">{u.email}</p>
+            {editableUsers.map((u) => {
+              const d = drafts[u.id] ?? { m: false, b: false };
+              const dirty = isDirty(u);
+              const saving = savingId === u.id;
+              return (
+                <div
+                  key={u.id}
+                  className="flex items-center gap-3 bg-slate-950 border border-slate-800 rounded px-3 py-2"
+                >
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm text-slate-200">{u.name}</p>
+                    <p className="text-xs text-slate-500">{u.email}</p>
+                  </div>
+                  <label className="flex items-center gap-1.5 text-xs text-slate-300 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={d.m}
+                      disabled={saving}
+                      onChange={(e) =>
+                        setDrafts((prev) => ({ ...prev, [u.id]: { ...prev[u.id], m: e.target.checked } }))
+                      }
+                    />
+                    <span>Membership</span>
+                  </label>
+                  <label className="flex items-center gap-1.5 text-xs text-slate-300 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={d.b}
+                      disabled={saving}
+                      onChange={(e) =>
+                        setDrafts((prev) => ({ ...prev, [u.id]: { ...prev[u.id], b: e.target.checked } }))
+                      }
+                    />
+                    <span>Billing</span>
+                  </label>
+                  <button
+                    onClick={() => applyOne(u)}
+                    disabled={!dirty || saving}
+                    className="px-3 py-1 text-xs rounded bg-indigo-700 hover:bg-indigo-600 disabled:bg-slate-800 disabled:text-slate-600"
+                  >
+                    {saving ? "적용 중..." : "적용"}
+                  </button>
                 </div>
-                <label className="flex items-center gap-1.5 text-xs text-slate-300 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={!!u.permissions?.membershipAdmin}
-                    onChange={(e) =>
-                      updatePermissions(u, {
-                        membershipAdmin: e.target.checked,
-                        billingAdmin: !!u.permissions?.billingAdmin,
-                      })
-                    }
-                  />
-                  <span>Membership</span>
-                </label>
-                <label className="flex items-center gap-1.5 text-xs text-slate-300 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={!!u.permissions?.billingAdmin}
-                    onChange={(e) =>
-                      updatePermissions(u, {
-                        membershipAdmin: !!u.permissions?.membershipAdmin,
-                        billingAdmin: e.target.checked,
-                      })
-                    }
-                  />
-                  <span>Billing</span>
-                </label>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </section>

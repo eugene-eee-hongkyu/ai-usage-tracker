@@ -40,16 +40,20 @@ interface AuditResp {
 export default function AdminAuditPage() {
   const [data, setData] = useState<AuditResp | null>(null);
   const [page, setPage] = useState(1);
-  const [action, setAction] = useState("");
-  const [actorId, setActorId] = useState("");
+  // draft = 사용자가 input 에 입력 중인 값. applied = 실제 fetch 에 쓰인 값.
+  // 글자 칠 때마다 fetch 되는 깜빡임 방지 위해 "검색" 버튼 누르거나 Enter 칠 때만 applied 로 commit.
+  const [actionDraft, setActionDraft] = useState("");
+  const [actorDraft, setActorDraft] = useState("");
+  const [actionApplied, setActionApplied] = useState("");
+  const [actorApplied, setActorApplied] = useState("");
   const [loading, setLoading] = useState(false);
 
   const fetchAudit = useCallback(async () => {
     setLoading(true);
     try {
       const params = new URLSearchParams({ page: String(page) });
-      if (action) params.set("action", action);
-      if (actorId) params.set("actorId", actorId);
+      if (actionApplied) params.set("action", actionApplied);
+      if (actorApplied) params.set("actorQ", actorApplied);
       const r = await fetch(`/api/admin/audit?${params}`);
       if (!r.ok) throw new Error(`HTTP ${r.status}`);
       setData((await r.json()) as AuditResp);
@@ -58,11 +62,25 @@ export default function AdminAuditPage() {
     } finally {
       setLoading(false);
     }
-  }, [page, action, actorId]);
+  }, [page, actionApplied, actorApplied]);
 
   useEffect(() => {
     void fetchAudit();
   }, [fetchAudit]);
+
+  const applySearch = () => {
+    setPage(1);
+    setActionApplied(actionDraft.trim());
+    setActorApplied(actorDraft.trim());
+  };
+
+  const resetSearch = () => {
+    setActionDraft("");
+    setActorDraft("");
+    setActionApplied("");
+    setActorApplied("");
+    setPage(1);
+  };
 
   return (
     <div className="space-y-6">
@@ -114,28 +132,38 @@ export default function AdminAuditPage() {
         </div>
       )}
 
-      {/* Filter toolbar */}
+      {/* Filter toolbar — Enter 또는 검색 버튼 클릭 시에만 fetch (글자마다 깜빡임 방지) */}
       <div className="flex items-center gap-2">
         <input
           type="text"
-          value={action}
-          onChange={(e) => {
-            setAction(e.target.value);
-            setPage(1);
-          }}
-          placeholder="action filter (예: user.suspend)"
+          value={actionDraft}
+          onChange={(e) => setActionDraft(e.target.value)}
+          onKeyDown={(e) => { if (e.key === "Enter") applySearch(); }}
+          placeholder="action 부분 매칭 (예: invitation, user.suspend)"
           className="flex-1 max-w-xs bg-slate-900 border border-slate-700 rounded px-3 py-1.5 text-sm font-mono"
         />
         <input
-          type="number"
-          value={actorId}
-          onChange={(e) => {
-            setActorId(e.target.value);
-            setPage(1);
-          }}
-          placeholder="actor user id"
-          className="w-32 bg-slate-900 border border-slate-700 rounded px-3 py-1.5 text-sm font-mono"
+          type="text"
+          value={actorDraft}
+          onChange={(e) => setActorDraft(e.target.value)}
+          onKeyDown={(e) => { if (e.key === "Enter") applySearch(); }}
+          placeholder="actor 이름 / 이메일 / ID"
+          className="w-56 bg-slate-900 border border-slate-700 rounded px-3 py-1.5 text-sm font-mono"
         />
+        <button
+          onClick={applySearch}
+          className="px-3 py-1.5 bg-indigo-700 hover:bg-indigo-600 text-white text-sm rounded"
+        >
+          검색
+        </button>
+        {(actionApplied || actorApplied) && (
+          <button
+            onClick={resetSearch}
+            className="px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-slate-200 text-sm rounded"
+          >
+            초기화
+          </button>
+        )}
       </div>
 
       {/* Table */}
