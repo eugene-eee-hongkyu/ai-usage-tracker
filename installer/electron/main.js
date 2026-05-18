@@ -74,9 +74,23 @@ const RUNTIME_BIN = path.join(RUNTIME_DIR, "node_modules", ".bin");
 const RUNTIME_MANIFEST = path.join(RUNTIME_DIR, "installed.json");
 
 const WEB_DIR = path.join(APP_ROOT, "web");
-const STANDALONE_DIR = isDev
-  ? path.join(WEB_DIR, ".next", "standalone")
-  : WEB_DIR;
+
+// dev 모드 standalone 결정.
+// 1순위: web/.next/standalone (방금 `web/ npm run build` 한 dev iteration)
+// 2순위: installer/electron/staged/web (가장 최근 `npm run stage` 결과 — production 동일)
+// next.js standalone 빌드가 outputFileTracing 누락으로 node_modules 일부 빠지는
+// 케이스가 있어 (node-polyfill-crypto 등), node_modules 존재 여부까지 확인 후 fallback.
+function pickDevStandalone() {
+  const primary = path.join(WEB_DIR, ".next", "standalone");
+  const fallback = path.join(__dirname, "staged", "web");
+  const primaryOk =
+    existsSync(path.join(primary, "server.js")) &&
+    existsSync(path.join(primary, "node_modules", "next"));
+  if (primaryOk) return primary;
+  if (existsSync(path.join(fallback, "server.js"))) return fallback;
+  return primary; // 둘 다 없으면 primary 가리키되 startServer 에서 명시적 에러
+}
+const STANDALONE_DIR = isDev ? pickDevStandalone() : WEB_DIR;
 const STANDALONE_SERVER = path.join(STANDALONE_DIR, "server.js");
 const MIGRATIONS_DIR = isDev
   ? path.join(WEB_DIR, "drizzle-sqlite")
