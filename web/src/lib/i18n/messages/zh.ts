@@ -59,4 +59,11 @@ export const zh: DeepPartial<Messages> = {
     saved: "设置完成!",
     error: "发生错误",
   },
+  dashboardView: {
+    staleSyncTitle: "自动采集已停止",
+    staleSyncBody: "上次同步在 {n} 小时前。launchd 可能已停止,或笔记本长时间未开启。",
+    staleSyncRepairLabel: "在终端中:",
+    staleSyncCopy: "复制",
+    staleSyncCopied: "已复制",
+  },
 };

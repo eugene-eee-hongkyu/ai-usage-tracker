@@ -27,6 +27,7 @@ import dynamic from "next/dynamic";
 import type { DrilldownPeriod } from "@/components/score-drilldown";
 import { UsageHero } from "@/components/usage-hero";
 import { PrivacyBanner } from "@/components/privacy-banner";
+import { StaleSyncBanner } from "@/components/stale-sync-banner";
 
 const ScoreDrilldown = dynamic(
   () => import("@/components/score-drilldown").then((m) => m.ScoreDrilldown),
@@ -1091,6 +1092,10 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
   return (
     <div className={`min-h-screen bg-neutral-950 text-neutral-100 transition-opacity duration-150 ${loading ? "opacity-50 pointer-events-none" : ""}`}>
       <NavComponent />
+      <StaleSyncBanner
+        lastSyncedAt={data.user.lastSyncedAt}
+        hidden={viewOnly || isLocalMode === true}
+      />
 
       {/* Period Tabs */}
       <div className="border-b border-neutral-800">

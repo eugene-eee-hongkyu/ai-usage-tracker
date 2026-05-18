@@ -498,6 +498,11 @@ export interface Messages {
     dataLoadFailed: string;
     retry: string;
     noDataYet: string;
+    staleSyncTitle: string;
+    staleSyncBody: string;
+    staleSyncRepairLabel: string;
+    staleSyncCopy: string;
+    staleSyncCopied: string;
     previous: string;
     daysAgoN: string;
     dayLabel: string;
@@ -1188,6 +1193,11 @@ export const en: Messages = {
     dataLoadFailed: "Failed to load data.",
     retry: "Retry",
     noDataYet: "No data yet.",
+    staleSyncTitle: "Auto-sync stalled",
+    staleSyncBody: "Last sync was {n}h ago. The launchd job may have broken, or your laptop has been off for a while.",
+    staleSyncRepairLabel: "In a terminal:",
+    staleSyncCopy: "Copy",
+    staleSyncCopied: "Copied",
     previous: "Earlier ▼",
     daysAgoN: "{n}d ago",
     dayLabel: "{n}d ago ({date})",

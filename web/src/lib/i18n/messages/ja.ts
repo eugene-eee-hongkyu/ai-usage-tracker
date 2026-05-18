@@ -59,4 +59,11 @@ export const ja: DeepPartial<Messages> = {
     saved: "セットアップ完了!",
     error: "問題が発生しました",
   },
+  dashboardView: {
+    staleSyncTitle: "自動収集が停止",
+    staleSyncBody: "最終同期から {n} 時間経過。launchd が停止しているか、ノートPC が長時間オフの可能性があります。",
+    staleSyncRepairLabel: "ターミナルで:",
+    staleSyncCopy: "コピー",
+    staleSyncCopied: "コピー済み",
+  },
 };
