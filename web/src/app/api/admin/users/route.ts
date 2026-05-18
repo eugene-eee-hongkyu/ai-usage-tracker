@@ -5,6 +5,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db, users, IS_LOCAL_MODE } from "@/lib/db";
 import { requireMembershipAdmin, requireOwner } from "@/lib/auth-guards";
 import { writeAudit } from "@/lib/audit";
+import { isAdmin } from "@/lib/admin";
 import { eq, ilike, isNull, isNotNull, and, or, asc, desc, sql } from "drizzle-orm";
 
 export const dynamic = "force-dynamic";
@@ -64,6 +65,9 @@ export async function GET(req: NextRequest) {
     .limit(PAGE_SIZE)
     .offset((page - 1) * PAGE_SIZE);
 
+  // Owner 표시 — ADMIN_EMAIL env 화이트리스트 매칭. DB 컬럼 아닌 derived.
+  const rowsWithOwner = rows.map((r) => ({ ...r, isOwner: isAdmin(r.email) }));
+
   // total count
   const countResult = await db
     .select({ c: sql<number>`count(*)::int` })
@@ -72,7 +76,7 @@ export async function GET(req: NextRequest) {
   const total = countResult[0]?.c ?? 0;
 
   return NextResponse.json({
-    users: rows,
+    users: rowsWithOwner,
     page,
     pageSize: PAGE_SIZE,
     total,

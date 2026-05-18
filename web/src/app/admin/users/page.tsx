@@ -7,6 +7,7 @@
 export const dynamic = "force-dynamic";
 
 import { useEffect, useState, useCallback } from "react";
+import { useSession } from "next-auth/react";
 
 interface UserRow {
   id: number;
@@ -19,6 +20,7 @@ interface UserRow {
   deletedAt: string | null;
   createdAt: string;
   lastSyncedAt: string | null;
+  isOwner: boolean;
 }
 
 interface UserListResp {
@@ -50,6 +52,8 @@ const STATUSES = ["active", "suspended", "deleted", "all"] as const;
 type Status = (typeof STATUSES)[number];
 
 export default function AdminUsersPage() {
+  const { data: session } = useSession();
+  const selfId = session?.user?.id;
   const [users, setUsers] = useState<UserListResp | null>(null);
   const [invitations, setInvitations] = useState<InvitationRow[]>([]);
   const [joinRequests, setJoinRequests] = useState<JoinRequestRow[]>([]);
@@ -274,7 +278,15 @@ export default function AdminUsersPage() {
                         </div>
                       </div>
                     </td>
-                    <td className="px-4 py-2.5 text-slate-300">{u.role}</td>
+                    <td className="px-4 py-2.5 text-slate-300">
+                      {u.isOwner ? (
+                        <span className="inline-block px-1.5 py-0.5 bg-amber-900/40 text-amber-300 rounded text-xs font-semibold">
+                          Owner
+                        </span>
+                      ) : (
+                        u.role
+                      )}
+                    </td>
                     <td className="px-4 py-2.5 text-xs text-slate-400">
                       {u.permissions?.membershipAdmin && (
                         <span className="inline-block mr-1 px-1.5 py-0.5 bg-indigo-900/40 text-indigo-300 rounded">
@@ -301,44 +313,58 @@ export default function AdminUsersPage() {
                         </span>
                       )}
                     </td>
-                    <td className="px-4 py-2.5 text-slate-400 text-xs">
-                      {u.lastSyncedAt ? new Date(u.lastSyncedAt).toLocaleDateString("ko") : "—"}
+                    <td className="px-4 py-2.5 text-slate-400 text-xs font-mono">
+                      {u.lastSyncedAt
+                        ? new Date(u.lastSyncedAt).toLocaleString("ko-KR", {
+                            year: "2-digit",
+                            month: "2-digit",
+                            day: "2-digit",
+                            hour: "2-digit",
+                            minute: "2-digit",
+                            second: "2-digit",
+                            hour12: false,
+                          })
+                        : "—"}
                     </td>
                     <td className="px-4 py-2.5 text-right">
-                      <div className="inline-flex gap-1">
-                        {isActive && (
-                          <>
+                      {u.id === selfId ? (
+                        <span className="text-xs text-slate-600">(본인)</span>
+                      ) : (
+                        <div className="inline-flex gap-1">
+                          {isActive && (
+                            <>
+                              <button
+                                onClick={() => patchUser(u.id, { action: "suspend" })}
+                                className="px-2 py-0.5 bg-slate-700 hover:bg-slate-600 text-slate-300 text-xs rounded"
+                              >
+                                Suspend
+                              </button>
+                              <button
+                                onClick={() => setDeleteModal(u)}
+                                className="px-2 py-0.5 bg-red-900/60 hover:bg-red-900 text-red-300 text-xs rounded"
+                              >
+                                Delete
+                              </button>
+                            </>
+                          )}
+                          {u.suspendedAt && !isDeleted && (
                             <button
-                              onClick={() => patchUser(u.id, { action: "suspend" })}
-                              className="px-2 py-0.5 bg-slate-700 hover:bg-slate-600 text-slate-300 text-xs rounded"
+                              onClick={() => patchUser(u.id, { action: "unsuspend" })}
+                              className="px-2 py-0.5 bg-emerald-900/60 hover:bg-emerald-900 text-emerald-300 text-xs rounded"
                             >
-                              Suspend
+                              Unsuspend
                             </button>
+                          )}
+                          {isDeleted && inGrace && (
                             <button
-                              onClick={() => setDeleteModal(u)}
-                              className="px-2 py-0.5 bg-red-900/60 hover:bg-red-900 text-red-300 text-xs rounded"
+                              onClick={() => patchUser(u.id, { action: "restore" })}
+                              className="px-2 py-0.5 bg-emerald-900/60 hover:bg-emerald-900 text-emerald-300 text-xs rounded"
                             >
-                              Delete
+                              Restore
                             </button>
-                          </>
-                        )}
-                        {u.suspendedAt && !isDeleted && (
-                          <button
-                            onClick={() => patchUser(u.id, { action: "unsuspend" })}
-                            className="px-2 py-0.5 bg-emerald-900/60 hover:bg-emerald-900 text-emerald-300 text-xs rounded"
-                          >
-                            Unsuspend
-                          </button>
-                        )}
-                        {isDeleted && inGrace && (
-                          <button
-                            onClick={() => patchUser(u.id, { action: "restore" })}
-                            className="px-2 py-0.5 bg-emerald-900/60 hover:bg-emerald-900 text-emerald-300 text-xs rounded"
-                          >
-                            Restore
-                          </button>
-                        )}
-                      </div>
+                          )}
+                        </div>
+                      )}
                     </td>
                   </tr>
                 );
