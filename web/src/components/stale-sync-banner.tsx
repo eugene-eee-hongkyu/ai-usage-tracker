@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useMessages } from "@/lib/use-i18n";
 
 // 본인 dashboard 상단에 표시. launchd 가 깨졌는데 본인이 모르는 만성 문제를
