@@ -11,7 +11,7 @@
 // 빌드 시점 (packaged): resourcesPath 안에 web/ + cli/ 가 들어 있음 (electron-builder
 // extraResources 로 복사). 개발 모드 (electron .) 면 repo root 에서 직접 참조.
 
-const { app, BrowserWindow, shell, dialog } = require("electron");
+const { app, BrowserWindow, Menu, shell, dialog } = require("electron");
 const path = require("path");
 const { spawn, execSync } = require("child_process");
 const { mkdirSync, existsSync, readFileSync, writeFileSync, openSync, readdirSync } = require("fs");
@@ -566,6 +566,124 @@ function syncLocalDestinationPort(port) {
 let mainWindow = null;
 let serverPort = 3737;
 
+// Phase 4.2 — Cloud mode (Claude desktop 패턴). 메뉴 "View → Cloud Dashboard" 클릭
+// 시 BrowserWindow 가 클라우드 URL 로드. OAuth 는 web 표준 그대로 (in-window redirect).
+// 로컬 모드 (LOCAL_MODE=1, SQLite) 와 토글로 분리 — 모드 안 섞임.
+const CLOUD_URL = process.env.CLOUD_URL ?? "https://aiusage.z21labs.world/dashboard";
+
+// in-window 허용 도메인 — OAuth provider 및 클라우드 자체. 그 외 외부 링크는 시스템 브라우저.
+const ALLOWED_IN_WINDOW_HOSTS = new Set([
+  "aiusage.z21labs.world",
+  "github.com",
+  "accounts.google.com",
+  "accounts.youtube.com",
+  "appleid.apple.com",
+  "auth0.com",  // 향후 provider 추가 대비
+]);
+
+function isAllowedInWindow(rawUrl) {
+  try {
+    const u = new URL(rawUrl);
+    if (!/^https?:/.test(u.protocol)) return false;
+    if (ALLOWED_IN_WINDOW_HOSTS.has(u.hostname)) return true;
+    // OAuth subdomain (login.* 등) — 도메인 suffix 매칭
+    for (const host of ALLOWED_IN_WINDOW_HOSTS) {
+      if (u.hostname.endsWith(`.${host}`)) return true;
+    }
+    return false;
+  } catch {
+    return false;
+  }
+}
+
+let currentMode = "local";
+
+async function loadLocalDashboard(locale) {
+  // server 죽었을 가능성 (cloud 모드에서 오래 있다가 복귀, 또는 비정상 종료) 대비.
+  const alive = await waitForServer(serverPort, 3000).catch(() => false);
+  if (!alive) {
+    log(`local 모드 진입 — server 죽음, 재시작`);
+    startServer(serverPort);
+    await waitForServer(serverPort, 30000);
+  }
+  currentMode = "local";
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    const url = `http://localhost:${serverPort}/dashboard?locale=${locale}`;
+    mainWindow.setTitle("AI Usage Tracker — Local");
+    mainWindow.loadURL(url);
+  }
+  rebuildAppMenu(locale);
+}
+
+function loadCloudDashboard(locale) {
+  currentMode = "cloud";
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.setTitle("AI Usage Tracker — Cloud");
+    const url = `${CLOUD_URL}?locale=${locale}`;
+    mainWindow.loadURL(url);
+  }
+  rebuildAppMenu(locale);
+}
+
+function rebuildAppMenu(locale) {
+  const isMac = process.platform === "darwin";
+  const template = [
+    ...(isMac
+      ? [{
+          label: app.name,
+          submenu: [
+            { role: "about" },
+            { type: "separator" },
+            { role: "services" },
+            { type: "separator" },
+            { role: "hide" },
+            { role: "hideOthers" },
+            { role: "unhide" },
+            { type: "separator" },
+            { role: "quit" },
+          ],
+        }]
+      : []),
+    {
+      label: "View",
+      submenu: [
+        {
+          label: "Local Dashboard",
+          accelerator: "CmdOrCtrl+1",
+          type: "radio",
+          checked: currentMode === "local",
+          click: () => { void loadLocalDashboard(locale); },
+        },
+        {
+          label: "Cloud Dashboard",
+          accelerator: "CmdOrCtrl+2",
+          type: "radio",
+          checked: currentMode === "cloud",
+          click: () => { loadCloudDashboard(locale); },
+        },
+        { type: "separator" },
+        { role: "reload" },
+        { role: "forceReload" },
+        { role: "toggleDevTools" },
+        { type: "separator" },
+        { role: "resetZoom" },
+        { role: "zoomIn" },
+        { role: "zoomOut" },
+        { type: "separator" },
+        { role: "togglefullscreen" },
+      ],
+    },
+    {
+      label: "Window",
+      submenu: [
+        { role: "minimize" },
+        { role: "close" },
+      ],
+    },
+  ];
+  Menu.setApplicationMenu(Menu.buildFromTemplate(template));
+}
+
 async function main() {
   ensureDataDir();
   await ensureSqliteSchema();
@@ -600,7 +718,7 @@ async function main() {
   mainWindow = new BrowserWindow({
     width: 1280,
     height: 800,
-    title: "AI Usage Tracker",
+    title: "AI Usage Tracker — Local",
     backgroundColor: "#0a0a0a",
     webPreferences: {
       contextIsolation: true,
@@ -608,17 +726,25 @@ async function main() {
     },
   });
   mainWindow.loadURL(url);
+  currentMode = "local";
+  rebuildAppMenu(locale);
 
-  // 외부 링크는 시스템 브라우저
+  // window.open() / target=_blank: OAuth provider 도메인은 in-window 허용 (popup 모드
+  // 대비), aiusage 자체도 같은 윈도우. 그 외는 시스템 브라우저.
   mainWindow.webContents.setWindowOpenHandler(({ url: u }) => {
+    if (isAllowedInWindow(u)) {
+      return { action: "allow" };
+    }
     shell.openExternal(u);
     return { action: "deny" };
   });
 
   // 위저드가 /dashboard 로 client-side router.push 하면 그 시점에 sync 한 번 트리거.
   // 그래야 위저드 save 가 만든 config.json 을 sync 가 읽음 (legacy fallback 아니라).
+  // 클라우드 모드에선 sync trigger 무관 — local 모드 전용.
   let syncTriggered = false;
   const onNav = (_e, navUrl) => {
+    if (currentMode !== "local") return;
     if (syncTriggered) return;
     if (!navUrl.includes("/dashboard")) return;
     if (!existsSync(CONFIG_FILE)) return;
