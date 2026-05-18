@@ -269,11 +269,17 @@ echo ""
 npx --yes --ignore-cache "$REPO" migrate || echo "   (migrate 단계 일부 실패 — init 계속 진행)"
 
 echo ""
-echo "📥 Usage Tracker init 실행..."
-echo ""
 
-# Run init via npx
-# AIUSAGE_FROM_INSTALL_SH=1: init 의 preflightNodeVersion 안전장치. 만약 nvm
-# 분기가 어떤 이유로든 Node 22 적용 실패면, init 이 자동 복구 prompt 재호출
-# 하지 않고 즉시 명확한 에러 출력 후 종료 (무한 루프 차단).
-AIUSAGE_FROM_INSTALL_SH=1 npx --yes --ignore-cache "$REPO" init
+# 기존 API 키 있음 = repair 흐름 (기존 사용자가 자동 복구로 install.sh 재실행한
+# 케이스). init 은 readline prompt 가 있는데, 비대화형 stdin 에선 "재설치할까요?"
+# 가 즉시 N 으로 떨어져 launchd 등록 전에 종료된다.
+# AIUSAGE_FROM_INSTALL_SH=1: preflightNodeVersion 무한 루프 안전장치.
+if [ -f "$HOME/.z21labs/usage-key" ] || [ -f "$HOME/.primus-usage-key" ]; then
+  echo "📥 Usage Tracker repair 실행 (기존 키 감지)..."
+  echo ""
+  AIUSAGE_FROM_INSTALL_SH=1 npx --yes --ignore-cache "$REPO" repair
+else
+  echo "📥 Usage Tracker init 실행 (신규)..."
+  echo ""
+  AIUSAGE_FROM_INSTALL_SH=1 npx --yes --ignore-cache "$REPO" init
+fi
