@@ -69,15 +69,66 @@ export const authOptions: NextAuthOptions = {
           .where(eq(users.email, email))
           .limit(1);
 
-        if (existing.length === 0) {
+        // 기존 사용자 처리
+        if (existing.length > 0) {
+          const u = existing[0];
+          // suspended / deleted 차단
+          if (u.deletedAt) return `/login?error=deleted`;
+          if (u.suspendedAt) return `/login?error=suspended`;
+          return true;
+        }
+
+        // 신규 사용자: invitation 검사. admin 이 보낸 invitation 의 email 과 매칭되는
+        // pending invitation 있으면 자동 가입 + role/permissions 적용 + accept 마킹.
+        // 없으면 가입 거부 → /join 페이지로 redirect (가입 신청 form 표시).
+        // eslint-disable-next-line @typescript-eslint/no-require-imports
+        const { invitations } = await import("@/lib/db");
+        const { and, isNull } = await import("drizzle-orm");
+        const invite = await db
+          .select({
+            id: invitations.id,
+            role: invitations.role,
+            permissions: invitations.permissions,
+            expiresAt: invitations.expiresAt,
+          })
+          .from(invitations)
+          .where(
+            and(
+              eq(invitations.email, email),
+              isNull(invitations.acceptedAt),
+              isNull(invitations.cancelledAt)
+            )
+          )
+          .limit(1);
+
+        if (invite[0]) {
+          // 만료된 invitation — cancel 마킹 후 가입 거부
+          if (invite[0].expiresAt < new Date()) {
+            await db
+              .update(invitations)
+              .set({ cancelledAt: new Date() })
+              .where(eq(invitations.id, invite[0].id));
+            return `/login?error=invitation_expired`;
+          }
+          // 자동 가입 + invitation accept
           await db.insert(users).values({
             githubId: String((profile as Record<string, unknown>)?.id ?? account?.providerAccountId),
             email,
             name: user.name ?? email.split("@")[0],
             avatarUrl: user.image ?? null,
+            role: invite[0].role,
+            permissions: invite[0].permissions,
           });
+          await db
+            .update(invitations)
+            .set({ acceptedAt: new Date() })
+            .where(eq(invitations.id, invite[0].id));
+          return true;
         }
-        return true;
+
+        // invitation 없는 신규 사용자 — /join 으로 redirect (가입 신청 form).
+        // users INSERT 하지 않음. /join 페이지가 public 이라 OAuth 정보 없이 form 으로 신청.
+        return `/join?email=${encodeURIComponent(email)}&name=${encodeURIComponent(user.name ?? "")}`;
       } catch (err) {
         console.error("[auth] signIn DB error:", err);
         return "/login?error=db";

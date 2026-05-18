@@ -36,6 +36,14 @@ export const periodSnapshots = schema.periodSnapshots;
 export const userBlocks = schema.userBlocks;
 export const dailyVisits = schema.dailyVisits;
 
+// admin-v1: cloud-only 테이블. type 은 PG schema 직접 import.
+// LOCAL_MODE 에서 admin code 호출 시 sqlite 의 "no such table" 에러 발생 — 따라서 admin
+// API route 는 IS_LOCAL_MODE 가드로 LOCAL_MODE 진입 차단 필수.
+export const invitations = pgSchema.invitations;
+export const joinRequests = pgSchema.joinRequests;
+export const apiTokens = pgSchema.apiTokens;
+export const auditLogs = pgSchema.auditLogs;
+
 function makeLocalDb(): Db {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const Database = require("better-sqlite3");
