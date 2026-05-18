@@ -93,6 +93,11 @@ export interface Messages {
       apiUnitCost: string;
       apiUnitCostHint: string;
       planTierMissing: string;
+      planSavings: string;
+      planSavingsApiLabel: string;
+      planSavingsPlanLabel: string;
+      planSavingsSavedLabel: string;
+      planSavingsHint: string;
     };
     syncNeeded: {
       title: string;
@@ -723,6 +728,11 @@ export const en: Messages = {
       apiUnitCost: "API-equivalent Unit Cost ($ / 1M)",
       apiUnitCostHint: "Anthropic API direct-call equivalent · shows plan savings",
       planTierMissing: "Plan tier not set — select it in the plan-health card above",
+      planSavings: "Plan Savings",
+      planSavingsApiLabel: "API equiv.",
+      planSavingsPlanLabel: "Plan cost",
+      planSavingsSavedLabel: "saved",
+      planSavingsHint: "API-equivalent cost vs plan price this period · estimated if tier missing",
     },
     syncNeeded: {
       title: "sync needed",

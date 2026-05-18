@@ -30,6 +30,11 @@ export const zh: DeepPartial<Messages> = {
       apiUnitCost: "API 折算单价 ($ / 1M)",
       apiUnitCostHint: "Anthropic API 直接调用折算 · 体现 plan 节省效果",
       planTierMissing: "Plan tier 未填写 — 请在上方 plan-health 卡片中选择",
+      planSavings: "Plan 节省",
+      planSavingsApiLabel: "API 折算",
+      planSavingsPlanLabel: "Plan 费用",
+      planSavingsSavedLabel: "节省",
+      planSavingsHint: "本期 API 折算成本 vs plan 价格 · 未填写 tier 时使用估算",
     },
     syncNeeded: {
       title: "sync needed",

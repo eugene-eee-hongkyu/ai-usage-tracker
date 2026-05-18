@@ -1408,65 +1408,70 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
             </div>
           </div>
 
-          {/* API 환산 단가 — ccusage API cost × 1M / 토큰. plan 가입 안 했을 때
-              들었을 비용 환산. amber = plan 절약 효과 / cost saving 컨셉. */}
-          <div data-testid="dash-card-api-unit-cost" className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-amber-500 rounded">
+          {/* Plan Savings KPI — 이 기간 API 환산 cost (ccusage 합) vs plan 가격
+              (priceForPeriod). 그래프 X, 단일 숫자. 직접 비교로 절약 효과 한눈에.
+              이전: API 환산 단가 그래프 (cache hit pct 의 inverse 라 거의 평탄 — 정보 가치 낮음). */}
+          <div data-testid="dash-card-plan-savings" className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-amber-500 rounded">
             <div className="px-3 py-2 border-b border-neutral-800">
               <span className="text-xs font-mono font-bold text-amber-400 uppercase tracking-wider">
-                {t.dashboard.cards.apiUnitCost}
-                <span className="ml-1.5 text-neutral-500 normal-case font-normal">(log)</span>
+                {t.dashboard.cards.planSavings}
               </span>
             </div>
             <div className="p-3">
               {(() => {
-                const apiUnitCostData = chartData.map((d) => {
-                  const tokens = tokenMap[d.date] ?? 0;
-                  const unitCost = tokens > 0 ? (d.cost * 1_000_000) / tokens : null;
-                  return { date: d.date, unitCost };
-                });
-                const hasData = apiUnitCostData.some((u) => u.unitCost != null);
-                if (!hasData) {
-                  return <p className="text-neutral-600 text-xs font-mono">no data</p>;
-                }
-                return (
-                  <>
-                    <ResponsiveContainer width="100%" height={160}>
-                      <LineChart data={apiUnitCostData} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="#1f2937" />
-                        <XAxis dataKey="date" stroke="#525252" fontSize={10} interval="preserveStartEnd" />
-                        <YAxis
-                          stroke="#525252"
-                          fontSize={10}
-                          scale="log"
-                          domain={[0.001, "auto"]}
-                          tickFormatter={(v) => {
-                            const n = Number(v);
-                            return n >= 0.01 ? `$${n.toFixed(2)}` : `$${n.toFixed(3)}`;
-                          }}
-                        />
-                        <Tooltip
-                          contentStyle={{ background: "#0a0a0a", border: "1px solid #404040", fontSize: 11, fontFamily: "monospace" }}
-                          formatter={(v) => {
-                            if (v == null) return ["—", "api unit cost"];
-                            const n = Number(v);
-                            const s = n >= 1 ? `$${n.toFixed(2)}` : n >= 0.01 ? `$${n.toFixed(3)}` : `$${n.toFixed(4)}`;
-                            return [`${s} / 1M`, "api unit cost"];
-                          }}
-                        />
-                        <Line
-                          type="monotone"
-                          dataKey="unitCost"
-                          stroke="#f59e0b"
-                          strokeWidth={1.75}
-                          dot={false}
-                          connectNulls={false}
-                        />
-                      </LineChart>
-                    </ResponsiveContainer>
-                    <p className="text-[10px] font-mono text-neutral-600 mt-1.5">
-                      {t.dashboard.cards.apiUnitCostHint}
+                const apiCost = chartData.reduce((s, d) => s + (d.cost ?? 0), 0);
+                const planCost = data.planHealth?.priceForPeriod ?? null;
+                if (planCost == null || planCost <= 0) {
+                  return (
+                    <p className="text-neutral-600 text-xs font-mono">
+                      {t.dashboard.cards.planTierMissing}
                     </p>
-                  </>
+                  );
+                }
+                const saved = apiCost - planCost;
+                const savedPct = apiCost > 0 ? Math.round((saved / apiCost) * 100) : null;
+                const positive = saved > 0;
+                const fmt = (v: number) =>
+                  v >= 100 ? `$${v.toFixed(0)}` : v >= 1 ? `$${v.toFixed(1)}` : `$${v.toFixed(2)}`;
+                return (
+                  <div className="space-y-2">
+                    <div className="flex items-baseline gap-2">
+                      <div className="flex-1">
+                        <p className="text-[10px] font-mono text-neutral-500 uppercase tracking-wider">
+                          {t.dashboard.cards.planSavingsApiLabel}
+                        </p>
+                        <p className="text-2xl font-mono font-bold text-amber-300">{fmt(apiCost)}</p>
+                      </div>
+                      <span className="text-neutral-600 text-xl font-mono">→</span>
+                      <div className="flex-1">
+                        <p className="text-[10px] font-mono text-neutral-500 uppercase tracking-wider">
+                          {t.dashboard.cards.planSavingsPlanLabel}
+                        </p>
+                        <p className="text-2xl font-mono font-bold text-neutral-200">{fmt(planCost)}</p>
+                      </div>
+                    </div>
+                    {savedPct !== null && positive && (
+                      <div className="pt-2 border-t border-neutral-800">
+                        <p className="text-xs font-mono">
+                          <span className="text-emerald-400 font-bold">▼ {savedPct}%</span>
+                          <span className="text-neutral-400"> {t.dashboard.cards.planSavingsSavedLabel} </span>
+                          <span className="text-neutral-300">({fmt(saved)})</span>
+                        </p>
+                      </div>
+                    )}
+                    {savedPct !== null && !positive && (
+                      <div className="pt-2 border-t border-neutral-800">
+                        <p className="text-xs font-mono">
+                          <span className="text-rose-400 font-bold">▲ {Math.abs(savedPct)}%</span>
+                          <span className="text-neutral-400"> over plan </span>
+                          <span className="text-neutral-300">({fmt(Math.abs(saved))})</span>
+                        </p>
+                      </div>
+                    )}
+                    <p className="text-[10px] font-mono text-neutral-600">
+                      {t.dashboard.cards.planSavingsHint}
+                    </p>
+                  </div>
                 );
               })()}
             </div>

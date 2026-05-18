@@ -30,6 +30,11 @@ export const ja: DeepPartial<Messages> = {
       apiUnitCost: "API 換算単価 ($ / 1M)",
       apiUnitCostHint: "Anthropic API 直接呼び出し換算 · plan 節約効果",
       planTierMissing: "Plan tier 未入力 — 上の plan-health カードで選択",
+      planSavings: "Plan 節約",
+      planSavingsApiLabel: "API 換算",
+      planSavingsPlanLabel: "Plan 料金",
+      planSavingsSavedLabel: "節約",
+      planSavingsHint: "この期間の API 換算コスト vs plan 料金 · tier 未入力時は推定",
     },
     syncNeeded: {
       title: "sync needed",

@@ -95,6 +95,11 @@ export const ko: DeepPartial<Messages> = {
       apiUnitCost: "API 환산 단가 ($ / 1M)",
       apiUnitCostHint: "Anthropic API 직접 호출 환산 · plan 절약 효과",
       planTierMissing: "Plan tier 미입력 — 위 plan-health 카드에서 선택",
+      planSavings: "Plan 절감",
+      planSavingsApiLabel: "API 환산",
+      planSavingsPlanLabel: "Plan 비용",
+      planSavingsSavedLabel: "절약",
+      planSavingsHint: "이 기간 API 환산 비용 vs plan 가격 · tier 미입력 시 추정 (P90 + cost)",
     },
     syncNeeded: {
       title: "sync needed",
