@@ -1433,6 +1433,12 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
                 const positive = saved > 0;
                 const fmt = (v: number) =>
                   v >= 100 ? `$${v.toFixed(0)}` : v >= 1 ? `$${v.toFixed(1)}` : `$${v.toFixed(2)}`;
+                // tier label + monthly price + (estimated). declaredLimits 에 label/monthlyPriceUsd 모두 있음.
+                // isEstimatedTier=true 면 자동 추정 (P90+cost), false 면 사용자 입력.
+                const limits = data.planHealth?.declaredLimits ?? null;
+                const tierLabel = limits?.label ?? null;
+                const monthlyPrice = limits?.monthlyPriceUsd ?? null;
+                const isEstimated = data.planHealth?.isEstimatedTier === true;
                 return (
                   <div className="space-y-2">
                     <div className="flex items-baseline gap-2">
@@ -1448,6 +1454,12 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
                           {t.dashboard.cards.planSavingsPlanLabel}
                         </p>
                         <p className="text-2xl font-mono font-bold text-neutral-200">{fmt(planCost)}</p>
+                        {tierLabel && monthlyPrice !== null && (
+                          <p className={`text-[10px] font-mono mt-0.5 ${isEstimated ? "text-amber-500/70" : "text-neutral-500"}`}>
+                            {tierLabel} · ${monthlyPrice}{t.dashboard.cards.planSavingsMonthlySuffix}
+                            {isEstimated && ` (${t.dashboard.cards.planSavingsEstimatedLabel})`}
+                          </p>
+                        )}
                       </div>
                     </div>
                     {savedPct !== null && positive && (

@@ -100,6 +100,8 @@ export const ko: DeepPartial<Messages> = {
       planSavingsPlanLabel: "Plan 비용",
       planSavingsSavedLabel: "절약",
       planSavingsHint: "이 기간 API 환산 비용 vs plan 가격 · tier 미입력 시 추정 (P90 + cost)",
+      planSavingsEstimatedLabel: "추정",
+      planSavingsMonthlySuffix: "/월",
     },
     syncNeeded: {
       title: "sync needed",

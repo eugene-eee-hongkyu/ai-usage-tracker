@@ -35,6 +35,8 @@ export const ja: DeepPartial<Messages> = {
       planSavingsPlanLabel: "Plan 料金",
       planSavingsSavedLabel: "節約",
       planSavingsHint: "この期間の API 換算コスト vs plan 料金 · tier 未入力時は推定",
+      planSavingsEstimatedLabel: "推定",
+      planSavingsMonthlySuffix: "/月",
     },
     syncNeeded: {
       title: "sync needed",

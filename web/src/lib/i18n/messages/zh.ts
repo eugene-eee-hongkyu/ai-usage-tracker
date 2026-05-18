@@ -35,6 +35,8 @@ export const zh: DeepPartial<Messages> = {
       planSavingsPlanLabel: "Plan 费用",
       planSavingsSavedLabel: "节省",
       planSavingsHint: "本期 API 折算成本 vs plan 价格 · 未填写 tier 时使用估算",
+      planSavingsEstimatedLabel: "估算",
+      planSavingsMonthlySuffix: "/月",
     },
     syncNeeded: {
       title: "sync needed",

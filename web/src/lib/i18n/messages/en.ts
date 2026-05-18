@@ -98,6 +98,8 @@ export interface Messages {
       planSavingsPlanLabel: string;
       planSavingsSavedLabel: string;
       planSavingsHint: string;
+      planSavingsEstimatedLabel: string;
+      planSavingsMonthlySuffix: string;
     };
     syncNeeded: {
       title: string;
@@ -733,6 +735,8 @@ export const en: Messages = {
       planSavingsPlanLabel: "Plan cost",
       planSavingsSavedLabel: "saved",
       planSavingsHint: "API-equivalent cost vs plan price this period · estimated if tier missing",
+      planSavingsEstimatedLabel: "estimated",
+      planSavingsMonthlySuffix: "/mo",
     },
     syncNeeded: {
       title: "sync needed",
