@@ -93,7 +93,22 @@ export default function AdminUsersPage() {
     void fetchAll();
   }, [fetchAll]);
 
+  // Phase 4.2 M6c — viewAs 상태에서 쓰기 액션 confirm 다이얼로그.
+  // 평소 (자기 팀) 작업엔 confirm 없음. 다른 팀 진입 중에만 한 단계 추가.
+  function confirmViewAsAction(targetLabel: string, actionLabel: string): boolean {
+    const viewAs = (session?.user as { viewAsTeamName?: string | null } | undefined)?.viewAsTeamName;
+    if (!viewAs) return true;
+    return window.confirm(
+      `[${viewAs}] 팀의 데이터를 수정합니다.\n\n대상: ${targetLabel}\n액션: ${actionLabel}\n\n계속하시겠습니까?`
+    );
+  }
+
   async function patchUser(id: number, body: Record<string, unknown>) {
+    const target = users?.users?.find((u) => u.id === id);
+    const targetLabel = target ? `${target.name} (${target.email})` : `id=${id}`;
+    const actionLabel = String(body.action ?? "update");
+    if (!confirmViewAsAction(targetLabel, actionLabel)) return false;
+
     const r = await fetch(`/api/admin/users?id=${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
@@ -109,6 +124,8 @@ export default function AdminUsersPage() {
   }
 
   async function patchJoinRequest(id: number, decision: "approved" | "rejected") {
+    if (!confirmViewAsAction(`join_request #${id}`, decision)) return;
+
     const r = await fetch(`/api/admin/join-requests?id=${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },

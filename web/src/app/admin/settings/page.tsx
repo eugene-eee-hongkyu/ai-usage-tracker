@@ -233,9 +233,18 @@ interface TeamRow {
 
 // Phase 4.2 M6b — 모든 팀 리스트 + 각 팀 멤버 표시. Owner only.
 // "내 팀" + "내가 만든 다른 팀들" 한 화면에서 관리.
+// M6c: Owner 가 다른 팀으로 view-as 진입 가능 — "Switch to" 버튼.
 function TeamsOverviewSection() {
   const [data, setData] = useState<TeamRow[]>([]);
   const [loading, setLoading] = useState(false);
+  const [switchingId, setSwitchingId] = useState<number | null>(null);
+  const { data: session } = useSession();
+  const u = session?.user as {
+    currentTeamId?: number | null;
+    viewAsTeamId?: number | null;
+  } | undefined;
+  const currentTeamId = u?.currentTeamId ?? null;
+  const viewAsTeamId = u?.viewAsTeamId ?? null;
 
   const fetchTeams = useCallback(async () => {
     setLoading(true);
@@ -253,6 +262,28 @@ function TeamsOverviewSection() {
     void fetchTeams();
   }, [fetchTeams]);
 
+  async function switchTo(teamId: number) {
+    if (switchingId !== null) return;
+    setSwitchingId(teamId);
+    try {
+      const r = await fetch("/api/admin/platform/switch-team", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ teamId }),
+      });
+      if (r.ok) {
+        window.location.reload();
+      } else {
+        const err = (await r.json().catch(() => ({}))) as { error?: string };
+        alert(`Switch 실패: ${err.error ?? "unknown"}`);
+        setSwitchingId(null);
+      }
+    } catch (e) {
+      alert(`Switch 실패: ${String(e)}`);
+      setSwitchingId(null);
+    }
+  }
+
   return (
     <section className="bg-slate-900 border border-slate-800 rounded-lg p-5 space-y-3">
       <header>
@@ -266,13 +297,22 @@ function TeamsOverviewSection() {
       {!loading && data.length === 0 && <p className="text-sm text-slate-500">팀이 없음.</p>}
       {!loading && data.length > 0 && (
         <div className="space-y-3">
-          {data.map((t) => (
+          {data.map((t) => {
+            const isCurrent = t.id === currentTeamId;
+            const isViewingNow = t.id === viewAsTeamId;
+            return (
             <div key={t.id} className="bg-slate-950 border border-slate-800 rounded p-3 space-y-2">
               <div className="flex items-center justify-between gap-3">
                 <div>
                   <p className="text-sm font-semibold text-slate-100">
                     {t.name}{" "}
                     <span className="text-xs text-slate-500 font-mono">#{t.id} · {t.slug}</span>
+                    {isCurrent && (
+                      <span className="ml-2 text-xs px-1.5 py-0.5 rounded bg-emerald-900/40 text-emerald-300">내 팀</span>
+                    )}
+                    {isViewingNow && (
+                      <span className="ml-2 text-xs px-1.5 py-0.5 rounded bg-orange-900/40 text-orange-300">view-as</span>
+                    )}
                   </p>
                   <p className="text-xs text-slate-500">
                     생성: {new Date(t.createdAt).toLocaleDateString("ko")} · 멤버 {t.memberCount ?? 0}명
@@ -281,6 +321,15 @@ function TeamsOverviewSection() {
                     )}
                   </p>
                 </div>
+                {!isCurrent && !t.deletedAt && (
+                  <button
+                    onClick={() => switchTo(t.id)}
+                    disabled={switchingId === t.id}
+                    className="text-xs px-3 py-1 rounded bg-orange-700 hover:bg-orange-800 text-orange-50 font-medium disabled:opacity-50"
+                  >
+                    {switchingId === t.id ? "Switching…" : isViewingNow ? "Re-enter" : "Switch to"}
+                  </button>
+                )}
               </div>
               {t.members && t.members.length > 0 && (
                 <div className="space-y-1">
@@ -308,7 +357,8 @@ function TeamsOverviewSection() {
                 </div>
               )}
             </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </section>
