@@ -24,6 +24,10 @@ import {
 } from "drizzle-orm/sqlite-core";
 import { sql } from "drizzle-orm";
 
+// admin-v1 의 role/permissions/suspended_at/deleted_at 컬럼은 LOCAL_MODE 에서도
+// schema 일관성 위해 보유. 단 LOCAL_MODE 는 1인용이라 사실상 row 1개 + role='admin'
+// 고정. invitations/join_requests/audit_logs/api_tokens 테이블은 cloud 전용이라
+// SQLite 에 추가 안 함 (admin UI 자체가 LOCAL_MODE 에서 hidden).
 export const users = sqliteTable("users", {
   id: integer("id", { mode: "number" }).primaryKey({ autoIncrement: true }),
   githubId: text("github_id").unique(),
@@ -33,6 +37,10 @@ export const users = sqliteTable("users", {
   apiKeyHash: text("api_key_hash"),
   timezone: text("timezone"),
   planTier: text("plan_tier"),
+  role: text("role").notNull().default("member"),
+  permissions: text("permissions", { mode: "json" }).notNull().default(sql`'{}'`),
+  suspendedAt: integer("suspended_at", { mode: "timestamp_ms" }),
+  deletedAt: integer("deleted_at", { mode: "timestamp_ms" }),
   createdAt: integer("created_at", { mode: "timestamp_ms" })
     .notNull()
     .default(sql`(unixepoch() * 1000)`),

@@ -10,6 +10,7 @@ import {
   date,
   uniqueIndex,
   index,
+  inet,
 } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 
@@ -24,9 +25,123 @@ export const users = pgTable("users", {
   // 사용자가 명시한 Claude Code plan tier. 자동 추정과 별도로 본인 입력 받음.
   // null 이면 추정만 사용. 값: 'pro' | 'max5' | 'max20' | 'team' | 'api'
   planTier: text("plan_tier"),
+  // admin-v1 (Phase 4.1) — 권한 + 라이프사이클.
+  //   role: 'member' (default) | 'admin'. Owner 는 ADMIN_EMAIL env 화이트리스트 기반 (별도).
+  //   permissions: { membershipAdmin: bool, billingAdmin: bool } JSON — 권한 분리 (Goodhart 회피).
+  //   suspendedAt: 정지 시각. NULL 이면 활성.
+  //   deletedAt: soft delete. 30일 grace period 동안 복구 가능.
+  role: text("role").notNull().default("member"),
+  permissions: jsonb("permissions").notNull().default(sql`'{}'::jsonb`),
+  suspendedAt: timestamp("suspended_at"),
+  deletedAt: timestamp("deleted_at"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   lastSyncedAt: timestamp("last_synced_at"),
 });
+
+// admin-v1: 이메일 초대.
+// 어드민이 email + 권한 지정 → token 발급 → Resend 로 발송 → 사용자가 OAuth 통과
+// + token 확인 시 즉시 가입. 7일 expire, 재초대/취소 지원.
+export const invitations = pgTable(
+  "invitations",
+  {
+    id: serial("id").primaryKey(),
+    email: text("email").notNull(),
+    invitedBy: integer("invited_by")
+      .notNull()
+      .references(() => users.id),
+    token: text("token").notNull(),
+    role: text("role").notNull().default("member"),
+    permissions: jsonb("permissions").notNull().default(sql`'{}'::jsonb`),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    acceptedAt: timestamp("accepted_at"),
+    cancelledAt: timestamp("cancelled_at"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (t) => ({
+    tokenUniq: uniqueIndex("invitations_token_uniq").on(t.token),
+    pendingByEmailIdx: index("invitations_pending_email_idx").on(t.email),
+  })
+);
+
+// admin-v1: 가입 신청.
+// 사용자가 OAuth 통과 후 (initial 가입 아닌) /join 페이지에서 사유 입력.
+// 어드민이 approve/reject. 상태 'pending' | 'approved' | 'rejected'.
+export const joinRequests = pgTable(
+  "join_requests",
+  {
+    id: serial("id").primaryKey(),
+    userId: integer("user_id").references(() => users.id),
+    email: text("email").notNull(),
+    teamNameHint: text("team_name_hint"),  // Phase 4.2 에 team_id 로 마이그
+    message: text("message"),
+    status: text("status").notNull().default("pending"),
+    decidedBy: integer("decided_by").references(() => users.id),
+    decidedAt: timestamp("decided_at"),
+    decisionNote: text("decision_note"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (t) => ({
+    statusIdx: index("join_requests_status_idx").on(t.status),
+  })
+);
+
+// admin-v1: API 토큰.
+// CLI sync 등 자동화용 토큰. 사용자가 본인 또는 admin 이 발급/회수.
+// scopes 는 향후 fine-grained 권한용 (현재는 ['ingest', 'read']).
+export const apiTokens = pgTable(
+  "api_tokens",
+  {
+    id: serial("id").primaryKey(),
+    userId: integer("user_id")
+      .notNull()
+      .references(() => users.id),
+    name: text("name").notNull(),
+    hash: text("hash").notNull(),
+    scopes: jsonb("scopes").notNull().default(sql`'[]'::jsonb`),
+    lastUsedAt: timestamp("last_used_at"),
+    revokedAt: timestamp("revoked_at"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (t) => ({
+    hashUniq: uniqueIndex("api_tokens_hash_uniq").on(t.hash),
+  })
+);
+
+// admin-v1: 감사 로그 (hash chain immutability).
+//
+// 방어 layer 3중 (Postgres migration 에서 정의):
+//   1. INSERT trigger: prev_hash + row_hash sha256 자동 계산 (advisory lock 으로 직렬화)
+//   2. RLS deny update/delete: app role 의 UPDATE/DELETE policy 자체가 false
+//   3. REVOKE update/delete on app/anon/authenticated role
+//
+// 검증: verify_audit_chain() 함수가 ID 순회하며 hash 재계산. 깨진 첫 row 반환.
+// admin/audit 페이지 진입 시 자동 호출 (cron 없음 — 사용자 결정 2026-05-18).
+//
+// actor_type:
+//   'user'    — 사람이 admin UI 에서 액션
+//   'service' — automated job (이건 보통 별도 sync_log, audit 엔 안 들어옴)
+//   'system'  — migration / cron / 자동 expire 등
+export const auditLogs = pgTable(
+  "audit_logs",
+  {
+    id: serial("id").primaryKey(),
+    prevHash: text("prev_hash"),
+    rowHash: text("row_hash").notNull(),
+    actorUserId: integer("actor_user_id").references(() => users.id),
+    actorType: text("actor_type").notNull(),
+    action: text("action").notNull(),
+    targetType: text("target_type"),
+    targetId: integer("target_id"),
+    metadata: jsonb("metadata").notNull().default(sql`'{}'::jsonb`),
+    ip: inet("ip"),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => ({
+    actorIdx: index("audit_logs_actor_idx").on(t.actorUserId),
+    actionIdx: index("audit_logs_action_idx").on(t.action),
+    createdAtIdx: index("audit_logs_created_at_idx").on(t.createdAt),
+  })
+);
 
 export const userSnapshots = pgTable(
   "user_snapshots",
