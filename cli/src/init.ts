@@ -123,82 +123,33 @@ function promptYn(question: string, defaultYes = true): boolean {
   return lower === "y" || lower === "yes";
 }
 
-// nvm + Node 22 자동 설치/전환. 우리 process 자체는 Node 20 으로 시작했으니
-// 설치 후엔 exit + 사용자에게 새 셸 안내. install.sh 의 자동 npx init 호출은
-// 무한 루프 잠재 위험이라 의존하지 않고 직접 처리.
-function installNvmNode22AndExit(): never {
+// install.sh 자동 실행 helper. nvm + Node 22 설치 + ~/.zshrc 갱신 + npx init 까지
+// 한 번에. preflightGlobalPackages 와 preflightNodeVersion 둘 다 같은 흐름 호출.
+function runInstallShAndExit(): never {
   const bar = "═".repeat(60);
-  const nvmDir = process.env.NVM_DIR || path.join(os.homedir(), ".nvm");
-  const nvmSh = path.join(nvmDir, "nvm.sh");
-
-  // 1) nvm 자체가 없으면 설치
-  if (!fs.existsSync(nvmSh)) {
-    console.log("");
-    console.log("📦 nvm 설치 중...");
-    try {
-      execSync(
-        "curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.1/install.sh | bash",
-        { stdio: "inherit" }
-      );
-    } catch {
-      console.error("\n❌ nvm 설치 실패. 네트워크 또는 권한 문제일 수 있음.");
-      process.exit(1);
-    }
-  } else {
-    console.log("✅ nvm 이미 설치됨 — Node 22 추가만 진행");
-  }
-
-  // 2) nvm install 22 + alias default 22 — bash -c 안에서 nvm.sh source 후 실행
-  console.log("\n📦 Node 22 설치 + default 전환 중...");
+  console.log("");
+  console.log("📦 install.sh 자동 실행 중 (nvm + Node 22 + 자동 init)...");
+  console.log("");
   try {
-    execSync(
-      `bash -c 'export NVM_DIR="${nvmDir}" && . "${nvmSh}" && nvm install 22 && nvm alias default 22'`,
-      { stdio: "inherit" }
-    );
+    execSync(`curl -fsSL ${SERVER_URL}/install.sh | bash`, { stdio: "inherit" });
   } catch {
-    console.error("\n❌ nvm install 22 실패.");
-    console.error("   수동 시도: nvm install 22 && nvm alias default 22");
+    console.error("");
+    console.error("❌ 자동 복구 실패. 수동 절차:");
+    console.error(`   curl -fsSL ${SERVER_URL}/install.sh | bash`);
+    console.error(`   npx --yes github:eugene-eee-hongkyu/ai-usage-tracker repair`);
     process.exit(1);
   }
-
-  // 3) ~/.zshrc 에 nvm 라인이 없으면 추가 (백업 자동)
-  ensureNvmInShellRc(nvmDir);
-
-  // 4) 사용자에게 새 셸 안내
-  console.log("\n" + bar);
-  console.log("✅ Node 22 설치 완료");
   console.log("");
-  console.log("   이 셸의 PATH 는 아직 옛 Node 20 을 가리킵니다. 새 셸에서:");
+  console.log(bar);
+  console.log("✅ 환경 설정 완료");
   console.log("");
-  console.log("     ⌘N (터미널 새 창)");
-  console.log("     node -v                  # v22.x.x 확인");
-  console.log("     npx --yes github:eugene-eee-hongkyu/ai-usage-tracker repair");
+  console.log("   현재 셸은 아직 옛 PATH 를 보고 있습니다. 새 Node 적용:");
+  console.log("     1. 터미널 새 창 (⌘N) 열고 repair 재실행 — 권장");
+  console.log("     2. 또는 현재 셸에서: exec $SHELL -l");
+  console.log("        그 다음: npx --yes github:eugene-eee-hongkyu/ai-usage-tracker repair");
+  console.log(bar);
   console.log("");
-  console.log("   롤백:");
-  console.log("     nvm alias default 20     # + 새 셸");
-  console.log(bar + "\n");
   process.exit(0);
-}
-
-function ensureNvmInShellRc(nvmDir: string): void {
-  const home = os.homedir();
-  const rcFiles = [".zshrc", ".bashrc", ".bash_profile"].map((f) => path.join(home, f));
-  const nvmBlock = `\n# nvm (added by ai-usage-tracker)\nexport NVM_DIR="${nvmDir}"\n[ -s "$NVM_DIR/nvm.sh" ] && \\. "$NVM_DIR/nvm.sh"\n[ -s "$NVM_DIR/bash_completion" ] && \\. "$NVM_DIR/bash_completion"\n`;
-  for (const rc of rcFiles) {
-    if (!fs.existsSync(rc)) continue;
-    const content = fs.readFileSync(rc, "utf8");
-    if (content.includes("NVM_DIR")) continue; // 이미 있음
-    const ts = Date.now();
-    const backup = path.join(STABLE_DIR, `${path.basename(rc)}.bak-${ts}`);
-    try {
-      fs.mkdirSync(STABLE_DIR, { recursive: true });
-      fs.copyFileSync(rc, backup);
-      fs.appendFileSync(rc, nvmBlock);
-      console.log(`   ✓ ${rc} 에 nvm 라인 추가 (백업: ${backup})`);
-    } catch (e) {
-      console.warn(`   ⚠️  ${rc} 갱신 실패:`, (e as Error).message);
-    }
-  }
 }
 
 // Node 22 미만이면 codeburn (engines >=22) / ccusage (engines >=22.0.0) 가
@@ -247,7 +198,7 @@ function preflightNodeVersion(): void {
 
   const autoFix = promptYn("\n   지금 자동 복구할까요? [Y/n]: ", true);
   if (autoFix) {
-    installNvmNode22AndExit();
+    runInstallShAndExit();
   }
 
   const forceProceed = promptYn(`\n   자동 복구 건너뜀. 그래도 Node ${major} 로 강행할까요? [y/N]: `, false);
@@ -324,7 +275,7 @@ function preflightGlobalPackages(): void {
   const accept = promptYn("\n   지금 자동 복구를 진행할까요? [Y/n]: ");
 
   if (accept) {
-    installNvmNode22AndExit();
+    runInstallShAndExit();
   }
 
   console.error("");
