@@ -58,9 +58,6 @@ export const authOptions: NextAuthOptions = {
   callbacks: {
     async signIn({ user, account, profile }) {
       const email = user.email ?? "";
-      if (!isEmailAllowed(email)) {
-        return `/login?error=domain`;
-      }
 
       try {
         const existing = await db
@@ -69,19 +66,15 @@ export const authOptions: NextAuthOptions = {
           .where(eq(users.email, email))
           .limit(1);
 
-        // 기존 사용자 처리
+        // 기존 사용자 — 도메인 화이트리스트 무관 통과 (이미 가입한 사람)
         if (existing.length > 0) {
           const u = existing[0];
-          // suspended / deleted 차단
           if (u.deletedAt) return `/login?error=deleted`;
           if (u.suspendedAt) return `/login?error=suspended`;
           return true;
         }
 
-        // 신규 사용자: invitation 검사. admin 이 보낸 invitation 의 email 과 매칭되는
-        // pending invitation 있으면 자동 가입 + role/permissions 적용 + accept 마킹.
-        // 없으면 가입 거부 → /join 페이지로 redirect (가입 신청 form 표시).
-        // eslint-disable-next-line @typescript-eslint/no-require-imports
+        // 신규 사용자: invitation 우선 조회. 명시 초대받은 사람은 도메인 화이트리스트 우회.
         const { invitations } = await import("@/lib/db");
         const { and, isNull } = await import("drizzle-orm");
         const invite = await db
@@ -110,7 +103,7 @@ export const authOptions: NextAuthOptions = {
               .where(eq(invitations.id, invite[0].id));
             return `/login?error=invitation_expired`;
           }
-          // 자동 가입 + invitation accept
+          // 자동 가입 + invitation accept (도메인 우회)
           await db.insert(users).values({
             githubId: String((profile as Record<string, unknown>)?.id ?? account?.providerAccountId),
             email,
@@ -126,8 +119,12 @@ export const authOptions: NextAuthOptions = {
           return true;
         }
 
-        // invitation 없는 신규 사용자 — /join 으로 redirect (가입 신청 form).
-        // users INSERT 하지 않음. /join 페이지가 public 이라 OAuth 정보 없이 form 으로 신청.
+        // invitation 없는 신규 사용자만 도메인 화이트리스트 적용
+        if (!isEmailAllowed(email)) {
+          return `/login?error=domain`;
+        }
+
+        // 도메인 통과한 self-signup 신규자 — /join 으로 redirect (가입 신청 form).
         return `/join?email=${encodeURIComponent(email)}&name=${encodeURIComponent(user.name ?? "")}`;
       } catch (err) {
         console.error("[auth] signIn DB error:", err);
