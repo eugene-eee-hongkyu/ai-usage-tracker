@@ -152,6 +152,7 @@ function deriveUserTodayFromBody(body: unknown): string | null {
  */
 export async function runIngest(
   userId: number,
+  teamId: number,
   userTimezone: string | null,
   body: unknown
 ): Promise<void> {
@@ -189,7 +190,7 @@ export async function runIngest(
   const existing = await db
     .select()
     .from(userSnapshots)
-    .where(eq(userSnapshots.userId, userId))
+    .where(and(eq(userSnapshots.userId, userId), eq(userSnapshots.teamId, teamId)))
     .limit(1);
 
   const prev = existing[0];
@@ -238,6 +239,7 @@ export async function runIngest(
       .insert(periodSnapshots)
       .values({
         userId,
+        teamId,
         periodType: "weekly",
         periodStart: prev.currentWeekStart,
         capturedAt: prev.updatedAt ?? now,
@@ -252,6 +254,7 @@ export async function runIngest(
       .insert(periodSnapshots)
       .values({
         userId,
+        teamId,
         periodType: "monthly",
         periodStart: prev.currentMonthStart,
         capturedAt: prev.updatedAt ?? now,
@@ -266,6 +269,7 @@ export async function runIngest(
       .insert(periodSnapshots)
       .values({
         userId,
+        teamId,
         periodType: "daily",
         periodStart: prev.currentDayStart,
         capturedAt: prev.updatedAt ?? now,
@@ -278,6 +282,7 @@ export async function runIngest(
     .insert(userSnapshots)
     .values({
       userId,
+      teamId,
       rawJson: body,
       totalCost,
       sessionsCount,
@@ -293,7 +298,7 @@ export async function runIngest(
       updatedAt: now,
     })
     .onConflictDoUpdate({
-      target: [userSnapshots.userId],
+      target: [userSnapshots.userId, userSnapshots.teamId],
       set: {
         rawJson: sql`excluded.raw_json`,
         totalCost: sql`excluded.total_cost`,
@@ -321,6 +326,7 @@ export async function runIngest(
     .where(
       and(
         eq(periodSnapshots.userId, userId),
+        eq(periodSnapshots.teamId, teamId),
         eq(periodSnapshots.periodType, "weekly"),
         lt(periodSnapshots.periodStart, retentionWeekStart),
       )
@@ -331,6 +337,7 @@ export async function runIngest(
     .where(
       and(
         eq(periodSnapshots.userId, userId),
+        eq(periodSnapshots.teamId, teamId),
         eq(periodSnapshots.periodType, "monthly"),
         lt(periodSnapshots.periodStart, retentionMonthStart),
       )
@@ -341,6 +348,7 @@ export async function runIngest(
     .where(
       and(
         eq(periodSnapshots.userId, userId),
+        eq(periodSnapshots.teamId, teamId),
         eq(periodSnapshots.periodType, "daily"),
         lt(periodSnapshots.periodStart, retentionDayStart),
       )
@@ -359,6 +367,7 @@ export async function runIngest(
       .insert(userBlocks)
       .values({
         userId,
+        teamId,
         blockId: blk.id,
         startedAt,
         endedAt,
@@ -370,7 +379,7 @@ export async function runIngest(
         updatedAt: now,
       })
       .onConflictDoUpdate({
-        target: [userBlocks.userId, userBlocks.blockId],
+        target: [userBlocks.userId, userBlocks.teamId, userBlocks.blockId],
         set: {
           endedAt: sql`excluded.ended_at`,
           minutes: sql`excluded.minutes`,
@@ -389,6 +398,7 @@ export async function runIngest(
     .where(
       and(
         eq(userBlocks.userId, userId),
+        eq(userBlocks.teamId, teamId),
         lt(userBlocks.startedAt, new Date(Date.now() - 90 * 86_400_000)),
       )
     );

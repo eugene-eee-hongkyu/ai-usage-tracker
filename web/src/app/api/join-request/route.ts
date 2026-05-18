@@ -34,6 +34,9 @@ export async function POST(req: NextRequest) {
   const inserted = await db
     .insert(joinRequests)
     .values({
+      // Phase 4.2 (M6a): join_request 의 teamId 는 신청 대상 팀.
+      // M6a 에선 기본 팀 (1) 만 존재 — M6b 에서 teamNameHint 로 새 팀 생성 또는 기존 팀 신청 분기.
+      teamId: 1,
       userId: session.user.id ?? null,
       email: session.user.email,
       teamNameHint: teamNameHint ?? null,

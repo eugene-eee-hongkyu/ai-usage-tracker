@@ -18,7 +18,7 @@ import { getServerSession, type Session } from "next-auth";
 import { authOptions } from "@/lib/auth";
 
 interface GuardResult {
-  user: NonNullable<Session["user"]> & { id: number };
+  user: NonNullable<Session["user"]> & { id: number; currentTeamId: number };
   error: null;
 }
 
@@ -40,6 +40,12 @@ export async function requireUser(): Promise<GuardResult | GuardError> {
   }
   if (session.user.deletedAt) {
     return { user: null, error: NextResponse.json({ error: "deleted" }, { status: 403 }) };
+  }
+  // Phase 4.2 (M6a): 팀 미가입 user 차단. session.user.currentTeamId 가 null 이면
+  // team_members 행이 없는 상태 — 정상 흐름이면 발생 안 함 (가입 시 자동 행 INSERT).
+  // signIn 콜백에서 team_members 추가 누락된 케이스 또는 데이터 불일치 방어.
+  if (!session.user.currentTeamId) {
+    return { user: null, error: NextResponse.json({ error: "no_team" }, { status: 403 }) };
   }
   return {
     user: session.user as GuardResult["user"],

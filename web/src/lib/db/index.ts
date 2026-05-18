@@ -44,6 +44,10 @@ export const joinRequests = pgSchema.joinRequests;
 export const apiTokens = pgSchema.apiTokens;
 export const auditLogs = pgSchema.auditLogs;
 
+// Phase 4.2 (M6a): multi-tenant. teams + team_members 신규.
+export const teams = pgSchema.teams;
+export const teamMembers = pgSchema.teamMembers;
+
 function makeLocalDb(): Db {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const Database = require("better-sqlite3");

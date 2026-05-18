@@ -3,12 +3,17 @@
 // hash chain trigger 가 자동으로 prev_hash + row_hash 계산. app code 는 actor/action/
 // target/metadata 만 박으면 됨.
 //
+// Phase 4.2 (M6a): teamId 필수. action 이 발생한 팀 scope. 보통 actor 의 currentTeamId.
+// 시스템 (cron / signIn 거절 등) 발 행 audit 은 actor 가 없어 teamId=null 후보지만,
+// schema 는 NOT NULL — 기본 팀 (1) 으로 박음. M6b 도입 시 system audit 의 의미 재검토.
+//
 // 사용:
-//   await writeAudit({ actorUserId, action: 'user.invite', targetType: 'user', targetId, metadata: { email } });
+//   await writeAudit({ teamId, actorUserId, action: 'user.invite', targetType: 'user', targetId, metadata: { email } });
 
 import { db, auditLogs } from "@/lib/db";
 
 interface WriteAuditParams {
+  teamId?: number | null;        // M6a: 명시 안 하면 1 (iskra.world default 팀)
   actorUserId: number | null;
   actorType?: "user" | "service" | "system";
   action: string;
@@ -21,6 +26,7 @@ interface WriteAuditParams {
 export async function writeAudit(p: WriteAuditParams): Promise<void> {
   try {
     await db.insert(auditLogs).values({
+      teamId: p.teamId ?? 1,
       actorUserId: p.actorUserId,
       actorType: p.actorType ?? "user",
       action: p.action,

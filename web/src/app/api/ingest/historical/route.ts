@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { db, periodSnapshots, users, IS_LOCAL_MODE } from "@/lib/db";
+import { db, periodSnapshots, users, teamMembers, IS_LOCAL_MODE } from "@/lib/db";
 import { ensureLocalUser } from "@/lib/local-user";
-import { eq } from "drizzle-orm";
+import { eq, and, isNull, asc } from "drizzle-orm";
 import crypto from "crypto";
 
 // 신규 사용자 onboarding / 노트북 장기 off 후 복귀 시 historical 데이터 backfill.
@@ -39,6 +39,21 @@ export async function POST(req: NextRequest) {
   if (userRow[0].deletedAt) return NextResponse.json({ error: "deleted" }, { status: 403 });
   if (userRow[0].suspendedAt) return NextResponse.json({ error: "suspended" }, { status: 403 });
 
+  // Phase 4.2 (M6a): teamId 확정 — team_members 의 첫 행 (M6b 에서 N팀 도입).
+  let teamId: number;
+  if (IS_LOCAL_MODE) {
+    teamId = 1;
+  } else {
+    const memberRow = await db
+      .select({ teamId: teamMembers.teamId })
+      .from(teamMembers)
+      .where(and(eq(teamMembers.userId, userRow[0].id), isNull(teamMembers.deletedAt)))
+      .orderBy(asc(teamMembers.joinedAt))
+      .limit(1);
+    if (!memberRow[0]) return NextResponse.json({ error: "no_team" }, { status: 403 });
+    teamId = memberRow[0].teamId;
+  }
+
   const body = await req.json();
   const items = Array.isArray(body?.snapshots)
     ? (body.snapshots as HistoricalPayload[])
@@ -67,6 +82,7 @@ export async function POST(req: NextRequest) {
         .insert(periodSnapshots)
         .values({
           userId: userRow[0].id,
+          teamId,
           periodType: it.type,
           periodStart: it.periodStart,
           capturedAt: new Date(),

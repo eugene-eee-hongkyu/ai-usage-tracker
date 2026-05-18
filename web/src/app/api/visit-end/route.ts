@@ -39,6 +39,12 @@ export async function POST(req: NextRequest) {
     .limit(1);
   if (!userRow[0]) return NextResponse.json({ error: "not found" }, { status: 404 });
 
+  // Phase 4.2 (M6a): session.user.currentTeamId 사용.
+  const teamId = IS_LOCAL_MODE
+    ? 1
+    : ((session?.user as { currentTeamId?: number | null } | undefined)?.currentTeamId ?? null);
+  if (!teamId) return NextResponse.json({ error: "no_team" }, { status: 403 });
+
   const tz = userRow[0].timezone ?? "UTC";
   const parts = new Intl.DateTimeFormat("en-CA", {
     timeZone: tz,
@@ -54,9 +60,9 @@ export async function POST(req: NextRequest) {
   // upsert.
   await db
     .insert(dailyVisits)
-    .values({ userId: userRow[0].id, date: todayYmd, count: 0, totalDwellSeconds: sec })
+    .values({ userId: userRow[0].id, teamId, date: todayYmd, count: 0, totalDwellSeconds: sec })
     .onConflictDoUpdate({
-      target: [dailyVisits.userId, dailyVisits.date],
+      target: [dailyVisits.userId, dailyVisits.teamId, dailyVisits.date],
       set: { totalDwellSeconds: sql`${dailyVisits.totalDwellSeconds} + ${sec}` },
     });
 

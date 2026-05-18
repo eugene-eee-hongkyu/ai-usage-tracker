@@ -51,6 +51,8 @@ export async function POST(req: NextRequest) {
   const inserted = await db
     .insert(joinRequests)
     .values({
+      // Phase 4.2 (M6a): 기본 팀 (1). M6b 에서 teamNameHint 로 분기.
+      teamId: 1,
       email,
       teamNameHint: teamNameHint ?? null,
       message: message?.slice(0, 1000) ?? null,

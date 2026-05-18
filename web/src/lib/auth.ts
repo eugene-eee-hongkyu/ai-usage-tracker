@@ -2,8 +2,8 @@ import type { NextAuthOptions } from "next-auth";
 import GithubProvider from "next-auth/providers/github";
 import GoogleProvider from "next-auth/providers/google";
 import CredentialsProvider from "next-auth/providers/credentials";
-import { db, users } from "@/lib/db";
-import { eq } from "drizzle-orm";
+import { db, users, teamMembers } from "@/lib/db";
+import { eq, and, isNull, asc } from "drizzle-orm";
 import { isAdmin } from "@/lib/admin";
 import { writeAudit } from "@/lib/audit";
 
@@ -105,6 +105,7 @@ export const authOptions: NextAuthOptions = {
             role: invitations.role,
             permissions: invitations.permissions,
             expiresAt: invitations.expiresAt,
+            teamId: invitations.teamId,
           })
           .from(invitations)
           .where(
@@ -150,13 +151,22 @@ export const authOptions: NextAuthOptions = {
             .set({ acceptedAt: new Date() })
             .where(eq(invitations.id, invite[0].id));
           const newUserId = inserted[0]?.id ?? null;
+          // Phase 4.2 (M6a): invitation 의 team_id 로 team_members 도 같이 INSERT.
+          // 가입 직후 session callback 이 currentTeamId 채울 수 있게.
+          if (newUserId && invite[0].teamId) {
+            await db.insert(teamMembers).values({
+              teamId: invite[0].teamId,
+              userId: newUserId,
+              role: invite[0].role === "admin" ? "admin" : "member",
+            });
+          }
           await writeAudit({
             actorUserId: newUserId,
             actorType: "user",
             action: "user.create.via_invite",
             targetType: "user",
             targetId: newUserId,
-            metadata: { email, provider, role: invite[0].role, invitationId: invite[0].id },
+            metadata: { email, provider, role: invite[0].role, invitationId: invite[0].id, teamId: invite[0].teamId },
           });
           await writeAudit({
             actorUserId: newUserId,
@@ -164,7 +174,7 @@ export const authOptions: NextAuthOptions = {
             action: "invitation.accept",
             targetType: "invitation",
             targetId: invite[0].id,
-            metadata: { email, provider, newUserId },
+            metadata: { email, provider, newUserId, teamId: invite[0].teamId },
           });
           return true;
         }
@@ -213,6 +223,16 @@ export const authOptions: NextAuthOptions = {
           .where(eq(users.email, session.user.email))
           .limit(1);
         if (row[0]) {
+          // Phase 4.2 (M6a): currentTeamId 결정 — team_members 의 첫 행 (가입 순).
+          // M6b 에서 N팀 가입 + cookie/URL 기반 전환 도입 예정. M6a 에선 first team.
+          const memberRow = await db
+            .select({ teamId: teamMembers.teamId })
+            .from(teamMembers)
+            .where(and(eq(teamMembers.userId, row[0].id), isNull(teamMembers.deletedAt)))
+            .orderBy(asc(teamMembers.joinedAt))
+            .limit(1);
+          const currentTeamId = memberRow[0]?.teamId ?? null;
+
           const u = session.user as typeof session.user & {
             id: number;
             role: string;
@@ -221,12 +241,14 @@ export const authOptions: NextAuthOptions = {
             deletedAt: Date | null;
             isOwner: boolean;
             isAdmin: boolean;
+            currentTeamId: number | null;
           };
           u.id = row[0].id;
           u.role = row[0].role;
           u.permissions = (row[0].permissions ?? {}) as typeof u.permissions;
           u.suspendedAt = row[0].suspendedAt;
           u.deletedAt = row[0].deletedAt;
+          u.currentTeamId = currentTeamId;
           // Owner = ADMIN_EMAIL env 화이트리스트. permissions 분리와 별개의 최상위 권한.
           u.isOwner = isAdmin(session.user.email);
           // isAdmin = Owner OR (membership_admin OR billing_admin 권한 보유). nav 의 어드민

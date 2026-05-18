@@ -15,6 +15,7 @@ declare module "next-auth" {
       deletedAt?: Date | null;
       isOwner?: boolean;             // ADMIN_EMAIL env 화이트리스트
       isAdmin?: boolean;             // isOwner || any permission. nav 어드민 메뉴 노출 조건
+      currentTeamId?: number | null; // Phase 4.2 (M6a): 현재 팀 (team_members.team_id). M6b 에서 N팀 switcher 도입
     };
   }
 }

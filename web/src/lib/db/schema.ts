@@ -38,6 +38,59 @@ export const users = pgTable("users", {
   lastSyncedAt: timestamp("last_synced_at"),
 });
 
+// Phase 4.2 (M6a) — multi-tenant 도입. teams + team_members 신설.
+//
+// 설계:
+//   - users 자체는 team_id 컬럼 없음 (한 user 가 N팀 가입 가능 — team_members 가 N:N 매핑)
+//   - 데이터 테이블 (user_snapshots 등) 은 team_id FK 보유 → RLS team-scoped 가능
+//   - 현재 보고 있는 팀 = session.user.currentTeamId (cookie/URL 추후 결정, M6a 에선 first team)
+//
+// teams:
+//   - name: 사용자 입력 (Slack 패턴). 도메인 무관, 자유 텍스트
+//   - slug: URL-safe (예: "iskra-world"). unique
+//   - ownerId: 최초 생성자. role 'owner' 와 별개로 빠른 lookup
+//   - deletedAt: 30일 grace soft delete (팀 단위)
+export const teams = pgTable(
+  "teams",
+  {
+    id: serial("id").primaryKey(),
+    name: text("name").notNull(),
+    slug: text("slug").notNull(),
+    ownerId: integer("owner_id")
+      .notNull()
+      .references(() => users.id),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    deletedAt: timestamp("deleted_at"),
+  },
+  (t) => ({
+    slugUniq: uniqueIndex("teams_slug_uniq").on(t.slug),
+    ownerIdx: index("teams_owner_idx").on(t.ownerId),
+  })
+);
+
+// team_members: user × team N:N 매핑.
+//   - role: 'owner' (env ADMIN_EMAIL 와 별개 — 팀별 소유자) | 'admin' | 'member'
+//   - deletedAt: 탈퇴 (history 보존, hard delete 안 함)
+export const teamMembers = pgTable(
+  "team_members",
+  {
+    id: serial("id").primaryKey(),
+    teamId: integer("team_id")
+      .notNull()
+      .references(() => teams.id),
+    userId: integer("user_id")
+      .notNull()
+      .references(() => users.id),
+    role: text("role").notNull().default("member"),
+    joinedAt: timestamp("joined_at").defaultNow().notNull(),
+    deletedAt: timestamp("deleted_at"),
+  },
+  (t) => ({
+    teamUserUniq: uniqueIndex("team_members_team_user_uniq").on(t.teamId, t.userId),
+    userIdx: index("team_members_user_idx").on(t.userId),
+  })
+);
+
 // admin-v1: 이메일 초대.
 // 어드민이 email + 권한 지정 → token 발급 → Resend 로 발송 → 사용자가 OAuth 통과
 // + token 확인 시 즉시 가입. 7일 expire, 재초대/취소 지원.
@@ -45,6 +98,10 @@ export const invitations = pgTable(
   "invitations",
   {
     id: serial("id").primaryKey(),
+    // Phase 4.2: 어느 팀에 초대하는지. M6a backfill 시 모든 기존 invitations → iskra.world (team_id=1).
+    teamId: integer("team_id")
+      .notNull()
+      .references(() => teams.id),
     email: text("email").notNull(),
     invitedBy: integer("invited_by")
       .notNull()
@@ -60,6 +117,7 @@ export const invitations = pgTable(
   (t) => ({
     tokenUniq: uniqueIndex("invitations_token_uniq").on(t.token),
     pendingByEmailIdx: index("invitations_pending_email_idx").on(t.email),
+    teamIdx: index("invitations_team_idx").on(t.teamId),
   })
 );
 
@@ -70,9 +128,13 @@ export const joinRequests = pgTable(
   "join_requests",
   {
     id: serial("id").primaryKey(),
+    // Phase 4.2: 가입 신청한 팀. M6a backfill 시 모든 기존 join_requests → iskra.world.
+    teamId: integer("team_id")
+      .notNull()
+      .references(() => teams.id),
     userId: integer("user_id").references(() => users.id),
     email: text("email").notNull(),
-    teamNameHint: text("team_name_hint"),  // Phase 4.2 에 team_id 로 마이그
+    teamNameHint: text("team_name_hint"),  // 옛 컬럼 — Phase 4.2 이후 deprecated, M6b 에서 정리
     message: text("message"),
     status: text("status").notNull().default("pending"),
     decidedBy: integer("decided_by").references(() => users.id),
@@ -82,6 +144,7 @@ export const joinRequests = pgTable(
   },
   (t) => ({
     statusIdx: index("join_requests_status_idx").on(t.status),
+    teamIdx: index("join_requests_team_idx").on(t.teamId),
   })
 );
 
@@ -92,6 +155,10 @@ export const apiTokens = pgTable(
   "api_tokens",
   {
     id: serial("id").primaryKey(),
+    // Phase 4.2: 어느 팀에 ingest 할지. M6a backfill 시 user 의 첫 team_members.team_id 로 채움.
+    teamId: integer("team_id")
+      .notNull()
+      .references(() => teams.id),
     userId: integer("user_id")
       .notNull()
       .references(() => users.id),
@@ -104,6 +171,7 @@ export const apiTokens = pgTable(
   },
   (t) => ({
     hashUniq: uniqueIndex("api_tokens_hash_uniq").on(t.hash),
+    teamIdx: index("api_tokens_team_idx").on(t.teamId),
   })
 );
 
@@ -127,6 +195,11 @@ export const auditLogs = pgTable(
     id: serial("id").primaryKey(),
     prevHash: text("prev_hash"),
     rowHash: text("row_hash").notNull(),
+    // Phase 4.2: 어느 팀의 audit 인지. immutability 정책 (RLS deny update/delete) 유지.
+    // M6a backfill 시 모든 기존 행 → iskra.world (team_id=1).
+    teamId: integer("team_id")
+      .notNull()
+      .references(() => teams.id),
     actorUserId: integer("actor_user_id").references(() => users.id),
     actorType: text("actor_type").notNull(),
     action: text("action").notNull(),
@@ -140,6 +213,7 @@ export const auditLogs = pgTable(
     actorIdx: index("audit_logs_actor_idx").on(t.actorUserId),
     actionIdx: index("audit_logs_action_idx").on(t.action),
     createdAtIdx: index("audit_logs_created_at_idx").on(t.createdAt),
+    teamIdx: index("audit_logs_team_idx").on(t.teamId),
   })
 );
 
@@ -147,6 +221,11 @@ export const userSnapshots = pgTable(
   "user_snapshots",
   {
     id: serial("id").primaryKey(),
+    // Phase 4.2: 어느 팀의 snapshot. M6a backfill 시 user 의 team_members.team_id 로 채움.
+    // user 가 N팀 가입 시 같은 user 가 N row (team 별 snapshot 분리).
+    teamId: integer("team_id")
+      .notNull()
+      .references(() => teams.id),
     userId: integer("user_id")
       .notNull()
       .references(() => users.id),
@@ -165,7 +244,8 @@ export const userSnapshots = pgTable(
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
   },
   (t) => ({
-    userUniq: uniqueIndex("user_snapshots_user_uniq").on(t.userId),
+    userTeamUniq: uniqueIndex("user_snapshots_user_team_uniq").on(t.userId, t.teamId),
+    teamIdx: index("user_snapshots_team_idx").on(t.teamId),
   })
 );
 
@@ -173,6 +253,10 @@ export const periodSnapshots = pgTable(
   "period_snapshots",
   {
     id: serial("id").primaryKey(),
+    // Phase 4.2: 팀별 분리. M6a backfill 시 모든 기존 row → iskra.world.
+    teamId: integer("team_id")
+      .notNull()
+      .references(() => teams.id),
     userId: integer("user_id")
       .notNull()
       .references(() => users.id),
@@ -182,7 +266,8 @@ export const periodSnapshots = pgTable(
     rawJson: jsonb("raw_json").notNull(),
   },
   (t) => ({
-    uniq: uniqueIndex("period_snapshots_uniq").on(t.userId, t.periodType, t.periodStart),
+    uniq: uniqueIndex("period_snapshots_uniq").on(t.userId, t.teamId, t.periodType, t.periodStart),
+    teamIdx: index("period_snapshots_team_idx").on(t.teamId),
   })
 );
 
@@ -194,6 +279,10 @@ export const userBlocks = pgTable(
   "user_blocks",
   {
     id: serial("id").primaryKey(),
+    // Phase 4.2: 팀별 분리. M6a backfill 시 모든 기존 row → iskra.world.
+    teamId: integer("team_id")
+      .notNull()
+      .references(() => teams.id),
     userId: integer("user_id")
       .notNull()
       .references(() => users.id),
@@ -208,8 +297,9 @@ export const userBlocks = pgTable(
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
   },
   (t) => ({
-    userBlockUniq: uniqueIndex("user_blocks_user_block_uniq").on(t.userId, t.blockId),
+    userBlockUniq: uniqueIndex("user_blocks_user_team_block_uniq").on(t.userId, t.teamId, t.blockId),
     userStartedIdx: index("user_blocks_user_started_idx").on(t.userId, t.startedAt),
+    teamIdx: index("user_blocks_team_idx").on(t.teamId),
   })
 );
 
@@ -221,6 +311,10 @@ export const dailyVisits = pgTable(
   "daily_visits",
   {
     id: serial("id").primaryKey(),
+    // Phase 4.2: 팀별 분리. M6a backfill 시 모든 기존 row → iskra.world.
+    teamId: integer("team_id")
+      .notNull()
+      .references(() => teams.id),
     userId: integer("user_id")
       .notNull()
       .references(() => users.id),
@@ -229,6 +323,7 @@ export const dailyVisits = pgTable(
     totalDwellSeconds: integer("total_dwell_seconds").notNull().default(0),
   },
   (t) => ({
-    userDateUniq: uniqueIndex("daily_visits_user_date_uniq").on(t.userId, t.date),
+    userDateUniq: uniqueIndex("daily_visits_user_team_date_uniq").on(t.userId, t.teamId, t.date),
+    teamIdx: index("daily_visits_team_idx").on(t.teamId),
   })
 );

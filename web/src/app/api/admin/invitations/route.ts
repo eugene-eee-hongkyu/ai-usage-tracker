@@ -61,6 +61,7 @@ export async function POST(req: NextRequest) {
   const inserted = await db
     .insert(invitations)
     .values({
+      teamId: guard.user.currentTeamId,
       email,
       invitedBy: guard.user.id,
       token,
