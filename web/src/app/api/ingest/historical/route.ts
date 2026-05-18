@@ -17,21 +17,27 @@ interface HistoricalPayload {
 
 export async function POST(req: NextRequest) {
   // LOCAL_MODE (.dmg) — apiKey 인증 우회, 단일 사용자 자동 보장. 일반 ingest 와 동일 패턴.
-  let userRow: Array<{ id: number }>;
+  let userRow: Array<{ id: number; suspendedAt: Date | null; deletedAt: Date | null }>;
   if (IS_LOCAL_MODE) {
     const u = await ensureLocalUser();
-    userRow = [{ id: u.id }];
+    userRow = [{ id: u.id, suspendedAt: null, deletedAt: null }];
   } else {
     const apiKey = req.headers.get("x-api-key");
     if (!apiKey) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
     userRow = await db
-      .select()
+      .select({
+        id: users.id,
+        suspendedAt: users.suspendedAt,
+        deletedAt: users.deletedAt,
+      })
       .from(users)
       .where(eq(users.apiKeyHash, crypto.createHash("sha256").update(apiKey).digest("hex")))
       .limit(1);
   }
 
   if (!userRow[0]) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  if (userRow[0].deletedAt) return NextResponse.json({ error: "deleted" }, { status: 403 });
+  if (userRow[0].suspendedAt) return NextResponse.json({ error: "suspended" }, { status: 403 });
 
   const body = await req.json();
   const items = Array.isArray(body?.snapshots)

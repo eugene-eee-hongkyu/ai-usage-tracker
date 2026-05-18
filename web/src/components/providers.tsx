@@ -2,6 +2,7 @@
 
 import { SessionProvider } from "next-auth/react";
 import type { Session } from "next-auth";
+import { SessionGuard } from "@/components/session-guard";
 
 // 로컬 단독 모드 (.pkg/.app 인스톨러) 에서는 NextAuth 의 OAuth flow 가 작동 안 함
 // (외부 callback URL 불가). server 측 API route 는 IS_LOCAL_MODE 로 우회하지만,
@@ -27,6 +28,7 @@ const LOCAL_SESSION: Session = {
 export function Providers({ children }: { children: React.ReactNode }) {
   return (
     <SessionProvider session={IS_LOCAL_BUILD ? LOCAL_SESSION : undefined}>
+      {!IS_LOCAL_BUILD && <SessionGuard />}
       {children}
     </SessionProvider>
   );
