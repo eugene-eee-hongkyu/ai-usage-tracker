@@ -720,9 +720,18 @@ async function main() {
   // 동적 port 잡으므로 옛 port 가 stale 상태가 되는 걸 방지.
   syncLocalDestinationPort(serverPort);
 
-  // sync launchd 등록 — 패키지된 cli/sync.mjs 위치
-  const syncPath = path.join(APP_ROOT, "cli", "sync.mjs");
-  const historicalPath = path.join(APP_ROOT, "cli", "historical.mjs");
+  // sync launchd 등록 — cli/{sync,historical}.mjs 위치.
+  // production: APP_ROOT/cli/ (stage 가 cli/src/*.mjs 를 평탄화 복사)
+  // dev: cli/src/*.mjs (bun build 결과물 위치). 둘 다 시도.
+  const pickCliFile = (basename) => {
+    const flat = path.join(APP_ROOT, "cli", basename);
+    if (existsSync(flat)) return flat;
+    const src = path.join(APP_ROOT, "cli", "src", basename);
+    if (existsSync(src)) return src;
+    return flat; // 둘 다 없으면 production path — 호출 측에서 existsSync 로 silent skip
+  };
+  const syncPath = pickCliFile("sync.mjs");
+  const historicalPath = pickCliFile("historical.mjs");
   ensureLaunchAgentMac(syncPath, CONFIG_FILE);
 
   const locale = normalizeLocale(app.getLocale());
