@@ -4,7 +4,7 @@
 // 권한: Membership-Admin OR Owner.
 
 import { NextRequest, NextResponse } from "next/server";
-import { db, joinRequests, users, IS_LOCAL_MODE } from "@/lib/db";
+import { db, joinRequests, IS_LOCAL_MODE } from "@/lib/db";
 import { requireMembershipAdmin } from "@/lib/auth-guards";
 import { writeAudit } from "@/lib/audit";
 import { sendJoinApproved } from "@/lib/email";
