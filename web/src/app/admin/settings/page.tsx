@@ -100,6 +100,7 @@ export default function AdminSettingsPage() {
 
   return (
     <div className="space-y-8">
+      <CreateTeamSection />
       {/* 권한 부여 */}
       <section className="bg-slate-900 border border-slate-800 rounded-lg p-5 space-y-3">
         <header>
@@ -215,5 +216,92 @@ export default function AdminSettingsPage() {
         </select>
       </section>
     </div>
+  );
+}
+
+// Phase 4.2 M6b — Owner 가 새 팀 생성 + 첫 owner 초대.
+// 시범 팀 발송 흐름. 사용자 입력 = 팀 이름 + owner 이메일.
+function CreateTeamSection() {
+  const [teamName, setTeamName] = useState("");
+  const [ownerEmail, setOwnerEmail] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [result, setResult] = useState<{ ok: boolean; msg: string } | null>(null);
+
+  async function submit() {
+    if (!teamName.trim() || !ownerEmail.trim()) return;
+    setSubmitting(true);
+    setResult(null);
+    try {
+      const r = await fetch("/api/admin/teams", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ teamName: teamName.trim(), ownerEmail: ownerEmail.trim() }),
+      });
+      const data = (await r.json()) as {
+        ok?: boolean;
+        teamId?: number;
+        invitationId?: number | null;
+        emailSent?: boolean;
+        emailError?: string | null;
+        hadExistingUser?: boolean;
+        error?: string;
+      };
+      if (!r.ok) {
+        setResult({ ok: false, msg: `실패: ${data.error}` });
+        return;
+      }
+      if (data.hadExistingUser) {
+        setResult({ ok: true, msg: `✓ 팀 #${data.teamId} 생성 + 기존 사용자 즉시 owner 추가됨` });
+      } else if (data.emailSent) {
+        setResult({ ok: true, msg: `✓ 팀 #${data.teamId} 생성 + 초대 이메일 발송됨` });
+      } else {
+        setResult({
+          ok: true,
+          msg: `✓ 팀 #${data.teamId} 생성. 이메일 발송 실패: ${data.emailError ?? "unknown"}. 수동 안내 필요.`,
+        });
+      }
+      setTeamName("");
+      setOwnerEmail("");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <section className="bg-slate-900 border border-indigo-700/40 rounded-lg p-5 space-y-3">
+      <header>
+        <h2 className="text-sm font-bold text-indigo-300">새 팀 생성 (Owner only — M6b)</h2>
+        <p className="text-xs text-slate-500 mt-1">
+          신규 시범 팀 / 외부 회사 팀 만들고 첫 owner 에게 초대 이메일 발송. 초대 받은 사용자가 OAuth 가입 시 자동으로
+          그 팀의 owner 권한 부여 + 자기 데이터 pool 분리.
+        </p>
+      </header>
+      <div className="flex flex-col sm:flex-row gap-2">
+        <input
+          type="text"
+          value={teamName}
+          onChange={(e) => setTeamName(e.target.value)}
+          placeholder="팀 이름 (예: ehongarykr team)"
+          className="flex-1 bg-slate-950 border border-slate-800 rounded px-3 py-2 text-sm"
+        />
+        <input
+          type="email"
+          value={ownerEmail}
+          onChange={(e) => setOwnerEmail(e.target.value)}
+          placeholder="owner 이메일 (예: ehongarykr@gmail.com)"
+          className="flex-1 bg-slate-950 border border-slate-800 rounded px-3 py-2 text-sm"
+        />
+        <button
+          onClick={submit}
+          disabled={!teamName.trim() || !ownerEmail.trim() || submitting}
+          className="px-4 py-2 text-sm rounded bg-indigo-700 hover:bg-indigo-600 disabled:bg-slate-800 disabled:text-slate-600"
+        >
+          {submitting ? "생성 중..." : "팀 생성 + 초대"}
+        </button>
+      </div>
+      {result && (
+        <p className={`text-xs ${result.ok ? "text-emerald-400" : "text-red-400"}`}>{result.msg}</p>
+      )}
+    </section>
   );
 }
