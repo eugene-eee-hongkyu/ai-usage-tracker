@@ -81,7 +81,7 @@ function preflightOwnership() {
 `);
   process.exit(1);
 }
-function promptYn(question) {
+function promptYn(question, defaultYes = true) {
   let ttyFd;
   try {
     ttyFd = fs.openSync("/dev/tty", "r");
@@ -108,9 +108,40 @@ function promptYn(question) {
   }
   const ans = Buffer.from(chunks).toString("utf8").trim();
   if (!ans)
-    return true;
+    return defaultYes;
   const lower = ans.toLowerCase();
   return lower === "y" || lower === "yes";
+}
+function preflightNodeVersion() {
+  const major = parseInt((process.versions.node ?? "0").split(".")[0], 10);
+  if (!Number.isFinite(major) || major >= 22)
+    return;
+  const bar = "═".repeat(60);
+  console.error(`
+` + bar);
+  console.error(`⚠️  Node ${process.versions.node} 감지 — codeburn / ccusage 는 Node 22 이상 필요`);
+  console.error("");
+  console.error("   이대로 install 하면:");
+  console.error("     - npm EBADENGINE 경고 (install 자체는 됨)");
+  console.error("     - codeburn / ccusage 런타임 오작동 위험");
+  console.error("     - launchd 가 매 2시간마다 silent 실패 가능");
+  console.error("");
+  console.error("   권장 복구:");
+  console.error("     nvm install 22");
+  console.error("     nvm use 22");
+  console.error("     nvm alias default 22");
+  console.error("     # 그 다음 다시 install / repair");
+  console.error(bar);
+  const proceed = promptYn(`
+   그래도 Node ${major} 로 강행할까요? [y/N]: `, false);
+  if (!proceed) {
+    console.error(`
+   중단됨. Node 22 로 전환 후 다시 시도하세요.`);
+    process.exit(1);
+  }
+  console.warn(`
+   ⚠️  Node ${major} 로 강행. 깨질 위험 인지함.
+`);
 }
 function preflightGlobalPackages() {
   if (process.platform === "win32" || !process.getuid)
@@ -618,6 +649,7 @@ async function runRepair() {
 `);
   preflightOwnership();
   preflightGlobalPackages();
+  preflightNodeVersion();
   const apiKey = await loadApiKey();
   if (!apiKey) {
     console.error("❌ 설치된 API 키가 없습니다. 먼저 init을 실행하세요:");
@@ -658,6 +690,7 @@ async function runInit() {
 `);
   preflightOwnership();
   preflightGlobalPackages();
+  preflightNodeVersion();
   const codeburnOk = await ensureCodeburn();
   if (!codeburnOk) {
     console.error("❌ codeburn 설치 실패. 수동으로 설치 후 다시 시도하세요:");

@@ -94,7 +94,7 @@ function preflightOwnership(): void {
 // /dev/tty 에서 한 줄 읽기. `curl|bash`·`npx` 환경에서 stdin 이 pipe 여도
 // user 터미널의 키 입력을 직접 받음. TTY 없으면 (CI 등) false 반환.
 // 응답 없이 Enter → 빈 문자열 → default Y (호출자가 처리).
-function promptYn(question: string): boolean {
+function promptYn(question: string, defaultYes = true): boolean {
   let ttyFd: number;
   try {
     ttyFd = fs.openSync("/dev/tty", "r");
@@ -118,9 +118,41 @@ function promptYn(question: string): boolean {
     fs.closeSync(ttyFd);
   }
   const ans = Buffer.from(chunks).toString("utf8").trim();
-  if (!ans) return true; // Enter → default Y
+  if (!ans) return defaultYes; // Enter → 호출자가 지정한 default
   const lower = ans.toLowerCase();
   return lower === "y" || lower === "yes";
+}
+
+// Node 22 미만이면 codeburn (engines >=22) / ccusage (engines >=22.0.0) 가
+// EBADENGINE 경고만 띄우고 설치는 되지만, ink 7 / cli-truncate 6 등 런타임이
+// 깨질 수 있다. 사용자 머신에서 launchd 가 매 2시간마다 silent 실패하는 만성
+// 문제의 흔한 원인. 명시 강행만 허용.
+function preflightNodeVersion(): void {
+  const major = parseInt((process.versions.node ?? "0").split(".")[0], 10);
+  if (!Number.isFinite(major) || major >= 22) return;
+
+  const bar = "═".repeat(60);
+  console.error("\n" + bar);
+  console.error(`⚠️  Node ${process.versions.node} 감지 — codeburn / ccusage 는 Node 22 이상 필요`);
+  console.error("");
+  console.error("   이대로 install 하면:");
+  console.error("     - npm EBADENGINE 경고 (install 자체는 됨)");
+  console.error("     - codeburn / ccusage 런타임 오작동 위험");
+  console.error("     - launchd 가 매 2시간마다 silent 실패 가능");
+  console.error("");
+  console.error("   권장 복구:");
+  console.error("     nvm install 22");
+  console.error("     nvm use 22");
+  console.error("     nvm alias default 22");
+  console.error("     # 그 다음 다시 install / repair");
+  console.error(bar);
+
+  const proceed = promptYn(`\n   그래도 Node ${major} 로 강행할까요? [y/N]: `, false);
+  if (!proceed) {
+    console.error("\n   중단됨. Node 22 로 전환 후 다시 시도하세요.");
+    process.exit(1);
+  }
+  console.warn(`\n   ⚠️  Node ${major} 로 강행. 깨질 위험 인지함.\n`);
 }
 
 // npm 전역 prefix 가 root 소유 등으로 쓰기 불가일 때 사전 차단 + 자동 복구 권유.
@@ -690,6 +722,7 @@ export async function runRepair() {
   console.log(`🔧 Usage Tracker v${CLI_VERSION} 복구 시작\n`);
   preflightOwnership();
   preflightGlobalPackages();
+  preflightNodeVersion();
 
   const apiKey = await loadApiKey();
   if (!apiKey) {
@@ -734,6 +767,7 @@ export async function runInit() {
   console.log(`🚀 Usage Tracker v${CLI_VERSION} 설치 시작\n`);
   preflightOwnership();
   preflightGlobalPackages();
+  preflightNodeVersion();
 
   // init 시에도 항상 @latest 시도. 기존 사용자도 install.sh 재실행만으로
   // codeburn/ccusage 최신 fix 자동 반영.
