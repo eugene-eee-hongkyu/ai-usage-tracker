@@ -2,9 +2,10 @@
 // settings 페이지의 비활성 alert 카드용.
 
 import { NextResponse } from "next/server";
-import { db, users, IS_LOCAL_MODE } from "@/lib/db";
+import { db, users, teamMembers, IS_LOCAL_MODE } from "@/lib/db";
 import { requireMembershipAdmin } from "@/lib/auth-guards";
-import { and, isNull, or, lt, asc, sql } from "drizzle-orm";
+import { getEffectiveTeamId } from "@/lib/effective-team";
+import { and, eq, isNull, or, lt, asc, sql, inArray } from "drizzle-orm";
 
 export const dynamic = "force-dynamic";
 
@@ -13,7 +14,20 @@ export async function GET() {
   const guard = await requireMembershipAdmin();
   if (guard.error) return guard.error;
 
+  const effectiveTeamId = await getEffectiveTeamId({ user: guard.user });
+  if (!effectiveTeamId) return NextResponse.json({ error: "no_team" }, { status: 403 });
+
   const cutoff = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+
+  // team 격리 — effectiveTeam 멤버만.
+  const memberIdRows = await db
+    .select({ userId: teamMembers.userId })
+    .from(teamMembers)
+    .where(and(eq(teamMembers.teamId, effectiveTeamId), isNull(teamMembers.deletedAt)));
+  const memberUserIds = memberIdRows.map((r) => r.userId);
+  if (memberUserIds.length === 0) {
+    return NextResponse.json({ inactiveUsers: [], cutoff });
+  }
 
   const rows = await db
     .select({
@@ -26,6 +40,7 @@ export async function GET() {
     .from(users)
     .where(
       and(
+        inArray(users.id, memberUserIds),
         isNull(users.suspendedAt),
         isNull(users.deletedAt),
         or(isNull(users.lastSyncedAt), lt(users.lastSyncedAt, cutoff))

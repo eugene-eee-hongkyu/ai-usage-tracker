@@ -1,9 +1,11 @@
 // GET /api/admin/audit — log 리스트 + filter + integrity verify
-// 권한: Owner only (audit 는 가장 민감).
+// 권한: MembershipAdmin OR Owner (자기 팀 audit 보기). Owner 는 view-as 로 다른 팀 audit.
+// chain integrity verify 결과는 platform 무관 글로벌.
 
 import { NextRequest, NextResponse } from "next/server";
 import { db, auditLogs, users, IS_LOCAL_MODE } from "@/lib/db";
-import { requireOwner } from "@/lib/auth-guards";
+import { requireMembershipAdmin } from "@/lib/auth-guards";
+import { getEffectiveTeamId } from "@/lib/effective-team";
 import { eq, and, desc, sql, ilike, or, inArray } from "drizzle-orm";
 
 export const dynamic = "force-dynamic";
@@ -12,8 +14,11 @@ const PAGE_SIZE = 50;
 
 export async function GET(req: NextRequest) {
   if (IS_LOCAL_MODE) return NextResponse.json({ error: "local_mode" }, { status: 403 });
-  const guard = await requireOwner();
+  const guard = await requireMembershipAdmin();
   if (guard.error) return guard.error;
+
+  const effectiveTeamId = await getEffectiveTeamId({ user: guard.user }, req);
+  if (!effectiveTeamId) return NextResponse.json({ error: "no_team" }, { status: 403 });
 
   const url = new URL(req.url);
   const action = url.searchParams.get("action");
@@ -22,7 +27,8 @@ export async function GET(req: NextRequest) {
   const targetType = url.searchParams.get("targetType");
   const page = Math.max(1, parseInt(url.searchParams.get("page") ?? "1", 10));
 
-  const whereParts = [];
+  // team 격리 — audit_logs.team_id = effectiveTeam
+  const whereParts = [eq(auditLogs.teamId, effectiveTeamId)];
   if (action) whereParts.push(ilike(auditLogs.action, `%${action}%`));
   if (actorId) whereParts.push(eq(auditLogs.actorUserId, parseInt(actorId, 10)));
   if (targetType) whereParts.push(targetType === "system" ? eq(auditLogs.actorType, "system") : eq(auditLogs.targetType, targetType));
@@ -46,7 +52,7 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  const where = whereParts.length > 0 ? and(...whereParts) : undefined;
+  const where = and(...whereParts);
 
   // join users for actor name/email (left join — system actor 는 NULL)
   const rows = await db

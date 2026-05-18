@@ -2,11 +2,12 @@
 // PATCH /api/admin/users?id=N    — suspend / unsuspend / soft delete / restore
 
 import { NextRequest, NextResponse } from "next/server";
-import { db, users, IS_LOCAL_MODE } from "@/lib/db";
+import { db, users, teamMembers, IS_LOCAL_MODE } from "@/lib/db";
 import { requireMembershipAdmin, requireOwner } from "@/lib/auth-guards";
 import { writeAudit } from "@/lib/audit";
 import { isAdmin } from "@/lib/admin";
-import { eq, ilike, isNull, isNotNull, and, or, asc, desc, sql } from "drizzle-orm";
+import { getEffectiveTeamId } from "@/lib/effective-team";
+import { eq, ilike, isNull, isNotNull, and, or, asc, desc, sql, inArray } from "drizzle-orm";
 
 export const dynamic = "force-dynamic";
 
@@ -17,6 +18,9 @@ export async function GET(req: NextRequest) {
   const guard = await requireMembershipAdmin();
   if (guard.error) return guard.error;
 
+  const effectiveTeamId = await getEffectiveTeamId({ user: guard.user }, req);
+  if (!effectiveTeamId) return NextResponse.json({ error: "no_team" }, { status: 403 });
+
   const url = new URL(req.url);
   const q = url.searchParams.get("q") ?? "";
   const status = url.searchParams.get("status") ?? "active";  // active|suspended|deleted|all
@@ -24,18 +28,29 @@ export async function GET(req: NextRequest) {
   const sort = url.searchParams.get("sort") ?? "lastSyncedAt";  // lastSyncedAt|createdAt|name
   const dir = url.searchParams.get("dir") ?? "desc";
 
-  const whereParts = [];
+  // team 격리 — team_members 의 user_id 만 조회. M6c: 같은 user 가 N팀 가능하지만
+  // 이 list 는 effectiveTeam 의 멤버만.
+  const memberIdRows = await db
+    .select({ userId: teamMembers.userId })
+    .from(teamMembers)
+    .where(and(eq(teamMembers.teamId, effectiveTeamId), isNull(teamMembers.deletedAt)));
+  const memberUserIds = memberIdRows.map((r) => r.userId);
+  if (memberUserIds.length === 0) {
+    return NextResponse.json({ users: [], page, pageSize: PAGE_SIZE, total: 0, totalPages: 0 });
+  }
+
+  const whereParts = [inArray(users.id, memberUserIds)];
   if (q) {
-    whereParts.push(or(ilike(users.email, `%${q}%`), ilike(users.name, `%${q}%`)));
+    whereParts.push(or(ilike(users.email, `%${q}%`), ilike(users.name, `%${q}%`))!);
   }
   if (status === "active") {
-    whereParts.push(and(isNull(users.suspendedAt), isNull(users.deletedAt)));
+    whereParts.push(and(isNull(users.suspendedAt), isNull(users.deletedAt))!);
   } else if (status === "suspended") {
     whereParts.push(isNotNull(users.suspendedAt));
   } else if (status === "deleted") {
     whereParts.push(isNotNull(users.deletedAt));
   }
-  const where = whereParts.length > 0 ? and(...whereParts) : undefined;
+  const where = and(...whereParts);
 
   const sortColMap = {
     lastSyncedAt: users.lastSyncedAt,
@@ -89,6 +104,9 @@ export async function PATCH(req: NextRequest) {
   const guard = await requireMembershipAdmin();
   if (guard.error) return guard.error;
 
+  const effectiveTeamId = await getEffectiveTeamId({ user: guard.user }, req);
+  if (!effectiveTeamId) return NextResponse.json({ error: "no_team" }, { status: 403 });
+
   const url = new URL(req.url);
   const id = parseInt(url.searchParams.get("id") ?? "", 10);
   if (!id) return NextResponse.json({ error: "id_required" }, { status: 400 });
@@ -100,6 +118,22 @@ export async function PATCH(req: NextRequest) {
     role?: string;
     permissions?: { membershipAdmin?: boolean; billingAdmin?: boolean };
   };
+
+  // target 가 effectiveTeam 의 멤버인지 검증 — 다른 회사 user id 추측해서 만지는 leak 방지.
+  const targetMembership = await db
+    .select({ id: teamMembers.id })
+    .from(teamMembers)
+    .where(
+      and(
+        eq(teamMembers.teamId, effectiveTeamId),
+        eq(teamMembers.userId, id),
+        isNull(teamMembers.deletedAt)
+      )
+    )
+    .limit(1);
+  if (!targetMembership[0]) {
+    return NextResponse.json({ error: "not_found" }, { status: 404 });
+  }
 
   const target = await db
     .select({

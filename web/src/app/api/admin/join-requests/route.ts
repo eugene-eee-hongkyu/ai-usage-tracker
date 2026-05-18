@@ -8,7 +8,8 @@ import { db, joinRequests, IS_LOCAL_MODE } from "@/lib/db";
 import { requireMembershipAdmin } from "@/lib/auth-guards";
 import { writeAudit } from "@/lib/audit";
 import { sendJoinApproved } from "@/lib/email";
-import { eq } from "drizzle-orm";
+import { getEffectiveTeamId } from "@/lib/effective-team";
+import { eq, and } from "drizzle-orm";
 
 export const dynamic = "force-dynamic";
 
@@ -17,8 +18,16 @@ export async function GET(req: NextRequest) {
   const guard = await requireMembershipAdmin();
   if (guard.error) return guard.error;
 
+  const effectiveTeamId = await getEffectiveTeamId({ user: guard.user }, req);
+  if (!effectiveTeamId) return NextResponse.json({ error: "no_team" }, { status: 403 });
+
   const url = new URL(req.url);
   const statusFilter = url.searchParams.get("status") ?? "pending";
+
+  const where =
+    statusFilter === "all"
+      ? eq(joinRequests.teamId, effectiveTeamId)
+      : and(eq(joinRequests.teamId, effectiveTeamId), eq(joinRequests.status, statusFilter));
 
   const rows = await db
     .select({
@@ -34,7 +43,7 @@ export async function GET(req: NextRequest) {
       createdAt: joinRequests.createdAt,
     })
     .from(joinRequests)
-    .where(statusFilter === "all" ? undefined : eq(joinRequests.status, statusFilter))
+    .where(where)
     .orderBy(joinRequests.createdAt);
 
   return NextResponse.json({ joinRequests: rows });
@@ -44,6 +53,9 @@ export async function PATCH(req: NextRequest) {
   if (IS_LOCAL_MODE) return NextResponse.json({ error: "local_mode" }, { status: 403 });
   const guard = await requireMembershipAdmin();
   if (guard.error) return guard.error;
+
+  const effectiveTeamId = await getEffectiveTeamId({ user: guard.user }, req);
+  if (!effectiveTeamId) return NextResponse.json({ error: "no_team" }, { status: 403 });
 
   const url = new URL(req.url);
   const id = parseInt(url.searchParams.get("id") ?? "", 10);
@@ -66,7 +78,7 @@ export async function PATCH(req: NextRequest) {
       status: joinRequests.status,
     })
     .from(joinRequests)
-    .where(eq(joinRequests.id, id))
+    .where(and(eq(joinRequests.id, id), eq(joinRequests.teamId, effectiveTeamId)))
     .limit(1);
   if (!existing[0]) return NextResponse.json({ error: "not_found" }, { status: 404 });
   if (existing[0].status !== "pending") {

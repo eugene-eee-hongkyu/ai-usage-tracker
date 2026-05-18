@@ -3,9 +3,10 @@ export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import { db, userSnapshots, users, periodSnapshots, dailyVisits, userBlocks, IS_LOCAL_MODE } from "@/lib/db";
+import { db, userSnapshots, users, periodSnapshots, dailyVisits, userBlocks, teamMembers, IS_LOCAL_MODE } from "@/lib/db";
 import { getAuthedEmail } from "@/lib/local-user";
-import { and, asc, desc, eq, gte, lt } from "drizzle-orm";
+import { getEffectiveTeamId } from "@/lib/effective-team";
+import { and, asc, desc, eq, gte, isNull, lt, inArray } from "drizzle-orm";
 import { isAdmin } from "@/lib/admin";
 import { computeDailyEfficiencyScore, computePowerIndex } from "@/lib/rules";
 import {
@@ -127,6 +128,15 @@ export async function GET(req: NextRequest) {
   const monthOffset = parseInt(req.nextUrl.searchParams.get("monthOffset") ?? "0") || 0;
   const dayOffset = parseInt(req.nextUrl.searchParams.get("dayOffset") ?? "0") || 0;
 
+  // team 격리 결정. LOCAL_MODE 는 single-tenant 라 team 무의미 → null 허용.
+  // platform owner 가 viewAs cookie 박은 경우 그 team, 일반 user 는 currentTeamId.
+  const effectiveTeamId = IS_LOCAL_MODE
+    ? null
+    : await getEffectiveTeamId(session, req);
+  if (!IS_LOCAL_MODE && !effectiveTeamId) {
+    return NextResponse.json({ error: "no_team" }, { status: 403 });
+  }
+
   let targetEmail = authedEmail;
   if (requestedUserId) {
     // 로컬 모드는 단일 사용자라 멤버 view 가 의미 없음 — 무시하고 본인 데이터로 폴백.
@@ -134,6 +144,20 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "forbidden" }, { status: 403 });
     }
     if (!IS_LOCAL_MODE) {
+      // target user 가 effectiveTeam 멤버인지 검증 — cross-tenant 노출 차단.
+      const targetMembership = await db
+        .select({ id: teamMembers.id })
+        .from(teamMembers)
+        .where(
+          and(
+            eq(teamMembers.teamId, effectiveTeamId!),
+            eq(teamMembers.userId, parseInt(requestedUserId)),
+            isNull(teamMembers.deletedAt)
+          )
+        )
+        .limit(1);
+      if (!targetMembership[0]) return NextResponse.json({ error: "not found" }, { status: 404 });
+
       const targetUser = await db.select().from(users).where(eq(users.id, parseInt(requestedUserId))).limit(1);
       if (!targetUser[0]) return NextResponse.json({ error: "not found" }, { status: 404 });
       targetEmail = targetUser[0].email;
@@ -150,24 +174,34 @@ export async function GET(req: NextRequest) {
   const snap = await db
     .select()
     .from(userSnapshots)
-    .where(eq(userSnapshots.userId, user[0].id))
+    .where(
+      IS_LOCAL_MODE
+        ? eq(userSnapshots.userId, user[0].id)
+        : and(eq(userSnapshots.userId, user[0].id), eq(userSnapshots.teamId, effectiveTeamId!))
+    )
     .limit(1);
+
+  // team_id scope helper (LOCAL_MODE 면 undefined → and() 가 무시).
+  const teamScope = IS_LOCAL_MODE ? undefined : eq(periodSnapshots.teamId, effectiveTeamId!);
+  const userSnapTeamScope = IS_LOCAL_MODE ? undefined : eq(userSnapshots.teamId, effectiveTeamId!);
+  const dailyVisitsTeamScope = IS_LOCAL_MODE ? undefined : eq(dailyVisits.teamId, effectiveTeamId!);
+  const userBlocksTeamScope = IS_LOCAL_MODE ? undefined : eq(userBlocks.teamId, effectiveTeamId!);
 
   // Available snapshot list (always returned for dropdown population)
   const availableWeeklyRows = await db
     .select({ periodStart: periodSnapshots.periodStart, capturedAt: periodSnapshots.capturedAt })
     .from(periodSnapshots)
-    .where(and(eq(periodSnapshots.userId, user[0].id), eq(periodSnapshots.periodType, "weekly")))
+    .where(and(eq(periodSnapshots.userId, user[0].id), eq(periodSnapshots.periodType, "weekly"), teamScope))
     .orderBy(desc(periodSnapshots.periodStart));
   const availableMonthlyRows = await db
     .select({ periodStart: periodSnapshots.periodStart, capturedAt: periodSnapshots.capturedAt })
     .from(periodSnapshots)
-    .where(and(eq(periodSnapshots.userId, user[0].id), eq(periodSnapshots.periodType, "monthly")))
+    .where(and(eq(periodSnapshots.userId, user[0].id), eq(periodSnapshots.periodType, "monthly"), teamScope))
     .orderBy(desc(periodSnapshots.periodStart));
   const availableDailyRows = await db
     .select({ periodStart: periodSnapshots.periodStart, capturedAt: periodSnapshots.capturedAt })
     .from(periodSnapshots)
-    .where(and(eq(periodSnapshots.userId, user[0].id), eq(periodSnapshots.periodType, "daily")))
+    .where(and(eq(periodSnapshots.userId, user[0].id), eq(periodSnapshots.periodType, "daily"), teamScope))
     .orderBy(desc(periodSnapshots.periodStart));
 
   const availableSnapshots = {
@@ -182,7 +216,7 @@ export async function GET(req: NextRequest) {
     const rows = await db
       .select()
       .from(periodSnapshots)
-      .where(and(eq(periodSnapshots.userId, user[0].id), eq(periodSnapshots.periodType, "weekly")))
+      .where(and(eq(periodSnapshots.userId, user[0].id), eq(periodSnapshots.periodType, "weekly"), teamScope))
       .orderBy(desc(periodSnapshots.periodStart))
       .limit(1)
       .offset(weekOffset - 1);
@@ -191,7 +225,7 @@ export async function GET(req: NextRequest) {
     const rows = await db
       .select()
       .from(periodSnapshots)
-      .where(and(eq(periodSnapshots.userId, user[0].id), eq(periodSnapshots.periodType, "monthly")))
+      .where(and(eq(periodSnapshots.userId, user[0].id), eq(periodSnapshots.periodType, "monthly"), teamScope))
       .orderBy(desc(periodSnapshots.periodStart))
       .limit(1)
       .offset(monthOffset - 1);
@@ -200,7 +234,7 @@ export async function GET(req: NextRequest) {
     const rows = await db
       .select()
       .from(periodSnapshots)
-      .where(and(eq(periodSnapshots.userId, user[0].id), eq(periodSnapshots.periodType, "daily")))
+      .where(and(eq(periodSnapshots.userId, user[0].id), eq(periodSnapshots.periodType, "daily"), teamScope))
       .orderBy(desc(periodSnapshots.periodStart))
       .limit(1)
       .offset(dayOffset - 1);
@@ -347,7 +381,7 @@ export async function GET(req: NextRequest) {
       dwell: dailyVisits.totalDwellSeconds,
     })
     .from(dailyVisits)
-    .where(eq(dailyVisits.userId, user[0].id));
+    .where(and(eq(dailyVisits.userId, user[0].id), dailyVisitsTeamScope));
   const visitMap: Record<string, { count: number; dwell: number }> = {};
   for (const r of visitRows) visitMap[r.date] = { count: r.count, dwell: r.dwell };
   const visitEarliest = Object.keys(visitMap).sort()[0];
@@ -570,8 +604,27 @@ export async function GET(req: NextRequest) {
     d2.setDate(d2.getDate() - 7);
     return d2.toISOString().slice(0, 10);
   })();
-  const allUsersForRank = await db.select().from(users);
-  const allSnapsForRank = await db.select().from(userSnapshots);
+  // team 랭킹 — effectiveTeam 멤버만. LOCAL_MODE 면 single-user, ranking 무의미하지만 호환.
+  const rankMemberIdRows = IS_LOCAL_MODE
+    ? []
+    : await db
+        .select({ userId: teamMembers.userId })
+        .from(teamMembers)
+        .where(and(eq(teamMembers.teamId, effectiveTeamId!), isNull(teamMembers.deletedAt)));
+  const rankMemberIds = rankMemberIdRows.map((r) => r.userId);
+  const allUsersForRank = IS_LOCAL_MODE
+    ? await db.select().from(users)
+    : rankMemberIds.length > 0
+      ? await db.select().from(users).where(inArray(users.id, rankMemberIds))
+      : [];
+  const allSnapsForRank = IS_LOCAL_MODE
+    ? await db.select().from(userSnapshots)
+    : rankMemberIds.length > 0
+      ? await db
+          .select()
+          .from(userSnapshots)
+          .where(and(inArray(userSnapshots.userId, rankMemberIds), userSnapTeamScope))
+      : [];
   const snapMapAll = new Map(allSnapsForRank.map((s2) => [s2.userId, s2]));
   const memberCacheHits: Array<{ userId: number; cacheHitPct: number }> = [];
   for (const u of allUsersForRank) {
@@ -643,6 +696,7 @@ export async function GET(req: NextRequest) {
         .where(and(
           eq(userBlocks.userId, user[0].id),
           gte(userBlocks.startedAt, blocksWindowStart),
+          userBlocksTeamScope,
         ))
         .orderBy(asc(userBlocks.startedAt))
     : [];
@@ -696,6 +750,7 @@ export async function GET(req: NextRequest) {
         eq(userBlocks.userId, user[0].id),
         gte(userBlocks.startedAt, prevStart),
         lt(userBlocks.startedAt, prevEnd),
+        userBlocksTeamScope,
       ));
     const prevCount = prevRows.length;
     const prevTotalMin = prevRows.reduce((s, r) => s + r.minutes, 0);
@@ -783,6 +838,7 @@ export async function GET(req: NextRequest) {
     .where(and(
       eq(userBlocks.userId, user[0].id),
       gte(userBlocks.startedAt, planBlocksWindowStart),
+      userBlocksTeamScope,
     ));
   const planHealth = analyzePlanHealth({
     blocks: planBlockRows.map((b) => ({
@@ -855,6 +911,7 @@ export async function GET(req: NextRequest) {
       .where(and(
         eq(userBlocks.userId, user[0].id),
         gte(userBlocks.startedAt, cost30dStart),
+        userBlocksTeamScope,
       ));
     const monthlyCost30d = cost30dRows.reduce((s, r) => s + Number(r.costUsd ?? 0), 0);
     // P90 token 신호는 cache 포함이라 단위 안 맞아 폐기 — cost 단독 추정.
