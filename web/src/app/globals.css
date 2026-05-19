@@ -2,9 +2,22 @@
 @tailwind components;
 @tailwind utilities;
 
+/* 한국어 친화 폰트 스택 — Pretendard 우선, mac Apple SD Gothic Neo,
+ * Windows/Linux 는 Noto Sans KR fallback. Pretendard 는 CJK + 라틴 글리프
+ * 둘 다 우수 + variable font 라 weight 자유로움. CDN 미사용 시 (오프라인
+ * Electron) system font 로 자동 fallback.
+ */
+@import url("https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css");
+
 @layer base {
   body {
     @apply bg-slate-950 text-slate-200;
+    font-family:
+      "Pretendard Variable", Pretendard,
+      -apple-system, BlinkMacSystemFont,
+      "Apple SD Gothic Neo",
+      "Noto Sans KR", "Segoe UI",
+      system-ui, sans-serif;
   }
 }
 
