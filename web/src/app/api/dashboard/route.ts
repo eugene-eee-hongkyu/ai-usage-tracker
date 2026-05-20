@@ -831,6 +831,7 @@ export async function GET(req: NextRequest) {
     .select({
       totalTokens: userBlocks.totalTokens,
       startedAt: userBlocks.startedAt,
+      costUsd: userBlocks.costUsd,
     })
     .from(userBlocks)
     .where(and(
@@ -838,6 +839,9 @@ export async function GET(req: NextRequest) {
       gte(userBlocks.startedAt, planBlocksWindowStart),
       userBlocksTeamScope,
     ));
+  // cost-based verdict 신호 — period 의 API 환산 비용.
+  // ccusage cost = PAYG 가격 환산. plan price 와 비교해 Plan ROI 평가.
+  const planBlocksMonthlyCost = planBlockRows.reduce((s, b) => s + Number(b.costUsd ?? 0), 0);
   const planHealth = analyzePlanHealth({
     blocks: planBlockRows.map((b) => ({
       totalTokens: Number(b.totalTokens ?? 0),
@@ -849,6 +853,7 @@ export async function GET(req: NextRequest) {
     cacheHitPct: cacheHitPct > 0 ? cacheHitPct : undefined,
     oneShotRate: snap[0]?.overallOneShot ? snap[0].overallOneShot * 100 : undefined,
     windowDays: periodDays,
+    monthlyCostUsd: planBlocksMonthlyCost,
   });
 
   // user_blocks 기반 1차 집계

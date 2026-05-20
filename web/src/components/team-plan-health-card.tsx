@@ -139,13 +139,9 @@ export function TeamPlanHealthCard({ summary }: { summary: TeamPlanSummary }) {
                     {verdictLabel(mb.verdict, m)}
                     {mb.verdict !== "unknown" && mb.utilizationPct > 0 && (
                       <span className="text-[10px] text-neutral-500 ml-1.5">
-                        ({tmpl(m.teamPlanHealth.verdictUtilFmt, { pct: mb.utilizationPct })}
-                        {mb.verdict === "over" && mb.hitCount > 0 && (
-                          <> · {tmpl(m.teamPlanHealth.verdictHitFmt, { n: mb.hitCount })}</>
-                        )})
+                        ({tmpl(m.teamPlanHealth.verdictUtilFmt, { pct: mb.utilizationPct })})
                       </span>
                     )}
-                    {mb.actionFirst && <span className="text-amber-400 ml-1">💡</span>}
                   </td>
                   <td className="py-1.5 px-2 text-neutral-300">
                     {rec === "unknown" ? (

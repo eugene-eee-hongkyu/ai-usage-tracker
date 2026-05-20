@@ -569,6 +569,8 @@ export async function GET(req: NextRequest) {
       cacheHitPct: snap?.cacheHitPct ?? undefined,
       oneShotRate: snap?.overallOneShot != null ? snap.overallOneShot * 100 : undefined,
       windowDays: periodDays,
+      // cost-based verdict 신호 — 멤버의 최근 30일 API 환산 비용.
+      monthlyCostUsd: monthlyCost30d,
     });
     memberHealthList.push({ userId: u.id, name: u.name, health, isEstimated: isEstimatedMember });
 

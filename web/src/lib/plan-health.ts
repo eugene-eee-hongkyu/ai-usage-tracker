@@ -103,6 +103,11 @@ export interface PlanHealthInput {
   oneShotRate?: number;
   // 분석 윈도우 — 기본 최근 30일
   windowDays?: number;
+  // 월 API 환산 비용 ($) — cost-based verdict 의 핵심 신호.
+  // 과거 P90 / 5h 한도 비교는 ccusage totalTokens (cache_read 포함) 와
+  // community-estimated limit (단위 불명확) 간 단위 불일치로 비현실적
+  // 수치 (정환님 Max5 99821% 등) 발생 → cost 비율로 교체.
+  monthlyCostUsd?: number;
 }
 
 export interface PlanHealthResult {
@@ -184,7 +189,9 @@ export function analyzePlanHealth(input: PlanHealthInput): PlanHealthResult {
   let verdict: Verdict = "unknown";
   let recommendedTier: PlanTier = declaredTier;
   let recommendedSavingsUsd = 0;
-  let actionFirst = false;
+  // actionFirst 는 cost-based 로직에서 더 이상 사용 안 함 — 항상 false.
+  // (과거: cache_hit / one_shot 낮을 때 plan 업그레이드 전 행동 개선 권장)
+  const actionFirst = false;
   const reasoning: string[] = [];
 
   if (dataInsufficient) {
@@ -231,66 +238,62 @@ export function analyzePlanHealth(input: PlanHealthInput): PlanHealthResult {
     };
   }
 
-  // declared tier 대비 평가
-  const limit = declaredLimits.estimated5hTokenLimit;
-  if (limit === 0) {
+  // declared tier 대비 평가 — cost-based.
+  // 과거: P90 / 5h 한도 비교 (utilizationPct, hitCount). 그러나 ccusage
+  // totalTokens 는 cache_read 포함이고 community-estimated 5h 한도는 단위
+  // 불명확 (Anthropic 미공개) → 사과·오렌지 비교로 99,821% 같은 비현실 수치.
+  //
+  // 현재: 월 API 환산 비용 (ccusage cost, 명확한 단위) vs Plan 가격 의
+  // ratio 로 판단.
+  //   ratio < 0.5  → downgrade 가능 (사용량 낮음, Plan 과대)
+  //   ratio 0.5~2 → fit (적정)
+  //   ratio 2~10  → tight 라벨 재활용: "Plan 잘 활용" (절감 효과 큼)
+  //   ratio > 10  → over 라벨 재활용: "Power User" (Plan 매우 잘 활용)
+  // 업그레이드 추천은 안 함 — Anthropic 의 실제 5h cap 단위가 미공개라
+  // "한도 도달" 판단 불가능. cap 도달 신호는 별도 source (rate limit
+  // hit log 등) 필요. 현재는 downgrade 만 actionable.
+  const planPrice = declaredLimits.monthlyPriceUsd;
+  const monthlyCost = input.monthlyCostUsd ?? 0;
+  // utilizationPct 의미 변경 — 'Plan price 대비 API 환산 비용 %'.
+  utilizationPct = planPrice > 0 ? Math.round((monthlyCost / planPrice) * 100) : 0;
+  hitCount = 0; // 더 이상 사용 안 함 (cap hit 측정 불가)
+
+  if (planPrice === 0) {
     // api tier — 한도 없음. plan health 평가 N/A.
-    reasoning.push("API 종량제 — 한도 평가 N/A. cost 모니터링은 다른 카드에서 확인.");
+    reasoning.push("API 종량제 — Plan ROI 평가 N/A.");
     verdict = "fit";
     recommendedTier = declaredTier;
   } else {
-    utilizationPct = Math.round((p90 / limit) * 100);
-    hitCount = tokens.filter((t) => t >= limit).length;
+    const ratio = monthlyCost / planPrice;
+    const costFmt = `$${Math.round(monthlyCost)}`;
+    const planFmt = `$${planPrice}/월`;
 
-    if (utilizationPct >= 100 || hitCount >= 3) {
-      verdict = "over";
-      // 행동 변경 vs plan 변경 분기
-      const cache = input.cacheHitPct ?? 100;
-      const oneShot = input.oneShotRate ?? 100;
-      if (cache < 80) {
-        actionFirst = true;
-        reasoning.push(`P90 ${p90.toLocaleString()} tokens — ${declaredLimits.label} 한도 (${limit.toLocaleString()}) ${utilizationPct}% 사용 (한도 도달)`);
-        reasoning.push(`Cache hit ${cache.toFixed(0)}% (권장 90%+) — cache 개선이 먼저, plan 업그레이드는 그 후 검토`);
-        recommendedTier = declaredTier;
-      } else if (oneShot < 60) {
-        actionFirst = true;
-        reasoning.push(`P90 ${p90.toLocaleString()} tokens — ${declaredLimits.label} 한도 ${utilizationPct}% (한도 도달)`);
-        reasoning.push(`One-shot ${oneShot.toFixed(0)}% (권장 60%+) — 첫 시도 정확도 개선 먼저 권장`);
-        recommendedTier = declaredTier;
-      } else {
-        const next = nextTierUp(declaredTier);
-        if (next) {
-          recommendedTier = next;
-          recommendedSavingsUsd = declaredLimits.monthlyPriceUsd - PLAN_LIMITS[next].monthlyPriceUsd;
-          reasoning.push(`P90 ${p90.toLocaleString()} tokens — ${declaredLimits.label} 한도 ${utilizationPct}% (이미 한도)`);
-          reasoning.push(`효율 지표 양호 (cache ${cache.toFixed(0)}%, one-shot ${oneShot.toFixed(0)}%) — ${PLAN_LIMITS[next].label} 업그레이드 권장`);
-        } else {
-          reasoning.push("이미 최상위 tier — 한도 도달 시 행동 변경만 가능");
-        }
-      }
-    } else if (utilizationPct >= 80) {
-      verdict = "tight";
-      reasoning.push(`P90 ${p90.toLocaleString()} tokens — ${declaredLimits.label} 한도 ${utilizationPct}% (여유 적음)`);
-      const next = nextTierUp(declaredTier);
-      if (next) {
-        recommendedTier = declaredTier; // 아직 업그레이드 강제 아님
-        reasoning.push(`사용량이 늘면 ${PLAN_LIMITS[next].label} 검토. 현재는 적정 범위 끝.`);
-      }
-    } else if (utilizationPct < 40) {
+    if (ratio < 0.5) {
       verdict = "downgrade";
       const down = nextTierDown(declaredTier);
       if (down) {
         recommendedTier = down;
-        recommendedSavingsUsd = declaredLimits.monthlyPriceUsd - PLAN_LIMITS[down].monthlyPriceUsd;
-        reasoning.push(`P90 ${p90.toLocaleString()} tokens — ${declaredLimits.label} 한도 ${utilizationPct}% (사용량 낮음)`);
+        recommendedSavingsUsd = planPrice - PLAN_LIMITS[down].monthlyPriceUsd;
+        reasoning.push(`월 API 환산 ${costFmt} — ${declaredLimits.label} ${planFmt} 의 ${utilizationPct}% (사용량 낮음)`);
         reasoning.push(`${PLAN_LIMITS[down].label} 다운그레이드 가능, 월 $${recommendedSavingsUsd} 절감`);
       } else {
-        reasoning.push(`사용량 적지만 이미 최하위 tier`);
+        recommendedTier = declaredTier;
+        reasoning.push(`월 API 환산 ${costFmt} — ${declaredLimits.label} ${planFmt} 의 ${utilizationPct}% (사용량 낮지만 이미 최하위 tier)`);
       }
-    } else {
+    } else if (ratio <= 2) {
       verdict = "fit";
       recommendedTier = declaredTier;
-      reasoning.push(`P90 ${p90.toLocaleString()} tokens — ${declaredLimits.label} 한도 ${utilizationPct}% (적정)`);
+      reasoning.push(`월 API 환산 ${costFmt} — ${declaredLimits.label} ${planFmt} 의 ${utilizationPct}% (적정)`);
+    } else if (ratio <= 10) {
+      // 기존 'tight' 라벨 재활용 → "Plan 잘 활용" 의미. 권장 변경 없음.
+      verdict = "tight";
+      recommendedTier = declaredTier;
+      reasoning.push(`월 API 환산 ${costFmt} — ${declaredLimits.label} ${planFmt} 의 ${utilizationPct}% (Plan 잘 활용)`);
+    } else {
+      // ratio > 10 — extreme power user. 'over' 라벨 재활용 → "Power User".
+      verdict = "over";
+      recommendedTier = declaredTier;
+      reasoning.push(`월 API 환산 ${costFmt} — ${declaredLimits.label} ${planFmt} 의 ${utilizationPct}% (Power User)`);
     }
   }
 
@@ -313,6 +316,9 @@ export function analyzePlanHealth(input: PlanHealthInput): PlanHealthResult {
   };
 }
 
+// cost-based 로직에서는 업그레이드 추천 안 함 (5h cap 단위 미공개). 함수는
+// 추후 cap 측정 가능해질 때 복귀 대비 유지. eslint suppress.
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function nextTierUp(tier: PlanTier): Exclude<PlanTier, null> | null {
   if (tier === "pro") return "max5";
   if (tier === "max5") return "max20";

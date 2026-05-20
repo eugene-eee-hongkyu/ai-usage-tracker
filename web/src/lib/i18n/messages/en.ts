@@ -862,12 +862,12 @@ export const en: Messages = {
     keep: "(keep)",
     verdictDowngrade: "▼ Downgrade",
     verdictFit: "✓ Fit",
-    verdictTight: "▲ Tight",
-    verdictOver: "▲▲ At cap",
-    verdictUtilFmt: "P90 {pct}%",
+    verdictTight: "▲ Plan well-used",
+    verdictOver: "▲▲ Power User",
+    verdictUtilFmt: "{pct}% of plan",
     verdictHitFmt: "{n}× at cap",
     footnote:
-      "※ Plan limits are community-P90 estimates. 30-day window, members with 7+ active days only. 💡 = improve efficiency before plan upgrade.",
+      "※ Verdict is based on monthly API-equivalent cost (ccusage) vs plan price ratio. 30-day window, members with 7+ active days only. No upgrade recommendations (Anthropic's 5h cap unit is undisclosed).",
   },
   planHealth: {
     cardTitle: "📊 Plan Health",
