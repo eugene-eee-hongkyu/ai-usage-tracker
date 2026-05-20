@@ -900,6 +900,45 @@ export function TeamView({ adminMode = false }: { adminMode?: boolean }) {
     );
   })() : null;
 
+  // Top 토큰 사용자 ranking (admin only, Plan Savings 옆 반셀).
+  // 매니저가 "지금 누가 토큰 많이 쓰나" 한눈에 보는 용도. byMember chart +
+  // powerRank ranking 은 기본 토글 안에 있어서 토글 안 열면 안 보임 — 이
+  // 카드는 항상 상단 노출. raw 토큰 ranking (Power Index composite 와 차별).
+  const topTokensBlock = adminUser ? (() => {
+    const ranked = [...members]
+      .filter((m) => m.totalTokens > 0)
+      .sort((a, b) => b.totalTokens - a.totalTokens)
+      .slice(0, 5);
+    if (ranked.length === 0) return null;
+    const max = Math.max(...ranked.map((m) => m.totalTokens), 1);
+    return (
+      <div data-testid="team-card-top-tokens" className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-cyan-500 rounded">
+        <div className="px-3 py-2 border-b border-neutral-800">
+          <span className="text-xs font-mono font-bold text-cyan-400 uppercase tracking-wider">
+            {tmpl(t.teamView.topTokenUsersTitle, { n: members.length })}
+          </span>
+        </div>
+        <div className="p-4 space-y-2.5">
+          {ranked.map((m, i) => (
+            <div key={`${m.userId}-${i}`} className="flex items-center gap-2.5 text-xs font-mono">
+              <span className="w-4 text-neutral-600 tabular-nums shrink-0 text-right">{i + 1}</span>
+              <span className="flex-1 text-neutral-300 truncate min-w-0">{m.name}</span>
+              <div className="w-20 sm:w-28 h-2 bg-neutral-800/60 rounded-full overflow-hidden shrink-0">
+                <div
+                  className="h-full bg-cyan-500 rounded-full transition-all"
+                  style={{ width: `${(m.totalTokens / max) * 100}%` }}
+                />
+              </div>
+              <span className="w-14 text-right text-cyan-300 tabular-nums shrink-0 font-bold">
+                {fmtTokens(m.totalTokens)}
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  })() : null;
+
   // Row 3: Efficiency (full-width) — 컬럼 6개 가독성 위해 1줄 차지.
   const efficiencyBlock = (
     <div data-testid="team-card-efficiency" className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-fuchsia-500 rounded">
@@ -1394,7 +1433,12 @@ export function TeamView({ adminMode = false }: { adminMode?: boolean }) {
           );
         })()}
 
-        {teamPlanSavingsBlock}
+        {(teamPlanSavingsBlock || topTokensBlock) && (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            {teamPlanSavingsBlock || <div />}
+            {topTokensBlock || <div />}
+          </div>
+        )}
 
         {members.length === 0 ? (
           <div data-testid="team-empty" className="bg-neutral-900 border border-neutral-800 rounded-lg p-8 text-center text-neutral-500 text-sm font-mono">

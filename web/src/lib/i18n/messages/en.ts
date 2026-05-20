@@ -466,6 +466,7 @@ export interface Messages {
     moreBasicDetails: string;          // admin only — 기본 팀정보 토글 (TeamUsageHero/Row 1·2·2.5/headline)
     moreBasicDetailsHint: string;
     moreDetailedDetailsAdmin: string;  // admin 만 보는 세부 토글 라벨 (기본 토글과 구분)
+    topTokenUsersTitle: string;        // 'Top 토큰 사용 · 팀 N명' — Plan Savings 옆 반셀 ranking
     teamSum: string;
     powerRankCard: string;
     unitCostCardLabel: string;
@@ -1190,6 +1191,7 @@ export const en: Messages = {
     moreBasicDetails: "Show basic team info ▼",
     moreBasicDetailsHint: "team usage · token unit cost · by member · activity · cost · power rank · daily unit cost · headline",
     moreDetailedDetailsAdmin: "Show detailed team info ▼",
+    topTokenUsersTitle: "Top token users · {n} members",
     teamSum: "Team total",
     powerRankCard: "Power Index Rank",
     unitCostCardLabel: "Daily Unit Cost ($ / 1M)",
