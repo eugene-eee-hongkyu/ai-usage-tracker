@@ -347,9 +347,9 @@ export async function GET(req: NextRequest) {
     if (!r.date) continue;
     heatmapMap[r.date] = (r as { totalCost?: number; cost?: number }).totalCost ?? r.cost ?? 0;
   }
-  // 짝수 weeks 만 — 잔디 그리드 좌우 균형 (홀수 weeks 면 시각적 어색).
-  const HEATMAP_MIN_WEEKS = 16;
-  const HEATMAP_MAX_WEEKS = 26;
+  // 활동·체류 히트맵 모두 26주 고정 — 데이터 양 무관 일관 카드 크기, 신규
+  // 사용자도 동일 시각. 활동 없는 날은 level 0 (배경색) 으로 자연 표시.
+  const HEATMAP_WEEKS = 26;
   const heatmapBase = new Date();
   const earliestDate = heatmapDailySource
     .map((r) => r.date)
@@ -358,13 +358,8 @@ export async function GET(req: NextRequest) {
   const dataDays = earliestDate
     ? Math.floor((heatmapBase.getTime() - new Date(earliestDate).getTime()) / 86_400_000) + 1
     : 0;
-  // 짝수 weeks 강제 — 홀수면 +1 로 올림.
-  const ceilEvenWeeks = (n: number) => (n % 2 === 1 ? n + 1 : n);
-  const targetWeeks = Math.max(
-    HEATMAP_MIN_WEEKS,
-    Math.min(HEATMAP_MAX_WEEKS, ceilEvenWeeks(Math.ceil(dataDays / 7))),
-  );
-  const heatmapDays = targetWeeks * 7;
+  void dataDays; // 옛 가변 로직 잔재 — 의도된 silence.
+  const heatmapDays = HEATMAP_WEEKS * 7;
   const heatmapDaily: Array<{ date: string; cost: number }> = [];
   for (let i = heatmapDays - 1; i >= 0; i--) {
     const d2 = new Date(heatmapBase);
@@ -391,11 +386,8 @@ export async function GET(req: NextRequest) {
   const visitDataDays = visitEarliest
     ? Math.floor((heatmapBase.getTime() - new Date(visitEarliest).getTime()) / 86_400_000) + 1
     : 0;
-  const visitWeeks = Math.max(
-    HEATMAP_MIN_WEEKS,
-    Math.min(HEATMAP_MAX_WEEKS, ceilEvenWeeks(Math.ceil(visitDataDays / 7))),
-  );
-  const visitDays = visitWeeks * 7;
+  void visitDataDays; // 옛 가변 로직 잔재
+  const visitDays = HEATMAP_WEEKS * 7;
   const visitDaily: Array<{ date: string; visitCount: number; dwellSec: number }> = [];
   for (let i = visitDays - 1; i >= 0; i--) {
     const d2 = new Date(heatmapBase);
