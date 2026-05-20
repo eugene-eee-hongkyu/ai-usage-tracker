@@ -349,7 +349,7 @@ export async function GET(req: NextRequest) {
   }
   // 짝수 weeks 만 — 잔디 그리드 좌우 균형 (홀수 weeks 면 시각적 어색).
   const HEATMAP_MIN_WEEKS = 16;
-  const HEATMAP_MAX_WEEKS = 28;
+  const HEATMAP_MAX_WEEKS = 26;
   const heatmapBase = new Date();
   const earliestDate = heatmapDailySource
     .map((r) => r.date)
