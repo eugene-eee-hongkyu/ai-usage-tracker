@@ -1756,22 +1756,27 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
           })() : <div />}
         </div>
 
-        {/* 자세히 보기 토글 — by model · by project · top sessions · by activity ·
-            core tools · shell · MCP · 체류 히트맵 모두 토글 안. default 닫힘 +
-            localStorage 사용자 선호 유지. */}
-        <div className="flex flex-col items-center gap-1 pt-2">
-          <button
-            type="button"
-            onClick={toggleDetails}
-            data-testid="dash-toggle-details"
-            className="text-sm font-mono text-neutral-400 hover:text-neutral-200 bg-neutral-900 hover:bg-neutral-800 border border-neutral-700 hover:border-neutral-600 rounded px-4 py-2 transition-colors"
-          >
-            {detailsOpen ? t.dashboardView.collapseDetails : t.dashboardView.moreDetails}
-          </button>
+        {/* 자세히 보기 토글 — divider + 중앙 라벨 풀폭 패턴 (Medium / Notion 식).
+            "여기부터 details" 메타포 + 위·아래 영역 시각 단절. by model · by
+            project · top sessions · by activity · core tools · shell · MCP ·
+            체류 · Active Blocks 모두 토글 안. localStorage 선호 유지. */}
+        <div className="pt-4 pb-1">
+          <div className="flex items-center gap-3">
+            <hr className="flex-1 border-t border-neutral-800" />
+            <button
+              type="button"
+              onClick={toggleDetails}
+              data-testid="dash-toggle-details"
+              className="text-sm font-mono text-neutral-400 hover:text-neutral-200 bg-neutral-900 hover:bg-neutral-800 border border-neutral-700 hover:border-neutral-600 rounded px-4 py-2 transition-colors shrink-0"
+            >
+              {detailsOpen ? t.dashboardView.collapseDetails : t.dashboardView.moreDetails}
+            </button>
+            <hr className="flex-1 border-t border-neutral-800" />
+          </div>
           {!detailsOpen && (
-            <span className="text-xs font-mono text-neutral-600">
+            <p className="text-center text-xs font-mono text-neutral-600 mt-2">
               {t.dashboardView.moreDetailsHint}
-            </span>
+            </p>
           )}
         </div>
 
