@@ -203,6 +203,8 @@ export interface Messages {
     verdictFit: string;
     verdictTight: string;
     verdictOver: string;
+    verdictUtilFmt: string;       // "P90 {pct}%"
+    verdictHitFmt: string;        // "{n}× at cap" — over verdict 에서만 추가 표시
     footnote: string;
   };
   planHealth: {
@@ -862,6 +864,8 @@ export const en: Messages = {
     verdictFit: "✓ Fit",
     verdictTight: "▲ Tight",
     verdictOver: "▲▲ At cap",
+    verdictUtilFmt: "P90 {pct}%",
+    verdictHitFmt: "{n}× at cap",
     footnote:
       "※ Plan limits are community-P90 estimates. 30-day window, members with 7+ active days only. 💡 = improve efficiency before plan upgrade.",
   },

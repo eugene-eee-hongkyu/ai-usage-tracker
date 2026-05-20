@@ -340,6 +340,9 @@ export interface TeamMemberPlan {
   verdict: Verdict;
   actionFirst: boolean;
   isEstimated: boolean;       // 본인 declaredTier 없어 추정값으로 평가됨
+  // verdict 근거 숫자 — UI 에서 "왜 이 평가인가" 설명 inline 표시.
+  utilizationPct: number;     // P90 / 한도 (declaredTier 없으면 0)
+  hitCount: number;            // 한도 도달한 5h 블록 수
 }
 
 export interface TeamPlanSummary {
@@ -387,6 +390,8 @@ export function summarizeTeamPlans(members: Array<{
       verdict: h.verdict,
       actionFirst: h.actionFirst,
       isEstimated,
+      utilizationPct: h.utilizationPct,
+      hitCount: h.hitCount,
     });
 
     // 분포는 추정값 포함 (현황 파악 위해).

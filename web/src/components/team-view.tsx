@@ -839,26 +839,29 @@ export function TeamView({ adminMode = false }: { adminMode?: boolean }) {
                 </p>
                 <p className="text-2xl font-mono font-bold text-neutral-200">{fmt(planCost)}</p>
               </div>
+              <span className="text-neutral-600 text-xl font-mono">→</span>
+              <div className="flex-1 text-right">
+                <p className="text-[12px] font-mono text-neutral-500 uppercase tracking-wider">
+                  {t.dashboard.cards.planSavingsSavedLabel}
+                </p>
+                {savedPct !== null && positive && (
+                  <>
+                    <p className="text-2xl font-mono font-bold text-emerald-400">▼ {savedPct}%</p>
+                    <p className="text-[10px] font-mono text-neutral-500 mt-0.5">({fmt(saved)})</p>
+                  </>
+                )}
+                {savedPct !== null && !positive && (
+                  <>
+                    <p className="text-2xl font-mono font-bold text-rose-400">▲ {Math.abs(savedPct)}%</p>
+                    <p className="text-[10px] font-mono text-neutral-500 mt-0.5">({fmt(Math.abs(saved))})</p>
+                  </>
+                )}
+                {savedPct === null && (
+                  <p className="text-2xl font-mono text-neutral-600">—</p>
+                )}
+              </div>
             </div>
-            {savedPct !== null && positive && (
-              <div className="pt-2 border-t border-neutral-800">
-                <p className="text-xs font-mono">
-                  <span className="text-emerald-400 font-bold">▼ {savedPct}%</span>
-                  <span className="text-neutral-400"> {t.dashboard.cards.planSavingsSavedLabel} </span>
-                  <span className="text-neutral-300">({fmt(saved)})</span>
-                </p>
-              </div>
-            )}
-            {savedPct !== null && !positive && (
-              <div className="pt-2 border-t border-neutral-800">
-                <p className="text-xs font-mono">
-                  <span className="text-rose-400 font-bold">▲ {Math.abs(savedPct)}%</span>
-                  <span className="text-neutral-400"> over plan </span>
-                  <span className="text-neutral-300">({fmt(Math.abs(saved))})</span>
-                </p>
-              </div>
-            )}
-            <p className="text-[12px] font-mono text-neutral-600">
+            <p className="text-[12px] font-mono text-neutral-600 pt-1">
               {t.dashboard.cards.planSavingsHint}
             </p>
           </div>

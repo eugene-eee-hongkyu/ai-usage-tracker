@@ -209,6 +209,8 @@ export const ko: DeepPartial<Messages> = {
     verdictFit: "✓ 적정",
     verdictTight: "▲ 여유 적음",
     verdictOver: "▲▲ 한도",
+    verdictUtilFmt: "P90 {pct}%",
+    verdictHitFmt: "한도 {n}회",
     footnote: "※ plan 한도는 커뮤니티 P90 추정. 30일 윈도우 / 활성 7일+ 멤버만 평가. 💡 = plan 업 전 효율 개선 권장.",
   },
   planHealth: {
