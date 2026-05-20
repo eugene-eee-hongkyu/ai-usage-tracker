@@ -305,7 +305,7 @@ export function UsageHero({
               const targetStr = targetWorkdays.toFixed(targetWorkdays >= 10 ? 0 : 1);
               const hwStr = hardworkerThreshold.toFixed(hardworkerThreshold >= 10 ? 0 : 1);
               return (
-                <div data-testid="usage-hero-power-breakdown" className="mt-3 pt-3 border-t border-neutral-800 space-y-3 text-[11px] font-mono">
+                <div data-testid="usage-hero-power-breakdown" className="mt-3 pt-3 border-t border-neutral-800 space-y-3 text-[13px] font-mono">
                   <div>
                     <p className="text-cyan-400 mb-1">{m.usageHero.breakdownActiveTitle}</p>
                     <p className="text-neutral-400 leading-relaxed">
@@ -476,7 +476,7 @@ export function UsageHero({
             )}
 
             {breakdownOpen && (
-              <div data-testid="usage-hero-unit-breakdown" className="mt-3 pt-3 border-t border-neutral-800 space-y-2 text-[11px] font-mono">
+              <div data-testid="usage-hero-unit-breakdown" className="mt-3 pt-3 border-t border-neutral-800 space-y-2 text-[13px] font-mono">
                 <p className="text-yellow-400">{m.usageHero.unitCostBreakdownTitle}</p>
                 <div className="space-y-0.5">
                   {UNIT_COST_LEVEL_ROWS.map((r) => {

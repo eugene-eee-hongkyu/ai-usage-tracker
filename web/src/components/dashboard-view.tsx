@@ -429,8 +429,8 @@ function EfficiencyScoreSection({ score, period, periodScore }: EfficiencyScoreS
               theme={theme}
               labels={{ legend: { less: m.dashboardView.legendLow, more: m.dashboardView.legendHigh } }}
               showWeekdayLabels
-              blockSize={10}
-              blockMargin={2}
+              blockSize={14}
+              blockMargin={4}
               showTotalCount={false}
               renderColorLegend={() => <></>}
               renderBlock={(block, activity) => {
@@ -2098,7 +2098,8 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
                     theme={{ dark: ["#1e293b", "#854d0e", "#a16207", "#ca8a04", "#facc15"] }}
                     labels={{ legend: { less: "0", more: "15+" } }}
                     showWeekdayLabels
-                    blockSize={11}
+                    blockSize={14}
+                    blockMargin={4}
                     showTotalCount={false}
                   />
                 </div>

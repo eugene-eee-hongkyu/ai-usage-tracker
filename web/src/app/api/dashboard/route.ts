@@ -347,8 +347,9 @@ export async function GET(req: NextRequest) {
     if (!r.date) continue;
     heatmapMap[r.date] = (r as { totalCost?: number; cost?: number }).totalCost ?? r.cost ?? 0;
   }
-  const HEATMAP_MIN_WEEKS = 15;
-  const HEATMAP_MAX_WEEKS = 26;
+  // 짝수 weeks 만 — 잔디 그리드 좌우 균형 (홀수 weeks 면 시각적 어색).
+  const HEATMAP_MIN_WEEKS = 16;
+  const HEATMAP_MAX_WEEKS = 28;
   const heatmapBase = new Date();
   const earliestDate = heatmapDailySource
     .map((r) => r.date)
@@ -357,9 +358,11 @@ export async function GET(req: NextRequest) {
   const dataDays = earliestDate
     ? Math.floor((heatmapBase.getTime() - new Date(earliestDate).getTime()) / 86_400_000) + 1
     : 0;
+  // 짝수 weeks 강제 — 홀수면 +1 로 올림.
+  const ceilEvenWeeks = (n: number) => (n % 2 === 1 ? n + 1 : n);
   const targetWeeks = Math.max(
     HEATMAP_MIN_WEEKS,
-    Math.min(HEATMAP_MAX_WEEKS, Math.ceil(dataDays / 7)),
+    Math.min(HEATMAP_MAX_WEEKS, ceilEvenWeeks(Math.ceil(dataDays / 7))),
   );
   const heatmapDays = targetWeeks * 7;
   const heatmapDaily: Array<{ date: string; cost: number }> = [];
@@ -390,7 +393,7 @@ export async function GET(req: NextRequest) {
     : 0;
   const visitWeeks = Math.max(
     HEATMAP_MIN_WEEKS,
-    Math.min(HEATMAP_MAX_WEEKS, Math.ceil(visitDataDays / 7)),
+    Math.min(HEATMAP_MAX_WEEKS, ceilEvenWeeks(Math.ceil(visitDataDays / 7))),
   );
   const visitDays = visitWeeks * 7;
   const visitDaily: Array<{ date: string; visitCount: number; dwellSec: number }> = [];
