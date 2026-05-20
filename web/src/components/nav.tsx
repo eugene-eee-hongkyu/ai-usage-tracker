@@ -32,10 +32,23 @@ function NavInner() {
   // dashboard / team 등 내부 링크에 현재 locale 유지.
   const withLocale = (href: string) => (href.includes("?") ? href : `${href}?locale=${locale}`);
 
+  const teamName =
+    !isLocalMode
+      ? ((session?.user as { currentTeamName?: string | null } | undefined)?.currentTeamName ?? null)
+      : null;
+
   return (
     <header className="border-b border-slate-800 px-4 py-3 flex items-center justify-between gap-2">
       <div className="flex items-center gap-3 min-w-0">
-        <span className="font-bold text-slate-200 shrink-0 hidden sm:block">{m.brand}</span>
+        <span className="font-bold text-slate-200 shrink-0 hidden sm:inline-flex items-center gap-2 min-w-0">
+          <span>{m.brand}</span>
+          {teamName && (
+            <>
+              <span className="text-slate-600">·</span>
+              <span className="text-slate-300 truncate">{teamName}</span>
+            </>
+          )}
+        </span>
         <nav className="flex gap-1 sm:gap-3">
           {tabs.map((t) =>
             t.external ? (
