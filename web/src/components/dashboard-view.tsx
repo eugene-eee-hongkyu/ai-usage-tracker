@@ -1103,6 +1103,113 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
     </div>
   );
 
+  // Active Blocks 카드 — 토글 안 마지막 row 단독. today period 면 데이터 없어 null.
+  const activeBlocksBlock = period !== "today" && data.blocks ? (
+    <div data-testid="dash-card-active-blocks" className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-sky-500 rounded">
+      <div className="px-3 py-2 border-b border-neutral-800 flex items-center justify-between">
+        <span className="text-xs font-mono font-bold text-sky-400 uppercase tracking-wider">Active Blocks</span>
+        {!data.blocks.tooFewData && (
+          <div className="relative group/pattern">
+            <span
+              data-testid="dash-active-blocks-pattern"
+              className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded border cursor-help ${PATTERN_COLORS[data.blocks.pattern]}`}
+            >
+              {patternLabel(data.blocks.pattern, t)} <span className="opacity-60">ⓘ</span>
+            </span>
+            <div className="absolute right-0 top-full mt-1 z-50 opacity-0 invisible group-hover/pattern:opacity-100 group-hover/pattern:visible transition-all duration-100 bg-slate-900 border border-slate-700 rounded-lg shadow-2xl p-3 w-72 text-left">
+              <p className="text-[10px] font-mono text-slate-500 mb-1.5 uppercase tracking-wider">{patternLabel(data.blocks.pattern, t)}{t.dashboardView.patternCriteriaSuffix}</p>
+              <p className="text-xs font-mono text-slate-300 leading-relaxed">{patternTooltip(data.blocks.pattern, t)}</p>
+              <p className="text-[10px] font-mono text-slate-500 mt-2 pt-2 border-t border-slate-800">
+                {t.dashboardView.patternDisclaimer}
+              </p>
+            </div>
+          </div>
+        )}
+      </div>
+      <div className="p-3">
+        {data.blocks.tooFewData ? (
+          <p data-testid="dash-active-blocks-empty" className="text-neutral-500 text-xs font-mono">{t.dashboardView.activeBlocksEmpty}</p>
+        ) : (
+          <>
+            <div className="space-y-1.5 text-xs font-mono">
+              <div className="flex justify-between items-center gap-2">
+                <span className="text-neutral-400 shrink-0">{t.dashboardView.activeBlocks}</span>
+                <span className="flex-1 text-right">
+                  <span className="text-neutral-200">{data.blocks.count}</span>
+                  <span className="text-neutral-500"> ({data.blocks.activeDays}{t.common.daysShort})</span>
+                </span>
+                <span className="w-20 text-right text-[10px]" title={t.dashboardView.deltaWindowTitle}>
+                  {data.blocks.trend?.hasPrevData
+                    ? <TrendArrow pct={data.blocks.trend.countDeltaPct} />
+                    : <span className="text-neutral-700">─</span>}
+                </span>
+              </div>
+              <div className="flex justify-between items-center gap-2">
+                <span className="text-neutral-400 shrink-0">{t.dashboardView.avgLength}</span>
+                <span className="flex-1 text-right">
+                  <span className="text-neutral-200">{fmtMinutes(data.blocks.avgMinutes)}</span>
+                  <span className="text-neutral-500"> (median {fmtMinutes(data.blocks.medianMinutes)})</span>
+                </span>
+                <span className="w-20 text-right text-[10px]" title={t.dashboardView.deltaWindowTitle}>
+                  {data.blocks.trend?.hasPrevData
+                    ? <TrendArrow pct={data.blocks.trend.avgMinutesDeltaPct} />
+                    : <span className="text-neutral-700">─</span>}
+                </span>
+              </div>
+              <div className="flex justify-between items-center gap-2">
+                <span className="text-neutral-400 shrink-0">{t.dashboardView.tokensPerMin}</span>
+                <span className="flex-1 text-right text-sky-400">{fmtTokens(data.blocks.tokensPerMinute)}</span>
+                <span className="w-20 text-right text-[10px]" title={t.dashboardView.deltaWindowTitle}>
+                  {data.blocks.trend?.hasPrevData
+                    ? <TrendArrow pct={data.blocks.trend.tokensPerMinuteDeltaPct} />
+                    : <span className="text-neutral-700">─</span>}
+                </span>
+              </div>
+              <div className="flex justify-between items-center gap-2">
+                <span className="text-neutral-400 shrink-0">{t.dashboardView.longestBlock}</span>
+                <span className="flex-1 text-right">
+                  <span className="text-neutral-200">{fmtMinutes(data.blocks.maxMinutes)}</span>
+                  {data.blocks.longestStartedAt && (
+                    <span className="text-neutral-500"> ({fmtBlockDate(data.blocks.longestStartedAt, t)})</span>
+                  )}
+                </span>
+                <span className="w-20 text-right text-neutral-700 text-[10px]">─</span>
+              </div>
+            </div>
+            <div className="mt-3 pt-3 border-t border-neutral-800">
+              <p className="text-[10px] text-neutral-500 mb-2 uppercase tracking-wider">{t.dashboardView.lengthDistribution}</p>
+              <div className="space-y-1 text-[11px] font-mono">
+                {(() => {
+                  const dist = data.blocks!.distribution;
+                  const buckets: Array<[string, number]> = [
+                    ["<30m", dist.lt30],
+                    ["30m-1h", dist.m30to60],
+                    ["1-2h", dist.h1to2],
+                    ["2-4h", dist.h2to4],
+                    ["4h+", dist.h4plus],
+                  ];
+                  const maxV = Math.max(...buckets.map(([, v]) => v), 1);
+                  const med = data.blocks!.medianMinutes;
+                  const medBucket = med < 30 ? 0 : med < 60 ? 1 : med < 120 ? 2 : med < 240 ? 3 : 4;
+                  return buckets.map(([label, v], i) => (
+                    <div key={label} className="flex items-center gap-2">
+                      <span className="w-14 text-neutral-500">{label}</span>
+                      <div className="flex-1 h-2 bg-neutral-800 rounded overflow-hidden">
+                        <div className="h-full bg-sky-500/70 rounded" style={{ width: `${(v / maxV) * 100}%` }} />
+                      </div>
+                      <span className="w-8 text-right text-neutral-400">{v}</span>
+                      <span className="w-16 text-[10px] text-sky-400">{i === medBucket ? "← median" : ""}</span>
+                    </div>
+                  ));
+                })()}
+              </div>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  ) : null;
+
   // Dwell heatmap 카드 — 토글 안 새 Row 에서 MCP 와 짝. 기존 Row 6 우측 위치에서
   // 이동. (사용자 요청: core/shell 아래로)
   const dwellHeatmapBlock = (data.visitDaily ?? []).length > 0 ? (() => {
@@ -2022,14 +2129,21 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
           </div>
         </div>
 
-        {/* 새 Row: MCP Servers + 체류 히트맵 — 사용자 요청: core/shell 아래.
-            토글 안 마지막 row. */}
+        {/* 새 Row: MCP Servers + 체류 히트맵 — 사용자 요청: core/shell 아래. */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           {mcpServersBlock}
           {dwellHeatmapBlock}
         </div>
 
-        </>)}  {/* detailsOpen 토글 닫기 — Row 3 ~ Row 5 + 새 Row 모두 토글 안 */}
+        {/* Active Blocks — 토글 안 마지막 row (단독 좌측, 우측 빈칸). */}
+        {activeBlocksBlock && (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            {activeBlocksBlock}
+            <div />
+          </div>
+        )}
+
+        </>)}  {/* detailsOpen 토글 닫기 — Row 3 ~ Row 5 + 새 Row + Active Blocks 모두 토글 안 */}
 
         {/* Daily Efficiency Score + Streak + 90일 잔디 + 팀 랭크 — 동기부여·게임화 패널.
             매일 보는 액션 카드가 아니라 주 1회 "이번 주 어땠지" 확인용. Core Tools /
@@ -2039,117 +2153,7 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
           <EfficiencyScoreSection score={data.efficiencyScore} period={period} periodScore={ov.periodScore} />
         )}
 
-        {/* Active Blocks 단독 row — today period 면 미표시 (해당 period 의 block
-            데이터 없음). 체류 히트맵 / MCP 는 토글 안 새 Row 로 이동. */}
-        {period !== "today" && data.blocks && (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            <div data-testid="dash-card-active-blocks" className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-sky-500 rounded">
-              <div className="px-3 py-2 border-b border-neutral-800 flex items-center justify-between">
-                <span className="text-xs font-mono font-bold text-sky-400 uppercase tracking-wider">Active Blocks</span>
-                {!data.blocks.tooFewData && (
-                  <div className="relative group/pattern">
-                    <span
-                      data-testid="dash-active-blocks-pattern"
-                      className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded border cursor-help ${PATTERN_COLORS[data.blocks.pattern]}`}
-                    >
-                      {patternLabel(data.blocks.pattern, t)} <span className="opacity-60">ⓘ</span>
-                    </span>
-                    <div className="absolute right-0 top-full mt-1 z-50 opacity-0 invisible group-hover/pattern:opacity-100 group-hover/pattern:visible transition-all duration-100 bg-slate-900 border border-slate-700 rounded-lg shadow-2xl p-3 w-72 text-left">
-                      <p className="text-[10px] font-mono text-slate-500 mb-1.5 uppercase tracking-wider">{patternLabel(data.blocks.pattern, t)}{t.dashboardView.patternCriteriaSuffix}</p>
-                      <p className="text-xs font-mono text-slate-300 leading-relaxed">{patternTooltip(data.blocks.pattern, t)}</p>
-                      <p className="text-[10px] font-mono text-slate-500 mt-2 pt-2 border-t border-slate-800">
-                        {t.dashboardView.patternDisclaimer}
-                      </p>
-                    </div>
-                  </div>
-                )}
-              </div>
-              <div className="p-3">
-                {data.blocks.tooFewData ? (
-                  <p data-testid="dash-active-blocks-empty" className="text-neutral-500 text-xs font-mono">{t.dashboardView.activeBlocksEmpty}</p>
-                ) : (
-                  <>
-                    <div className="space-y-1.5 text-xs font-mono">
-                      <div className="flex justify-between items-center gap-2">
-                        <span className="text-neutral-400 shrink-0">{t.dashboardView.activeBlocks}</span>
-                        <span className="flex-1 text-right">
-                          <span className="text-neutral-200">{data.blocks.count}</span>
-                          <span className="text-neutral-500"> ({data.blocks.activeDays}{t.common.daysShort})</span>
-                        </span>
-                        <span className="w-20 text-right text-[10px]" title={t.dashboardView.deltaWindowTitle}>
-                          {data.blocks.trend?.hasPrevData
-                            ? <TrendArrow pct={data.blocks.trend.countDeltaPct} />
-                            : <span className="text-neutral-700">─</span>}
-                        </span>
-                      </div>
-                      <div className="flex justify-between items-center gap-2">
-                        <span className="text-neutral-400 shrink-0">{t.dashboardView.avgLength}</span>
-                        <span className="flex-1 text-right">
-                          <span className="text-neutral-200">{fmtMinutes(data.blocks.avgMinutes)}</span>
-                          <span className="text-neutral-500"> (median {fmtMinutes(data.blocks.medianMinutes)})</span>
-                        </span>
-                        <span className="w-20 text-right text-[10px]" title={t.dashboardView.deltaWindowTitle}>
-                          {data.blocks.trend?.hasPrevData
-                            ? <TrendArrow pct={data.blocks.trend.avgMinutesDeltaPct} />
-                            : <span className="text-neutral-700">─</span>}
-                        </span>
-                      </div>
-                      <div className="flex justify-between items-center gap-2">
-                        <span className="text-neutral-400 shrink-0">{t.dashboardView.tokensPerMin}</span>
-                        <span className="flex-1 text-right text-sky-400">{fmtTokens(data.blocks.tokensPerMinute)}</span>
-                        <span className="w-20 text-right text-[10px]" title={t.dashboardView.deltaWindowTitle}>
-                          {data.blocks.trend?.hasPrevData
-                            ? <TrendArrow pct={data.blocks.trend.tokensPerMinuteDeltaPct} />
-                            : <span className="text-neutral-700">─</span>}
-                        </span>
-                      </div>
-                      <div className="flex justify-between items-center gap-2">
-                        <span className="text-neutral-400 shrink-0">{t.dashboardView.longestBlock}</span>
-                        <span className="flex-1 text-right">
-                          <span className="text-neutral-200">{fmtMinutes(data.blocks.maxMinutes)}</span>
-                          {data.blocks.longestStartedAt && (
-                            <span className="text-neutral-500"> ({fmtBlockDate(data.blocks.longestStartedAt, t)})</span>
-                          )}
-                        </span>
-                        <span className="w-20 text-right text-neutral-700 text-[10px]">─</span>
-                      </div>
-                    </div>
-                    <div className="mt-3 pt-3 border-t border-neutral-800">
-                      <p className="text-[10px] text-neutral-500 mb-2 uppercase tracking-wider">{t.dashboardView.lengthDistribution}</p>
-                      <div className="space-y-1 text-[11px] font-mono">
-                        {(() => {
-                          const dist = data.blocks.distribution;
-                          const buckets: Array<[string, number]> = [
-                            ["<30m", dist.lt30],
-                            ["30m-1h", dist.m30to60],
-                            ["1-2h", dist.h1to2],
-                            ["2-4h", dist.h2to4],
-                            ["4h+", dist.h4plus],
-                          ];
-                          const maxV = Math.max(...buckets.map(([, v]) => v), 1);
-                          const med = data.blocks!.medianMinutes;
-                          const medBucket = med < 30 ? 0 : med < 60 ? 1 : med < 120 ? 2 : med < 240 ? 3 : 4;
-                          return buckets.map(([label, v], i) => (
-                            <div key={label} className="flex items-center gap-2">
-                              <span className="w-14 text-neutral-500">{label}</span>
-                              <div className="flex-1 h-2 bg-neutral-800 rounded overflow-hidden">
-                                <div className="h-full bg-sky-500/70 rounded" style={{ width: `${(v / maxV) * 100}%` }} />
-                              </div>
-                              <span className="w-8 text-right text-neutral-400">{v}</span>
-                              <span className="w-16 text-[10px] text-sky-400">{i === medBucket ? "← median" : ""}</span>
-                            </div>
-                          ));
-                        })()}
-                      </div>
-                    </div>
-                  </>
-                )}
-              </div>
-            </div>
-            {/* 우측 빈칸 — Active Blocks 단독이라 빈자리 (의도된 시각 균형) */}
-            <div />
-          </div>
-        )}
+        {/* Active Blocks 는 토글 안 마지막으로 이동 — activeBlocksBlock 변수 사용. */}
 
       </main>
 
