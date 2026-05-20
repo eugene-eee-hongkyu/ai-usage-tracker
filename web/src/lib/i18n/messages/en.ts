@@ -454,6 +454,9 @@ export interface Messages {
     activeMembers: string;
     planSavings: string;
     noActivityPeriod: string;
+    moreDetails: string;
+    collapseDetails: string;
+    moreDetailsHint: string;
     teamSum: string;
     powerRankCard: string;
     unitCostCardLabel: string;
@@ -1165,6 +1168,9 @@ export const en: Messages = {
     activeMembers: "Active {n}/{total}",
     planSavings: "Plan optimization could save ${n}/mo",
     noActivityPeriod: "No activity data in this period.",
+    moreDetails: "Show details ▼",
+    collapseDetails: "Collapse ▲",
+    moreDetailsHint: "efficiency · team activities · by model · core tools · shell",
     teamSum: "Team total",
     powerRankCard: "Power Index Rank",
     unitCostCardLabel: "Daily Unit Cost ($ / 1M)",

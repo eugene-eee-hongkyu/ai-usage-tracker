@@ -341,6 +341,21 @@ export function TeamView({ adminMode = false }: { adminMode?: boolean }) {
   const [reloadKey, setReloadKey] = useState(0);
   const isLocalMode = useLocalMode();
 
+  // 자세히 보기 토글 — efficiency · Row 4 (Team Activities + By Model) ·
+  // Row 5 (Core Tools + Shell) 묶음. dashboard-view 와 동일 패턴.
+  const [detailsOpen, setDetailsOpen] = useState(false);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    setDetailsOpen(localStorage.getItem("team_details_open") === "1");
+  }, []);
+  const toggleDetails = () => {
+    setDetailsOpen((prev) => {
+      const next = !prev;
+      try { localStorage.setItem("team_details_open", next ? "1" : "0"); } catch {}
+      return next;
+    });
+  };
+
   useEffect(() => {
     if (isLocalMode === null) return;
     if (isLocalMode) return;
@@ -1348,6 +1363,30 @@ export function TeamView({ adminMode = false }: { adminMode?: boolean }) {
 
             {headlineBlock}
 
+            {/* 자세히 보기 토글 — efficiency + Row 4 + Row 5 묶음.
+                dashboard-view 와 동일 divider + 중앙 라벨 풀폭 패턴. */}
+            <div className="pt-4 pb-1">
+              <div className="flex items-center gap-3">
+                <hr className="flex-1 border-t border-neutral-800" />
+                <button
+                  type="button"
+                  onClick={toggleDetails}
+                  data-testid="team-toggle-details"
+                  className="text-sm font-mono text-neutral-400 hover:text-neutral-200 bg-neutral-900 hover:bg-neutral-800 border border-neutral-700 hover:border-neutral-600 rounded px-4 py-2 transition-colors shrink-0"
+                >
+                  {detailsOpen ? t.teamView.collapseDetails : t.teamView.moreDetails}
+                </button>
+                <hr className="flex-1 border-t border-neutral-800" />
+              </div>
+              {!detailsOpen && (
+                <p className="text-center text-xs font-mono text-neutral-600 mt-2">
+                  {t.teamView.moreDetailsHint}
+                </p>
+              )}
+            </div>
+
+            {detailsOpen && (<>
+
             {/* Row 3: Efficiency (full-width) — 컬럼 6개 가독성 위해 1줄 차지. */}
             {efficiencyBlock}
 
@@ -1370,6 +1409,8 @@ export function TeamView({ adminMode = false }: { adminMode?: boolean }) {
               {/* Shell Commands */}
               {shellCommandsBlock}
             </div>
+
+            </>)}  {/* detailsOpen 토글 닫기 — efficiency · Row 4 · Row 5 */}
 
             {/* Team Plan Health (admin only) — full width, 매니저 의사결정용 */}
             {adminUser && data.teamPlanHealth && (
