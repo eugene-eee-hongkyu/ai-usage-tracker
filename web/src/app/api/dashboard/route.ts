@@ -347,9 +347,10 @@ export async function GET(req: NextRequest) {
     if (!r.date) continue;
     heatmapMap[r.date] = (r as { totalCost?: number; cost?: number }).totalCost ?? r.cost ?? 0;
   }
-  // 활동·체류 히트맵 모두 26주 고정 — 데이터 양 무관 일관 카드 크기, 신규
+  // 활동·체류 히트맵 모두 24주 고정 — 데이터 양 무관 일관 카드 크기, 신규
   // 사용자도 동일 시각. 활동 없는 날은 level 0 (배경색) 으로 자연 표시.
-  const HEATMAP_WEEKS = 26;
+  // 26주는 너무 빽빽 → 24주 (짝수, 카드 폭과 균형).
+  const HEATMAP_WEEKS = 24;
   const heatmapBase = new Date();
   const earliestDate = heatmapDailySource
     .map((r) => r.date)

@@ -1666,7 +1666,7 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
                 <div className="px-3 py-2 border-b border-neutral-800">
                   <span data-testid="dash-heatmap-activity" className="text-xs font-mono font-bold text-indigo-400 uppercase tracking-wider">{tmpl(t.dashboardView.activityHeatmapLabel, { weeks: Math.round((data.heatmapDaily ?? []).length / 7) })}</span>
                 </div>
-                <div className="p-3">
+                <div className="p-3 flex justify-center [&>article]:!items-center">
                   <ActivityCalendar
                     data={calData}
                     colorScheme="dark"
@@ -2091,7 +2091,7 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
                     {monthVisitsTotal > 0 && tmpl(t.dashboardView.dwellMonthVisits, { n: monthVisitsTotal, time: avgMinSec })})
                   </span>
                 </div>
-                <div className="p-3">
+                <div className="p-3 flex justify-center [&>article]:!items-center">
                   <ActivityCalendar
                     data={calData}
                     colorScheme="dark"
