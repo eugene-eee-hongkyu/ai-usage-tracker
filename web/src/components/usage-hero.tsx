@@ -265,7 +265,7 @@ export function UsageHero({
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-2">
               <div className="flex items-center gap-2 flex-wrap">
                 <span className="text-xs font-mono font-bold text-cyan-400 uppercase tracking-wider">{m.usageHero.powerLabel}</span>
-                <span className="text-[10px] font-mono text-neutral-600">{m.common.powerIndexShort} · {periodLabel}</span>
+                <span className="text-[12px] font-mono text-neutral-600">{m.common.powerIndexShort} · {periodLabel}</span>
               </div>
               <button
                 type="button"
@@ -296,7 +296,7 @@ export function UsageHero({
                 {m.common.activeShort} <span className="text-neutral-300">{activeDays}/{periodDays}{daysSfx}</span>
                 {" · "}{m.common.dailyAvg} <span className="text-neutral-300">{fmtTokens(Math.round(avgDailyTokens))}</span> {m.common.tokens}
               </p>
-              <p className="text-[10px] text-neutral-600">{m.usageHero.powerFormula}</p>
+              <p className="text-[12px] text-neutral-600">{m.usageHero.powerFormula}</p>
             </div>
 
             {breakdownOpen && (() => {
@@ -360,7 +360,7 @@ export function UsageHero({
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-2">
               <div className="flex items-center gap-2 flex-wrap">
                 <span className="text-xs font-mono font-bold text-yellow-400 uppercase tracking-wider">{m.usageHero.unitCostLabel}</span>
-                <span className="text-[10px] font-mono text-neutral-600">{fmt(m.usageHero.unitCostSubtitle, { period: periodLabel })}</span>
+                <span className="text-[12px] font-mono text-neutral-600">{fmt(m.usageHero.unitCostSubtitle, { period: periodLabel })}</span>
               </div>
               <div className="flex items-center gap-1.5 flex-wrap">
                 {viewOnly ? (
@@ -440,7 +440,7 @@ export function UsageHero({
                       <span className={`text-sm font-mono font-bold ml-1 ${unitGrade.color}`}>
                         {unitGrade.label}
                       </span>
-                      <span className="text-[10px] font-mono text-neutral-500">
+                      <span className="text-[12px] font-mono text-neutral-500">
                         L{unitLevel} / 10
                       </span>
                     </>
@@ -468,7 +468,7 @@ export function UsageHero({
                       </span>
                     </p>
                   )}
-                  <p className="text-[10px] text-neutral-600">
+                  <p className="text-[12px] text-neutral-600">
                     {m.usageHero.sonnetAnchorHint}
                   </p>
                 </div>

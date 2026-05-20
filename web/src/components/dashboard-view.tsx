@@ -318,7 +318,7 @@ function EfficiencyScoreSection({ score, period, periodScore }: EfficiencyScoreS
         {referenceNode && <span className="text-neutral-500">·</span>}
         {referenceNode}
       </div>
-      <span className="text-[10px] font-mono text-neutral-600 mt-0.5">{m.dashboardView.efficiencyFormula}</span>
+      <span className="text-[12px] font-mono text-neutral-600 mt-0.5">{m.dashboardView.efficiencyFormula}</span>
       {drilldownAvailable && (() => {
         const periodLabel = period === "8days" ? m.common.eightDays
           : period === "month" ? m.common.thisMonth
@@ -348,14 +348,14 @@ function EfficiencyScoreSection({ score, period, periodScore }: EfficiencyScoreS
               onClick={toggleDrilldown}
               className="group col-span-12 sm:col-span-3 flex flex-col items-center bg-transparent border-0 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-500/60 rounded"
             >
-              <span className="text-[10px] font-mono text-neutral-500 uppercase tracking-wider mb-1">
+              <span className="text-[12px] font-mono text-neutral-500 uppercase tracking-wider mb-1">
                 {labelMain}{labelSuffix}
               </span>
               {gaugeBlock}
             </button>
           ) : (
             <div data-testid="score-today" className="col-span-12 sm:col-span-3 flex flex-col items-center">
-              <span className="text-[10px] font-mono text-neutral-500 uppercase tracking-wider mb-1">
+              <span className="text-[12px] font-mono text-neutral-500 uppercase tracking-wider mb-1">
                 {labelMain}{labelSuffix}
               </span>
               {gaugeBlock}
@@ -366,7 +366,7 @@ function EfficiencyScoreSection({ score, period, periodScore }: EfficiencyScoreS
           <div className="col-span-12 sm:col-span-3 flex flex-col gap-3 py-1">
             {/* Streak */}
             <div data-testid="score-streak">
-              <span className="text-[10px] font-mono text-neutral-500 uppercase tracking-wider block mb-1">
+              <span className="text-[12px] font-mono text-neutral-500 uppercase tracking-wider block mb-1">
                 {m.dashboardView.streakLabel}
               </span>
               <div className="flex items-center gap-3">
@@ -378,7 +378,7 @@ function EfficiencyScoreSection({ score, period, periodScore }: EfficiencyScoreS
                     </span>
                     <span className="text-xs font-mono text-neutral-500">{m.common.daysShort}</span>
                   </div>
-                  <span className="text-[10px] font-mono text-neutral-500 mt-0.5">{m.dashboardView.streakSkip}</span>
+                  <span className="text-[12px] font-mono text-neutral-500 mt-0.5">{m.dashboardView.streakSkip}</span>
                 </div>
               </div>
             </div>
@@ -386,7 +386,7 @@ function EfficiencyScoreSection({ score, period, periodScore }: EfficiencyScoreS
             {/* Team rank */}
             {score.teamRank ? (
               <div data-testid="score-team-rank">
-                <span className="text-[10px] font-mono text-neutral-500 uppercase tracking-wider block mb-1">
+                <span className="text-[12px] font-mono text-neutral-500 uppercase tracking-wider block mb-1">
                   {m.dashboardView.weekTeamCacheRank}
                 </span>
                 <div className="flex items-center gap-3">
@@ -398,7 +398,7 @@ function EfficiencyScoreSection({ score, period, periodScore }: EfficiencyScoreS
                       </span>
                       <span className="text-xs font-mono text-neutral-500">{tmpl(m.dashboardView.rankOutOf, { n: score.teamRank.total })}</span>
                     </div>
-                    <span className="text-[10px] font-mono text-neutral-500 mt-0.5">
+                    <span className="text-[12px] font-mono text-neutral-500 mt-0.5">
                       {tmpl(m.dashboardView.rankMeTeam, { self: score.teamRank.selfCacheHitPct.toFixed(1), team: score.teamRank.teamAvgCacheHitPct.toFixed(1) })}
                     </span>
                   </div>
@@ -415,8 +415,8 @@ function EfficiencyScoreSection({ score, period, periodScore }: EfficiencyScoreS
           {/* Grass (6 cols) */}
           <div data-testid="score-grass" className="col-span-12 sm:col-span-6 flex flex-col gap-1">
             <div className="flex items-center justify-between">
-              <span className="text-[10px] font-mono text-neutral-500 uppercase tracking-wider">{m.dashboardView.recent90dEfficiency}</span>
-              <div className="flex items-center gap-2.5 text-[10px] font-mono text-neutral-500">
+              <span className="text-[12px] font-mono text-neutral-500 uppercase tracking-wider">{m.dashboardView.recent90dEfficiency}</span>
+              <div className="flex items-center gap-2.5 text-[12px] font-mono text-neutral-500">
                 <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm" style={{ background: theme.dark[1] }} />{m.dashboardView.gradeWarning}</span>
                 <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm" style={{ background: theme.dark[2] }} />{m.dashboardView.gradeImprove}</span>
                 <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm" style={{ background: theme.dark[3] }} />{m.dashboardView.gradeGood}</span>
@@ -1399,7 +1399,7 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
                         />
                       </LineChart>
                     </ResponsiveContainer>
-                    <p className="text-[10px] font-mono text-neutral-600 mt-1.5">
+                    <p className="text-[12px] font-mono text-neutral-600 mt-1.5">
                       {t.dashboard.cards.unitCostHint}
                     </p>
                   </>
@@ -1443,14 +1443,14 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
                   <div className="space-y-2">
                     <div className="flex items-baseline gap-2">
                       <div className="flex-1">
-                        <p className="text-[10px] font-mono text-neutral-500 uppercase tracking-wider">
+                        <p className="text-[12px] font-mono text-neutral-500 uppercase tracking-wider">
                           {t.dashboard.cards.planSavingsApiLabel}
                         </p>
                         <p className="text-2xl font-mono font-bold text-amber-300">{fmt(apiCost)}</p>
                       </div>
                       <span className="text-neutral-600 text-xl font-mono">→</span>
                       <div className="flex-1">
-                        <p className="text-[10px] font-mono text-neutral-500 uppercase tracking-wider">
+                        <p className="text-[12px] font-mono text-neutral-500 uppercase tracking-wider">
                           {t.dashboard.cards.planSavingsPlanLabel}
                         </p>
                         <p className="text-2xl font-mono font-bold text-neutral-200">{fmt(planCost)}</p>
@@ -1480,7 +1480,7 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
                         </p>
                       </div>
                     )}
-                    <p className="text-[10px] font-mono text-neutral-600">
+                    <p className="text-[12px] font-mono text-neutral-600">
                       {t.dashboard.cards.planSavingsHint}
                     </p>
                   </div>
@@ -1610,7 +1610,7 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
                 type MetricRow = (typeof gradedRows)[number] | (typeof referenceRows)[number];
                 const renderRow = ({ tid, label, value, color, grade, gradeRows, gradeTitle, onDesc, onAct, actLabel }: MetricRow) => (
                   <div key={label} data-testid={`dash-metric-${tid}`} className="flex items-center text-xs py-0.5 gap-2">
-                    <span className="text-neutral-400 w-28 shrink-0">{label}</span>
+                    <span className="text-neutral-400 w-36 shrink-0 whitespace-nowrap">{label}</span>
                     <span className="flex gap-1 shrink-0 w-24">
                       <TipBtn testid={`dash-tip-${tid}-desc`} label={t.dashboardView.explain} onClick={onDesc} variant="explain" />
                       {grade && isBad(grade) && <TipBtn testid={`dash-tip-${tid}-act`} label={actLabel} onClick={onAct} />}
@@ -1673,7 +1673,8 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
                     theme={{ dark: ["#1e293b", "#4338ca", "#6366f1", "#818cf8", "#a5b4fc"] }}
                     labels={{ legend: { less: "$0", more: "$100+" } }}
                     showWeekdayLabels
-                    blockSize={11}
+                    blockSize={14}
+                    blockMargin={4}
                     showTotalCount={false}
                     renderBlock={(block, activity) => {
                       // today 셀은 amber outline 으로 강조 — "오늘 어디?" 즉시 파악.
@@ -1794,7 +1795,7 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
                   return (
                     <div key={s.id || i} className="flex items-center gap-2 text-xs font-mono">
                       <span className="w-5 text-neutral-600">{i + 1}.</span>
-                      <span className="w-20 text-neutral-500 shrink-0">{s.date}</span>
+                      <span className="w-24 text-neutral-500 shrink-0 whitespace-nowrap">{s.date}</span>
                       <div className="flex-1 flex items-center gap-2 min-w-0">
                         <div className="w-16 h-1.5 bg-neutral-800 rounded overflow-hidden shrink-0">
                           <div className="h-full bg-red-500 rounded" style={{ width: `${(s.cost / maxSessionCost) * 100}%` }} />
