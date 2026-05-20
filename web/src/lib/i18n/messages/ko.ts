@@ -599,7 +599,7 @@ export const ko: DeepPartial<Messages> = {
     rankOutOf: "/ {n}명",
     rankMeTeam: "나 {self}% · 팀 {team}%",
     teamRankEmpty: "팀 랭크 데이터 없음",
-    recent90dEfficiency: "최근 90일 효율",
+    recent90dEfficiency: "최근 24주 효율",
     gradeWarning: "경고",
     gradeImprove: "개선",
     gradeGood: "양호",

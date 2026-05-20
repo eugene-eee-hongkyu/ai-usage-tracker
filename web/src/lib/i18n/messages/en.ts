@@ -1242,7 +1242,7 @@ export const en: Messages = {
     rankOutOf: "/ {n}",
     rankMeTeam: "Me {self}% · Team {team}%",
     teamRankEmpty: "No team rank data",
-    recent90dEfficiency: "Last 90 days — efficiency",
+    recent90dEfficiency: "Last 24 weeks — efficiency",
     gradeWarning: "Warning",
     gradeImprove: "Improve",
     gradeGood: "Good",

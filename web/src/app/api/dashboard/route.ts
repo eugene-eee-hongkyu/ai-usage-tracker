@@ -501,7 +501,9 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  const SCORE_DAYS = 90;
+  // 24주 (168일) — 활동·체류 히트맵 (HEATMAP_WEEKS=24) 와 동일 시각 균형.
+  // 응답 크기 ~1.87× (90→168), Vercel 한도 안전.
+  const SCORE_DAYS = 168;
   const scoreSeries: Array<{
     date: string;
     score: number | null;
