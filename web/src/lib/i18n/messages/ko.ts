@@ -340,6 +340,7 @@ export const ko: DeepPartial<Messages> = {
   adminNav: {
     team: "팀",
     members: "팀원",
+    ranking: "랭킹",
     home: "홈페이지",
   },
   metricModal: {

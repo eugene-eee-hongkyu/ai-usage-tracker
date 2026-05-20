@@ -14,7 +14,15 @@ export function AdminNav() {
   const tabs = [
     { href: "/admin/team", label: m.adminNav.team },
     { href: "/admin/members", label: m.adminNav.members },
+    { href: "/admin/team/ranking", label: m.adminNav.ranking },
   ];
+
+  // active 판정 — strict + 가장 긴 prefix 매칭. /admin/team/ranking 진입 시
+  // ranking 만 active 되고 team 은 dim 처리 (둘 다 startsWith=true 인 사고 방지).
+  const activeHref =
+    tabs
+      .filter((t) => path === t.href || path.startsWith(t.href + "/"))
+      .sort((a, b) => b.href.length - a.href.length)[0]?.href ?? null;
 
   return (
     <header className="border-b border-amber-900/40 bg-amber-950/10 px-4 py-3 flex items-center gap-3">
@@ -29,7 +37,7 @@ export function AdminNav() {
             href={t.href}
             data-testid={`admin-nav-tab-${t.href.replace(/^\//, "").replace(/\//g, "-")}`}
             className={`text-sm px-2 sm:px-3 py-1 rounded transition-colors whitespace-nowrap inline-flex items-center gap-1 ${
-              path === t.href || path.startsWith(t.href)
+              activeHref === t.href
                 ? "bg-amber-700/40 text-amber-100"
                 : "text-slate-400 hover:text-slate-200"
             }`}

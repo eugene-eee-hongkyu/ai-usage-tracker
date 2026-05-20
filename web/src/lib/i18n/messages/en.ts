@@ -333,6 +333,7 @@ export interface Messages {
   adminNav: {
     team: string;
     members: string;
+    ranking: string;
     home: string;
   };
   metricModal: {
@@ -1020,6 +1021,7 @@ export const en: Messages = {
   adminNav: {
     team: "Team",
     members: "Members",
+    ranking: "Ranking",
     home: "Home",
   },
   metricModal: {
