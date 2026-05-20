@@ -17,6 +17,7 @@ declare module "next-auth" {
       isAdmin?: boolean;             // isPlatformAdmin || any permission. nav 어드민 메뉴 노출 조건
       currentTeamId?: number | null; // Phase 4.2 (M6a): 현재 팀 (team_members.team_id). M6b 에서 N팀 switcher 도입
       currentTeamRole?: string | null; // Phase 4.2 (M6d): 현재 팀에서의 역할 ('owner'|'admin'|'member'). owner 면 자동 admin 권한.
+      currentTeamName?: string | null; // Phase 4.2 (M6d): 현재 팀 이름. Settings 의 팀 이름 변경 UI 에서 사용.
     };
   }
 }

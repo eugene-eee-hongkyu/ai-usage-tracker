@@ -239,6 +239,7 @@ export const authOptions: NextAuthOptions = {
             .select({
               teamId: teamMembers.teamId,
               teamRole: teamMembers.role,
+              teamName: teams.name,
               namePending: teams.namePending,
             })
             .from(teamMembers)
@@ -254,6 +255,7 @@ export const authOptions: NextAuthOptions = {
             .limit(1);
           const currentTeamId = memberRow[0]?.teamId ?? null;
           const currentTeamRole = memberRow[0]?.teamRole ?? null;
+          const currentTeamName = memberRow[0]?.teamName ?? null;
           const currentTeamNamePending = memberRow[0]?.namePending ?? false;
 
           const u = session.user as typeof session.user & {
@@ -266,6 +268,7 @@ export const authOptions: NextAuthOptions = {
             isAdmin: boolean;
             currentTeamId: number | null;
             currentTeamRole: string | null;
+            currentTeamName: string | null;
             currentTeamNamePending: boolean;
             viewAsTeamId: number | null;
             viewAsTeamName: string | null;
@@ -277,6 +280,7 @@ export const authOptions: NextAuthOptions = {
           u.deletedAt = row[0].deletedAt;
           u.currentTeamId = currentTeamId;
           u.currentTeamRole = currentTeamRole;
+          u.currentTeamName = currentTeamName;
           u.currentTeamNamePending = currentTeamNamePending;
           // Platform Admin = ADMIN_EMAIL env 화이트리스트 (= eugene). 모든 팀 조회·view-as·
           // 새 팀 생성 권한. Team owner (team_members.role='owner') 와 별개.

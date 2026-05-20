@@ -110,6 +110,7 @@ export default function AdminSettingsPage() {
           자기 팀의 사용자 권한 · 비활성 사용자 · 데이터 보관 기간. 모든 팀 현황 / 새 팀 생성은 Platform Admin 메뉴.
         </p>
       </header>
+      <TeamRenameSection />
       {/* 권한 부여 */}
       <section className="bg-slate-900 border border-slate-800 rounded-lg p-5 space-y-3">
         <header>
@@ -225,5 +226,91 @@ export default function AdminSettingsPage() {
         </select>
       </section>
     </div>
+  );
+}
+
+// 팀 이름 변경 — Settings 페이지 상단 섹션. Team Owner 또는 Platform Admin 만.
+function TeamRenameSection() {
+  const { data: session } = useSession();
+  const currentName =
+    (session?.user as { currentTeamName?: string | null } | undefined)?.currentTeamName ?? "";
+  const [name, setName] = useState(currentName);
+  const [submitting, setSubmitting] = useState(false);
+  const [result, setResult] = useState<{ ok: boolean; msg: string } | null>(null);
+
+  // session 이 늦게 로드되면 currentName 도 늦게 옴 — name state 동기화.
+  useEffect(() => {
+    if (currentName && !name) setName(currentName);
+  }, [currentName, name]);
+
+  const trimmed = name.trim();
+  const dirty = trimmed !== currentName;
+  const valid = trimmed.length >= 4 && trimmed.length <= 20;
+
+  async function save() {
+    if (!dirty || !valid) return;
+    setSubmitting(true);
+    setResult(null);
+    try {
+      const r = await fetch("/api/admin/team/rename", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ teamName: trimmed }),
+      });
+      const data = (await r.json().catch(() => ({}))) as {
+        ok?: boolean;
+        error?: string;
+        slug?: string;
+      };
+      if (!r.ok || !data.ok) {
+        const msg =
+          data.error === "slug_taken"
+            ? `이미 사용 중인 이름입니다 (${data.slug}).`
+            : data.error === "invalid_team_name"
+              ? "팀 이름은 4~20자로 입력해주세요."
+              : data.error ?? `HTTP ${r.status}`;
+        setResult({ ok: false, msg: `실패: ${msg}` });
+        return;
+      }
+      setResult({ ok: true, msg: "✓ 팀 이름이 변경되었습니다. 새로고침 중..." });
+      setTimeout(() => window.location.reload(), 800);
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <section className="bg-slate-900 border border-slate-800 rounded-lg p-5 space-y-3">
+      <header>
+        <h2 className="text-sm font-bold text-slate-200">팀 이름</h2>
+        <p className="text-xs text-slate-500 mt-1">
+          현재 팀 이름. 4~20자로 변경 가능. Team Owner 또는 Platform Admin 만.
+        </p>
+      </header>
+      <div className="flex flex-col sm:flex-row gap-2">
+        <input
+          type="text"
+          minLength={4}
+          maxLength={20}
+          value={name}
+          onChange={(e) => {
+            setName(e.target.value);
+            setResult(null);
+          }}
+          placeholder="4~20자"
+          className="flex-1 bg-slate-950 border border-slate-800 rounded px-3 py-2 text-sm"
+        />
+        <button
+          onClick={save}
+          disabled={!dirty || !valid || submitting}
+          className="px-4 py-2 text-sm rounded bg-indigo-700 hover:bg-indigo-600 disabled:bg-slate-800 disabled:text-slate-600"
+        >
+          {submitting ? "변경 중..." : "이름 변경"}
+        </button>
+      </div>
+      {result && (
+        <p className={`text-xs ${result.ok ? "text-emerald-400" : "text-red-400"}`}>{result.msg}</p>
+      )}
+    </section>
   );
 }
