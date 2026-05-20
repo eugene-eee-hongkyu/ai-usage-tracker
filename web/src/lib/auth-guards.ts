@@ -83,7 +83,13 @@ export async function requirePlatformAdmin(): Promise<GuardResult | GuardError> 
 export async function requireMembershipAdmin(): Promise<GuardResult | GuardError> {
   const result = await requireUser();
   if (result.error) return result;
-  if (!result.user.isPlatformAdmin && !result.user.permissions?.membershipAdmin) {
+  // Team owner 는 별도 permission 없어도 자기 팀 관리 (옵션 A, 2026-05-20).
+  const isTeamOwner = result.user.currentTeamRole === "owner";
+  if (
+    !result.user.isPlatformAdmin &&
+    !isTeamOwner &&
+    !result.user.permissions?.membershipAdmin
+  ) {
     return {
       user: null,
       error: NextResponse.json({ error: "membership_admin_required" }, { status: 403 }),
@@ -99,7 +105,12 @@ export async function requireMembershipAdmin(): Promise<GuardResult | GuardError
 export async function requireBillingAdmin(): Promise<GuardResult | GuardError> {
   const result = await requireUser();
   if (result.error) return result;
-  if (!result.user.isPlatformAdmin && !result.user.permissions?.billingAdmin) {
+  const isTeamOwner = result.user.currentTeamRole === "owner";
+  if (
+    !result.user.isPlatformAdmin &&
+    !isTeamOwner &&
+    !result.user.permissions?.billingAdmin
+  ) {
     return {
       user: null,
       error: NextResponse.json({ error: "billing_admin_required" }, { status: 403 }),

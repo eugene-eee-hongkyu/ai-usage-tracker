@@ -236,7 +236,11 @@ export const authOptions: NextAuthOptions = {
           // M6b 에서 N팀 가입 + cookie/URL 기반 전환 도입 예정. M6a 에선 first team.
           // M6d: teams.name_pending 도 함께 가져와 /onboard-team 가드용으로 노출.
           const memberRow = await db
-            .select({ teamId: teamMembers.teamId, namePending: teams.namePending })
+            .select({
+              teamId: teamMembers.teamId,
+              teamRole: teamMembers.role,
+              namePending: teams.namePending,
+            })
             .from(teamMembers)
             .leftJoin(teams, eq(teams.id, teamMembers.teamId))
             .where(
@@ -249,6 +253,7 @@ export const authOptions: NextAuthOptions = {
             .orderBy(asc(teamMembers.joinedAt))
             .limit(1);
           const currentTeamId = memberRow[0]?.teamId ?? null;
+          const currentTeamRole = memberRow[0]?.teamRole ?? null;
           const currentTeamNamePending = memberRow[0]?.namePending ?? false;
 
           const u = session.user as typeof session.user & {
@@ -260,6 +265,7 @@ export const authOptions: NextAuthOptions = {
             isPlatformAdmin: boolean;
             isAdmin: boolean;
             currentTeamId: number | null;
+            currentTeamRole: string | null;
             currentTeamNamePending: boolean;
             viewAsTeamId: number | null;
             viewAsTeamName: string | null;
@@ -270,14 +276,19 @@ export const authOptions: NextAuthOptions = {
           u.suspendedAt = row[0].suspendedAt;
           u.deletedAt = row[0].deletedAt;
           u.currentTeamId = currentTeamId;
+          u.currentTeamRole = currentTeamRole;
           u.currentTeamNamePending = currentTeamNamePending;
           // Platform Admin = ADMIN_EMAIL env 화이트리스트 (= eugene). 모든 팀 조회·view-as·
           // 새 팀 생성 권한. Team owner (team_members.role='owner') 와 별개.
           u.isPlatformAdmin = isAdmin(session.user.email);
-          // isAdmin = Platform Admin OR (membership_admin OR billing_admin 권한 보유).
-          // nav 의 어드민 메뉴 노출 조건. 세부 가드는 permissions 로.
+          // isAdmin = Platform Admin OR team owner OR (membership_admin OR billing_admin 권한 보유).
+          // nav 의 어드민 메뉴 노출 조건. team owner 는 별도 permissions 없어도 자기 팀
+          // 관리 권한 자동 부여 (옵션 A, 2026-05-20). 세부 가드는 permissions 로.
           u.isAdmin =
-            u.isPlatformAdmin || !!u.permissions?.membershipAdmin || !!u.permissions?.billingAdmin;
+            u.isPlatformAdmin ||
+            currentTeamRole === "owner" ||
+            !!u.permissions?.membershipAdmin ||
+            !!u.permissions?.billingAdmin;
 
           // Phase 4.2 (M6c): platform owner 의 view-as 상태를 session 에 노출.
           // client 헤더 띠가 useSession() 으로 viewAsTeamName 표시. cookie 는 httpOnly.
