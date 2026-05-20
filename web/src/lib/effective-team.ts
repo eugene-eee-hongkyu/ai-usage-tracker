@@ -16,7 +16,7 @@
 //
 // viewAs 검증:
 //   cookie 값이 숫자가 아니거나 존재하지 않는 team id 면 무시 (currentTeamId fallback).
-//   owner 가 아닌 user 가 cookie 박아도 무시 (isOwner 체크 선행).
+//   owner 가 아닌 user 가 cookie 박아도 무시 (isPlatformAdmin 체크 선행).
 
 import { cookies } from "next/headers";
 import type { NextRequest } from "next/server";
@@ -28,7 +28,7 @@ export const PLATFORM_VIEW_AS_COOKIE = "platform-view-as";
 interface SessionLike {
   user?: {
     id?: number;
-    isOwner?: boolean;
+    isPlatformAdmin?: boolean;
     currentTeamId?: number | null;
   };
 }
@@ -43,7 +43,7 @@ export async function getEffectiveTeamId(
   req?: NextRequest
 ): Promise<number | null> {
   const currentTeamId = session?.user?.currentTeamId ?? null;
-  if (!session?.user?.isOwner) return currentTeamId;
+  if (!session?.user?.isPlatformAdmin) return currentTeamId;
 
   const cookieValue = readCookie(req);
   if (!cookieValue) return currentTeamId;
@@ -76,7 +76,7 @@ export function isPlatformViewAs(
   effectiveTeamId: number | null
 ): boolean {
   return (
-    !!session?.user?.isOwner &&
+    !!session?.user?.isPlatformAdmin &&
     effectiveTeamId != null &&
     effectiveTeamId !== (session?.user?.currentTeamId ?? null)
   );

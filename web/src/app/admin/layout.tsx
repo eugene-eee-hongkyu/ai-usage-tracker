@@ -17,7 +17,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const router = useRouter();
   const { data: session, status } = useSession();
   const isLocalMode = useLocalMode();
-  const { isAnyAdmin, isMembershipAdmin, isBillingAdmin, isOwner, loading } = usePermissions();
+  const { isAnyAdmin, isMembershipAdmin, isBillingAdmin, isPlatformAdmin, loading } = usePermissions();
   const [exiting, setExiting] = useState(false);
   const viewAsTeamId = (session?.user as { viewAsTeamId?: number | null } | undefined)?.viewAsTeamId ?? null;
   const viewAsTeamName = (session?.user as { viewAsTeamName?: string | null } | undefined)?.viewAsTeamName ?? null;
@@ -51,17 +51,17 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   const tabs: Array<{ href: string; label: string; visible: boolean }> = [
     { href: "/admin/users", label: "Users", visible: isMembershipAdmin },
-    { href: "/admin/audit", label: "Audit", visible: isOwner },
+    { href: "/admin/audit", label: "Audit", visible: isPlatformAdmin },
     { href: "/admin/team", label: "Team", visible: isBillingAdmin },
-    { href: "/admin/settings", label: "Settings", visible: isOwner },
-    // Platform Admin (= ADMIN_EMAIL env 화이트리스트, isOwner) 전용 — 모든 팀 현황 + 새 팀 생성.
-    { href: "/admin/platform", label: "Platform", visible: isOwner },
+    { href: "/admin/settings", label: "Settings", visible: isPlatformAdmin },
+    // Platform Admin (= ADMIN_EMAIL env 화이트리스트, isPlatformAdmin) 전용 — 모든 팀 현황 + 새 팀 생성.
+    { href: "/admin/platform", label: "Platform", visible: isPlatformAdmin },
   ];
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100">
       <Nav />
-      {viewAsTeamId && viewAsTeamName && isOwner && (
+      {viewAsTeamId && viewAsTeamName && isPlatformAdmin && (
         <div
           role="alert"
           className="bg-orange-600/90 border-b border-orange-800 px-4 py-2 flex items-center justify-between text-sm"

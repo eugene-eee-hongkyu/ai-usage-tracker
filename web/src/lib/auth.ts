@@ -257,7 +257,7 @@ export const authOptions: NextAuthOptions = {
             permissions: { membershipAdmin?: boolean; billingAdmin?: boolean };
             suspendedAt: Date | null;
             deletedAt: Date | null;
-            isOwner: boolean;
+            isPlatformAdmin: boolean;
             isAdmin: boolean;
             currentTeamId: number | null;
             currentTeamNamePending: boolean;
@@ -271,18 +271,19 @@ export const authOptions: NextAuthOptions = {
           u.deletedAt = row[0].deletedAt;
           u.currentTeamId = currentTeamId;
           u.currentTeamNamePending = currentTeamNamePending;
-          // Owner = ADMIN_EMAIL env 화이트리스트. permissions 분리와 별개의 최상위 권한.
-          u.isOwner = isAdmin(session.user.email);
-          // isAdmin = Owner OR (membership_admin OR billing_admin 권한 보유). nav 의 어드민
-          // 메뉴 노출 조건. 세부 가드는 permissions 로.
+          // Platform Admin = ADMIN_EMAIL env 화이트리스트 (= eugene). 모든 팀 조회·view-as·
+          // 새 팀 생성 권한. Team owner (team_members.role='owner') 와 별개.
+          u.isPlatformAdmin = isAdmin(session.user.email);
+          // isAdmin = Platform Admin OR (membership_admin OR billing_admin 권한 보유).
+          // nav 의 어드민 메뉴 노출 조건. 세부 가드는 permissions 로.
           u.isAdmin =
-            u.isOwner || !!u.permissions?.membershipAdmin || !!u.permissions?.billingAdmin;
+            u.isPlatformAdmin || !!u.permissions?.membershipAdmin || !!u.permissions?.billingAdmin;
 
           // Phase 4.2 (M6c): platform owner 의 view-as 상태를 session 에 노출.
           // client 헤더 띠가 useSession() 으로 viewAsTeamName 표시. cookie 는 httpOnly.
           u.viewAsTeamId = null;
           u.viewAsTeamName = null;
-          if (u.isOwner) {
+          if (u.isPlatformAdmin) {
             try {
               const viewAsRaw = cookies().get(PLATFORM_VIEW_AS_COOKIE)?.value;
               if (viewAsRaw) {

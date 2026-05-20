@@ -20,7 +20,7 @@ interface UserRow {
   deletedAt: string | null;
   createdAt: string;
   lastSyncedAt: string | null;
-  isOwner: boolean;
+  isPlatformAdmin: boolean;
 }
 
 interface UserListResp {
@@ -296,9 +296,9 @@ export default function AdminUsersPage() {
                       </div>
                     </td>
                     <td className="px-4 py-2.5 text-slate-300">
-                      {u.isOwner ? (
+                      {u.isPlatformAdmin ? (
                         <span className="inline-block px-1.5 py-0.5 bg-amber-900/40 text-amber-300 rounded text-xs font-semibold">
-                          Owner
+                          Platform Admin
                         </span>
                       ) : (
                         u.role
@@ -573,7 +573,6 @@ function InviteModal({ onClose, onSent }: { onClose: () => void; onSent: () => v
           >
             <option value="member">member</option>
             <option value="admin">admin</option>
-            <option value="owner">owner</option>
           </select>
         </label>
         {needsPermissions && (

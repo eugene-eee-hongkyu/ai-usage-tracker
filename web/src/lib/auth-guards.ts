@@ -8,7 +8,7 @@
 // Goodhart 회피 정합:
 //   - Membership-Admin: 사용자 관리만 (invite/approve/suspend/delete)
 //   - Billing-Admin: cost 자세히 보기
-//   - Owner: ADMIN_EMAIL env 화이트리스트 — 모든 권한 + 권한 부여 권한
+//   - Platform Admin: ADMIN_EMAIL env 화이트리스트 — 모든 팀 + 권한 부여 + 새 팀 생성
 //
 // 권한 분리는 session.user.permissions JSONB 에 박혀 있고 (auth.ts session callback),
 // 이 helper 는 session 만 읽음 — DB 조회 없음.
@@ -54,13 +54,25 @@ export async function requireUser(): Promise<GuardResult | GuardError> {
 }
 
 /**
- * Owner (ADMIN_EMAIL env) 만 통과. 가장 강한 권한 — 권한 부여 / 팀 설정 등.
+ * Platform Admin (ADMIN_EMAIL env) 만 통과. 가장 강한 권한 — 모든 팀 + 새 팀 생성.
+ * @deprecated 이름 혼동 방지 — 새 코드는 requirePlatformAdmin 사용.
  */
 export async function requireOwner(): Promise<GuardResult | GuardError> {
+  return requirePlatformAdmin();
+}
+
+/**
+ * Platform Admin = ADMIN_EMAIL env 화이트리스트. eugene 만 통과.
+ * Team owner (team_members.role='owner') 와 별개의 최상위 권한.
+ */
+export async function requirePlatformAdmin(): Promise<GuardResult | GuardError> {
   const result = await requireUser();
   if (result.error) return result;
-  if (!result.user.isOwner) {
-    return { user: null, error: NextResponse.json({ error: "owner_only" }, { status: 403 }) };
+  if (!result.user.isPlatformAdmin) {
+    return {
+      user: null,
+      error: NextResponse.json({ error: "platform_admin_only" }, { status: 403 }),
+    };
   }
   return result;
 }
@@ -71,7 +83,7 @@ export async function requireOwner(): Promise<GuardResult | GuardError> {
 export async function requireMembershipAdmin(): Promise<GuardResult | GuardError> {
   const result = await requireUser();
   if (result.error) return result;
-  if (!result.user.isOwner && !result.user.permissions?.membershipAdmin) {
+  if (!result.user.isPlatformAdmin && !result.user.permissions?.membershipAdmin) {
     return {
       user: null,
       error: NextResponse.json({ error: "membership_admin_required" }, { status: 403 }),
@@ -87,7 +99,7 @@ export async function requireMembershipAdmin(): Promise<GuardResult | GuardError
 export async function requireBillingAdmin(): Promise<GuardResult | GuardError> {
   const result = await requireUser();
   if (result.error) return result;
-  if (!result.user.isOwner && !result.user.permissions?.billingAdmin) {
+  if (!result.user.isPlatformAdmin && !result.user.permissions?.billingAdmin) {
     return {
       user: null,
       error: NextResponse.json({ error: "billing_admin_required" }, { status: 403 }),

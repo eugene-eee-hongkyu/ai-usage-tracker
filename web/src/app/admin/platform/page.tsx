@@ -2,7 +2,7 @@
 // eugene 만 접근. 모든 팀 현황 + view-as switcher + 새 팀 생성/초대.
 //
 // 권한 위계:
-//   Platform Admin (session.user.isOwner)  ← 이 페이지 접근 가능
+//   Platform Admin (session.user.isPlatformAdmin)  ← 이 페이지 접근 가능
 //   Team Owner (team_members.role='owner')
 //   Team Admin (membershipAdmin / billingAdmin)
 //   Member

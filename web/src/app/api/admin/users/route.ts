@@ -80,8 +80,8 @@ export async function GET(req: NextRequest) {
     .limit(PAGE_SIZE)
     .offset((page - 1) * PAGE_SIZE);
 
-  // Owner 표시 — ADMIN_EMAIL env 화이트리스트 매칭. DB 컬럼 아닌 derived.
-  const rowsWithOwner = rows.map((r) => ({ ...r, isOwner: isAdmin(r.email) }));
+  // Platform Admin 표시 — ADMIN_EMAIL env 화이트리스트 매칭. DB 컬럼 아닌 derived.
+  const rowsWithOwner = rows.map((r) => ({ ...r, isPlatformAdmin: isAdmin(r.email) }));
 
   // total count
   const countResult = await db

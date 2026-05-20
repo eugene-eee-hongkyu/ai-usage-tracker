@@ -36,8 +36,9 @@ export async function POST(req: NextRequest) {
   if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     return NextResponse.json({ error: "invalid_email" }, { status: 400 });
   }
-  // role 화이트리스트 — owner/admin/member 외 값은 거부.
-  const VALID_ROLES = new Set(["owner", "admin", "member"]);
+  // role 화이트리스트 — admin / member 만. owner 초대는 새 팀 생성 흐름
+  // (POST /api/admin/teams, Platform Admin 전용) 에서만 가능.
+  const VALID_ROLES = new Set(["admin", "member"]);
   if (!VALID_ROLES.has(role)) {
     return NextResponse.json({ error: "invalid_role" }, { status: 400 });
   }
