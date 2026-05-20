@@ -154,6 +154,8 @@ export interface Messages {
     tierModalLead: string;          // 토큰 단가와 plan 활용도를 계산하려면…
     tierModalLeadNoActivity: string; // activity 0 일 때 — CLI sync 먼저 확인 안내
     tierModalSelectLabel: string;   // 본인 plan tier
+    tierModalPickPlaceholder: string; // "선택해 주세요" — 강제 선택 placeholder
+    tierModalConfirm: string;       // "확인" — selection 후 저장 트리거
     tierModalHintToggle: string;    // ▾ 내 tier 확인하기
     tierModalStep1: string;
     tierModalStep2: string;
@@ -804,6 +806,8 @@ export const en: Messages = {
     tierModalLeadNoActivity:
       "No activity data collected yet. First make sure the CLI sync is running. Once activity appears, picking a plan tier here will fill in unit cost.",
     tierModalSelectLabel: "Your plan tier",
+    tierModalPickPlaceholder: "Pick a plan…",
+    tierModalConfirm: "Confirm",
     tierModalHintToggle: "▾ Find my tier",
     tierModalStep1: "1. Go to {claudeAi} → top-right profile → {sub}",
     tierModalStep2: "2. Or in the terminal run {cmd} → type {slash}",

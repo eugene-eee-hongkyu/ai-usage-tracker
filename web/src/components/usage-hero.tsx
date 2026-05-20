@@ -39,8 +39,10 @@ interface UsageHeroProps {
 }
 
 function tierOptions(m: Messages): Array<{ value: string; label: string }> {
+  // 첫 옵션은 placeholder (강제 선택 유도) — value="" 일 때 "확인" 버튼 disabled.
+  // tierUnknown ("잘 모름") 은 의도적으로 제거 — 추정 사용자는 실제 tier 를 골라야 함.
   return [
-    { value: "",               label: m.usageHero.tierUnknown },
+    { value: "",               label: m.usageHero.tierModalPickPlaceholder },
     { value: "pro",            label: "Pro ($20/mo)" },
     { value: "max5",           label: "Max 5x ($100/mo)" },
     { value: "max20",          label: "Max 20x ($200/mo)" },
@@ -161,18 +163,37 @@ export function UsageHero({
   const [tierHintOpen, setTierHintOpen] = useState(false);
 
   const [tierModalOpen, setTierModalOpen] = useState(false);
+  // declaredTier prop 이 mount 후 바뀌어도 (예: API refetch 후 null 로 update)
+  // tierValue 가 stale 한 max20 같은 값 안 잡고 있도록 sync. placeholder 표시 보장.
+  useEffect(() => {
+    setTierValue(declaredTier ?? "");
+  }, [declaredTier]);
+  // 추정 사용자에게 항상 표시 — localStorage dismissed 플래그 제거.
+  // tier 실제 선택하면 declaredTier 가 non-null 이 되어 자동으로 안 뜸.
   useEffect(() => {
     if (viewOnly) return;
     if (declaredTier && declaredTier !== "") return;
-    if (typeof window === "undefined") return;
-    const dismissed = localStorage.getItem("tier_modal_dismissed");
-    if (dismissed === "1") return;
     setTierModalOpen(true);
   }, [viewOnly, declaredTier]);
-  const dismissTierModal = () => {
-    setTierModalOpen(false);
-    try { localStorage.setItem("tier_modal_dismissed", "1"); } catch {}
+  // 명시 선택 후 저장 — placeholder ("") 면 호출 금지 (버튼 disabled 가 1차 방어).
+  const saveTier = async () => {
+    if (!tierValue) return;
+    setSaving(true);
+    try {
+      const res = await fetch("/api/user/plan-tier", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ planTier: tierValue }),
+      });
+      if (res.ok) {
+        setTimeout(() => window.location.reload(), 300);
+      }
+    } finally {
+      setSaving(false);
+    }
   };
+  // Inline tier select (모달 밖, hero panel 안) — 이미 tier 입력된 사용자가
+  // 변경할 때 사용. 즉시 저장 + reload (기존 동작 유지).
   const onChangeTier = async (value: string) => {
     setTierValue(value);
     setSaving(true);
@@ -183,9 +204,6 @@ export function UsageHero({
         body: JSON.stringify({ planTier: value || null }),
       });
       if (res.ok) {
-        if (value) {
-          try { localStorage.setItem("tier_modal_dismissed", "1"); } catch {}
-        }
         setTimeout(() => window.location.reload(), 300);
       }
     } finally {
@@ -205,12 +223,10 @@ export function UsageHero({
       <div
         data-testid="tier-modal-overlay"
         className="fixed inset-0 z-[100] bg-black/70 backdrop-blur-sm flex items-center justify-center px-4"
-        onClick={dismissTierModal}
       >
         <div
           data-testid="tier-modal-card"
           className="bg-neutral-900 border-2 border-yellow-500/70 rounded-lg shadow-2xl max-w-md w-full p-6 space-y-4"
-          onClick={(e) => e.stopPropagation()}
         >
           <div className="flex items-center gap-2">
             <span className="text-3xl">{hasActivity ? "📊" : "🔌"}</span>
@@ -224,7 +240,7 @@ export function UsageHero({
             <select
               data-testid="tier-modal-select"
               value={tierValue}
-              onChange={(e) => onChangeTier(e.target.value)}
+              onChange={(e) => setTierValue(e.target.value)}
               disabled={saving}
               className="w-full bg-neutral-800 border border-neutral-700 text-neutral-100 text-sm font-mono rounded px-3 py-2 focus:outline-none focus:border-yellow-500"
             >
@@ -250,11 +266,12 @@ export function UsageHero({
           <div className="flex items-center justify-end gap-2 pt-2">
             <button
               type="button"
-              data-testid="tier-modal-dismiss"
-              onClick={dismissTierModal}
-              className="text-xs font-mono text-neutral-500 hover:text-neutral-300 px-3 py-1.5 transition-colors"
+              data-testid="tier-modal-confirm"
+              onClick={saveTier}
+              disabled={!tierValue || saving}
+              className="text-sm font-mono font-bold bg-yellow-500 hover:bg-yellow-400 text-neutral-900 px-5 py-2 rounded transition-colors disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-yellow-500"
             >
-              {m.usageHero.tierModalDismiss}
+              {m.usageHero.tierModalConfirm}
             </button>
           </div>
         </div>

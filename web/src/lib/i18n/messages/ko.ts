@@ -156,6 +156,8 @@ export const ko: DeepPartial<Messages> = {
     tierModalLead: "토큰 단가와 plan 활용도를 계산하려면 본인 Claude 플랜이 필요합니다. 아래에서 선택하면 즉시 반영됩니다.",
     tierModalLeadNoActivity: "아직 활동 데이터가 수집되지 않았어요. 우선 터미널에서 CLI sync 가 동작 중인지 확인해주세요. 활동이 잡힌 뒤 plan tier 를 선택하면 단가가 표시됩니다.",
     tierModalSelectLabel: "본인 plan tier",
+    tierModalPickPlaceholder: "선택해 주세요…",
+    tierModalConfirm: "확인",
     tierModalHintToggle: "▾ 내 tier 확인하기",
     tierModalStep1: "1. {claudeAi} 접속 → 우측 상단 프로필 → {sub}",
     tierModalStep2: "2. 또는 터미널에서 {cmd} 실행 → {slash} 입력",
