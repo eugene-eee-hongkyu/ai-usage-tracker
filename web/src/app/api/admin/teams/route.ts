@@ -49,8 +49,12 @@ export async function POST(req: NextRequest) {
   };
 
   // teamName 은 선택 — 비우면 어드민이 가입 후 /onboard-team 에서 직접 정함.
+  // 입력했으면 4~20자 검증.
   const teamNameTrimmed = teamName?.trim() ?? "";
   const namePending = teamNameTrimmed.length === 0;
+  if (!namePending && (teamNameTrimmed.length < 4 || teamNameTrimmed.length > 20)) {
+    return NextResponse.json({ error: "invalid_team_name" }, { status: 400 });
+  }
 
   if (!ownerEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(ownerEmail)) {
     return NextResponse.json({ error: "invalid_owner_email" }, { status: 400 });

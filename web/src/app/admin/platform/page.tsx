@@ -198,6 +198,11 @@ function CreateTeamSection() {
 
   async function submit() {
     if (!ownerEmail.trim()) return;
+    const trimmedName = teamName.trim();
+    if (trimmedName.length > 0 && (trimmedName.length < 4 || trimmedName.length > 20)) {
+      setResult({ ok: false, msg: "팀 이름은 4~20자로 입력해주세요 (비우면 어드민이 정함)." });
+      return;
+    }
     setSubmitting(true);
     setResult(null);
     try {
@@ -250,9 +255,10 @@ function CreateTeamSection() {
       <div className="flex flex-col sm:flex-row gap-2">
         <input
           type="text"
+          maxLength={20}
           value={teamName}
           onChange={(e) => setTeamName(e.target.value)}
-          placeholder="팀 이름 (선택 — 비우면 어드민이 정함)"
+          placeholder="팀 이름 4~20자 (선택 — 비우면 어드민이 정함)"
           className="flex-1 bg-slate-950 border border-slate-800 rounded px-3 py-2 text-sm"
         />
         <input

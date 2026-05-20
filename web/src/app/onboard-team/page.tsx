@@ -23,7 +23,12 @@ export default function OnboardTeamPage() {
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
-    if (teamName.trim().length === 0) return;
+    const trimmed = teamName.trim();
+    if (trimmed.length < 4 || trimmed.length > 20) {
+      setErrorMsg(m.onboardTeam.errorInvalidName);
+      setPhase("error");
+      return;
+    }
     setPhase("submitting");
     setErrorMsg("");
     try {
@@ -86,7 +91,8 @@ export default function OnboardTeamPage() {
           <input
             type="text"
             required
-            maxLength={80}
+            minLength={4}
+            maxLength={20}
             value={teamName}
             onChange={(e) => setTeamName(e.target.value)}
             placeholder={m.onboardTeam.placeholder}
@@ -98,7 +104,7 @@ export default function OnboardTeamPage() {
         {phase === "error" && <p className="text-sm text-red-400 font-mono">{errorMsg}</p>}
         <button
           type="submit"
-          disabled={phase === "submitting" || teamName.trim().length === 0}
+          disabled={phase === "submitting" || teamName.trim().length < 4 || teamName.trim().length > 20}
           className="w-full px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 rounded font-semibold"
         >
           {phase === "submitting" ? m.onboardTeam.submitting : m.onboardTeam.submit}

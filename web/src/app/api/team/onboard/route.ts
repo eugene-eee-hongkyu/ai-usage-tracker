@@ -42,7 +42,7 @@ export async function PATCH(req: NextRequest) {
   const body = await req.json().catch(() => ({}));
   const { teamName } = body as { teamName?: string };
   const trimmed = teamName?.trim() ?? "";
-  if (trimmed.length === 0 || trimmed.length > 80) {
+  if (trimmed.length < 4 || trimmed.length > 20) {
     return NextResponse.json({ error: "invalid_team_name" }, { status: 400 });
   }
 

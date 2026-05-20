@@ -994,13 +994,13 @@ export const en: Messages = {
     fieldLabel: "Company name",
     placeholder: "e.g. thenexa",
     helper:
-      "Shown when inviting team members and across rankings. You can change it later in admin settings.",
+      "4–20 characters. Shown when inviting team members and across rankings. You can change it later in admin settings.",
     submit: "Save and continue",
     submitting: "Saving…",
     errorSlugTaken: (slug: string) =>
       `This name is already taken (${slug}). Please pick another.`,
     errorAlreadyNamed: "This team has already been named.",
-    errorInvalidName: "Company name must be 1–80 characters.",
+    errorInvalidName: "Company name must be 4–20 characters.",
   },
   dashboardAdminBanner: {
     title: "You're set up as an admin",
