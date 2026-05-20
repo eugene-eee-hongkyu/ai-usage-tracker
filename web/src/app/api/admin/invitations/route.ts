@@ -36,6 +36,11 @@ export async function POST(req: NextRequest) {
   if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     return NextResponse.json({ error: "invalid_email" }, { status: 400 });
   }
+  // role 화이트리스트 — owner/admin/member 외 값은 거부.
+  const VALID_ROLES = new Set(["owner", "admin", "member"]);
+  if (!VALID_ROLES.has(role)) {
+    return NextResponse.json({ error: "invalid_role" }, { status: 400 });
+  }
 
   // 이미 effectiveTeam 의 멤버인지 확인 — 다른 팀 user 라도 같은 메일은 invitation 가능
   // (한 user N팀 정책 유지). 같은 팀 멤버면 거부.

@@ -157,10 +157,14 @@ export const authOptions: NextAuthOptions = {
           // Phase 4.2 (M6a): invitation 의 team_id 로 team_members 도 같이 INSERT.
           // 가입 직후 session callback 이 currentTeamId 채울 수 있게.
           if (newUserId && invite[0].teamId) {
+            // invitation.role 은 'owner' | 'admin' | 'member' 셋만 허용 (POST 가드에서 검증).
+            // 화이트리스트 외 값은 안전하게 'member' 로 fallback.
+            const teamRole =
+              invite[0].role === "owner" || invite[0].role === "admin" ? invite[0].role : "member";
             await db.insert(teamMembers).values({
               teamId: invite[0].teamId,
               userId: newUserId,
-              role: invite[0].role === "admin" ? "admin" : "member",
+              role: teamRole,
             });
           }
           await writeAudit({
@@ -230,13 +234,22 @@ export const authOptions: NextAuthOptions = {
         if (row[0]) {
           // Phase 4.2 (M6a): currentTeamId 결정 — team_members 의 첫 행 (가입 순).
           // M6b 에서 N팀 가입 + cookie/URL 기반 전환 도입 예정. M6a 에선 first team.
+          // M6d: teams.name_pending 도 함께 가져와 /onboard-team 가드용으로 노출.
           const memberRow = await db
-            .select({ teamId: teamMembers.teamId })
+            .select({ teamId: teamMembers.teamId, namePending: teams.namePending })
             .from(teamMembers)
-            .where(and(eq(teamMembers.userId, row[0].id), isNull(teamMembers.deletedAt)))
+            .leftJoin(teams, eq(teams.id, teamMembers.teamId))
+            .where(
+              and(
+                eq(teamMembers.userId, row[0].id),
+                isNull(teamMembers.deletedAt),
+                isNull(teams.deletedAt)
+              )
+            )
             .orderBy(asc(teamMembers.joinedAt))
             .limit(1);
           const currentTeamId = memberRow[0]?.teamId ?? null;
+          const currentTeamNamePending = memberRow[0]?.namePending ?? false;
 
           const u = session.user as typeof session.user & {
             id: number;
@@ -247,6 +260,7 @@ export const authOptions: NextAuthOptions = {
             isOwner: boolean;
             isAdmin: boolean;
             currentTeamId: number | null;
+            currentTeamNamePending: boolean;
             viewAsTeamId: number | null;
             viewAsTeamName: string | null;
           };
@@ -256,6 +270,7 @@ export const authOptions: NextAuthOptions = {
           u.suspendedAt = row[0].suspendedAt;
           u.deletedAt = row[0].deletedAt;
           u.currentTeamId = currentTeamId;
+          u.currentTeamNamePending = currentTeamNamePending;
           // Owner = ADMIN_EMAIL env 화이트리스트. permissions 분리와 별개의 최상위 권한.
           u.isOwner = isAdmin(session.user.email);
           // isAdmin = Owner OR (membership_admin OR billing_admin 권한 보유). nav 의 어드민

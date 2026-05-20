@@ -374,7 +374,8 @@ function CreateTeamSection() {
   const [result, setResult] = useState<{ ok: boolean; msg: string } | null>(null);
 
   async function submit() {
-    if (!teamName.trim() || !ownerEmail.trim()) return;
+    // teamName 은 선택 — 비우면 어드민이 가입 후 /onboard-team 에서 직접 입력.
+    if (!ownerEmail.trim()) return;
     setSubmitting(true);
     setResult(null);
     try {
@@ -421,25 +422,28 @@ function CreateTeamSection() {
           신규 시범 팀 / 외부 회사 팀 만들고 첫 owner 에게 초대 이메일 발송. 초대 받은 사용자가 OAuth 가입 시 자동으로
           그 팀의 owner 권한 부여 + 자기 데이터 pool 분리.
         </p>
+        <p className="text-[11px] text-amber-400/80 mt-1">
+          팀 이름을 비우면 초대받은 어드민이 가입 후 본인이 직접 회사명을 정합니다 (M6d).
+        </p>
       </header>
       <div className="flex flex-col sm:flex-row gap-2">
         <input
           type="text"
           value={teamName}
           onChange={(e) => setTeamName(e.target.value)}
-          placeholder="팀 이름 (예: ehongarykr team)"
+          placeholder="팀 이름 (선택 — 비우면 어드민이 정함)"
           className="flex-1 bg-slate-950 border border-slate-800 rounded px-3 py-2 text-sm"
         />
         <input
           type="email"
           value={ownerEmail}
           onChange={(e) => setOwnerEmail(e.target.value)}
-          placeholder="owner 이메일 (예: ehongarykr@gmail.com)"
+          placeholder="owner 이메일 (예: kj@thenexa.io)"
           className="flex-1 bg-slate-950 border border-slate-800 rounded px-3 py-2 text-sm"
         />
         <button
           onClick={submit}
-          disabled={!teamName.trim() || !ownerEmail.trim() || submitting}
+          disabled={!ownerEmail.trim() || submitting}
           className="px-4 py-2 text-sm rounded bg-indigo-700 hover:bg-indigo-600 disabled:bg-slate-800 disabled:text-slate-600"
         >
           {submitting ? "생성 중..." : "팀 생성 + 초대"}

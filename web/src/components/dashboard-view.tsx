@@ -966,7 +966,11 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
 
   // 로컬 모드 (.app 인스톨러) 는 setup 흐름이 다름 (위저드 → launchd 자동 등록).
   // sync 가 아직 안 돈 상태여도 setup 페이지로 보내지 않고 빈 dashboard 표시.
-  if (!data.user.lastSyncedAt && !viewOnly && isLocalMode === false) {
+  // M6d: admin 권한만 있는 사용자 (별도 회사 어드민 등) 는 본인이 Claude Code 트래킹
+  // 안 할 수 있으므로 /setup 강제 redirect 안 함. dashboard 가 빈 상태로 떠 있고
+  // 본인이 원하면 /setup 으로 직접 진입.
+  const sessionUser = session?.user as { isAdmin?: boolean } | undefined;
+  if (!data.user.lastSyncedAt && !viewOnly && isLocalMode === false && !sessionUser?.isAdmin) {
     router.push("/setup");
     return null;
   }

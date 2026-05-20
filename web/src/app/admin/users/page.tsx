@@ -560,6 +560,7 @@ function InviteModal({ onClose, onSent }: { onClose: () => void; onSent: () => v
           >
             <option value="member">member</option>
             <option value="admin">admin</option>
+            <option value="owner">owner</option>
           </select>
         </label>
         <div className="space-y-2">

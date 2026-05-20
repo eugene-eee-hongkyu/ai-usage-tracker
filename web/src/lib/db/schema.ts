@@ -60,6 +60,10 @@ export const teams = pgTable(
     ownerId: integer("owner_id")
       .notNull()
       .references(() => users.id),
+    // Phase 4.2 (M6d): 어드민이 회사명을 직접 정하기 전 임시 상태.
+    // true 면 가입 후 /onboard-team 으로 강제 redirect 되어 회사명 입력 받음.
+    // 기본 false — 기존 팀과 명시적으로 teamName 받은 신규 팀은 false.
+    namePending: boolean("name_pending").notNull().default(false),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     deletedAt: timestamp("deleted_at"),
   },

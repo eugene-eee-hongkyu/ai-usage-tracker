@@ -62,6 +62,7 @@ export const teams = sqliteTable(
     name: text("name").notNull(),
     slug: text("slug").notNull(),
     ownerId: integer("owner_id", { mode: "number" }).notNull(),
+    namePending: integer("name_pending", { mode: "boolean" }).notNull().default(false),
     createdAt: integer("created_at", { mode: "timestamp_ms" })
       .notNull()
       .default(sql`(unixepoch() * 1000)`),

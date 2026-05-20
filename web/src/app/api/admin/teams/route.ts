@@ -48,20 +48,26 @@ export async function POST(req: NextRequest) {
     locale?: "ko" | "en";
   };
 
-  if (!teamName || teamName.trim().length === 0) {
-    return NextResponse.json({ error: "team_name_required" }, { status: 400 });
-  }
+  // teamName 은 선택 — 비우면 어드민이 가입 후 /onboard-team 에서 직접 정함.
+  const teamNameTrimmed = teamName?.trim() ?? "";
+  const namePending = teamNameTrimmed.length === 0;
+
   if (!ownerEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(ownerEmail)) {
     return NextResponse.json({ error: "invalid_owner_email" }, { status: 400 });
   }
 
-  const slug = slugify(teamName);
-  if (!slug) return NextResponse.json({ error: "team_name_invalid_chars" }, { status: 400 });
-
-  // slug 중복 방지
-  const existingSlug = await db.select({ id: teams.id }).from(teams).where(eq(teams.slug, slug)).limit(1);
-  if (existingSlug[0]) {
-    return NextResponse.json({ error: "slug_taken", slug }, { status: 409 });
+  // slug 결정: 이름 있으면 slugify, 없으면 random suffix 한 임시 slug.
+  // 임시 slug 는 어드민이 회사명을 정할 때 PATCH /api/team/onboard 에서 갱신.
+  let slug: string;
+  if (namePending) {
+    slug = `team-pending-${crypto.randomBytes(4).toString("hex")}`;
+  } else {
+    slug = slugify(teamNameTrimmed);
+    if (!slug) return NextResponse.json({ error: "team_name_invalid_chars" }, { status: 400 });
+    const existingSlug = await db.select({ id: teams.id }).from(teams).where(eq(teams.slug, slug)).limit(1);
+    if (existingSlug[0]) {
+      return NextResponse.json({ error: "slug_taken", slug }, { status: 409 });
+    }
   }
 
   // ownerEmail 이 이미 다른 팀의 user 인 경우 — 막지 않음. 한 user 가 N팀 가능 (M6b 후속).
@@ -82,9 +88,10 @@ export async function POST(req: NextRequest) {
   const teamInserted = await db
     .insert(teams)
     .values({
-      name: teamName.trim(),
+      name: namePending ? "(pending)" : teamNameTrimmed,
       slug,
       ownerId: guard.user.id, // 임시 — 가입 후 ehongarykr 의 id 로 교체 (M6c)
+      namePending,
     })
     .returning({ id: teams.id });
   const newTeamId = teamInserted[0].id;
@@ -156,7 +163,7 @@ export async function POST(req: NextRequest) {
     action: "team.create",
     targetType: "team",
     targetId: newTeamId,
-    metadata: { teamName: teamName.trim(), slug, ownerEmail, invitationId, hadExistingUser: !!existingUser[0] },
+    metadata: { teamName: teamNameTrimmed, namePending, slug, ownerEmail, invitationId, hadExistingUser: !!existingUser[0] },
     ip: req.headers.get("x-forwarded-for") ?? null,
   });
 
