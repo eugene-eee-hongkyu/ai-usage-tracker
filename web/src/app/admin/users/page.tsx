@@ -505,7 +505,17 @@ function InviteModal({ onClose, onSent }: { onClose: () => void; onSent: () => v
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState<string | null>(null);
 
+  // admin/owner 는 세부 권한 (membershipAdmin / billingAdmin) 중 최소 1개 필수.
+  // member 는 권한 없음 — UI 도 숨기고 payload 도 비움.
+  const needsPermissions = role !== "member";
+  const hasAnyPermission = membershipAdmin || billingAdmin;
+  const permissionsValid = !needsPermissions || hasAnyPermission;
+
   async function send() {
+    if (!permissionsValid) {
+      setResult(`실패: ${role} 역할은 Membership Admin 또는 Billing Admin 중 최소 1개를 선택해야 합니다.`);
+      return;
+    }
     setSubmitting(true);
     try {
       const r = await fetch("/api/admin/invitations", {
@@ -514,7 +524,7 @@ function InviteModal({ onClose, onSent }: { onClose: () => void; onSent: () => v
         body: JSON.stringify({
           email,
           role,
-          permissions: { membershipAdmin, billingAdmin },
+          permissions: needsPermissions ? { membershipAdmin, billingAdmin } : {},
           locale: "ko",
         }),
       });
@@ -555,7 +565,10 @@ function InviteModal({ onClose, onSent }: { onClose: () => void; onSent: () => v
           <span className="text-xs uppercase tracking-wide text-slate-400">역할</span>
           <select
             value={role}
-            onChange={(e) => setRole(e.target.value)}
+            onChange={(e) => {
+              setRole(e.target.value);
+              setResult(null);
+            }}
             className="w-full bg-slate-950 border border-slate-700 rounded px-3 py-2 text-sm"
           >
             <option value="member">member</option>
@@ -563,25 +576,36 @@ function InviteModal({ onClose, onSent }: { onClose: () => void; onSent: () => v
             <option value="owner">owner</option>
           </select>
         </label>
-        <div className="space-y-2">
-          <p className="text-xs uppercase tracking-wide text-slate-400">권한</p>
-          <label className="flex items-center gap-2 text-sm">
-            <input
-              type="checkbox"
-              checked={membershipAdmin}
-              onChange={(e) => setMembershipAdmin(e.target.checked)}
-            />
-            <span>Membership Admin (사용자 관리)</span>
-          </label>
-          <label className="flex items-center gap-2 text-sm">
-            <input
-              type="checkbox"
-              checked={billingAdmin}
-              onChange={(e) => setBillingAdmin(e.target.checked)}
-            />
-            <span>Billing Admin (cost 자세히 보기)</span>
-          </label>
-        </div>
+        {needsPermissions && (
+          <div className="space-y-2">
+            <p className="text-xs uppercase tracking-wide text-slate-400">
+              권한 <span className="text-red-400 normal-case">*</span>
+              <span className="ml-2 text-[10px] text-slate-500 normal-case">최소 1개 선택</span>
+            </p>
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={membershipAdmin}
+                onChange={(e) => {
+                  setMembershipAdmin(e.target.checked);
+                  setResult(null);
+                }}
+              />
+              <span>Membership Admin (사용자 관리)</span>
+            </label>
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={billingAdmin}
+                onChange={(e) => {
+                  setBillingAdmin(e.target.checked);
+                  setResult(null);
+                }}
+              />
+              <span>Billing Admin (cost 자세히 보기)</span>
+            </label>
+          </div>
+        )}
         {result && (
           <p
             className={`text-xs ${
@@ -600,7 +624,7 @@ function InviteModal({ onClose, onSent }: { onClose: () => void; onSent: () => v
           </button>
           <button
             onClick={send}
-            disabled={!email || submitting}
+            disabled={!email || submitting || !permissionsValid}
             className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white rounded text-sm"
           >
             {submitting ? "전송 중..." : "발송"}

@@ -3,7 +3,7 @@
 // nav / wizard 우측 상단에 붙는 언어 토글.
 // click 시 locale 전환 → localStorage 저장 + URL ?locale 동기화 + reload (use-i18n.setLocale).
 //
-// 표시 라벨: KO / EN / 日 / 中 — 항상 4개 다 노출.
+// 표시 라벨: KO / EN — 2개. ja/zh 는 유지보수 부담으로 제거 (2026-05-20).
 //
 // hydration mismatch 회피: SSR 시점엔 navigator/localStorage 가 없어서 locale 이 'en' 으로 계산되지만
 // client 시점엔 navigator.language (예: 'ko-KR') 가 잡혀 'ko' 가 됨 → aria-pressed mismatch 로
@@ -16,11 +16,9 @@ import { useMessages } from "@/lib/use-i18n";
 const LOCALE_LABELS: Record<string, string> = {
   ko: "KO",
   en: "EN",
-  ja: "日",
-  zh: "中",
 };
 
-const ORDER = ["ko", "en", "ja", "zh"] as const;
+const ORDER = ["ko", "en"] as const;
 
 interface Props {
   variant?: "nav" | "wizard";

@@ -3,8 +3,8 @@
 
 import { en, type Messages } from "./messages/en";
 import { ko } from "./messages/ko";
-import { ja } from "./messages/ja";
-import { zh } from "./messages/zh";
+// ja, zh 는 유지보수 부담으로 dropdown 옵션에서 제거 (2026-05-20). 카탈로그 파일은
+// 보존 — 추후 복구 시 overrides 에 다시 추가.
 
 export type DeepPartial<T> = {
   [K in keyof T]?: T[K] extends object ? DeepPartial<T[K]> : T[K];
@@ -13,8 +13,6 @@ export type DeepPartial<T> = {
 const overrides: Record<string, DeepPartial<Messages>> = {
   en: {},
   ko,
-  ja,
-  zh,
 };
 
 export const SUPPORTED_LOCALES = Object.keys(overrides);
