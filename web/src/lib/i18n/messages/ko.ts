@@ -554,7 +554,7 @@ export const ko: DeepPartial<Messages> = {
     planLastReceived: "마지막 수신",
     planVisitsMonth: "방문/달",
     planAvgDwell: "평균체류",
-    monthlyVisitsTitle: "일별 방문 (최근 30일)",
+    monthlyVisitsTitle: "Engagement · 일별 방문 (최근 30일)",
     visitsOfDay: "{date}: {n}회",
     monthLabel: "{n}월",
     monthRow: "월",

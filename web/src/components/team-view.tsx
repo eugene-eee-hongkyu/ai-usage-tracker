@@ -1114,64 +1114,8 @@ export function TeamView({ adminMode = false }: { adminMode?: boolean }) {
   );
 
   // Engagement (admin only)
-  const engagementBlock = (
-    <div data-testid="team-card-engagement" className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-slate-500 rounded">
-      <div className="px-3 py-2 border-b border-neutral-800 flex items-center gap-2">
-        <span className="text-xs font-mono font-bold text-slate-400 uppercase tracking-wider">Engagement</span>
-        <AdminBadge />
-      </div>
-      <div className="p-3">
-        <table className="w-full text-xs font-mono border-collapse">
-          <thead>
-            <tr className="border-b border-neutral-800">
-              <th className="text-left text-neutral-500 pb-2 font-normal">{t.teamView.planMember}</th>
-              <th className="text-right text-neutral-500 pb-2 px-3 font-normal">{t.teamView.planLastReceived}</th>
-              <th className="text-right text-neutral-500 pb-2 px-3 font-normal" title={t.teamView.planVisitsMonth}>{t.teamView.planVisitsMonth}</th>
-              <th className="text-right text-neutral-500 pb-2 px-3 font-normal" title={t.teamView.planAvgDwell}>{t.teamView.planAvgDwell}</th>
-              <th className="w-12 text-right text-neutral-500 pb-2 pl-3 font-normal" />
-            </tr>
-          </thead>
-          <tbody>
-            {[...members]
-              .sort((a, b) => {
-                if (!a.lastSyncedAt && !b.lastSyncedAt) return 0;
-                if (!a.lastSyncedAt) return -1;
-                if (!b.lastSyncedAt) return 1;
-                return new Date(a.lastSyncedAt).getTime() - new Date(b.lastSyncedAt).getTime();
-              })
-              .map((m) => {
-                const { timeClass, badge } = syncStyle(m.lastSyncedAt, t);
-                const dwellMin = Math.floor(m.avgDwellSec / 60);
-                const dwellSec = m.avgDwellSec % 60;
-                const dwellLabel = m.monthVisits > 0
-                  ? `${dwellMin}:${String(dwellSec).padStart(2, "0")}`
-                  : "—";
-                const visitsClass = m.monthVisits === 0
-                  ? "text-red-400"
-                  : m.monthVisits < 4
-                    ? "text-yellow-500"
-                    : "text-neutral-300";
-                return (
-                  <tr key={m.userId} data-testid={`team-eng-row-${m.userId}`} className="border-b border-neutral-800/40 hover:bg-neutral-800/20 transition-colors">
-                    <td className="py-2 text-neutral-300">{m.name}</td>
-                    <td className={`py-2 px-3 text-right tabular-nums ${timeClass}`}>
-                      {m.lastSyncedAt ? fmtSyncTime(m.lastSyncedAt) : "—"}
-                    </td>
-                    <td data-testid={`team-eng-visits-${m.userId}`} className={`py-2 px-3 text-right tabular-nums ${visitsClass}`}>
-                      {m.monthVisits}
-                    </td>
-                    <td className="py-2 px-3 text-right tabular-nums text-neutral-400">
-                      {dwellLabel}
-                    </td>
-                    <td className="py-2 pl-3 text-right">{badge}</td>
-                  </tr>
-                );
-              })}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  );
+  // engagementBlock 삭제 — dailyVisitsBlock 에 통합됨 (멤버 행 + engagement
+  // 컬럼 + 30일 visit 셀).
 
   // Top Sessions (admin only)
   const topSessionsBlock = (
@@ -1236,11 +1180,21 @@ export function TeamView({ adminMode = false }: { adminMode?: boolean }) {
   // Row 6.5: 일별 방문 매트릭스 (full-width, admin only) — ENGAGEMENT +
   // TOP SESSIONS 행 아래. 멤버 × 30일 방문 횟수 그리드 + 하단 날짜 라벨.
   // 모든 셀 너비 균일 (w-6) · 월 시작 셀 (DD=01) 에 좌측 border 로 시각 구분.
+  // Engagement + 일별 방문 통합 — 멤버별 1행. 기존 engagement 카드의 컬럼
+  // (last sync · visits/mo · avg dwell · badge) + 30일 visit 셀을 한 표로.
+  // 정렬: lastSyncedAt asc (오래 sync 안 한 멤버 우선 — admin actionable).
   const dailyVisitsBlock = adminUser && data.dailyVisits30d ? (() => {
     const grid = data.dailyVisits30d;
     const fmtDay = (ymd: string) => ymd.slice(8);    // "DD"
     const isMonthStart = (ymd: string) => ymd.endsWith("-01");
     const monthOf = (ymd: string) => ymd.slice(5, 7); // "MM"
+    const sortedMembers = [...members].sort((a, b) => {
+      if (!a.lastSyncedAt && !b.lastSyncedAt) return 0;
+      if (!a.lastSyncedAt) return -1;
+      if (!b.lastSyncedAt) return 1;
+      return new Date(a.lastSyncedAt).getTime() - new Date(b.lastSyncedAt).getTime();
+    });
+    const ENG_COLS = 5; // member · last sync · visits · dwell · badge
     return (
       <div data-testid="team-card-daily-visits" className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-slate-500 rounded">
         <div className="px-3 py-2 border-b border-neutral-800 flex items-center gap-2">
@@ -1250,52 +1204,86 @@ export function TeamView({ adminMode = false }: { adminMode?: boolean }) {
         <div className="p-3 overflow-x-auto">
           <table className="text-[11px] font-mono border-collapse" style={{ tableLayout: "fixed" }}>
             <colgroup>
-              <col style={{ width: "10rem" }} />
+              <col style={{ width: "10rem" }} />     {/* member name */}
+              <col style={{ width: "5rem" }} />      {/* last sync */}
+              <col style={{ width: "4rem" }} />      {/* visits/mo */}
+              <col style={{ width: "4rem" }} />      {/* avg dwell */}
+              <col style={{ width: "3rem" }} />      {/* sync badge */}
               {grid.dates.map((_, i) => (
                 <col key={i} style={{ width: "1.5rem" }} />
               ))}
             </colgroup>
-            <tbody>
-              {Object.entries(grid.byUser).map(([userId, row]) => (
-                <tr key={userId} className="hover:bg-neutral-800/30">
-                  <td className="pr-3 py-1 text-neutral-300 whitespace-nowrap overflow-hidden text-ellipsis">{row.name}</td>
-                  {row.counts.map((c, i) => (
-                    <td
-                      key={i}
-                      className={`text-center py-1 tabular-nums ${
-                        isMonthStart(grid.dates[i]) ? "border-l border-l-neutral-700" : ""
-                      } ${
-                        c === 0 ? "text-neutral-700" :
-                        c >= 10 ? "text-cyan-400 font-bold" :
-                        "text-neutral-200"
-                      }`}
-                      title={tmpl(t.teamView.visitsOfDay, { date: grid.dates[i], n: c })}
-                    >
-                      {c === 0 ? "·" : c}
-                    </td>
-                  ))}
-                </tr>
-              ))}
-              {/* 일자 라벨 행 — 모두 "DD" 2글자로 균일 폭. 월 시작 셀에 좌측 구분선 + 라벨 표시. */}
-              <tr>
-                <td className="pr-3 py-1" />
+            <thead>
+              <tr className="border-b border-neutral-800">
+                <th className="text-left text-neutral-500 pb-2 font-normal">{t.teamView.planMember}</th>
+                <th className="text-right text-neutral-500 pb-2 px-2 font-normal whitespace-nowrap">{t.teamView.planLastReceived}</th>
+                <th className="text-right text-neutral-500 pb-2 px-2 font-normal whitespace-nowrap" title={t.teamView.planVisitsMonth}>{t.teamView.planVisitsMonth}</th>
+                <th className="text-right text-neutral-500 pb-2 px-2 font-normal whitespace-nowrap" title={t.teamView.planAvgDwell}>{t.teamView.planAvgDwell}</th>
+                <th />
                 {grid.dates.map((d, i) => {
                   const showLabel = i % 5 === 0 || isMonthStart(d) || i === grid.dates.length - 1;
                   return (
-                    <td
+                    <th
                       key={i}
-                      className={`text-center py-1 text-[10px] tabular-nums ${
+                      className={`text-center py-1 text-[10px] tabular-nums font-normal ${
                         isMonthStart(d) ? "border-l border-l-neutral-700 text-amber-400" : "text-neutral-600"
                       }`}
                     >
                       {showLabel ? fmtDay(d) : ""}
-                    </td>
+                    </th>
                   );
                 })}
               </tr>
+            </thead>
+            <tbody>
+              {sortedMembers.map((m) => {
+                const { timeClass, badge } = syncStyle(m.lastSyncedAt, t);
+                const dwellMin = Math.floor(m.avgDwellSec / 60);
+                const dwellSec = m.avgDwellSec % 60;
+                const dwellLabel = m.monthVisits > 0
+                  ? `${dwellMin}:${String(dwellSec).padStart(2, "0")}`
+                  : "—";
+                const visitsClass = m.monthVisits === 0
+                  ? "text-red-400"
+                  : m.monthVisits < 4
+                    ? "text-yellow-500"
+                    : "text-neutral-300";
+                const dailyRow = grid.byUser[String(m.userId)] ?? null;
+                return (
+                  <tr key={m.userId} data-testid={`team-eng-row-${m.userId}`} className="border-b border-neutral-800/40 hover:bg-neutral-800/30 transition-colors">
+                    <td className="py-1.5 text-neutral-300 whitespace-nowrap overflow-hidden text-ellipsis">{m.name}</td>
+                    <td className={`py-1.5 px-2 text-right tabular-nums whitespace-nowrap ${timeClass}`}>
+                      {m.lastSyncedAt ? fmtSyncTime(m.lastSyncedAt) : "—"}
+                    </td>
+                    <td data-testid={`team-eng-visits-${m.userId}`} className={`py-1.5 px-2 text-right tabular-nums whitespace-nowrap ${visitsClass}`}>
+                      {m.monthVisits}
+                    </td>
+                    <td className="py-1.5 px-2 text-right tabular-nums text-neutral-400 whitespace-nowrap">{dwellLabel}</td>
+                    <td className="py-1.5 text-right">{badge}</td>
+                    {grid.dates.map((d, i) => {
+                      const c = dailyRow?.counts[i] ?? 0;
+                      return (
+                        <td
+                          key={i}
+                          className={`text-center py-1 tabular-nums ${
+                            isMonthStart(d) ? "border-l border-l-neutral-700" : ""
+                          } ${
+                            c === 0 ? "text-neutral-700" :
+                            c >= 10 ? "text-cyan-400 font-bold" :
+                            "text-neutral-200"
+                          }`}
+                          title={tmpl(t.teamView.visitsOfDay, { date: d, n: c })}
+                        >
+                          {c === 0 ? "·" : c}
+                        </td>
+                      );
+                    })}
+                  </tr>
+                );
+              })}
               {/* 월 표시 행 — 월 시작 셀에 "M월" 표시. */}
               <tr>
-                <td className="pr-3 py-0.5 text-[10px] text-neutral-500 text-right">{t.teamView.monthRow}</td>
+                <td className="pr-3 py-0.5 text-[10px] text-neutral-500 text-right" colSpan={ENG_COLS}>{t.teamView.monthRow}</td>
                 {grid.dates.map((d, i) => {
                   const isStart = isMonthStart(d);
                   const isFirst = i === 0;  // 윈도우 첫 셀 (월 중간 시작)
@@ -1518,21 +1506,20 @@ export function TeamView({ adminMode = false }: { adminMode?: boolean }) {
               {shellCommandsBlock}
             </div>
 
-            </>)}  {/* detailsOpen 토글 닫기 — efficiency · Row 4 · Row 5 */}
+            {/* Row 5.5: Top Sessions (admin only) — half-width + 빈 칸.
+                dashboard Active Blocks 와 동일 단독 row 패턴. */}
+            {adminUser && (
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                {topSessionsBlock}
+                <div />
+              </div>
+            )}
+
+            </>)}  {/* detailsOpen 토글 닫기 — efficiency · Row 4 · Row 5 · Top Sessions */}
 
             {/* Team Plan Health (admin only) — full width, 매니저 의사결정용 */}
             {adminUser && data.teamPlanHealth && (
               <TeamPlanHealthCard summary={data.teamPlanHealth} />
-            )}
-
-            {/* Row 6: Last Sync + Top Sessions (admin only) */}
-            {adminUser && (
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                {engagementBlock}
-
-                {/* Top Sessions (admin only) */}
-                {topSessionsBlock}
-              </div>
             )}
 
             {dailyVisitsBlock}

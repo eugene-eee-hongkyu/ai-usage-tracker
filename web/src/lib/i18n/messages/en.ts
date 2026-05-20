@@ -1214,7 +1214,7 @@ export const en: Messages = {
     planLastReceived: "Last received",
     planVisitsMonth: "Visits/mo",
     planAvgDwell: "Avg dwell",
-    monthlyVisitsTitle: "Daily visits (last 30 days)",
+    monthlyVisitsTitle: "Engagement · Daily visits (last 30 days)",
     visitsOfDay: "{date}: {n} visits",
     monthLabel: "M{n}",
     monthRow: "Mo",
