@@ -1256,6 +1256,431 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
     );
   })() : <div />;
 
+  // 일별 토큰 단가 (plan amortized) — (monthlyPrice/30) / 일별 토큰 × 1M.
+  // 팀 화면의 BY MEMBER 카드와 동일 공식. emerald = plan 활용 효율 컨셉.
+  const unitCostBlock = (
+    <div data-testid="dash-card-unit-cost" className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-emerald-500 rounded">
+      <div className="px-3 py-2 border-b border-neutral-800">
+        <span className="text-xs font-mono font-bold text-emerald-400 uppercase tracking-wider">
+          {t.dashboard.cards.unitCost}
+          <span className="ml-1.5 text-neutral-500 normal-case font-normal">(log)</span>
+        </span>
+      </div>
+      <div className="p-3">
+        {(() => {
+          const planUnitCostData = (data.dailyPlanUnitCost ?? []).map((row) => ({
+            date: row.date.slice(5),
+            unitCost: row.unitCost,
+          }));
+          const hasData = planUnitCostData.some((u) => u.unitCost != null);
+          if (!hasData) {
+            return (
+              <p className="text-neutral-600 text-xs font-mono">
+                {t.dashboard.cards.planTierMissing}
+              </p>
+            );
+          }
+          // 기준선 2개 — 본인 기간 평균(회색) + API PAYG 환산 평균(황색).
+          // 글로벌/팀 평균을 안 쓰는 이유: 워크로드 이질성 + upward social
+          // comparison 디모티베이션 (Obloj·Zenger 2017) + JMIR RCT 가
+          // personal baseline > population average 효과 확인.
+          // 평균은 active 일 unitCost 의 산술 평균 (낮을수록 좋음 메시지 유지).
+          const tokensByDateKey: Record<string, number> = {};
+          for (const t of data.dailyTokens ?? []) {
+            tokensByDateKey[t.date.slice(5)] = t.totalTokens;
+          }
+          const costByDateKey: Record<string, number> = {};
+          for (const d of data.daily) costByDateKey[d.date.slice(5)] = d.cost;
+          const planUnitVals: number[] = [];
+          const apiUnitVals: number[] = [];
+          for (const row of planUnitCostData) {
+            if (row.unitCost != null) planUnitVals.push(row.unitCost);
+            const tokens = tokensByDateKey[row.date] ?? 0;
+            const cost = costByDateKey[row.date] ?? 0;
+            if (tokens > 0 && cost > 0) apiUnitVals.push((cost / tokens) * 1_000_000);
+          }
+          const personalAvg = planUnitVals.length > 0
+            ? planUnitVals.reduce((s, v) => s + v, 0) / planUnitVals.length
+            : null;
+          const apiAvg = apiUnitVals.length > 0
+            ? apiUnitVals.reduce((s, v) => s + v, 0) / apiUnitVals.length
+            : null;
+          const fmtUnit = (n: number) =>
+            n >= 1 ? `$${n.toFixed(2)}` : n >= 0.01 ? `$${n.toFixed(3)}` : `$${n.toFixed(4)}`;
+          return (
+            <>
+              <ResponsiveContainer width="100%" height={160}>
+                <LineChart data={planUnitCostData} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#1f2937" />
+                  <XAxis dataKey="date" stroke="#525252" fontSize={10} interval="preserveStartEnd" />
+                  <YAxis
+                    stroke="#525252"
+                    fontSize={10}
+                    scale="log"
+                    domain={[0.001, "auto"]}
+                    tickFormatter={(v) => {
+                      const n = Number(v);
+                      return n >= 0.01 ? `$${n.toFixed(2)}` : `$${n.toFixed(3)}`;
+                    }}
+                  />
+                  <Tooltip
+                    contentStyle={{ background: "#0a0a0a", border: "1px solid #404040", fontSize: 11, fontFamily: "monospace" }}
+                    formatter={(v) => {
+                      if (v == null) return ["—", "unit cost"];
+                      const n = Number(v);
+                      const s = n >= 1 ? `$${n.toFixed(2)}` : n >= 0.01 ? `$${n.toFixed(3)}` : `$${n.toFixed(4)}`;
+                      return [`${s} / 1M`, "unit cost"];
+                    }}
+                  />
+                  {personalAvg !== null && (
+                    <ReferenceLine
+                      y={personalAvg}
+                      stroke="#a3a3a3"
+                      strokeDasharray="3 3"
+                      strokeWidth={1}
+                      ifOverflow="hidden"
+                    />
+                  )}
+                  {apiAvg !== null && (
+                    <ReferenceLine
+                      y={apiAvg}
+                      stroke="#f59e0b"
+                      strokeDasharray="3 3"
+                      strokeWidth={1}
+                      ifOverflow="extendDomain"
+                    />
+                  )}
+                  <Line
+                    type="monotone"
+                    dataKey="unitCost"
+                    stroke="#10b981"
+                    strokeWidth={1.75}
+                    dot={false}
+                    connectNulls={false}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+              <div className="flex items-center gap-3 mt-1.5 flex-wrap text-[11px] font-mono">
+                <span className="inline-flex items-center gap-1.5 text-emerald-400">
+                  <span className="inline-block w-3 h-[2px] bg-emerald-500" />
+                  {t.dashboard.cards.unitCostLegendActual}
+                </span>
+                {personalAvg !== null && (
+                  <span className="inline-flex items-center gap-1.5 text-neutral-400">
+                    <span
+                      className="inline-block w-3 border-t border-dashed"
+                      style={{ borderColor: "#a3a3a3" }}
+                    />
+                    {t.dashboard.cards.unitCostLegendPersonalAvg} {fmtUnit(personalAvg)}
+                  </span>
+                )}
+                {apiAvg !== null && (
+                  <span className="inline-flex items-center gap-1.5 text-amber-500/90">
+                    <span
+                      className="inline-block w-3 border-t border-dashed"
+                      style={{ borderColor: "#f59e0b" }}
+                    />
+                    {t.dashboard.cards.unitCostLegendApiAvg} {fmtUnit(apiAvg)}
+                  </span>
+                )}
+              </div>
+              <p className="text-[12px] font-mono text-neutral-600 mt-1.5">
+                {t.dashboard.cards.unitCostHint}
+              </p>
+            </>
+          );
+        })()}
+      </div>
+    </div>
+  );
+
+  // Plan Savings KPI — 이 기간 API 환산 cost (ccusage 합) vs plan 가격
+  // (priceForPeriod). 그래프 X, 단일 숫자. 직접 비교로 절약 효과 한눈에.
+  // 이전: API 환산 단가 그래프 (cache hit pct 의 inverse 라 거의 평탄 — 정보 가치 낮음).
+  const planSavingsBlock = (
+    <div data-testid="dash-card-plan-savings" className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-amber-500 rounded">
+      <div className="px-3 py-2 border-b border-neutral-800">
+        <span className="text-xs font-mono font-bold text-amber-400 uppercase tracking-wider">
+          {t.dashboard.cards.planSavings}
+        </span>
+      </div>
+      <div className="p-3">
+        {(() => {
+          const apiCost = chartData.reduce((s, d) => s + (d.cost ?? 0), 0);
+          const planCost = data.planHealth?.priceForPeriod ?? null;
+          if (planCost == null || planCost <= 0) {
+            return (
+              <p className="text-neutral-600 text-xs font-mono">
+                {t.dashboard.cards.planTierMissing}
+              </p>
+            );
+          }
+          const saved = apiCost - planCost;
+          const savedPct = apiCost > 0 ? Math.round((saved / apiCost) * 100) : null;
+          const positive = saved > 0;
+          const fmt = (v: number) =>
+            v >= 100 ? `$${v.toFixed(0)}` : v >= 1 ? `$${v.toFixed(1)}` : `$${v.toFixed(2)}`;
+          // tier label + monthly price + (estimated). declaredLimits 에 label/monthlyPriceUsd 모두 있음.
+          // isEstimatedTier=true 면 자동 추정 (P90+cost), false 면 사용자 입력.
+          const limits = data.planHealth?.declaredLimits ?? null;
+          const tierLabel = limits?.label ?? null;
+          const monthlyPrice = limits?.monthlyPriceUsd ?? null;
+          const isEstimated = data.planHealth?.isEstimatedTier === true;
+          return (
+            <div className="space-y-2">
+              <div className="flex items-baseline gap-2">
+                <div className="flex-1">
+                  <p className="text-[12px] font-mono text-neutral-500 uppercase tracking-wider">
+                    {t.dashboard.cards.planSavingsApiLabel}
+                  </p>
+                  <p className="text-2xl font-mono font-bold text-amber-300">{fmt(apiCost)}</p>
+                </div>
+                <span className="text-neutral-600 text-xl font-mono">→</span>
+                <div className="flex-1">
+                  <p className="text-[12px] font-mono text-neutral-500 uppercase tracking-wider">
+                    {t.dashboard.cards.planSavingsPlanLabel}
+                  </p>
+                  <p className="text-2xl font-mono font-bold text-neutral-200">{fmt(planCost)}</p>
+                  {tierLabel && monthlyPrice !== null && (
+                    <p className={`text-[10px] font-mono mt-0.5 ${isEstimated ? "text-amber-500/70" : "text-neutral-500"}`}>
+                      {tierLabel} · ${monthlyPrice}{t.dashboard.cards.planSavingsMonthlySuffix}
+                      {isEstimated && ` (${t.dashboard.cards.planSavingsEstimatedLabel})`}
+                    </p>
+                  )}
+                </div>
+              </div>
+              {savedPct !== null && positive && (
+                <div className="pt-2 border-t border-neutral-800">
+                  <p className="text-xs font-mono">
+                    <span className="text-emerald-400 font-bold">▼ {savedPct}%</span>
+                    <span className="text-neutral-400"> {t.dashboard.cards.planSavingsSavedLabel} </span>
+                    <span className="text-neutral-300">({fmt(saved)})</span>
+                  </p>
+                </div>
+              )}
+              {savedPct !== null && !positive && (
+                <div className="pt-2 border-t border-neutral-800">
+                  <p className="text-xs font-mono">
+                    <span className="text-rose-400 font-bold">▲ {Math.abs(savedPct)}%</span>
+                    <span className="text-neutral-400"> over plan </span>
+                    <span className="text-neutral-300">({fmt(Math.abs(saved))})</span>
+                  </p>
+                </div>
+              )}
+              <p className="text-[12px] font-mono text-neutral-600">
+                {t.dashboard.cards.planSavingsHint}
+              </p>
+            </div>
+          );
+        })()}
+      </div>
+    </div>
+  );
+
+  // Efficiency Metrics
+  const efficiencyBlock = (
+    <div data-testid="dash-card-efficiency" className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-fuchsia-500 rounded">
+      <div className="px-3 py-2 border-b border-neutral-800 flex items-center justify-between">
+        <span className="text-xs font-mono font-bold text-fuchsia-400 uppercase tracking-wider">Efficiency</span>
+        {(() => {
+          const costPs = ov.sessions > 0 ? ov.cost / ov.sessions : 0;
+          const grade = badgeGradeFromScore(ov.periodScore);
+          return (
+            <div className="relative group/grade">
+              <span data-testid="dash-grade-overall" className={`text-xs font-mono font-bold px-2 py-0.5 rounded border cursor-default ${GRADE_STYLES[grade]}`}>
+                {gradeLabel(grade, t)}
+              </span>
+              {grade !== "good" && (
+                <div className="absolute right-0 top-full mt-1 z-50 opacity-0 invisible group-hover/grade:opacity-100 group-hover/grade:visible transition-all duration-100 bg-slate-900 border border-slate-700 rounded-lg shadow-2xl p-3 w-[580px]">
+                  <p className="text-[10px] font-mono text-slate-500 mb-2.5 uppercase tracking-wider">{t.dashboardView.gradeCriteria}</p>
+                  <div className="grid grid-cols-2 gap-3">
+                    <MiniGradeTable m={t} title="Cache hit" rows={cacheRows(t)} current={cacheHitGrade(ov.cacheHitPct)} />
+                    <MiniGradeTable m={t} title="One-shot rate" rows={oneshotRows(t)} current={oneShotGrade(Math.round(ov.oneShotRate * 100))} />
+                    <MiniGradeTable m={t} title="Cost / session" rows={costRows(t)} current={costGrade(costPs)} />
+                    <MiniGradeTable m={t} title={tmpl(t.dashboardView.usageWithLevel, { lvl: computeTokenLevel(ov.avgDailyTokens) })} rows={tokenRows(t)} current={tokenLevelToGrade(computeTokenLevel(ov.avgDailyTokens))} />
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })()}
+      </div>
+      <div className="p-3 font-mono">
+        <div className="flex text-xs text-neutral-600 mb-1.5">
+          <span className="flex-1">metric</span>
+          <span>value</span>
+        </div>
+        {(() => {
+          const costPerSession = ov.sessions > 0 ? ov.cost / ov.sessions : 0;
+          const callsPerSession = ov.sessions > 0 ? Math.round(ov.calls / ov.sessions) : 0;
+          const BAD: GradeLevel[] = ["moderate", "insufficient", "warning"];
+          const isBad = (g: GradeLevel) => BAD.includes(g);
+          const tokenLvl = computeTokenLevel(ov.avgDailyTokens);
+          const gradedRows = [
+            {
+              tid: "cache",
+              label: "Cache hit",
+              value: `${ov.cacheHitPct.toFixed(1)}%`,
+              color: "text-emerald-400",
+              grade: cacheHitGrade(ov.cacheHitPct),
+              gradeRows: cacheRows(t),
+              gradeTitle: "Cache hit",
+              onDesc: () => setShowCacheModal(true),
+              onAct: () => setShowCacheMethodsModal(true),
+              actLabel: t.dashboardView.increase,
+            },
+            {
+              tid: "oneshot",
+              label: "One-shot rate",
+              value: `${Math.round(ov.oneShotRate * 100)}%`,
+              color: "text-violet-400",
+              grade: oneShotGrade(Math.round(ov.oneShotRate * 100)),
+              gradeRows: oneshotRows(t),
+              gradeTitle: "One-shot rate",
+              onDesc: () => setShowOneShotModal(true),
+              onAct: () => setShowOneShotMethodsModal(true),
+              actLabel: t.dashboardView.increase,
+            },
+            {
+              tid: "cost-session",
+              label: "Cost / session",
+              value: ov.sessions > 0 ? fmt$(costPerSession) : "$0.00",
+              color: "text-yellow-400",
+              grade: costGrade(costPerSession),
+              gradeRows: costRows(t),
+              gradeTitle: "Cost / session",
+              onDesc: () => setShowCostModal(true),
+              onAct: () => setShowCostMethodsModal(true),
+              actLabel: t.dashboardView.decrease,
+            },
+            {
+              tid: "tokens",
+              label: t.dashboardView.usage,
+              value: ov.avgDailyTokens > 0 ? `${tokenLvl}/10 · ${fmtTokensShort(ov.avgDailyTokens)}` : "0",
+              color: "text-cyan-400",
+              grade: tokenLevelToGrade(tokenLvl),
+              gradeRows: tokenRows(t),
+              gradeTitle: tmpl(t.dashboardView.usageWithLevel, { lvl: tokenLvl }),
+              onDesc: () => setShowTokenModal(true),
+              onAct: () => setShowTokenModal(true),
+              actLabel: t.dashboardView.moreUsage,
+            },
+          ];
+          const referenceRows = [
+            {
+              tid: "calls-session",
+              label: "Calls / session",
+              value: callsPerSession.toString(),
+              color: "text-blue-400",
+              grade: null as GradeLevel | null,
+              gradeRows: null as [GradeLevel, string, string][] | null,
+              gradeTitle: "",
+              onDesc: () => setShowCallsModal(true),
+              onAct: () => setShowCallsMethodsModal(true),
+              actLabel: t.dashboardView.optimize,
+            },
+            {
+              tid: "cost-call",
+              label: "Cost / call",
+              value: ov.calls > 0 ? `$${(ov.costPerCall ?? 0).toFixed(3)}` : "$0.000",
+              color: "text-orange-400",
+              grade: null as GradeLevel | null,
+              gradeRows: null as [GradeLevel, string, string][] | null,
+              gradeTitle: "",
+              onDesc: () => setShowCostCallModal(true),
+              onAct: () => setShowCostCallMethodsModal(true),
+              actLabel: t.dashboardView.decrease,
+            },
+          ];
+          type MetricRow = (typeof gradedRows)[number] | (typeof referenceRows)[number];
+          const renderRow = ({ tid, label, value, color, grade, gradeRows, gradeTitle, onDesc, onAct, actLabel }: MetricRow) => (
+            <div key={label} data-testid={`dash-metric-${tid}`} className="flex items-center text-xs py-0.5 gap-2">
+              <span className="text-neutral-400 w-36 shrink-0 whitespace-nowrap">{label}</span>
+              <span className="flex gap-1 shrink-0 w-24">
+                <TipBtn testid={`dash-tip-${tid}-desc`} label={t.dashboardView.explain} onClick={onDesc} variant="explain" />
+                {grade && isBad(grade) && <TipBtn testid={`dash-tip-${tid}-act`} label={actLabel} onClick={onAct} />}
+              </span>
+              <div className="ml-auto flex items-center gap-2">
+                <span className={`font-bold ${color}`}>{value}</span>
+                {grade && gradeRows ? (
+                  <div className="relative group/mbadge">
+                    <span data-testid={`dash-metric-${tid}-grade`} className={`text-[10px] font-mono font-bold px-1.5 py-0.5 rounded border w-14 text-center block cursor-default ${GRADE_STYLES[grade]}`}>{gradeLabel(grade, t)}</span>
+                    <div className="absolute right-0 top-full mt-1 z-50 opacity-0 invisible group-hover/mbadge:opacity-100 group-hover/mbadge:visible transition-all duration-100 bg-slate-900 border border-slate-700 rounded-lg shadow-2xl p-3 w-72">
+                      <MiniGradeTable m={t} title={gradeTitle} rows={gradeRows} current={grade} />
+                    </div>
+                  </div>
+                ) : (
+                  <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded border border-transparent w-14 text-center block" aria-hidden>&nbsp;</span>
+                )}
+              </div>
+            </div>
+          );
+          return (
+            <>
+              {gradedRows.map(renderRow)}
+              {/* 시각 그룹 분리 — 등급 (행동 가이드) vs 참고 (diagnostic). */}
+              <div className="mt-2 pt-1.5 border-t border-neutral-800/60 flex items-center">
+                <span className="text-[9px] font-mono text-neutral-600 uppercase tracking-wider">{t.dashboardView.referenceFigures}</span>
+              </div>
+              {referenceRows.map(renderRow)}
+            </>
+          );
+        })()}
+      </div>
+    </div>
+  );
+
+  // Activity Heatmap (last 13 weeks, cost-based)
+  const activityHeatmapBlock = (data.heatmapDaily ?? []).length > 0 ? (() => {
+    const calData = (data.heatmapDaily ?? []).map((row) => {
+      const cost = row.cost;
+      // 임계 근거 (외부 + 내부 데이터):
+      //  - level 1 <$5: Anthropic 평균 사용자 ($6) 의 절반 이하
+      //  - level 2 $5~25: Anthropic 평균 ~ 엔터 평균 ($6~$13) 포함
+      //  - level 3 $25~100: 엔터 90th ($30) 이상 ~ 우리 p75 ($89) 위
+      //  - level 4 $100+: 외부 99th + 우리 p90 ($154) + "엄청 했음"
+      const level: 0 | 1 | 2 | 3 | 4 =
+        cost === 0 ? 0 :
+        cost < 5 ? 1 :
+        cost < 25 ? 2 :
+        cost < 100 ? 3 :
+        4;
+      return { date: row.date, count: Math.round(cost * 100), level };
+    });
+    return (
+      <div data-testid="dash-card-activity-heatmap" className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-indigo-500 rounded">
+        <div className="px-3 py-2 border-b border-neutral-800">
+          <span data-testid="dash-heatmap-activity" className="text-xs font-mono font-bold text-indigo-400 uppercase tracking-wider">{tmpl(t.dashboardView.activityHeatmapLabel, { weeks: Math.round((data.heatmapDaily ?? []).length / 7) })}</span>
+        </div>
+        <div className="p-3 flex justify-center [&>article]:!items-center">
+          <ActivityCalendar
+            data={calData}
+            colorScheme="dark"
+            theme={{ dark: ["#1e293b", "#4338ca", "#6366f1", "#818cf8", "#a5b4fc"] }}
+            labels={{ legend: { less: "$0", more: "$100+" } }}
+            showWeekdayLabels
+            blockSize={14}
+            blockMargin={4}
+            showTotalCount={false}
+            renderBlock={(block, activity) => {
+              // today 셀은 amber outline 으로 강조 — "오늘 어디?" 즉시 파악.
+              // hover 시 tooltip 으로 그 날 cost 표시 (잔디 패턴과 동일).
+              const todayKey = new Date().toISOString().slice(0, 10);
+              const isToday = activity.date === todayKey;
+              const cost = activity.count / 100; // calData 에서 *100 했던 거 복원
+              const label = activity.level === 0
+                ? `${tmpl(t.dashboardView.dayCellNoActivity, { date: activity.date })}${isToday ? t.dashboardView.todaySuffix : ""}`
+                : `${tmpl(t.dashboardView.dayCellCost, { date: activity.date, cost: cost.toFixed(2) })}${isToday ? t.dashboardView.todaySuffix : ""}`;
+              return isToday
+                ? React.cloneElement(block, { stroke: "#fbbf24", strokeWidth: 1.5 }, <title>{label}</title>)
+                : React.cloneElement(block, {}, <title>{label}</title>);
+            }}
+          />
+        </div>
+      </div>
+    );
+  })() : <div />;
+
   return (
     <div className={`min-h-screen bg-neutral-950 text-neutral-100 transition-opacity duration-150 ${loading ? "opacity-50 pointer-events-none" : ""}`}>
       <NavComponent />
@@ -1509,428 +1934,17 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
             변경: 코스트 추세 삭제 + plan amortized 신규 + API 환산은 별도 카드로 분리. */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
 
-          {/* 일별 토큰 단가 (plan amortized) — (monthlyPrice/30) / 일별 토큰 × 1M.
-              팀 화면의 BY MEMBER 카드와 동일 공식. emerald = plan 활용 효율 컨셉. */}
-          <div data-testid="dash-card-unit-cost" className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-emerald-500 rounded">
-            <div className="px-3 py-2 border-b border-neutral-800">
-              <span className="text-xs font-mono font-bold text-emerald-400 uppercase tracking-wider">
-                {t.dashboard.cards.unitCost}
-                <span className="ml-1.5 text-neutral-500 normal-case font-normal">(log)</span>
-              </span>
-            </div>
-            <div className="p-3">
-              {(() => {
-                const planUnitCostData = (data.dailyPlanUnitCost ?? []).map((row) => ({
-                  date: row.date.slice(5),
-                  unitCost: row.unitCost,
-                }));
-                const hasData = planUnitCostData.some((u) => u.unitCost != null);
-                if (!hasData) {
-                  return (
-                    <p className="text-neutral-600 text-xs font-mono">
-                      {t.dashboard.cards.planTierMissing}
-                    </p>
-                  );
-                }
-                // 기준선 2개 — 본인 기간 평균(회색) + API PAYG 환산 평균(황색).
-                // 글로벌/팀 평균을 안 쓰는 이유: 워크로드 이질성 + upward social
-                // comparison 디모티베이션 (Obloj·Zenger 2017) + JMIR RCT 가
-                // personal baseline > population average 효과 확인.
-                // 평균은 active 일 unitCost 의 산술 평균 (낮을수록 좋음 메시지 유지).
-                const tokensByDateKey: Record<string, number> = {};
-                for (const t of data.dailyTokens ?? []) {
-                  tokensByDateKey[t.date.slice(5)] = t.totalTokens;
-                }
-                const costByDateKey: Record<string, number> = {};
-                for (const d of data.daily) costByDateKey[d.date.slice(5)] = d.cost;
-                const planUnitVals: number[] = [];
-                const apiUnitVals: number[] = [];
-                for (const row of planUnitCostData) {
-                  if (row.unitCost != null) planUnitVals.push(row.unitCost);
-                  const tokens = tokensByDateKey[row.date] ?? 0;
-                  const cost = costByDateKey[row.date] ?? 0;
-                  if (tokens > 0 && cost > 0) apiUnitVals.push((cost / tokens) * 1_000_000);
-                }
-                const personalAvg = planUnitVals.length > 0
-                  ? planUnitVals.reduce((s, v) => s + v, 0) / planUnitVals.length
-                  : null;
-                const apiAvg = apiUnitVals.length > 0
-                  ? apiUnitVals.reduce((s, v) => s + v, 0) / apiUnitVals.length
-                  : null;
-                const fmtUnit = (n: number) =>
-                  n >= 1 ? `$${n.toFixed(2)}` : n >= 0.01 ? `$${n.toFixed(3)}` : `$${n.toFixed(4)}`;
-                return (
-                  <>
-                    <ResponsiveContainer width="100%" height={160}>
-                      <LineChart data={planUnitCostData} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="#1f2937" />
-                        <XAxis dataKey="date" stroke="#525252" fontSize={10} interval="preserveStartEnd" />
-                        <YAxis
-                          stroke="#525252"
-                          fontSize={10}
-                          scale="log"
-                          domain={[0.001, "auto"]}
-                          tickFormatter={(v) => {
-                            const n = Number(v);
-                            return n >= 0.01 ? `$${n.toFixed(2)}` : `$${n.toFixed(3)}`;
-                          }}
-                        />
-                        <Tooltip
-                          contentStyle={{ background: "#0a0a0a", border: "1px solid #404040", fontSize: 11, fontFamily: "monospace" }}
-                          formatter={(v) => {
-                            if (v == null) return ["—", "unit cost"];
-                            const n = Number(v);
-                            const s = n >= 1 ? `$${n.toFixed(2)}` : n >= 0.01 ? `$${n.toFixed(3)}` : `$${n.toFixed(4)}`;
-                            return [`${s} / 1M`, "unit cost"];
-                          }}
-                        />
-                        {personalAvg !== null && (
-                          <ReferenceLine
-                            y={personalAvg}
-                            stroke="#a3a3a3"
-                            strokeDasharray="3 3"
-                            strokeWidth={1}
-                            ifOverflow="hidden"
-                          />
-                        )}
-                        {apiAvg !== null && (
-                          <ReferenceLine
-                            y={apiAvg}
-                            stroke="#f59e0b"
-                            strokeDasharray="3 3"
-                            strokeWidth={1}
-                            ifOverflow="extendDomain"
-                          />
-                        )}
-                        <Line
-                          type="monotone"
-                          dataKey="unitCost"
-                          stroke="#10b981"
-                          strokeWidth={1.75}
-                          dot={false}
-                          connectNulls={false}
-                        />
-                      </LineChart>
-                    </ResponsiveContainer>
-                    <div className="flex items-center gap-3 mt-1.5 flex-wrap text-[11px] font-mono">
-                      <span className="inline-flex items-center gap-1.5 text-emerald-400">
-                        <span className="inline-block w-3 h-[2px] bg-emerald-500" />
-                        {t.dashboard.cards.unitCostLegendActual}
-                      </span>
-                      {personalAvg !== null && (
-                        <span className="inline-flex items-center gap-1.5 text-neutral-400">
-                          <span
-                            className="inline-block w-3 border-t border-dashed"
-                            style={{ borderColor: "#a3a3a3" }}
-                          />
-                          {t.dashboard.cards.unitCostLegendPersonalAvg} {fmtUnit(personalAvg)}
-                        </span>
-                      )}
-                      {apiAvg !== null && (
-                        <span className="inline-flex items-center gap-1.5 text-amber-500/90">
-                          <span
-                            className="inline-block w-3 border-t border-dashed"
-                            style={{ borderColor: "#f59e0b" }}
-                          />
-                          {t.dashboard.cards.unitCostLegendApiAvg} {fmtUnit(apiAvg)}
-                        </span>
-                      )}
-                    </div>
-                    <p className="text-[12px] font-mono text-neutral-600 mt-1.5">
-                      {t.dashboard.cards.unitCostHint}
-                    </p>
-                  </>
-                );
-              })()}
-            </div>
-          </div>
+          {unitCostBlock}
 
-          {/* Plan Savings KPI — 이 기간 API 환산 cost (ccusage 합) vs plan 가격
-              (priceForPeriod). 그래프 X, 단일 숫자. 직접 비교로 절약 효과 한눈에.
-              이전: API 환산 단가 그래프 (cache hit pct 의 inverse 라 거의 평탄 — 정보 가치 낮음). */}
-          <div data-testid="dash-card-plan-savings" className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-amber-500 rounded">
-            <div className="px-3 py-2 border-b border-neutral-800">
-              <span className="text-xs font-mono font-bold text-amber-400 uppercase tracking-wider">
-                {t.dashboard.cards.planSavings}
-              </span>
-            </div>
-            <div className="p-3">
-              {(() => {
-                const apiCost = chartData.reduce((s, d) => s + (d.cost ?? 0), 0);
-                const planCost = data.planHealth?.priceForPeriod ?? null;
-                if (planCost == null || planCost <= 0) {
-                  return (
-                    <p className="text-neutral-600 text-xs font-mono">
-                      {t.dashboard.cards.planTierMissing}
-                    </p>
-                  );
-                }
-                const saved = apiCost - planCost;
-                const savedPct = apiCost > 0 ? Math.round((saved / apiCost) * 100) : null;
-                const positive = saved > 0;
-                const fmt = (v: number) =>
-                  v >= 100 ? `$${v.toFixed(0)}` : v >= 1 ? `$${v.toFixed(1)}` : `$${v.toFixed(2)}`;
-                // tier label + monthly price + (estimated). declaredLimits 에 label/monthlyPriceUsd 모두 있음.
-                // isEstimatedTier=true 면 자동 추정 (P90+cost), false 면 사용자 입력.
-                const limits = data.planHealth?.declaredLimits ?? null;
-                const tierLabel = limits?.label ?? null;
-                const monthlyPrice = limits?.monthlyPriceUsd ?? null;
-                const isEstimated = data.planHealth?.isEstimatedTier === true;
-                return (
-                  <div className="space-y-2">
-                    <div className="flex items-baseline gap-2">
-                      <div className="flex-1">
-                        <p className="text-[12px] font-mono text-neutral-500 uppercase tracking-wider">
-                          {t.dashboard.cards.planSavingsApiLabel}
-                        </p>
-                        <p className="text-2xl font-mono font-bold text-amber-300">{fmt(apiCost)}</p>
-                      </div>
-                      <span className="text-neutral-600 text-xl font-mono">→</span>
-                      <div className="flex-1">
-                        <p className="text-[12px] font-mono text-neutral-500 uppercase tracking-wider">
-                          {t.dashboard.cards.planSavingsPlanLabel}
-                        </p>
-                        <p className="text-2xl font-mono font-bold text-neutral-200">{fmt(planCost)}</p>
-                        {tierLabel && monthlyPrice !== null && (
-                          <p className={`text-[10px] font-mono mt-0.5 ${isEstimated ? "text-amber-500/70" : "text-neutral-500"}`}>
-                            {tierLabel} · ${monthlyPrice}{t.dashboard.cards.planSavingsMonthlySuffix}
-                            {isEstimated && ` (${t.dashboard.cards.planSavingsEstimatedLabel})`}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                    {savedPct !== null && positive && (
-                      <div className="pt-2 border-t border-neutral-800">
-                        <p className="text-xs font-mono">
-                          <span className="text-emerald-400 font-bold">▼ {savedPct}%</span>
-                          <span className="text-neutral-400"> {t.dashboard.cards.planSavingsSavedLabel} </span>
-                          <span className="text-neutral-300">({fmt(saved)})</span>
-                        </p>
-                      </div>
-                    )}
-                    {savedPct !== null && !positive && (
-                      <div className="pt-2 border-t border-neutral-800">
-                        <p className="text-xs font-mono">
-                          <span className="text-rose-400 font-bold">▲ {Math.abs(savedPct)}%</span>
-                          <span className="text-neutral-400"> over plan </span>
-                          <span className="text-neutral-300">({fmt(Math.abs(saved))})</span>
-                        </p>
-                      </div>
-                    )}
-                    <p className="text-[12px] font-mono text-neutral-600">
-                      {t.dashboard.cards.planSavingsHint}
-                    </p>
-                  </div>
-                );
-              })()}
-            </div>
-          </div>
+          {planSavingsBlock}
         </div>
 
         {/* Row 2: Efficiency + Activity Heatmap */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
 
-          {/* Efficiency Metrics */}
-          <div data-testid="dash-card-efficiency" className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-fuchsia-500 rounded">
-            <div className="px-3 py-2 border-b border-neutral-800 flex items-center justify-between">
-              <span className="text-xs font-mono font-bold text-fuchsia-400 uppercase tracking-wider">Efficiency</span>
-              {(() => {
-                const costPs = ov.sessions > 0 ? ov.cost / ov.sessions : 0;
-                const grade = badgeGradeFromScore(ov.periodScore);
-                return (
-                  <div className="relative group/grade">
-                    <span data-testid="dash-grade-overall" className={`text-xs font-mono font-bold px-2 py-0.5 rounded border cursor-default ${GRADE_STYLES[grade]}`}>
-                      {gradeLabel(grade, t)}
-                    </span>
-                    {grade !== "good" && (
-                      <div className="absolute right-0 top-full mt-1 z-50 opacity-0 invisible group-hover/grade:opacity-100 group-hover/grade:visible transition-all duration-100 bg-slate-900 border border-slate-700 rounded-lg shadow-2xl p-3 w-[580px]">
-                        <p className="text-[10px] font-mono text-slate-500 mb-2.5 uppercase tracking-wider">{t.dashboardView.gradeCriteria}</p>
-                        <div className="grid grid-cols-2 gap-3">
-                          <MiniGradeTable m={t} title="Cache hit" rows={cacheRows(t)} current={cacheHitGrade(ov.cacheHitPct)} />
-                          <MiniGradeTable m={t} title="One-shot rate" rows={oneshotRows(t)} current={oneShotGrade(Math.round(ov.oneShotRate * 100))} />
-                          <MiniGradeTable m={t} title="Cost / session" rows={costRows(t)} current={costGrade(costPs)} />
-                          <MiniGradeTable m={t} title={tmpl(t.dashboardView.usageWithLevel, { lvl: computeTokenLevel(ov.avgDailyTokens) })} rows={tokenRows(t)} current={tokenLevelToGrade(computeTokenLevel(ov.avgDailyTokens))} />
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                );
-              })()}
-            </div>
-            <div className="p-3 font-mono">
-              <div className="flex text-xs text-neutral-600 mb-1.5">
-                <span className="flex-1">metric</span>
-                <span>value</span>
-              </div>
-              {(() => {
-                const costPerSession = ov.sessions > 0 ? ov.cost / ov.sessions : 0;
-                const callsPerSession = ov.sessions > 0 ? Math.round(ov.calls / ov.sessions) : 0;
-                const BAD: GradeLevel[] = ["moderate", "insufficient", "warning"];
-                const isBad = (g: GradeLevel) => BAD.includes(g);
-                const tokenLvl = computeTokenLevel(ov.avgDailyTokens);
-                const gradedRows = [
-                  {
-                    tid: "cache",
-                    label: "Cache hit",
-                    value: `${ov.cacheHitPct.toFixed(1)}%`,
-                    color: "text-emerald-400",
-                    grade: cacheHitGrade(ov.cacheHitPct),
-                    gradeRows: cacheRows(t),
-                    gradeTitle: "Cache hit",
-                    onDesc: () => setShowCacheModal(true),
-                    onAct: () => setShowCacheMethodsModal(true),
-                    actLabel: t.dashboardView.increase,
-                  },
-                  {
-                    tid: "oneshot",
-                    label: "One-shot rate",
-                    value: `${Math.round(ov.oneShotRate * 100)}%`,
-                    color: "text-violet-400",
-                    grade: oneShotGrade(Math.round(ov.oneShotRate * 100)),
-                    gradeRows: oneshotRows(t),
-                    gradeTitle: "One-shot rate",
-                    onDesc: () => setShowOneShotModal(true),
-                    onAct: () => setShowOneShotMethodsModal(true),
-                    actLabel: t.dashboardView.increase,
-                  },
-                  {
-                    tid: "cost-session",
-                    label: "Cost / session",
-                    value: ov.sessions > 0 ? fmt$(costPerSession) : "$0.00",
-                    color: "text-yellow-400",
-                    grade: costGrade(costPerSession),
-                    gradeRows: costRows(t),
-                    gradeTitle: "Cost / session",
-                    onDesc: () => setShowCostModal(true),
-                    onAct: () => setShowCostMethodsModal(true),
-                    actLabel: t.dashboardView.decrease,
-                  },
-                  {
-                    tid: "tokens",
-                    label: t.dashboardView.usage,
-                    value: ov.avgDailyTokens > 0 ? `${tokenLvl}/10 · ${fmtTokensShort(ov.avgDailyTokens)}` : "0",
-                    color: "text-cyan-400",
-                    grade: tokenLevelToGrade(tokenLvl),
-                    gradeRows: tokenRows(t),
-                    gradeTitle: tmpl(t.dashboardView.usageWithLevel, { lvl: tokenLvl }),
-                    onDesc: () => setShowTokenModal(true),
-                    onAct: () => setShowTokenModal(true),
-                    actLabel: t.dashboardView.moreUsage,
-                  },
-                ];
-                const referenceRows = [
-                  {
-                    tid: "calls-session",
-                    label: "Calls / session",
-                    value: callsPerSession.toString(),
-                    color: "text-blue-400",
-                    grade: null as GradeLevel | null,
-                    gradeRows: null as [GradeLevel, string, string][] | null,
-                    gradeTitle: "",
-                    onDesc: () => setShowCallsModal(true),
-                    onAct: () => setShowCallsMethodsModal(true),
-                    actLabel: t.dashboardView.optimize,
-                  },
-                  {
-                    tid: "cost-call",
-                    label: "Cost / call",
-                    value: ov.calls > 0 ? `$${(ov.costPerCall ?? 0).toFixed(3)}` : "$0.000",
-                    color: "text-orange-400",
-                    grade: null as GradeLevel | null,
-                    gradeRows: null as [GradeLevel, string, string][] | null,
-                    gradeTitle: "",
-                    onDesc: () => setShowCostCallModal(true),
-                    onAct: () => setShowCostCallMethodsModal(true),
-                    actLabel: t.dashboardView.decrease,
-                  },
-                ];
-                type MetricRow = (typeof gradedRows)[number] | (typeof referenceRows)[number];
-                const renderRow = ({ tid, label, value, color, grade, gradeRows, gradeTitle, onDesc, onAct, actLabel }: MetricRow) => (
-                  <div key={label} data-testid={`dash-metric-${tid}`} className="flex items-center text-xs py-0.5 gap-2">
-                    <span className="text-neutral-400 w-36 shrink-0 whitespace-nowrap">{label}</span>
-                    <span className="flex gap-1 shrink-0 w-24">
-                      <TipBtn testid={`dash-tip-${tid}-desc`} label={t.dashboardView.explain} onClick={onDesc} variant="explain" />
-                      {grade && isBad(grade) && <TipBtn testid={`dash-tip-${tid}-act`} label={actLabel} onClick={onAct} />}
-                    </span>
-                    <div className="ml-auto flex items-center gap-2">
-                      <span className={`font-bold ${color}`}>{value}</span>
-                      {grade && gradeRows ? (
-                        <div className="relative group/mbadge">
-                          <span data-testid={`dash-metric-${tid}-grade`} className={`text-[10px] font-mono font-bold px-1.5 py-0.5 rounded border w-14 text-center block cursor-default ${GRADE_STYLES[grade]}`}>{gradeLabel(grade, t)}</span>
-                          <div className="absolute right-0 top-full mt-1 z-50 opacity-0 invisible group-hover/mbadge:opacity-100 group-hover/mbadge:visible transition-all duration-100 bg-slate-900 border border-slate-700 rounded-lg shadow-2xl p-3 w-72">
-                            <MiniGradeTable m={t} title={gradeTitle} rows={gradeRows} current={grade} />
-                          </div>
-                        </div>
-                      ) : (
-                        <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded border border-transparent w-14 text-center block" aria-hidden>&nbsp;</span>
-                      )}
-                    </div>
-                  </div>
-                );
-                return (
-                  <>
-                    {gradedRows.map(renderRow)}
-                    {/* 시각 그룹 분리 — 등급 (행동 가이드) vs 참고 (diagnostic). */}
-                    <div className="mt-2 pt-1.5 border-t border-neutral-800/60 flex items-center">
-                      <span className="text-[9px] font-mono text-neutral-600 uppercase tracking-wider">{t.dashboardView.referenceFigures}</span>
-                    </div>
-                    {referenceRows.map(renderRow)}
-                  </>
-                );
-              })()}
-            </div>
-          </div>
+          {efficiencyBlock}
 
-          {/* Activity Heatmap (last 13 weeks, cost-based) */}
-          {(data.heatmapDaily ?? []).length > 0 ? (() => {
-            const calData = (data.heatmapDaily ?? []).map((row) => {
-              const cost = row.cost;
-              // 임계 근거 (외부 + 내부 데이터):
-              //  - level 1 <$5: Anthropic 평균 사용자 ($6) 의 절반 이하
-              //  - level 2 $5~25: Anthropic 평균 ~ 엔터 평균 ($6~$13) 포함
-              //  - level 3 $25~100: 엔터 90th ($30) 이상 ~ 우리 p75 ($89) 위
-              //  - level 4 $100+: 외부 99th + 우리 p90 ($154) + "엄청 했음"
-              const level: 0 | 1 | 2 | 3 | 4 =
-                cost === 0 ? 0 :
-                cost < 5 ? 1 :
-                cost < 25 ? 2 :
-                cost < 100 ? 3 :
-                4;
-              return { date: row.date, count: Math.round(cost * 100), level };
-            });
-            return (
-              <div data-testid="dash-card-activity-heatmap" className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-indigo-500 rounded">
-                <div className="px-3 py-2 border-b border-neutral-800">
-                  <span data-testid="dash-heatmap-activity" className="text-xs font-mono font-bold text-indigo-400 uppercase tracking-wider">{tmpl(t.dashboardView.activityHeatmapLabel, { weeks: Math.round((data.heatmapDaily ?? []).length / 7) })}</span>
-                </div>
-                <div className="p-3 flex justify-center [&>article]:!items-center">
-                  <ActivityCalendar
-                    data={calData}
-                    colorScheme="dark"
-                    theme={{ dark: ["#1e293b", "#4338ca", "#6366f1", "#818cf8", "#a5b4fc"] }}
-                    labels={{ legend: { less: "$0", more: "$100+" } }}
-                    showWeekdayLabels
-                    blockSize={14}
-                    blockMargin={4}
-                    showTotalCount={false}
-                    renderBlock={(block, activity) => {
-                      // today 셀은 amber outline 으로 강조 — "오늘 어디?" 즉시 파악.
-                      // hover 시 tooltip 으로 그 날 cost 표시 (잔디 패턴과 동일).
-                      const todayKey = new Date().toISOString().slice(0, 10);
-                      const isToday = activity.date === todayKey;
-                      const cost = activity.count / 100; // calData 에서 *100 했던 거 복원
-                      const label = activity.level === 0
-                        ? `${tmpl(t.dashboardView.dayCellNoActivity, { date: activity.date })}${isToday ? t.dashboardView.todaySuffix : ""}`
-                        : `${tmpl(t.dashboardView.dayCellCost, { date: activity.date, cost: cost.toFixed(2) })}${isToday ? t.dashboardView.todaySuffix : ""}`;
-                      return isToday
-                        ? React.cloneElement(block, { stroke: "#fbbf24", strokeWidth: 1.5 }, <title>{label}</title>)
-                        : React.cloneElement(block, {}, <title>{label}</title>);
-                    }}
-                  />
-                </div>
-              </div>
-            );
-          })() : <div />}
+          {activityHeatmapBlock}
         </div>
 
         {/* 자세히 보기 토글 — divider + 중앙 라벨 풀폭 패턴 (Medium / Notion 식).
