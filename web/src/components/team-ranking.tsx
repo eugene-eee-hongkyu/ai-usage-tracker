@@ -68,8 +68,8 @@ export function TeamRanking() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <TeamPowerRankingCard teams={data.teams} />
         <TeamUnitPriceRankingCard teams={data.teams} />
-        <MemberTokensRankingCard members={data.members} myTeamId={data.myTeamId} />
-        <MemberCostRankingCard members={data.members} myTeamId={data.myTeamId} />
+        <MemberTokensRankingCard members={data.members} />
+        <MemberCostRankingCard members={data.members} />
       </div>
     </div>
   );
@@ -142,7 +142,7 @@ function TeamUnitPriceRankingCard({ teams }: { teams: TeamRow[] }) {
   );
 }
 
-function MemberTokensRankingCard({ members, myTeamId }: { members: MemberRow[]; myTeamId: number | null }) {
+function MemberTokensRankingCard({ members }: { members: MemberRow[] }) {
   const active = members.filter((m) => m.totalTokens > 0);
   const sorted = [...active].sort((a, b) => b.totalTokens - a.totalTokens);
   return (
@@ -150,13 +150,12 @@ function MemberTokensRankingCard({ members, myTeamId }: { members: MemberRow[]; 
       title="Top 토큰 사용자 (30일)"
       subtitle="개인별 30일 누적 토큰 합."
       members={sorted}
-      myTeamId={myTeamId}
       formatValue={(m) => fmtTokens(m.totalTokens)}
     />
   );
 }
 
-function MemberCostRankingCard({ members, myTeamId }: { members: MemberRow[]; myTeamId: number | null }) {
+function MemberCostRankingCard({ members }: { members: MemberRow[] }) {
   const active = members.filter((m) => m.totalCostUsd > 0);
   const sorted = [...active].sort((a, b) => b.totalCostUsd - a.totalCostUsd);
   return (
@@ -164,24 +163,22 @@ function MemberCostRankingCard({ members, myTeamId }: { members: MemberRow[]; my
       title="Top API 환산 비용 (30일)"
       subtitle="개인별 30일 누적 비용 (USD)."
       members={sorted}
-      myTeamId={myTeamId}
       formatValue={(m) => `$${m.totalCostUsd.toFixed(2)}`}
     />
   );
 }
 
 // 공통 멤버 랭킹 카드 — top 10 + 우리 팀 안 들어가면 11번째 표시 + 우리팀 1등 표기.
+// 우리 팀 여부는 server 측 isMyTeam 플래그로만 판정 (응답 직렬화 시 마킹됨).
 function MemberRankingCard({
   title,
   subtitle,
   members,
-  myTeamId,
   formatValue,
 }: {
   title: string;
   subtitle: string;
   members: MemberRow[];
-  myTeamId: number | null;
   formatValue: (m: MemberRow) => string;
 }) {
   const TOP = 10;
