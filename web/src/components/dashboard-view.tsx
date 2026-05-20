@@ -1274,9 +1274,12 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
           }));
           const hasData = planUnitCostData.some((u) => u.unitCost != null);
           if (!hasData) {
+            // empty state 는 코드상 monthlyCost30d=0 + tier 미입력 케이스만 발생
+            // (tier 있으면 정상, tier 없고 activity 있으면 자동 추정으로 채움).
+            // 즉 사용자의 실제 문제는 "데이터 sync 안 됨" — actionable 메시지.
             return (
               <p className="text-neutral-600 text-xs font-mono">
-                {t.dashboard.cards.planTierMissing}
+                {t.dashboard.cards.noActivityHint}
               </p>
             );
           }
@@ -1409,9 +1412,10 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
           const apiCost = chartData.reduce((s, d) => s + (d.cost ?? 0), 0);
           const planCost = data.planHealth?.priceForPeriod ?? null;
           if (planCost == null || planCost <= 0) {
+            // unit-cost 카드와 동일 — activity 0 + tier 미입력만 도달.
             return (
               <p className="text-neutral-600 text-xs font-mono">
-                {t.dashboard.cards.planTierMissing}
+                {t.dashboard.cards.noActivityHint}
               </p>
             );
           }
@@ -1789,6 +1793,7 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
           cacheHitPctForPeriod={data.planHealth?.cacheHitPctForPeriod ?? null}
           viewOnly={viewOnly}
           isEstimatedTier={data.planHealth?.isEstimatedTier ?? false}
+          hasActivity={chartData.some((d) => (d.cost ?? 0) > 0)}
         />
       )}
 

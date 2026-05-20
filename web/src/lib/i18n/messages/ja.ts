@@ -33,6 +33,7 @@ export const ja: DeepPartial<Messages> = {
       apiUnitCost: "API 換算単価 ($ / 1M)",
       apiUnitCostHint: "Anthropic API 直接呼び出し換算 · plan 節約効果",
       planTierMissing: "Plan tier 未入力 — 上の plan-health カードで選択",
+      noActivityHint: "アクティビティデータがまだありません。ターミナルで CLI sync が動作しているか確認してください。活動が記録されると plan tier を入力した際に単価が表示されます。",
       planSavings: "Plan 節約",
       planSavingsApiLabel: "Plan なしの場合",
       planSavingsPlanLabel: "Plan 料金",

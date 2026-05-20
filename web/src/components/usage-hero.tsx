@@ -33,6 +33,9 @@ interface UsageHeroProps {
   viewOnly?: boolean;
   // tier 가 자동 추정값이면 (declared 없음) UI 에 "(추정)" 라벨 + 시각 구분.
   isEstimatedTier?: boolean;
+  // tier 미입력 + activity 0 케이스 — 팝업 메시지 분기.
+  // false 이면 tier 입력 권유보다 CLI sync 확인 안내가 우선 actionable.
+  hasActivity?: boolean;
 }
 
 function tierOptions(m: Messages): Array<{ value: string; label: string }> {
@@ -131,6 +134,7 @@ export function UsageHero({
   declaredTierLabel,
   priceForPeriod,
   totalWindowTokens,
+  hasActivity = true,
   realUsagePct,
   nonCacheTotalWindowTokens,
   cacheHitPctForPeriod,
@@ -209,11 +213,11 @@ export function UsageHero({
           onClick={(e) => e.stopPropagation()}
         >
           <div className="flex items-center gap-2">
-            <span className="text-3xl">📊</span>
+            <span className="text-3xl">{hasActivity ? "📊" : "🔌"}</span>
             <h2 className="text-lg font-mono font-bold text-yellow-300">{m.usageHero.tierModalTitle}</h2>
           </div>
           <p className="text-sm font-mono text-neutral-300 leading-relaxed">
-            {m.usageHero.tierModalLead}
+            {hasActivity ? m.usageHero.tierModalLead : m.usageHero.tierModalLeadNoActivity}
           </p>
           <div className="space-y-2">
             <label className="text-xs font-mono text-neutral-500 block">{m.usageHero.tierModalSelectLabel}</label>

@@ -33,6 +33,7 @@ export const zh: DeepPartial<Messages> = {
       apiUnitCost: "API 折算单价 ($ / 1M)",
       apiUnitCostHint: "Anthropic API 直接调用折算 · 体现 plan 节省效果",
       planTierMissing: "Plan tier 未填写 — 请在上方 plan-health 卡片中选择",
+      noActivityHint: "尚未收集到活动数据。请先在终端检查 CLI sync 是否正在运行。活动出现后，填写上方 plan tier 即可显示单价。",
       planSavings: "Plan 节省",
       planSavingsApiLabel: "无 Plan 时",
       planSavingsPlanLabel: "Plan 费用",

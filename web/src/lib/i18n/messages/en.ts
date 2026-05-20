@@ -96,6 +96,7 @@ export interface Messages {
       apiUnitCost: string;
       apiUnitCostHint: string;
       planTierMissing: string;
+      noActivityHint: string;
       planSavings: string;
       planSavingsApiLabel: string;
       planSavingsPlanLabel: string;
@@ -151,6 +152,7 @@ export interface Messages {
     tierHintStep2A: string;         // 또는 Claude Code 터미널에서 {cmd} 실행 → {slash} 입력
     tierModalTitle: string;         // Plan tier 를 알려주세요
     tierModalLead: string;          // 토큰 단가와 plan 활용도를 계산하려면…
+    tierModalLeadNoActivity: string; // activity 0 일 때 — CLI sync 먼저 확인 안내
     tierModalSelectLabel: string;   // 본인 plan tier
     tierModalHintToggle: string;    // ▾ 내 tier 확인하기
     tierModalStep1: string;
@@ -742,6 +744,7 @@ export const en: Messages = {
       apiUnitCost: "API-equivalent Unit Cost ($ / 1M)",
       apiUnitCostHint: "Anthropic API direct-call equivalent · shows plan savings",
       planTierMissing: "Plan tier not set — select it in the plan-health card above",
+      noActivityHint: "No activity data yet — check that the CLI sync is running. Once active, enter your plan tier to see unit cost.",
       planSavings: "Plan Savings",
       planSavingsApiLabel: "without plan",
       planSavingsPlanLabel: "Plan cost",
@@ -798,6 +801,8 @@ export const en: Messages = {
     tierModalTitle: "Tell us your plan tier",
     tierModalLead:
       "We need your Claude plan to compute unit cost and plan utilization. Pick below — it's applied instantly.",
+    tierModalLeadNoActivity:
+      "No activity data collected yet. First make sure the CLI sync is running. Once activity appears, picking a plan tier here will fill in unit cost.",
     tierModalSelectLabel: "Your plan tier",
     tierModalHintToggle: "▾ Find my tier",
     tierModalStep1: "1. Go to {claudeAi} → top-right profile → {sub}",
