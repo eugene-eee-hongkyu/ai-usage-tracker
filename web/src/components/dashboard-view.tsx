@@ -1285,7 +1285,7 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
                       const maxTokens = Math.max(...chartTokenData.map((d) => d.tokens), 1);
                       return chartTokenData.map((d) => (
                         <div key={d.date} className="flex items-center gap-1.5 text-xs font-mono">
-                          <span className="w-10 text-neutral-500 shrink-0">{d.date}</span>
+                          <span className="w-12 text-neutral-500 shrink-0 whitespace-nowrap">{d.date}</span>
                           <div className="flex-1 h-1.5 bg-neutral-800 rounded overflow-hidden">
                             <div className="h-full bg-cyan-500 rounded" style={{ width: `${(d.tokens / maxTokens) * 100}%` }} />
                           </div>
@@ -1319,7 +1319,7 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
                       const maxCost = Math.max(...chartData.map((d) => d.cost), 0.01);
                       return chartData.map((d) => (
                         <div key={d.date} className="flex items-center gap-1.5 text-xs font-mono">
-                          <span className="w-10 text-neutral-500 shrink-0">{d.date}</span>
+                          <span className="w-12 text-neutral-500 shrink-0 whitespace-nowrap">{d.date}</span>
                           <div className="flex-1 h-1.5 bg-neutral-800 rounded overflow-hidden">
                             <div className="h-full bg-yellow-500 rounded" style={{ width: `${(d.cost / maxCost) * 100}%` }} />
                           </div>
