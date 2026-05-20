@@ -54,6 +54,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     { href: "/admin/audit", label: "Audit", visible: isOwner },
     { href: "/admin/team", label: "Team", visible: isBillingAdmin },
     { href: "/admin/settings", label: "Settings", visible: isOwner },
+    // Platform Admin (= ADMIN_EMAIL env 화이트리스트, isOwner) 전용 — 모든 팀 현황 + 새 팀 생성.
+    { href: "/admin/platform", label: "Platform", visible: isOwner },
   ];
 
   return (
