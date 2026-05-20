@@ -1322,17 +1322,8 @@ export function TeamView({ adminMode = false }: { adminMode?: boolean }) {
         </div>
       </div>
 
-      {/* Team Summary Bar */}
-      <div data-testid="team-summary-bar" className="bg-neutral-900 border-b border-neutral-800">
-        <div className="max-w-6xl mx-auto px-4 py-2.5 flex flex-wrap gap-x-5 gap-y-1 text-sm font-mono">
-          <span><span className="text-cyan-400 font-bold">{fmtTokens(members.reduce((s, m) => s + m.totalTokens, 0))}</span><span className="text-neutral-500 ml-1 text-xs">{t.teamView.summaryTotalTokens}</span></span>
-          <span><span className="text-yellow-400 font-bold">${sum.totalCost.toFixed(2)}</span><span className="text-neutral-500 ml-1 text-xs">{t.teamView.summaryTotalCost}</span></span>
-          <span><span className="text-blue-400 font-bold">{sum.totalSessions.toLocaleString()}</span><span className="text-neutral-500 ml-1 text-xs">{t.teamView.summarySessions}</span></span>
-          <span><span className="text-cyan-400 font-bold">{sum.activeMemberCount}</span><span className="text-neutral-500 ml-1 text-xs">{t.teamView.summaryActiveMembers}</span></span>
-          <span><span className="text-emerald-400 font-bold">{sum.avgCacheHitPct.toFixed(1)}%</span><span className="text-neutral-500 ml-1 text-xs">{t.teamView.summaryAvgCacheHit}</span></span>
-          <span><span className="text-pink-400 font-bold">{Math.round(sum.avgOneShotRate * 100)}%</span><span className="text-neutral-500 ml-1 text-xs">{t.teamView.summaryAvgOneShot}</span></span>
-        </div>
-      </div>
+      {/* Team Summary Bar 는 기본 토글 안 첫 child 로 이동 — 사용자 피드백:
+          토큰·비용·세션 등 합산도 admin 한테는 기본 정보 함께 접혀 있어야 함. */}
 
       <main className={`max-w-6xl mx-auto px-4 py-4 space-y-4 transition-opacity duration-150 ${loading ? "opacity-40 pointer-events-none" : "opacity-100"}`}>
 
@@ -1404,6 +1395,16 @@ export function TeamView({ adminMode = false }: { adminMode?: boolean }) {
             )}
 
             {(!adminUser || basicInfoOpen) && (<>
+
+            {/* Team Summary Bar — 합산 KPI (총토큰·총비용·세션·활성·cache·1-shot). */}
+            <div data-testid="team-summary-bar" className="bg-neutral-900 border border-neutral-800 rounded px-4 py-2.5 flex flex-wrap gap-x-5 gap-y-1 text-sm font-mono">
+              <span><span className="text-cyan-400 font-bold">{fmtTokens(members.reduce((s, m) => s + m.totalTokens, 0))}</span><span className="text-neutral-500 ml-1 text-xs">{t.teamView.summaryTotalTokens}</span></span>
+              <span><span className="text-yellow-400 font-bold">${sum.totalCost.toFixed(2)}</span><span className="text-neutral-500 ml-1 text-xs">{t.teamView.summaryTotalCost}</span></span>
+              <span><span className="text-blue-400 font-bold">{sum.totalSessions.toLocaleString()}</span><span className="text-neutral-500 ml-1 text-xs">{t.teamView.summarySessions}</span></span>
+              <span><span className="text-cyan-400 font-bold">{sum.activeMemberCount}</span><span className="text-neutral-500 ml-1 text-xs">{t.teamView.summaryActiveMembers}</span></span>
+              <span><span className="text-emerald-400 font-bold">{sum.avgCacheHitPct.toFixed(1)}%</span><span className="text-neutral-500 ml-1 text-xs">{t.teamView.summaryAvgCacheHit}</span></span>
+              <span><span className="text-pink-400 font-bold">{Math.round(sum.avgOneShotRate * 100)}%</span><span className="text-neutral-500 ml-1 text-xs">{t.teamView.summaryAvgOneShot}</span></span>
+            </div>
 
             {/* Team Usage Hero — 팀 활용지수 + 토큰단가 (개인 화면 대응). */}
             {data.teamUsage && (
