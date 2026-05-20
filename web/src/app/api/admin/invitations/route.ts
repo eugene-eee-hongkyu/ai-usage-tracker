@@ -42,6 +42,14 @@ export async function POST(req: NextRequest) {
   if (!VALID_ROLES.has(role)) {
     return NextResponse.json({ error: "invalid_role" }, { status: 400 });
   }
+  // admin role 초대는 Team Owner 또는 Platform Admin 만 가능. 일반 Membership-Admin
+  // (permissions 만 보유) 은 member 만 초대.
+  if (role === "admin") {
+    const isTeamOwner = guard.user.currentTeamRole === "owner";
+    if (!guard.user.isPlatformAdmin && !isTeamOwner) {
+      return NextResponse.json({ error: "admin_invite_requires_owner" }, { status: 403 });
+    }
+  }
 
   // 이미 effectiveTeam 의 멤버인지 확인 — 다른 팀 user 라도 같은 메일은 invitation 가능
   // (한 user N팀 정책 유지). 같은 팀 멤버면 거부.

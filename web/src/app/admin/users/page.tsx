@@ -8,6 +8,7 @@ export const dynamic = "force-dynamic";
 
 import { useEffect, useState, useCallback } from "react";
 import { useSession } from "next-auth/react";
+import { usePermissions } from "@/lib/use-permissions";
 
 interface UserRow {
   id: number;
@@ -498,6 +499,11 @@ function DeleteModal({
 }
 
 function InviteModal({ onClose, onSent }: { onClose: () => void; onSent: () => void }) {
+  const { isTeamOwner, isPlatformAdmin } = usePermissions();
+  // admin role 초대 권한: Team Owner 또는 Platform Admin 만. 일반 Membership-Admin
+  // (permissions 만 있는 사람) 은 member 만 초대 가능.
+  const canInviteAdmin = isTeamOwner || isPlatformAdmin;
+
   const [email, setEmail] = useState("");
   const [role, setRole] = useState("member");
   const [membershipAdmin, setMembershipAdmin] = useState(false);
@@ -505,7 +511,7 @@ function InviteModal({ onClose, onSent }: { onClose: () => void; onSent: () => v
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState<string | null>(null);
 
-  // admin/owner 는 세부 권한 (membershipAdmin / billingAdmin) 중 최소 1개 필수.
+  // admin role 은 세부 권한 (membershipAdmin / billingAdmin) 중 최소 1개 필수.
   // member 는 권한 없음 — UI 도 숨기고 payload 도 비움.
   const needsPermissions = role !== "member";
   const hasAnyPermission = membershipAdmin || billingAdmin;
@@ -572,7 +578,7 @@ function InviteModal({ onClose, onSent }: { onClose: () => void; onSent: () => v
             className="w-full bg-slate-950 border border-slate-700 rounded px-3 py-2 text-sm"
           >
             <option value="member">member</option>
-            <option value="admin">admin</option>
+            {canInviteAdmin && <option value="admin">admin</option>}
           </select>
         </label>
         {needsPermissions && (
