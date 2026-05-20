@@ -90,6 +90,9 @@ export interface Messages {
       myCost: string;
       unitCost: string;
       unitCostHint: string;
+      unitCostLegendActual: string;
+      unitCostLegendPersonalAvg: string;
+      unitCostLegendApiAvg: string;
       apiUnitCost: string;
       apiUnitCostHint: string;
       planTierMissing: string;
@@ -729,7 +732,10 @@ export const en: Messages = {
     cards: {
       myCost: "My Cost",
       unitCost: "Daily Unit Cost ($ / 1M)",
-      unitCostHint: "Lower = better plan utilization · No-activity days break the line · log scale",
+      unitCostHint: "Below the gray line = beating your own baseline · below amber = plan paying for itself · log scale",
+      unitCostLegendActual: "actual",
+      unitCostLegendPersonalAvg: "your avg",
+      unitCostLegendApiAvg: "API equiv",
       apiUnitCost: "API-equivalent Unit Cost ($ / 1M)",
       apiUnitCostHint: "Anthropic API direct-call equivalent · shows plan savings",
       planTierMissing: "Plan tier not set — select it in the plan-health card above",

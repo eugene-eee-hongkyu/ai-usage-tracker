@@ -26,7 +26,10 @@ export const ja: DeepPartial<Messages> = {
     cards: {
       myCost: "コスト推移",
       unitCost: "日別トークン単価 ($ / 1M)",
-      unitCostHint: "低いほど plan を有効活用 · アクティビティがない日は線が途切れる · log scale",
+      unitCostHint: "グレー線より下 = 自分の平均より良い日 · 黄色より下 = plan の元を取っている · log scale",
+      unitCostLegendActual: "実績",
+      unitCostLegendPersonalAvg: "自分の平均",
+      unitCostLegendApiAvg: "API 換算",
       apiUnitCost: "API 換算単価 ($ / 1M)",
       apiUnitCostHint: "Anthropic API 直接呼び出し換算 · plan 節約効果",
       planTierMissing: "Plan tier 未入力 — 上の plan-health カードで選択",

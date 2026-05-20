@@ -91,7 +91,10 @@ export const ko: DeepPartial<Messages> = {
     cards: {
       myCost: "내 비용",
       unitCost: "일별 토큰 단가 ($ / 1M)",
-      unitCostHint: "낮을수록 plan 잘 활용 · 활동 없는 날은 line 끊김 · log scale",
+      unitCostHint: "회색 아래 = 내 평균보다 좋은 날 · 황색 아래 = plan 본전 회수 중 · log scale",
+      unitCostLegendActual: "실제",
+      unitCostLegendPersonalAvg: "내 평균",
+      unitCostLegendApiAvg: "API 환산",
       apiUnitCost: "API 환산 단가 ($ / 1M)",
       apiUnitCostHint: "Anthropic API 직접 호출 환산 · plan 절약 효과",
       planTierMissing: "Plan tier 미입력 — 위 plan-health 카드에서 선택",

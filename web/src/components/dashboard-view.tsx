@@ -9,6 +9,7 @@ import {
   XAxis,
   YAxis,
   Tooltip,
+  ReferenceLine,
 } from "recharts";
 import { useSession, signOut } from "next-auth/react";
 import { useRouter } from "next/navigation";
@@ -1531,6 +1532,33 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
                     </p>
                   );
                 }
+                // 기준선 2개 — 본인 기간 평균(회색) + API PAYG 환산 평균(황색).
+                // 글로벌/팀 평균을 안 쓰는 이유: 워크로드 이질성 + upward social
+                // comparison 디모티베이션 (Obloj·Zenger 2017) + JMIR RCT 가
+                // personal baseline > population average 효과 확인.
+                // 평균은 active 일 unitCost 의 산술 평균 (낮을수록 좋음 메시지 유지).
+                const tokensByDateKey: Record<string, number> = {};
+                for (const t of data.dailyTokens ?? []) {
+                  tokensByDateKey[t.date.slice(5)] = t.totalTokens;
+                }
+                const costByDateKey: Record<string, number> = {};
+                for (const d of data.daily) costByDateKey[d.date.slice(5)] = d.cost;
+                const planUnitVals: number[] = [];
+                const apiUnitVals: number[] = [];
+                for (const row of planUnitCostData) {
+                  if (row.unitCost != null) planUnitVals.push(row.unitCost);
+                  const tokens = tokensByDateKey[row.date] ?? 0;
+                  const cost = costByDateKey[row.date] ?? 0;
+                  if (tokens > 0 && cost > 0) apiUnitVals.push((cost / tokens) * 1_000_000);
+                }
+                const personalAvg = planUnitVals.length > 0
+                  ? planUnitVals.reduce((s, v) => s + v, 0) / planUnitVals.length
+                  : null;
+                const apiAvg = apiUnitVals.length > 0
+                  ? apiUnitVals.reduce((s, v) => s + v, 0) / apiUnitVals.length
+                  : null;
+                const fmtUnit = (n: number) =>
+                  n >= 1 ? `$${n.toFixed(2)}` : n >= 0.01 ? `$${n.toFixed(3)}` : `$${n.toFixed(4)}`;
                 return (
                   <>
                     <ResponsiveContainer width="100%" height={160}>
@@ -1556,6 +1584,24 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
                             return [`${s} / 1M`, "unit cost"];
                           }}
                         />
+                        {personalAvg !== null && (
+                          <ReferenceLine
+                            y={personalAvg}
+                            stroke="#a3a3a3"
+                            strokeDasharray="3 3"
+                            strokeWidth={1}
+                            ifOverflow="hidden"
+                          />
+                        )}
+                        {apiAvg !== null && (
+                          <ReferenceLine
+                            y={apiAvg}
+                            stroke="#f59e0b"
+                            strokeDasharray="3 3"
+                            strokeWidth={1}
+                            ifOverflow="hidden"
+                          />
+                        )}
                         <Line
                           type="monotone"
                           dataKey="unitCost"
@@ -1566,6 +1612,30 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
                         />
                       </LineChart>
                     </ResponsiveContainer>
+                    <div className="flex items-center gap-3 mt-1.5 flex-wrap text-[11px] font-mono">
+                      <span className="inline-flex items-center gap-1.5 text-emerald-400">
+                        <span className="inline-block w-3 h-[2px] bg-emerald-500" />
+                        {t.dashboard.cards.unitCostLegendActual}
+                      </span>
+                      {personalAvg !== null && (
+                        <span className="inline-flex items-center gap-1.5 text-neutral-400">
+                          <span
+                            className="inline-block w-3 border-t border-dashed"
+                            style={{ borderColor: "#a3a3a3" }}
+                          />
+                          {t.dashboard.cards.unitCostLegendPersonalAvg} {fmtUnit(personalAvg)}
+                        </span>
+                      )}
+                      {apiAvg !== null && (
+                        <span className="inline-flex items-center gap-1.5 text-amber-500/90">
+                          <span
+                            className="inline-block w-3 border-t border-dashed"
+                            style={{ borderColor: "#f59e0b" }}
+                          />
+                          {t.dashboard.cards.unitCostLegendApiAvg} {fmtUnit(apiAvg)}
+                        </span>
+                      )}
+                    </div>
                     <p className="text-[12px] font-mono text-neutral-600 mt-1.5">
                       {t.dashboard.cards.unitCostHint}
                     </p>
