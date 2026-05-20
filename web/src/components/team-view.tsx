@@ -355,6 +355,21 @@ export function TeamView({ adminMode = false }: { adminMode?: boolean }) {
       return next;
     });
   };
+  // 기본 팀정보 토글 (admin only) — TeamUsageHero · Row 1·2·2.5 · headline 묶음.
+  // 멤버도 볼 수 있는 정보라 admin 한테는 default 닫혀있고, 누르면 펼침.
+  // 비-admin 은 토글 없이 항상 펼쳐진 상태.
+  const [basicInfoOpen, setBasicInfoOpen] = useState(false);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    setBasicInfoOpen(localStorage.getItem("team_basic_info_open") === "1");
+  }, []);
+  const toggleBasicInfo = () => {
+    setBasicInfoOpen((prev) => {
+      const next = !prev;
+      try { localStorage.setItem("team_basic_info_open", next ? "1" : "0"); } catch {}
+      return next;
+    });
+  };
 
   useEffect(() => {
     if (isLocalMode === null) return;
@@ -1369,27 +1384,53 @@ export function TeamView({ adminMode = false }: { adminMode?: boolean }) {
 
         {teamPlanSavingsBlock}
 
-        {/* Team Usage Hero — 팀 활용지수 + 토큰단가 (개인 화면 대응).
-            page top 자리에 배치, 효율 점수 카드는 efficiency 위로 이동. */}
-        {data.teamUsage && (
-          <TeamUsageHero
-            powerIndex={data.teamUsage.powerIndex}
-            activeMembers={data.teamUsage.activeMembers}
-            avgActiveDays={data.teamUsage.avgActiveDays}
-            avgDailyTokens={data.teamUsage.avgDailyTokens}
-            periodDays={data.teamUsage.periodDays}
-            periodLabel={periodLabel(period, t)}
-            priceForPeriodSum={data.teamUsage.priceForPeriodSum}
-            totalWindowTokensSum={data.teamUsage.totalWindowTokensSum}
-          />
-        )}
-
         {members.length === 0 ? (
           <div data-testid="team-empty" className="bg-neutral-900 border border-neutral-800 rounded-lg p-8 text-center text-neutral-500 text-sm font-mono">
             {t.teamView.noActivityPeriod}
           </div>
         ) : (
           <>
+            {/* 기본 팀정보 자세히 보기 토글 (admin only) — TeamUsageHero +
+                Row 1·2·2.5 + headline 묶음. 멤버도 보는 정보라 admin 에게는
+                default 닫힘. 비-admin 은 토글 없이 항상 펼쳐짐. */}
+            {adminUser && (
+              <div className="pt-2 pb-1">
+                <div className="flex items-center gap-3">
+                  <hr className="flex-1 border-t border-neutral-800" />
+                  <button
+                    type="button"
+                    onClick={toggleBasicInfo}
+                    data-testid="team-toggle-basic-info"
+                    className="text-sm font-mono text-neutral-400 hover:text-neutral-200 bg-neutral-900 hover:bg-neutral-800 border border-neutral-700 hover:border-neutral-600 rounded px-4 py-2 transition-colors shrink-0"
+                  >
+                    {basicInfoOpen ? t.teamView.collapseDetails : t.teamView.moreBasicDetails}
+                  </button>
+                  <hr className="flex-1 border-t border-neutral-800" />
+                </div>
+                {!basicInfoOpen && (
+                  <p className="text-center text-xs font-mono text-neutral-600 mt-2">
+                    {t.teamView.moreBasicDetailsHint}
+                  </p>
+                )}
+              </div>
+            )}
+
+            {(!adminUser || basicInfoOpen) && (<>
+
+            {/* Team Usage Hero — 팀 활용지수 + 토큰단가 (개인 화면 대응). */}
+            {data.teamUsage && (
+              <TeamUsageHero
+                powerIndex={data.teamUsage.powerIndex}
+                activeMembers={data.teamUsage.activeMembers}
+                avgActiveDays={data.teamUsage.avgActiveDays}
+                avgDailyTokens={data.teamUsage.avgDailyTokens}
+                periodDays={data.teamUsage.periodDays}
+                periodLabel={periodLabel(period, t)}
+                priceForPeriodSum={data.teamUsage.priceForPeriodSum}
+                totalWindowTokensSum={data.teamUsage.totalWindowTokensSum}
+              />
+            )}
+
             {/* Row 1: Daily Cost Trend — stacked (per-member) + total */}
             {(data.dailyByMember ?? []).length > 1 && (
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -1426,8 +1467,10 @@ export function TeamView({ adminMode = false }: { adminMode?: boolean }) {
 
             {headlineBlock}
 
-            {/* 자세히 보기 토글 — efficiency + Row 4 + Row 5 묶음.
-                dashboard-view 와 동일 divider + 중앙 라벨 풀폭 패턴. */}
+            </>)}  {/* basicInfoOpen 토글 닫기 — TeamUsageHero · Row 1·2·2.5 · headline */}
+
+            {/* 세부 팀정보 자세히 보기 토글 — efficiency + Row 4 + Row 5 묶음.
+                admin 에게는 위 기본 토글과 구분되도록 '세부' 라벨 사용. */}
             <div className="pt-4 pb-1">
               <div className="flex items-center gap-3">
                 <hr className="flex-1 border-t border-neutral-800" />
@@ -1437,7 +1480,9 @@ export function TeamView({ adminMode = false }: { adminMode?: boolean }) {
                   data-testid="team-toggle-details"
                   className="text-sm font-mono text-neutral-400 hover:text-neutral-200 bg-neutral-900 hover:bg-neutral-800 border border-neutral-700 hover:border-neutral-600 rounded px-4 py-2 transition-colors shrink-0"
                 >
-                  {detailsOpen ? t.teamView.collapseDetails : t.teamView.moreDetails}
+                  {detailsOpen
+                    ? t.teamView.collapseDetails
+                    : (adminUser ? t.teamView.moreDetailedDetailsAdmin : t.teamView.moreDetails)}
                 </button>
                 <hr className="flex-1 border-t border-neutral-800" />
               </div>

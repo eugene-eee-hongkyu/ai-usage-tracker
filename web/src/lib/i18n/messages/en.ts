@@ -461,6 +461,9 @@ export interface Messages {
     moreDetails: string;
     collapseDetails: string;
     moreDetailsHint: string;
+    moreBasicDetails: string;          // admin only — 기본 팀정보 토글 (TeamUsageHero/Row 1·2·2.5/headline)
+    moreBasicDetailsHint: string;
+    moreDetailedDetailsAdmin: string;  // admin 만 보는 세부 토글 라벨 (기본 토글과 구분)
     teamSum: string;
     powerRankCard: string;
     unitCostCardLabel: string;
@@ -1180,6 +1183,9 @@ export const en: Messages = {
     moreDetails: "Show details ▼",
     collapseDetails: "Collapse ▲",
     moreDetailsHint: "efficiency · team activities · by model · core tools · shell",
+    moreBasicDetails: "Show basic team info ▼",
+    moreBasicDetailsHint: "team usage · token unit cost · by member · activity · cost · power rank · daily unit cost · headline",
+    moreDetailedDetailsAdmin: "Show detailed team info ▼",
     teamSum: "Team total",
     powerRankCard: "Power Index Rank",
     unitCostCardLabel: "Daily Unit Cost ($ / 1M)",
