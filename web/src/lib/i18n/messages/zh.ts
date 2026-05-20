@@ -80,4 +80,26 @@ export const zh: DeepPartial<Messages> = {
     staleSyncCopy: "复制",
     staleSyncCopied: "已复制",
   },
+  onboardTeam: {
+    greeting: "欢迎",
+    nameSuffix: (name: string) => `,${name}`,
+    sub: "您是此公司的管理员。请先设置公司名称。",
+    fieldLabel: "公司名称",
+    placeholder: "例如:thenexa",
+    helper: "将在邀请团队成员和排行榜中显示。稍后可在管理员设置中修改。",
+    submit: "保存并开始",
+    submitting: "保存中…",
+    errorSlugTaken: (slug: string) =>
+      `此名称已被使用 (${slug})。请选择其他名称。`,
+    errorAlreadyNamed: "此团队已设置名称。",
+    errorInvalidName: "公司名称需为 1~80 个字符。",
+  },
+  dashboardAdminBanner: {
+    title: "您已被设置为管理员",
+    body: "如果您也想追踪自己的 Claude Code 使用情况,请安装 CLI。",
+    cta: "安装 CLI",
+  },
+  teamList: {
+    namePending: "(名称待定)",
+  },
 };

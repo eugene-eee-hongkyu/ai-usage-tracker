@@ -308,6 +308,28 @@ export const ko: DeepPartial<Messages> = {
     githubStart: "GitHub로 시작하기",
     googleStart: "Google로 시작하기",
   },
+  onboardTeam: {
+    greeting: "환영합니다",
+    nameSuffix: (name: string) => `, ${name}님`,
+    sub: "당신은 이 회사의 어드민입니다. 먼저 회사명을 정해주세요.",
+    fieldLabel: "회사명",
+    placeholder: "예: thenexa",
+    helper: "팀 멤버 초대·랭킹 등에서 표시됩니다. 어드민 설정에서 나중에 바꿀 수 있어요.",
+    submit: "회사명 저장하고 시작하기",
+    submitting: "저장 중...",
+    errorSlugTaken: (slug: string) =>
+      `이미 사용 중인 이름입니다 (${slug}). 다른 이름을 입력해주세요.`,
+    errorAlreadyNamed: "이미 설정된 팀입니다.",
+    errorInvalidName: "회사명은 1~80자로 입력해주세요.",
+  },
+  dashboardAdminBanner: {
+    title: "어드민으로 설정되어 있습니다",
+    body: "본인의 Claude Code 사용량도 트래킹하려면 CLI 를 설치하세요.",
+    cta: "CLI 설치하기",
+  },
+  teamList: {
+    namePending: "(이름 대기 중)",
+  },
   privacy: {
     banner: "🔒 이 도구는",
     bannerEm1: "token count · 도구명만",

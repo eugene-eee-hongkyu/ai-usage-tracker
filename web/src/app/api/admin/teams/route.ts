@@ -192,6 +192,7 @@ export async function GET(req: NextRequest) {
       name: teams.name,
       slug: teams.slug,
       ownerId: teams.ownerId,
+      namePending: teams.namePending,
       createdAt: teams.createdAt,
       deletedAt: teams.deletedAt,
     })

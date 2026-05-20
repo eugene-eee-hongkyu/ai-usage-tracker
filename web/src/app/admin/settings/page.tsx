@@ -225,6 +225,7 @@ interface TeamRow {
   name: string;
   slug: string;
   ownerId: number;
+  namePending?: boolean;
   createdAt: string;
   deletedAt: string | null;
   memberCount?: number;
@@ -305,13 +306,20 @@ function TeamsOverviewSection() {
               <div className="flex items-center justify-between gap-3">
                 <div>
                   <p className="text-sm font-semibold text-slate-100">
-                    {t.name}{" "}
+                    {t.namePending ? (
+                      <span className="text-amber-300">{t.name} · (이름 대기 중)</span>
+                    ) : (
+                      t.name
+                    )}{" "}
                     <span className="text-xs text-slate-500 font-mono">#{t.id} · {t.slug}</span>
                     {isCurrent && (
                       <span className="ml-2 text-xs px-1.5 py-0.5 rounded bg-emerald-900/40 text-emerald-300">내 팀</span>
                     )}
                     {isViewingNow && (
                       <span className="ml-2 text-xs px-1.5 py-0.5 rounded bg-orange-900/40 text-orange-300">view-as</span>
+                    )}
+                    {t.namePending && (
+                      <span className="ml-2 text-xs px-1.5 py-0.5 rounded bg-amber-900/40 text-amber-300">name-pending</span>
                     )}
                   </p>
                   <p className="text-xs text-slate-500">

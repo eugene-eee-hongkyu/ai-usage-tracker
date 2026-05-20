@@ -1038,6 +1038,36 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
       );
     }
 
+    // M6d: admin 권한자가 데이터 없는 상태로 dashboard 진입한 경우 — sync 강제
+    // 안내 대신 "admin 설정 완료 + (원하면) CLI 설치" 배너 + admin 패널 진입 링크.
+    if (sessionUser?.isAdmin) {
+      return (
+        <div className="min-h-screen bg-neutral-950">
+          <NavComponent />
+          <main className="max-w-md mx-auto px-4 py-20 text-center space-y-6">
+            <h1 className="text-2xl font-bold text-neutral-100">
+              {t.dashboardAdminBanner.title}
+            </h1>
+            <p className="text-neutral-400 text-sm">{t.dashboardAdminBanner.body}</p>
+            <div className="flex flex-col gap-2">
+              <a
+                href="/admin/members"
+                className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 rounded text-sm font-semibold text-white"
+              >
+                Admin
+              </a>
+              <a
+                href="/setup"
+                className="px-5 py-2.5 bg-neutral-800 hover:bg-neutral-700 rounded text-sm font-mono text-neutral-200"
+              >
+                {t.dashboardAdminBanner.cta}
+              </a>
+            </div>
+          </main>
+        </div>
+      );
+    }
+
     // 서버 모드 (5명) — 외부 npx 명령으로 sync 안내
     const syncCmd = `npx github:${process.env.NEXT_PUBLIC_GITHUB_ORG ?? "eugene-eee-hongkyu"}/ai-usage-tracker sync`;
     return (

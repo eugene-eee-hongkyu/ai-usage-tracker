@@ -302,6 +302,27 @@ export interface Messages {
     githubStart: string;
     googleStart: string;
   };
+  onboardTeam: {
+    greeting: string;          // "Welcome{nameSuffix}"
+    nameSuffix: (name: string) => string;
+    sub: string;
+    fieldLabel: string;
+    placeholder: string;
+    helper: string;
+    submit: string;
+    submitting: string;
+    errorSlugTaken: (slug: string) => string;
+    errorAlreadyNamed: string;
+    errorInvalidName: string;
+  };
+  dashboardAdminBanner: {
+    title: string;
+    body: string;
+    cta: string;
+  };
+  teamList: {
+    namePending: string;
+  };
   privacy: {
     banner: string;
     bannerEm1: string;
@@ -965,6 +986,29 @@ export const en: Messages = {
     errorOther: "An error occurred during login.",
     githubStart: "Continue with GitHub",
     googleStart: "Continue with Google",
+  },
+  onboardTeam: {
+    greeting: "Welcome",
+    nameSuffix: (name: string) => `, ${name}`,
+    sub: "You're the admin of this company. Start by naming it.",
+    fieldLabel: "Company name",
+    placeholder: "e.g. thenexa",
+    helper:
+      "Shown when inviting team members and across rankings. You can change it later in admin settings.",
+    submit: "Save and continue",
+    submitting: "Saving…",
+    errorSlugTaken: (slug: string) =>
+      `This name is already taken (${slug}). Please pick another.`,
+    errorAlreadyNamed: "This team has already been named.",
+    errorInvalidName: "Company name must be 1–80 characters.",
+  },
+  dashboardAdminBanner: {
+    title: "You're set up as an admin",
+    body: "If you also want to track your own Claude Code usage, install the CLI.",
+    cta: "Install CLI",
+  },
+  teamList: {
+    namePending: "(name pending)",
   },
   privacy: {
     banner: "🔒 This tool only collects",

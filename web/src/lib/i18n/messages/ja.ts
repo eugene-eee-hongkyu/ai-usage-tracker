@@ -80,4 +80,27 @@ export const ja: DeepPartial<Messages> = {
     staleSyncCopy: "コピー",
     staleSyncCopied: "コピー済み",
   },
+  onboardTeam: {
+    greeting: "ようこそ",
+    nameSuffix: (name: string) => `、${name} さん`,
+    sub: "あなたはこの会社の管理者です。まず会社名を設定してください。",
+    fieldLabel: "会社名",
+    placeholder: "例: thenexa",
+    helper:
+      "チームメンバー招待やランキングなどで表示されます。後で管理者設定から変更できます。",
+    submit: "保存して開始",
+    submitting: "保存中…",
+    errorSlugTaken: (slug: string) =>
+      `この名前はすでに使われています (${slug})。別の名前を入力してください。`,
+    errorAlreadyNamed: "このチームはすでに名前が設定されています。",
+    errorInvalidName: "会社名は1〜80文字で入力してください。",
+  },
+  dashboardAdminBanner: {
+    title: "管理者として設定されています",
+    body: "ご自身の Claude Code 利用も追跡したい場合は CLI をインストールしてください。",
+    cta: "CLI をインストール",
+  },
+  teamList: {
+    namePending: "(名前未設定)",
+  },
 };
