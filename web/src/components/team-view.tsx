@@ -814,56 +814,86 @@ export function TeamView({ adminMode = false }: { adminMode?: boolean }) {
     const savedPct = apiCost > 0 ? Math.round((saved / apiCost) * 100) : null;
     const positive = saved > 0;
     const fmt = (v: number) =>
-      v >= 100 ? `$${v.toFixed(0)}` : v >= 1 ? `$${v.toFixed(1)}` : `$${v.toFixed(2)}`;
+      v >= 1000 ? `$${(v / 1000).toFixed(1)}k`.replace(".0k", "k") :
+      v >= 100 ? `$${v.toFixed(0)}` :
+      v >= 1 ? `$${v.toFixed(1)}` : `$${v.toFixed(2)}`;
+    const fmtExact = (v: number) =>
+      v >= 100 ? `$${Math.round(v).toLocaleString()}` :
+      v >= 1 ? `$${v.toFixed(1)}` : `$${v.toFixed(2)}`;
     const memberCount = data.teamSummary.activeMemberCount;
+    // 비교 막대 — 두 값 중 max 를 100% 폭으로 normalize.
+    const barMax = Math.max(apiCost, planCost);
+    const apiPct = (apiCost / barMax) * 100;
+    const planPct = (planCost / barMax) * 100;
     return (
-      <div data-testid="team-card-plan-savings" className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-amber-500 rounded">
+      <div data-testid="team-card-plan-savings" className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-emerald-500 rounded">
         <div className="px-3 py-2 border-b border-neutral-800">
-          <span className="text-xs font-mono font-bold text-amber-400 uppercase tracking-wider">
+          <span className="text-xs font-mono font-bold text-emerald-400 uppercase tracking-wider">
             {t.dashboard.cards.planSavings} · {tmpl(t.teamView.teamAvgN, { n: memberCount })}
           </span>
         </div>
-        <div className="p-3">
-          <div className="space-y-2">
-            <div className="flex items-baseline gap-2">
-              <div className="flex-1">
-                <p className="text-[12px] font-mono text-neutral-500 uppercase tracking-wider">
+        <div className="p-4 space-y-4">
+          {/* HERO: 절약 금액이 메인 — fintech stat card pattern (빅 넘버 +
+              트렌드 화살표 + 보조 라벨). 사용자가 0.5초 안에 'we saved a
+              lot' 인식하도록. */}
+          <div>
+            {savedPct !== null && positive && (
+              <>
+                <div className="flex items-baseline gap-2">
+                  <span className="text-emerald-400 text-3xl sm:text-4xl font-mono font-bold tracking-tight">
+                    ▼ {fmtExact(saved)}
+                  </span>
+                </div>
+                <p className="text-[13px] font-mono text-emerald-300/80 mt-1">
+                  {savedPct}% {t.dashboard.cards.planSavingsSavedLabel} · {periodLabel(period, t)}
+                </p>
+              </>
+            )}
+            {savedPct !== null && !positive && (
+              <>
+                <div className="flex items-baseline gap-2">
+                  <span className="text-rose-400 text-3xl sm:text-4xl font-mono font-bold tracking-tight">
+                    ▲ {fmtExact(Math.abs(saved))}
+                  </span>
+                </div>
+                <p className="text-[13px] font-mono text-rose-300/80 mt-1">
+                  {Math.abs(savedPct)}% over · {periodLabel(period, t)}
+                </p>
+              </>
+            )}
+          </div>
+
+          {/* 시각 비교 — 비율 막대 2개. 사용자가 'plan vs API' 차이를
+              proportional 하게 즉시 파악. */}
+          <div className="space-y-2.5">
+            <div>
+              <div className="flex items-baseline justify-between mb-1">
+                <span className="text-[11px] font-mono text-neutral-500 uppercase tracking-wider">
                   {t.dashboard.cards.planSavingsApiLabel}
-                </p>
-                <p className="text-2xl font-mono font-bold text-amber-300">{fmt(apiCost)}</p>
+                </span>
+                <span className="text-amber-300 font-mono font-bold tabular-nums">{fmt(apiCost)}</span>
               </div>
-              <span className="text-neutral-600 text-xl font-mono">→</span>
-              <div className="flex-1">
-                <p className="text-[12px] font-mono text-neutral-500 uppercase tracking-wider">
-                  {t.dashboard.cards.planSavingsPlanLabel}
-                </p>
-                <p className="text-2xl font-mono font-bold text-neutral-200">{fmt(planCost)}</p>
-              </div>
-              <span className="text-neutral-600 text-xl font-mono">→</span>
-              <div className="flex-1 text-right">
-                <p className="text-[12px] font-mono text-neutral-500 uppercase tracking-wider">
-                  {t.dashboard.cards.planSavingsSavedLabel}
-                </p>
-                {savedPct !== null && positive && (
-                  <>
-                    <p className="text-2xl font-mono font-bold text-emerald-400">▼ {savedPct}%</p>
-                    <p className="text-[10px] font-mono text-neutral-500 mt-0.5">({fmt(saved)})</p>
-                  </>
-                )}
-                {savedPct !== null && !positive && (
-                  <>
-                    <p className="text-2xl font-mono font-bold text-rose-400">▲ {Math.abs(savedPct)}%</p>
-                    <p className="text-[10px] font-mono text-neutral-500 mt-0.5">({fmt(Math.abs(saved))})</p>
-                  </>
-                )}
-                {savedPct === null && (
-                  <p className="text-2xl font-mono text-neutral-600">—</p>
-                )}
+              <div className="h-2 bg-neutral-800/60 rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-amber-500 rounded-full transition-all"
+                  style={{ width: `${apiPct}%` }}
+                />
               </div>
             </div>
-            <p className="text-[12px] font-mono text-neutral-600 pt-1">
-              {t.dashboard.cards.planSavingsHint}
-            </p>
+            <div>
+              <div className="flex items-baseline justify-between mb-1">
+                <span className="text-[11px] font-mono text-neutral-500 uppercase tracking-wider">
+                  {t.dashboard.cards.planSavingsPlanLabel}
+                </span>
+                <span className="text-neutral-100 font-mono font-bold tabular-nums">{fmt(planCost)}</span>
+              </div>
+              <div className="h-2 bg-neutral-800/60 rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-neutral-300 rounded-full transition-all"
+                  style={{ width: `${planPct}%` }}
+                />
+              </div>
+            </div>
           </div>
         </div>
       </div>

@@ -1397,22 +1397,21 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
     </div>
   );
 
-  // Plan Savings KPI — 이 기간 API 환산 cost (ccusage 합) vs plan 가격
-  // (priceForPeriod). 그래프 X, 단일 숫자. 직접 비교로 절약 효과 한눈에.
-  // 이전: API 환산 단가 그래프 (cache hit pct 의 inverse 라 거의 평탄 — 정보 가치 낮음).
+  // Plan Savings KPI — fintech stat card pattern: 빅 넘버 (절약 금액) + 트렌드
+  // 화살표 + 비교 막대. team 카드와 동일 디자인.
   const planSavingsBlock = (
-    <div data-testid="dash-card-plan-savings" className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-amber-500 rounded">
+    <div data-testid="dash-card-plan-savings" className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-emerald-500 rounded">
       <div className="px-3 py-2 border-b border-neutral-800">
-        <span className="text-xs font-mono font-bold text-amber-400 uppercase tracking-wider">
+        <span className="text-xs font-mono font-bold text-emerald-400 uppercase tracking-wider">
           {t.dashboard.cards.planSavings}
         </span>
       </div>
-      <div className="p-3">
+      <div className="p-4">
         {(() => {
           const apiCost = chartData.reduce((s, d) => s + (d.cost ?? 0), 0);
           const planCost = data.planHealth?.priceForPeriod ?? null;
           if (planCost == null || planCost <= 0) {
-            // unit-cost 카드와 동일 — activity 0 + tier 미입력만 도달.
+            // activity 0 + tier 미입력 케이스만 도달.
             return (
               <p className="text-neutral-600 text-xs font-mono">
                 {t.dashboard.cards.noActivityHint}
@@ -1423,60 +1422,86 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
           const savedPct = apiCost > 0 ? Math.round((saved / apiCost) * 100) : null;
           const positive = saved > 0;
           const fmt = (v: number) =>
-            v >= 100 ? `$${v.toFixed(0)}` : v >= 1 ? `$${v.toFixed(1)}` : `$${v.toFixed(2)}`;
-          // tier label + monthly price + (estimated). declaredLimits 에 label/monthlyPriceUsd 모두 있음.
-          // isEstimatedTier=true 면 자동 추정 (P90+cost), false 면 사용자 입력.
+            v >= 1000 ? `$${(v / 1000).toFixed(1)}k`.replace(".0k", "k") :
+            v >= 100 ? `$${v.toFixed(0)}` :
+            v >= 1 ? `$${v.toFixed(1)}` : `$${v.toFixed(2)}`;
+          const fmtExact = (v: number) =>
+            v >= 100 ? `$${Math.round(v).toLocaleString()}` :
+            v >= 1 ? `$${v.toFixed(1)}` : `$${v.toFixed(2)}`;
           const limits = data.planHealth?.declaredLimits ?? null;
           const tierLabel = limits?.label ?? null;
           const monthlyPrice = limits?.monthlyPriceUsd ?? null;
           const isEstimated = data.planHealth?.isEstimatedTier === true;
+          const barMax = Math.max(apiCost, planCost);
+          const apiPct = (apiCost / barMax) * 100;
+          const planPct = (planCost / barMax) * 100;
           return (
-            <div className="space-y-2">
-              <div className="flex items-baseline gap-2">
-                <div className="flex-1">
-                  <p className="text-[12px] font-mono text-neutral-500 uppercase tracking-wider">
-                    {t.dashboard.cards.planSavingsApiLabel}
-                  </p>
-                  <p className="text-2xl font-mono font-bold text-amber-300">{fmt(apiCost)}</p>
-                </div>
-                <span className="text-neutral-600 text-xl font-mono">→</span>
-                <div className="flex-1">
-                  <p className="text-[12px] font-mono text-neutral-500 uppercase tracking-wider">
-                    {t.dashboard.cards.planSavingsPlanLabel}
-                  </p>
-                  <p className="text-2xl font-mono font-bold text-neutral-200">{fmt(planCost)}</p>
-                  {tierLabel && monthlyPrice !== null && (
-                    <p className={`text-[10px] font-mono mt-0.5 ${isEstimated ? "text-amber-500/70" : "text-neutral-500"}`}>
-                      {tierLabel} · ${monthlyPrice}{t.dashboard.cards.planSavingsMonthlySuffix}
-                      {isEstimated && ` (${t.dashboard.cards.planSavingsEstimatedLabel})`}
+            <div className="space-y-4">
+              {/* HERO: 절약 금액 빅 넘버 */}
+              <div>
+                {savedPct !== null && positive && (
+                  <>
+                    <div className="flex items-baseline gap-2">
+                      <span className="text-emerald-400 text-3xl sm:text-4xl font-mono font-bold tracking-tight">
+                        ▼ {fmtExact(saved)}
+                      </span>
+                    </div>
+                    <p className="text-[13px] font-mono text-emerald-300/80 mt-1">
+                      {savedPct}% {t.dashboard.cards.planSavingsSavedLabel}
                     </p>
-                  )}
+                  </>
+                )}
+                {savedPct !== null && !positive && (
+                  <>
+                    <div className="flex items-baseline gap-2">
+                      <span className="text-rose-400 text-3xl sm:text-4xl font-mono font-bold tracking-tight">
+                        ▲ {fmtExact(Math.abs(saved))}
+                      </span>
+                    </div>
+                    <p className="text-[13px] font-mono text-rose-300/80 mt-1">
+                      {Math.abs(savedPct)}% over
+                    </p>
+                  </>
+                )}
+              </div>
+
+              {/* 비교 막대 — Plan 없을 때 vs Plan 비용 비율 */}
+              <div className="space-y-2.5">
+                <div>
+                  <div className="flex items-baseline justify-between mb-1">
+                    <span className="text-[11px] font-mono text-neutral-500 uppercase tracking-wider">
+                      {t.dashboard.cards.planSavingsApiLabel}
+                    </span>
+                    <span className="text-amber-300 font-mono font-bold tabular-nums">{fmt(apiCost)}</span>
+                  </div>
+                  <div className="h-2 bg-neutral-800/60 rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-amber-500 rounded-full transition-all"
+                      style={{ width: `${apiPct}%` }}
+                    />
+                  </div>
                 </div>
-                <span className="text-neutral-600 text-xl font-mono">→</span>
-                <div className="flex-1 text-right">
-                  <p className="text-[12px] font-mono text-neutral-500 uppercase tracking-wider">
-                    {t.dashboard.cards.planSavingsSavedLabel}
-                  </p>
-                  {savedPct !== null && positive && (
-                    <>
-                      <p className="text-2xl font-mono font-bold text-emerald-400">▼ {savedPct}%</p>
-                      <p className="text-[10px] font-mono text-neutral-500 mt-0.5">({fmt(saved)})</p>
-                    </>
-                  )}
-                  {savedPct !== null && !positive && (
-                    <>
-                      <p className="text-2xl font-mono font-bold text-rose-400">▲ {Math.abs(savedPct)}%</p>
-                      <p className="text-[10px] font-mono text-neutral-500 mt-0.5">({fmt(Math.abs(saved))})</p>
-                    </>
-                  )}
-                  {savedPct === null && (
-                    <p className="text-2xl font-mono text-neutral-600">—</p>
-                  )}
+                <div>
+                  <div className="flex items-baseline justify-between mb-1">
+                    <span className="text-[11px] font-mono text-neutral-500 uppercase tracking-wider">
+                      {t.dashboard.cards.planSavingsPlanLabel}
+                      {tierLabel && monthlyPrice !== null && (
+                        <span className={`ml-2 normal-case ${isEstimated ? "text-amber-500/70" : "text-neutral-600"}`}>
+                          {tierLabel} · ${monthlyPrice}{t.dashboard.cards.planSavingsMonthlySuffix}
+                          {isEstimated && ` (${t.dashboard.cards.planSavingsEstimatedLabel})`}
+                        </span>
+                      )}
+                    </span>
+                    <span className="text-neutral-100 font-mono font-bold tabular-nums">{fmt(planCost)}</span>
+                  </div>
+                  <div className="h-2 bg-neutral-800/60 rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-neutral-300 rounded-full transition-all"
+                      style={{ width: `${planPct}%` }}
+                    />
+                  </div>
                 </div>
               </div>
-              <p className="text-[12px] font-mono text-neutral-600 pt-1">
-                {t.dashboard.cards.planSavingsHint}
-              </p>
             </div>
           );
         })()}
