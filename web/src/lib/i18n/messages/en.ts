@@ -538,6 +538,9 @@ export interface Messages {
     rankMeTeam: string;
     teamRankEmpty: string;
     recent90dEfficiency: string;
+    moreDetails: string;
+    collapseDetails: string;
+    moreDetailsHint: string;
     gradeWarning: string;
     gradeImprove: string;
     gradeGood: string;
@@ -1243,6 +1246,9 @@ export const en: Messages = {
     rankMeTeam: "Me {self}% · Team {team}%",
     teamRankEmpty: "No team rank data",
     recent90dEfficiency: "Last 24 weeks — efficiency",
+    moreDetails: "Show details ▼",
+    collapseDetails: "Collapse ▲",
+    moreDetailsHint: "by model · by project · top sessions · by activity · tools · shell · MCP · dwell heatmap",
     gradeWarning: "Warning",
     gradeImprove: "Improve",
     gradeGood: "Good",

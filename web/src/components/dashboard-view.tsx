@@ -755,6 +755,21 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState(false);
   const [syncCopied, setSyncCopied] = useState(false);
+  // 자세히 보기 토글 — by model / by project / top sessions / by activity /
+  // core tools / shell commands / MCP / 체류 히트맵 모두 토글 안. localStorage
+  // 로 사용자 선호 유지.
+  const [detailsOpen, setDetailsOpen] = useState(false);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    setDetailsOpen(localStorage.getItem("dash_details_open") === "1");
+  }, []);
+  const toggleDetails = () => {
+    setDetailsOpen((prev) => {
+      const next = !prev;
+      try { localStorage.setItem("dash_details_open", next ? "1" : "0"); } catch {}
+      return next;
+    });
+  };
   const [showCacheModal, setShowCacheModal] = useState(false);
   const [showOneShotModal, setShowOneShotModal] = useState(false);
   const [showCostModal, setShowCostModal] = useState(false);
@@ -1087,6 +1102,51 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
       </div>
     </div>
   );
+
+  // Dwell heatmap 카드 — 토글 안 새 Row 에서 MCP 와 짝. 기존 Row 6 우측 위치에서
+  // 이동. (사용자 요청: core/shell 아래로)
+  const dwellHeatmapBlock = (data.visitDaily ?? []).length > 0 ? (() => {
+    const rows = data.visitDaily ?? [];
+    const calData = rows.map((row) => {
+      const min = Math.round(row.dwellSec / 60);
+      const sec = row.dwellSec;
+      const level: 0 | 1 | 2 | 3 | 4 =
+        sec === 0 ? 0 :
+        sec < 120 ? 1 :
+        sec < 300 ? 2 :
+        sec < 900 ? 3 :
+        4;
+      return { date: row.date, count: min, level };
+    });
+    const monthKey = new Date().toISOString().slice(0, 7);
+    const monthRows = rows.filter((r) => r.date.startsWith(monthKey));
+    const monthVisitsTotal = monthRows.reduce((s, r) => s + r.visitCount, 0);
+    const monthDwellTotal = monthRows.reduce((s, r) => s + r.dwellSec, 0);
+    const avgDwellSec = monthVisitsTotal > 0 ? Math.round(monthDwellTotal / monthVisitsTotal) : 0;
+    const avgMinSec = `${Math.floor(avgDwellSec / 60)}:${String(avgDwellSec % 60).padStart(2, "0")}`;
+    return (
+      <div data-testid="dash-card-dwell-heatmap" className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-amber-500 rounded">
+        <div className="px-3 py-2 border-b border-neutral-800">
+          <span data-testid="dash-heatmap-dwell" className="text-xs font-mono font-bold text-amber-400 uppercase tracking-wider">
+            {tmpl(t.dashboardView.dwellHeatmapLabel, { weeks: Math.round(rows.length / 7) })}
+            {monthVisitsTotal > 0 && tmpl(t.dashboardView.dwellMonthVisits, { n: monthVisitsTotal, time: avgMinSec })})
+          </span>
+        </div>
+        <div className="p-3 flex justify-center [&>article]:!items-center">
+          <ActivityCalendar
+            data={calData}
+            colorScheme="dark"
+            theme={{ dark: ["#1e293b", "#854d0e", "#a16207", "#ca8a04", "#facc15"] }}
+            labels={{ legend: { less: "0", more: "15+" } }}
+            showWeekdayLabels
+            blockSize={14}
+            blockMargin={4}
+            showTotalCount={false}
+          />
+        </div>
+      </div>
+    );
+  })() : <div />;
 
   return (
     <div className={`min-h-screen bg-neutral-950 text-neutral-100 transition-opacity duration-150 ${loading ? "opacity-50 pointer-events-none" : ""}`}>
@@ -1696,6 +1756,27 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
           })() : <div />}
         </div>
 
+        {/* 자세히 보기 토글 — by model · by project · top sessions · by activity ·
+            core tools · shell · MCP · 체류 히트맵 모두 토글 안. default 닫힘 +
+            localStorage 사용자 선호 유지. */}
+        <div className="flex flex-col items-center gap-1 pt-2">
+          <button
+            type="button"
+            onClick={toggleDetails}
+            data-testid="dash-toggle-details"
+            className="text-sm font-mono text-neutral-400 hover:text-neutral-200 bg-neutral-900 hover:bg-neutral-800 border border-neutral-700 hover:border-neutral-600 rounded px-4 py-2 transition-colors"
+          >
+            {detailsOpen ? t.dashboardView.collapseDetails : t.dashboardView.moreDetails}
+          </button>
+          {!detailsOpen && (
+            <span className="text-xs font-mono text-neutral-600">
+              {t.dashboardView.moreDetailsHint}
+            </span>
+          )}
+        </div>
+
+        {detailsOpen && (<>
+
         {/* Row 3: By Model + By Project — 비용 분해 그룹 (어디에 썼나) */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
 
@@ -1936,6 +2017,15 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
           </div>
         </div>
 
+        {/* 새 Row: MCP Servers + 체류 히트맵 — 사용자 요청: core/shell 아래.
+            토글 안 마지막 row. */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          {mcpServersBlock}
+          {dwellHeatmapBlock}
+        </div>
+
+        </>)}  {/* detailsOpen 토글 닫기 — Row 3 ~ Row 5 + 새 Row 모두 토글 안 */}
+
         {/* Daily Efficiency Score + Streak + 90일 잔디 + 팀 랭크 — 동기부여·게임화 패널.
             매일 보는 액션 카드가 아니라 주 1회 "이번 주 어땠지" 확인용. Core Tools /
             Shell Commands 아래로 배치해 핵심 의사결정 layer (activity → 효율 →
@@ -1944,14 +2034,10 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
           <EfficiencyScoreSection score={data.efficiencyScore} period={period} periodScore={ov.periodScore} />
         )}
 
-        {/* Row 6: Active Blocks + Dwell Heatmap.
-            today period 면 좌측 Active Blocks 가 미표시라 그 자리에 MCP Servers 올림. */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-
-          {/* 좌측 슬롯 — today 면 MCP Servers, 그 외 Active Blocks. */}
-          {period === "today" ? (
-            mcpServersBlock
-          ) : data.blocks ? (
+        {/* Active Blocks 단독 row — today period 면 미표시 (해당 period 의 block
+            데이터 없음). 체류 히트맵 / MCP 는 토글 안 새 Row 로 이동. */}
+        {period !== "today" && data.blocks && (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             <div data-testid="dash-card-active-blocks" className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-sky-500 rounded">
               <div className="px-3 py-2 border-b border-neutral-800 flex items-center justify-between">
                 <span className="text-xs font-mono font-bold text-sky-400 uppercase tracking-wider">Active Blocks</span>
@@ -2055,64 +2141,8 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
                 )}
               </div>
             </div>
-          ) : <div />}
-
-          {/* Engagement heatmap (lower bar 가설 검증 + 깊이 측정).
-              일자별 총 머문 시간 (분) 으로 색 인코딩.
-              level: 0 / <2min / 2-5 / 5-15 / 15+ min.
-              tooltip 의 count 는 "분" 으로 입력 (사용자 hover 시 자연
-              해석). 카드 라벨에 이번달 visit 횟수도 같이 표시 → "12회
-              방문 · 평균 3:40" 통계 한 줄 inline. */}
-          {(data.visitDaily ?? []).length > 0 ? (() => {
-            const rows = data.visitDaily ?? [];
-            const calData = rows.map((row) => {
-              const min = Math.round(row.dwellSec / 60);
-              const sec = row.dwellSec;
-              const level: 0 | 1 | 2 | 3 | 4 =
-                sec === 0 ? 0 :
-                sec < 120 ? 1 :
-                sec < 300 ? 2 :
-                sec < 900 ? 3 :
-                4;
-              return { date: row.date, count: min, level };
-            });
-            // 이번달 (UTC YYYY-MM) 합계 — 카드 라벨용
-            const monthKey = new Date().toISOString().slice(0, 7);
-            const monthRows = rows.filter((r) => r.date.startsWith(monthKey));
-            const monthVisitsTotal = monthRows.reduce((s, r) => s + r.visitCount, 0);
-            const monthDwellTotal = monthRows.reduce((s, r) => s + r.dwellSec, 0);
-            const avgDwellSec = monthVisitsTotal > 0 ? Math.round(monthDwellTotal / monthVisitsTotal) : 0;
-            const avgMinSec = `${Math.floor(avgDwellSec / 60)}:${String(avgDwellSec % 60).padStart(2, "0")}`;
-            return (
-              <div data-testid="dash-card-dwell-heatmap" className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-amber-500 rounded">
-                <div className="px-3 py-2 border-b border-neutral-800">
-                  <span data-testid="dash-heatmap-dwell" className="text-xs font-mono font-bold text-amber-400 uppercase tracking-wider">
-                    {tmpl(t.dashboardView.dwellHeatmapLabel, { weeks: Math.round(rows.length / 7) })}
-                    {monthVisitsTotal > 0 && tmpl(t.dashboardView.dwellMonthVisits, { n: monthVisitsTotal, time: avgMinSec })})
-                  </span>
-                </div>
-                <div className="p-3 flex justify-center [&>article]:!items-center">
-                  <ActivityCalendar
-                    data={calData}
-                    colorScheme="dark"
-                    theme={{ dark: ["#1e293b", "#854d0e", "#a16207", "#ca8a04", "#facc15"] }}
-                    labels={{ legend: { less: "0", more: "15+" } }}
-                    showWeekdayLabels
-                    blockSize={14}
-                    blockMargin={4}
-                    showTotalCount={false}
-                  />
-                </div>
-              </div>
-            );
-          })() : <div />}
-        </div>
-
-        {/* Row 7: MCP Servers — today period 에선 Row 6 좌측으로 올렸으므로 미렌더링.
-            그 외 period 는 반쪽 (우측 빈칸). */}
-        {period !== "today" && (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            {mcpServersBlock}
+            {/* 우측 빈칸 — Active Blocks 단독이라 빈자리 (의도된 시각 균형) */}
+            <div />
           </div>
         )}
 
