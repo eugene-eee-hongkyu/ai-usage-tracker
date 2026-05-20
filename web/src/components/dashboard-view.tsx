@@ -1599,7 +1599,7 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
                             stroke="#f59e0b"
                             strokeDasharray="3 3"
                             strokeWidth={1}
-                            ifOverflow="hidden"
+                            ifOverflow="extendDomain"
                           />
                         )}
                         <Line
