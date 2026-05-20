@@ -787,6 +787,71 @@ export function TeamView({ adminMode = false }: { adminMode?: boolean }) {
     );
   })() : null;
 
+  // Team Plan Savings — 모든 멤버 API 환산 비용 합 vs 모든 멤버 plan 가격 합.
+  // 개인 dashboard 의 planSavingsBlock 팀 합산 버전. admin only.
+  // data.teamSummary.totalCost = ccusage 합산 (API 환산), data.teamUsage.priceForPeriodSum
+  // = tier 선언/추정된 멤버들의 monthlyPrice × periodDays/30 합.
+  const teamPlanSavingsBlock = adminUser && data.teamUsage ? (() => {
+    const apiCost = data.teamSummary.totalCost;
+    const planCost = data.teamUsage.priceForPeriodSum;
+    if (planCost == null || planCost <= 0 || apiCost <= 0) return null;
+    const saved = apiCost - planCost;
+    const savedPct = apiCost > 0 ? Math.round((saved / apiCost) * 100) : null;
+    const positive = saved > 0;
+    const fmt = (v: number) =>
+      v >= 100 ? `$${v.toFixed(0)}` : v >= 1 ? `$${v.toFixed(1)}` : `$${v.toFixed(2)}`;
+    const memberCount = data.teamSummary.activeMemberCount;
+    return (
+      <div data-testid="team-card-plan-savings" className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-amber-500 rounded">
+        <div className="px-3 py-2 border-b border-neutral-800">
+          <span className="text-xs font-mono font-bold text-amber-400 uppercase tracking-wider">
+            {t.dashboard.cards.planSavings} · {tmpl(t.teamView.teamAvgN, { n: memberCount })}
+          </span>
+        </div>
+        <div className="p-3">
+          <div className="space-y-2">
+            <div className="flex items-baseline gap-2">
+              <div className="flex-1">
+                <p className="text-[12px] font-mono text-neutral-500 uppercase tracking-wider">
+                  {t.dashboard.cards.planSavingsApiLabel}
+                </p>
+                <p className="text-2xl font-mono font-bold text-amber-300">{fmt(apiCost)}</p>
+              </div>
+              <span className="text-neutral-600 text-xl font-mono">→</span>
+              <div className="flex-1">
+                <p className="text-[12px] font-mono text-neutral-500 uppercase tracking-wider">
+                  {t.dashboard.cards.planSavingsPlanLabel}
+                </p>
+                <p className="text-2xl font-mono font-bold text-neutral-200">{fmt(planCost)}</p>
+              </div>
+            </div>
+            {savedPct !== null && positive && (
+              <div className="pt-2 border-t border-neutral-800">
+                <p className="text-xs font-mono">
+                  <span className="text-emerald-400 font-bold">▼ {savedPct}%</span>
+                  <span className="text-neutral-400"> {t.dashboard.cards.planSavingsSavedLabel} </span>
+                  <span className="text-neutral-300">({fmt(saved)})</span>
+                </p>
+              </div>
+            )}
+            {savedPct !== null && !positive && (
+              <div className="pt-2 border-t border-neutral-800">
+                <p className="text-xs font-mono">
+                  <span className="text-rose-400 font-bold">▲ {Math.abs(savedPct)}%</span>
+                  <span className="text-neutral-400"> over plan </span>
+                  <span className="text-neutral-300">({fmt(Math.abs(saved))})</span>
+                </p>
+              </div>
+            )}
+            <p className="text-[12px] font-mono text-neutral-600">
+              {t.dashboard.cards.planSavingsHint}
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  })() : null;
+
   // Row 3: Efficiency (full-width) — 컬럼 6개 가독성 위해 1줄 차지.
   const efficiencyBlock = (
     <div data-testid="team-card-efficiency" className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-fuchsia-500 rounded">
@@ -1287,10 +1352,6 @@ export function TeamView({ adminMode = false }: { adminMode?: boolean }) {
                 </span>
                 <span className="text-neutral-400">·</span>
                 <span className="text-neutral-200">
-                  cache <span className="text-emerald-400 font-bold">{data.teamSummary.avgCacheHitPct.toFixed(0)}%</span>
-                </span>
-                <span className="text-neutral-400">·</span>
-                <span className="text-neutral-200">
                   {tmpl(t.teamView.activeMembers, { n: memberActiveCount, total: memberTotal })}
                 </span>
                 {data.teamPlanHealth && data.teamPlanHealth.monthlySavingsUsd > 0 && (
@@ -1305,6 +1366,8 @@ export function TeamView({ adminMode = false }: { adminMode?: boolean }) {
             </div>
           );
         })()}
+
+        {teamPlanSavingsBlock}
 
         {/* Team Usage Hero — 팀 활용지수 + 토큰단가 (개인 화면 대응).
             page top 자리에 배치, 효율 점수 카드는 efficiency 위로 이동. */}
