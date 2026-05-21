@@ -4,7 +4,7 @@ import GoogleProvider from "next-auth/providers/google";
 import CredentialsProvider from "next-auth/providers/credentials";
 import { cookies } from "next/headers";
 import { db, users, teamMembers, teams } from "@/lib/db";
-import { eq, and, isNull, asc } from "drizzle-orm";
+import { eq, and, isNull, asc, sql } from "drizzle-orm";
 import { isAdmin } from "@/lib/admin";
 import { writeAudit } from "@/lib/audit";
 import { PLATFORM_VIEW_AS_COOKIE } from "@/lib/effective-team";
@@ -201,7 +201,57 @@ export const authOptions: NextAuthOptions = {
           return `/login?error=domain`;
         }
 
-        // 도메인 통과한 self-signup 신규자 — /join 으로 redirect (가입 신청 form).
+        // M6f (2026-05-21): email 도메인이 어떤 팀의 auto_join_domains 에 포함되면
+        // 그 팀 member 로 즉시 자동 가입. invitation 없어도 OAuth ownership 으로 충분.
+        const emailDomain = email.split("@")[1]?.toLowerCase();
+        if (emailDomain) {
+          // jsonb @> '["domain"]' — 배열 contains 매칭. team 1개 매칭 가정 (첫 번째 사용).
+          const autoTeamRows = await db
+            .select({ id: teams.id })
+            .from(teams)
+            .where(
+              and(
+                isNull(teams.deletedAt),
+                eq(teams.namePending, false),
+                sql`${teams.autoJoinDomains} @> ${JSON.stringify([emailDomain])}::jsonb`
+              )
+            )
+            .limit(1);
+          if (autoTeamRows[0]) {
+            const autoTeamId = autoTeamRows[0].id;
+            const inserted = await db
+              .insert(users)
+              .values({
+                githubId: String((profile as Record<string, unknown>)?.id ?? account?.providerAccountId),
+                email,
+                name: user.name ?? email.split("@")[0],
+                avatarUrl: user.image ?? null,
+                role: "member",
+                permissions: {},
+              })
+              .returning({ id: users.id });
+            const newUserId = inserted[0]?.id ?? null;
+            if (newUserId) {
+              await db.insert(teamMembers).values({
+                teamId: autoTeamId,
+                userId: newUserId,
+                role: "member",
+              });
+              await writeAudit({
+                teamId: autoTeamId,
+                actorUserId: newUserId,
+                actorType: "system",
+                action: "user.create.auto_join_domain",
+                targetType: "user",
+                targetId: newUserId,
+                metadata: { email, provider, domain: emailDomain, teamId: autoTeamId },
+              });
+            }
+            return true;
+          }
+        }
+
+        // 어디에도 매칭 안 됨 — /join 으로 redirect (신규 회사 등록 or 멤버 초대 요청 안내).
         await writeAudit({
           actorUserId: null,
           actorType: "system",
