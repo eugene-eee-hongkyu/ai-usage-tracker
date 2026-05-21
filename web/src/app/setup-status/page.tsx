@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { Nav } from "@/components/nav";
+import { DevicesSection } from "@/components/devices-section";
 import Link from "next/link";
 import { useLocalMode } from "@/lib/use-local-mode";
 import { useMessages } from "@/lib/use-i18n";
@@ -206,6 +207,11 @@ export default function SetupStatusPage() {
 
         {/* 환경 진단 — CLI 가 ingest 시 보낸 envInfo 기반. 옛 cli 면 envInfo 없음. */}
         {data.envInfo && <EnvDiagnosticCard env={data.envInfo} en={en} />}
+
+        {/* 내 디바이스 — api_tokens 기반 device-scope 관리 (M6e, 2026-05-21). */}
+        <div className="bg-slate-900 border border-slate-800 rounded-lg p-4">
+          <DevicesSection />
+        </div>
 
         {/* Troubleshooting */}
         <div className="bg-slate-900 rounded-lg p-4 space-y-3">

@@ -8,7 +8,6 @@ export interface Messages {
     setup: string;
     logout: string;
     admin: string;
-    devices: string;
   };
   about: {
     title: string;        // ⓘ aria-label
@@ -688,7 +687,6 @@ export const en: Messages = {
     setup: "Setup",
     logout: "Logout",
     admin: "Admin",
-    devices: "My devices",
   },
   about: {
     title: "Version info",

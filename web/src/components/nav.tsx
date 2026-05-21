@@ -92,18 +92,10 @@ function NavInner() {
         </button>
         {open && !isLocalMode && (
           <div className="absolute right-0 top-8 bg-slate-800 border border-slate-700 rounded shadow-lg z-50 whitespace-nowrap">
-            <Link
-              href={withLocale("/me/devices")}
-              data-testid="nav-devices"
-              onClick={() => setOpen(false)}
-              className="block px-4 py-2 text-sm text-slate-300 hover:bg-slate-700 w-full text-left"
-            >
-              {m.nav.devices}
-            </Link>
             <button
               data-testid="nav-logout"
               onClick={() => signOut({ callbackUrl: "/login" })}
-              className="block px-4 py-2 text-sm text-slate-300 hover:bg-slate-700 w-full text-left border-t border-slate-700"
+              className="block px-4 py-2 text-sm text-slate-300 hover:bg-slate-700 w-full text-left"
             >
               {m.nav.logout}
             </button>
