@@ -53,7 +53,7 @@ export default function ChangelogPage() {
                     <li key={entry.slug}>
                       <details className="group">
                         <summary className="flex items-baseline gap-3 py-3 cursor-pointer list-none hover:bg-neutral-900/50 -mx-2 px-2 rounded">
-                          <span className="text-xs text-neutral-500 font-mono shrink-0 w-24">
+                          <span className="text-xs text-neutral-500 font-mono shrink-0 w-36 whitespace-nowrap">
                             {formatDate(entry.date)}
                           </span>
                           <span className="text-sm text-neutral-200 flex-1">{entry.title}</span>
@@ -61,7 +61,7 @@ export default function ChangelogPage() {
                             ▸
                           </span>
                         </summary>
-                        <div className="pb-4 pt-1 pl-[7.25rem] pr-2 space-y-2 text-sm text-neutral-300 leading-relaxed">
+                        <div className="pb-4 pt-1 pl-[10.25rem] pr-2 space-y-2 text-sm text-neutral-300 leading-relaxed">
                           {parseMarkdown(entry.body).map((t, i) => (
                             <MdNode key={i} token={t} />
                           ))}
