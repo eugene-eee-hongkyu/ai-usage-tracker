@@ -734,6 +734,9 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
   const { data: session, status } = useSession();
   const router = useRouter();
   const [period, setPeriod] = useState<Period>("8days");
+  // localStorage 읽기 전 첫 fetch 가 stale period 로 발사 + race 로 늦은 응답이
+  // 덮어쓰는 버그 방지. 읽기 완료 후에만 fetch 허용.
+  const [periodReady, setPeriodReady] = useState(false);
 
   // 로컬 모드 (.pkg/.app 설치 환경) 면 NextAuth session 없이도 작동.
   const isLocalMode = useLocalMode();
@@ -746,11 +749,13 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
     if (upgraded && ["today", "8days", "month", "30days", "all"].includes(upgraded)) {
       setPeriod(upgraded as Period);
     }
+    setPeriodReady(true);
   }, [storageKey]);
 
   useEffect(() => {
+    if (!periodReady) return;
     localStorage.setItem(storageKey, period);
-  }, [period, storageKey]);
+  }, [period, storageKey, periodReady]);
   const [data, setData] = useState<DashboardData | null>(null);
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
   const [loading, setLoading] = useState(true);
@@ -874,8 +879,10 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
 
   useEffect(() => {
     if (!session) return;
+    if (!periodReady) return;
+    const ctrl = new AbortController();
     setLoading(true);
-    fetch(apiUrl(period, weekOffset, monthOffset, dayOffset))
+    fetch(apiUrl(period, weekOffset, monthOffset, dayOffset), { signal: ctrl.signal })
       .then((r) => r.json())
       .then((d) => {
         if (d?.error) { setFetchError(true); setLoading(false); return; }
@@ -883,9 +890,14 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
         setData(d);
         setLoading(false);
       })
-      .catch(() => { setFetchError(true); setLoading(false); });
+      .catch((e: unknown) => {
+        if (e instanceof DOMException && e.name === "AbortError") return;
+        setFetchError(true);
+        setLoading(false);
+      });
+    return () => ctrl.abort();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [session, period, weekOffset, monthOffset, dayOffset, targetUserId]);
+  }, [session, period, weekOffset, monthOffset, dayOffset, targetUserId, periodReady]);
 
   useEffect(() => {
     if (data?.user?.timezone) setUserTz(data.user.timezone);

@@ -323,6 +323,9 @@ export function TeamView({ adminMode = false }: { adminMode?: boolean }) {
   const { data: session, status } = useSession();
   const router = useRouter();
   const [period, setPeriod] = useState<Period>("month");
+  // localStorage 읽기 전 첫 fetch 가 stale period 로 발사 + race 로 늦은 응답이
+  // 덮어쓰는 버그 방지. 읽기 완료 후에만 fetch 허용.
+  const [periodReady, setPeriodReady] = useState(false);
 
   useEffect(() => {
     const saved = localStorage.getItem("team_period");
@@ -331,11 +334,13 @@ export function TeamView({ adminMode = false }: { adminMode?: boolean }) {
     if (upgraded && ["today", "8days", "month", "30days", "all"].includes(upgraded)) {
       setPeriod(upgraded as Period);
     }
+    setPeriodReady(true);
   }, []);
 
   useEffect(() => {
+    if (!periodReady) return;
     localStorage.setItem("team_period", period);
-  }, [period]);
+  }, [period, periodReady]);
   const [data, setData] = useState<TeamData | null>(null);
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState(false);
@@ -380,9 +385,11 @@ export function TeamView({ adminMode = false }: { adminMode?: boolean }) {
 
   useEffect(() => {
     if (!session) return;
+    if (!periodReady) return;
+    const ctrl = new AbortController();
     setLoading(true);
     setFetchError(false);
-    fetch(`/api/team?period=${period}`)
+    fetch(`/api/team?period=${period}`, { signal: ctrl.signal })
       .then((r) => {
         if (!r.ok) throw new Error(String(r.status));
         return r.json();
@@ -392,8 +399,13 @@ export function TeamView({ adminMode = false }: { adminMode?: boolean }) {
         setData(d);
         setLoading(false);
       })
-      .catch(() => { setFetchError(true); setLoading(false); });
-  }, [session, period, reloadKey]);
+      .catch((e: unknown) => {
+        if (e instanceof DOMException && e.name === "AbortError") return;
+        setFetchError(true);
+        setLoading(false);
+      });
+    return () => ctrl.abort();
+  }, [session, period, reloadKey, periodReady]);
 
   if (fetchError) return (
     <div className="min-h-screen bg-neutral-950">
