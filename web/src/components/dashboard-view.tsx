@@ -966,11 +966,14 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
 
   // 로컬 모드 (.app 인스톨러) 는 setup 흐름이 다름 (위저드 → launchd 자동 등록).
   // sync 가 아직 안 돈 상태여도 setup 페이지로 보내지 않고 빈 dashboard 표시.
-  // M6d: admin 권한만 있는 사용자 (별도 회사 어드민 등) 는 본인이 Claude Code 트래킹
-  // 안 할 수 있으므로 /setup 강제 redirect 안 함. dashboard 가 빈 상태로 떠 있고
-  // 본인이 원하면 /setup 으로 직접 진입.
-  const sessionUser = session?.user as { isAdmin?: boolean } | undefined;
-  if (!data.user.lastSyncedAt && !viewOnly && isLocalMode === false && !sessionUser?.isAdmin) {
+  // M6d (2026-05-21): /setup 강제 redirect 예외를 Owner (Platform Admin || Team Owner)
+  // 만으로 좁힘. Membership/Billing Admin 도 본인 트래킹 필수 — 설치 안 했으면 /setup.
+  const sessionUser = session?.user as
+    | { isAdmin?: boolean; isPlatformAdmin?: boolean; currentTeamRole?: string | null }
+    | undefined;
+  const isOwnerLike =
+    !!sessionUser?.isPlatformAdmin || sessionUser?.currentTeamRole === "owner";
+  if (!data.user.lastSyncedAt && !viewOnly && isLocalMode === false && !isOwnerLike) {
     router.push("/setup");
     return null;
   }
@@ -1038,9 +1041,11 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
       );
     }
 
-    // M6d: admin 권한자가 데이터 없는 상태로 dashboard 진입한 경우 — sync 강제
-    // 안내 대신 "admin 설정 완료 + (원하면) CLI 설치" 배너 + admin 패널 진입 링크.
-    if (sessionUser?.isAdmin) {
+    // M6d: Owner (Platform Admin || Team Owner) 가 데이터 없는 상태로 dashboard 에
+    // 머무를 때 — sync 강제 안내 대신 "admin 설정 완료 + (원하면) CLI 설치" 배너 +
+    // admin 패널 진입 링크. Membership/Billing Admin 은 위 redirect 단계에서 이미
+    // /setup 으로 보내졌으므로 여기 도달 불가.
+    if (isOwnerLike) {
       return (
         <div className="min-h-screen bg-neutral-950">
           <NavComponent />
