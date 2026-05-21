@@ -255,17 +255,57 @@ export async function GET(req: NextRequest) {
       const d = getPeriodData(snap.rawJson, period);
       const dAll = getPeriodData(snap.rawJson, "all");
 
-      // Stale month/day check — codeburn에서 4월 데이터를 받은 멤버가 다른 멤버와
-      // 함께 "이번달"로 집계되면 May와 April이 섞인다. 첫 daily 날짜가 현재
-      // month/day와 다르면 그 멤버를 0으로 처리하고 활동 집계에서 제외.
-      const firstDailyDate = (d.daily ?? [])[0]?.date;
+      // ccusage daily extraction — stale check / token 합산 / 오늘 보정 모두에서 사용.
+      // ccusage 19.x 에서 row 키가 'date' → 'period' 로 breaking change. 한 팀 안에
+      // 옛/새 형식 사용자 섞일 수 있으므로 normalize. (dashboard route 와 동일 패턴)
+      const ccusageDaily = (
+        ((snap.rawJson as Record<string, unknown>).ccusageDaily as
+          | { daily?: Array<{ date?: string; period?: string; totalTokens?: number; totalCost?: number }> }
+          | undefined)?.daily ?? []
+      ).map((r) => ({ ...r, date: r.date ?? r.period }));
+
+      // "오늘" 보정 — codeburn 은 UTC 기준이라 KST/SGT 사용자에서 UTC 자정 ~ 사용자
+      // 자정 사이엔 today.daily 가 비어있거나 어제 (UTC) 날짜로 들어옴. ccusage 의
+      // 최신 날짜가 더 미래면 그 행을 사용자 로컬 today 로 채택. (dashboard route 의
+      // line 301-317 과 동일 로직 — Junghwan 같은 KST 사용자가 0 으로 표시되던 버그.)
+      let rawDaily = d.daily ?? [];
+      let todayOverrideCost: number | null = null;
+      if (period === "today" && ccusageDaily.length > 0) {
+        const sortedCc = [...ccusageDaily]
+          .filter((r) => !!r.date)
+          .sort((a, b) => (a.date ?? "").localeCompare(b.date ?? ""));
+        const latestCc = sortedCc[sortedCc.length - 1];
+        const latestCb = rawDaily[rawDaily.length - 1]?.date;
+        if (latestCc?.date && (!latestCb || latestCc.date > latestCb)) {
+          const ccCost = (latestCc as { totalCost?: number }).totalCost ?? 0;
+          rawDaily = [{ date: latestCc.date, cost: ccCost, sessions: 0 }];
+          todayOverrideCost = ccCost;
+        }
+      }
+
+      // Stale month/day check — codeburn 에서 옛 달/날짜 데이터만 가진 멤버를 0 으로
+      // 처리. 원래는 firstDailyDate (배열 [0] element) 만 봤지만, codeburn 의 daily
+      // 는 오래된 날짜가 앞 (ascending) 이라 KST/SGT 사용자처럼 어제 + 오늘 두 날짜를
+      // 모두 가진 정상 멤버를 stale 로 오탐 (firstDailyDate=어제, currentDayKey=오늘 UTC).
+      // 가장 최근 (latest) 날짜로 판단해야 정확.
+      const dailyDates = rawDaily
+        .map((day) => day.date)
+        .filter((s): s is string => !!s);
+      const latestDailyDate = dailyDates.length > 0
+        ? dailyDates.reduce((a, b) => (a > b ? a : b))
+        : undefined;
       const nowUtc = new Date().toISOString();
       const currentMonthKey = nowUtc.slice(0, 7);   // "YYYY-MM"
       const currentDayKey = nowUtc.slice(0, 10);    // "YYYY-MM-DD"
       const isStale = (() => {
-        if (!firstDailyDate) return false;
-        if (period === "month") return !firstDailyDate.startsWith(currentMonthKey);
-        if (period === "today") return firstDailyDate !== currentDayKey;
+        if (!latestDailyDate) return false;
+        if (period === "month") return !latestDailyDate.startsWith(currentMonthKey);
+        if (period === "today") {
+          // 오늘 보정 적용된 경우 ccusage 의 future UTC 날짜일 수 있어 검사 건너뜀.
+          if (todayOverrideCost !== null) return false;
+          // 가장 최근 날짜가 오늘 UTC 이전이면 stale (어제+오늘 정상 케이스는 not stale).
+          return latestDailyDate < currentDayKey;
+        }
         return false;
       })();
 
@@ -301,15 +341,9 @@ export async function GET(req: NextRequest) {
         };
       }
 
-      // ccusage daily tokens — sum by dates that appear in this period's daily array.
-      // ccusage 19.x 에서 row 키가 'date' → 'period' 로 breaking change. 한 팀 안에
-      // 옛/새 형식 사용자 섞일 수 있으므로 normalize. (dashboard route 와 동일 패턴)
-      const periodDates = new Set((d.daily ?? []).map((day) => day.date));
-      const ccusageDaily = (
-        ((snap.rawJson as Record<string, unknown>).ccusageDaily as
-          | { daily?: Array<{ date?: string; period?: string; totalTokens?: number }> }
-          | undefined)?.daily ?? []
-      ).map((r) => ({ ...r, date: r.date ?? r.period }));
+      // tokens — period 의 daily 날짜 set 에 해당하는 ccusage 행 합산.
+      // 오늘 보정 시 rawDaily 는 ccusage 최신 1행이라 그 날짜의 토큰이 잡힘.
+      const periodDates = new Set(rawDaily.map((day) => day.date));
       const totalTokens = ccusageDaily
         .filter((row) => row.date && periodDates.has(row.date))
         .reduce((s, row) => s + (row.totalTokens ?? 0), 0);
@@ -331,7 +365,11 @@ export async function GET(req: NextRequest) {
         topProject = (d.projects ?? []).sort((a, b) => (b.cost ?? 0) - (a.cost ?? 0))[0]?.name ?? "unknown";
       } else {
         const ov = d.overview ?? d.summary ?? {};
-        totalCost = ov.cost ?? ov.totalCost ?? 0;
+        // 오늘 보정이 적용된 경우 codeburn overview 는 비어 있거나 어제 UTC 라
+        // 신뢰할 수 없음. cost 는 ccusage 의 today 행 값으로 대체.
+        totalCost = todayOverrideCost !== null
+          ? todayOverrideCost
+          : (ov.cost ?? ov.totalCost ?? 0);
         sessionsCount = ov.sessions ?? ov.totalSessions ?? 0;
         overallOneShot = computeOneShotRate(d.activities ?? []);
         callsCount = ov.calls ?? 0;
@@ -364,9 +402,10 @@ export async function GET(req: NextRequest) {
         entry.members.add(u.id);
       }
 
-      // Aggregate daily by member — key by id to handle duplicate names
+      // Aggregate daily by member — key by id to handle duplicate names.
+      // rawDaily 는 오늘 보정이 적용된 daily (period=today + KST/SGT 사용자).
       const memberKey = `${u.name}__${u.id}`;
-      for (const day of d.daily ?? []) {
+      for (const day of rawDaily) {
         if (!dailyMemberMap.has(day.date)) {
           dailyMemberMap.set(day.date, {});
         }
