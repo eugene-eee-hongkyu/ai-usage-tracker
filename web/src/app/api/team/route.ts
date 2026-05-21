@@ -389,12 +389,27 @@ export async function GET(req: NextRequest) {
         // cost 우선순위:
         //   1) period="today" → strict today ccusage cost (사용자 timezone 기준 오늘 행)
         //   2) "오늘 보정" override 적용된 경우 → ccusage 의 latest 행 cost
-        //   3) 그 외 → codeburn overview cost
+        //   3) 8days/month/30days → period 안의 ccusage daily cost 합산.
+        //      ccusage 가 있는 날짜는 ccusage cost, 없는 날짜는 codeburn day.cost
+        //      (dashboard route 의 correctedTotalCost 패턴과 동일).
+        //   4) ccusage 가 한 행도 없으면 codeburn overview cost.
+        const ccusageCostMap = new Map<string, number>();
+        for (const row of ccusageDaily) {
+          if (row.date) {
+            ccusageCostMap.set(row.date, (row as { totalCost?: number }).totalCost ?? 0);
+          }
+        }
+        const periodCostFromDaily = rawDaily.reduce(
+          (s, day) => s + (ccusageCostMap.get(day.date) ?? day.cost ?? 0),
+          0
+        );
         totalCost = strictToday
           ? strictToday.cost
           : (todayOverrideCost !== null
             ? todayOverrideCost
-            : (ov.cost ?? ov.totalCost ?? 0));
+            : (ccusageDaily.length > 0
+              ? periodCostFromDaily
+              : (ov.cost ?? ov.totalCost ?? 0)));
         sessionsCount = ov.sessions ?? ov.totalSessions ?? 0;
         overallOneShot = computeOneShotRate(d.activities ?? []);
         callsCount = ov.calls ?? 0;
