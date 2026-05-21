@@ -752,14 +752,10 @@ async function installCcusage(): Promise<boolean> {
 // (codeburn fix 가 사용자 PC 에 자동 반영). 업그레이드 실패해도 기존 설치 있으면 진행.
 async function ensureCcusage(): Promise<boolean> {
   const hadBefore = checkCcusage();
-  console.log("📦 ccusage (사용량 측정 도구) 준비 중...");
   const installed = await installCcusage();
-  if (installed && checkCcusage()) {
-    console.log("   ✓ 완료");
-    return true;
-  }
+  if (installed && checkCcusage()) return true;
   if (hadBefore) {
-    console.log("   ⚠ 업데이트 실패 — 기존 버전으로 계속합니다");
+    console.log("   ⚠ ccusage 업데이트 실패 — 기존 버전으로 계속합니다");
     return true;
   }
   const bar = "═".repeat(60);
@@ -775,14 +771,10 @@ async function ensureCcusage(): Promise<boolean> {
 // codeburn 도 동일 패턴. 기존 설치 있어도 @latest 시도.
 async function ensureCodeburn(): Promise<boolean> {
   const hadBefore = checkCodeburn();
-  console.log("📦 codeburn (데이터 수집 도구) 준비 중...");
   const installed = await installCodeburn();
-  if (installed && checkCodeburn()) {
-    console.log("   ✓ 완료");
-    return true;
-  }
+  if (installed && checkCodeburn()) return true;
   if (hadBefore) {
-    console.log("   ⚠ 업데이트 실패 — 기존 버전으로 계속합니다");
+    console.log("   ⚠ codeburn 업데이트 실패 — 기존 버전으로 계속합니다");
     return true;
   }
   return false;
@@ -801,10 +793,11 @@ export async function runRepair() {
     console.error("   curl -fsSL https://aiusage.z21labs.world/install.sh | bash");
     process.exit(1);
   }
-  console.log("✓ 인증 확인\n");
+  console.log("✓ 인증 확인");
 
   // repair 시 codeburn / ccusage 항상 @latest 로 강제 업그레이드.
   // codeburn fix (#184 timezone 등) 가 사용자 PC 에 자동 반영되도록.
+  console.log("📦 의존성 설치 중...");
   const codeburnOk = await ensureCodeburn();
   if (!codeburnOk) {
     console.error("❌ codeburn 사용 불가 상태. 수동 설치 후 다시 시도하세요:");
@@ -812,6 +805,7 @@ export async function runRepair() {
     process.exit(1);
   }
   const ccusageOk = await ensureCcusage();
+  if (codeburnOk && ccusageOk) console.log("   ✓ 완료\n");
 
   // submit.mjs는 standalone 실행이라 keytar 없음 → 항상 파일에도 보장
   fs.mkdirSync(path.dirname(API_KEY_FALLBACK), { recursive: true });
@@ -826,7 +820,7 @@ export async function runRepair() {
   runHistoricalBackfill(apiKey);
 
   console.log("\n✨ 업데이트 완료\n");
-  console.log("   백그라운드에서 자동으로 사용량을 보내고 있어요.");
+  console.log("   이제 자동으로 사용량이 수집됩니다.");
   console.log(`   📊 대시보드:  ${SERVER_URL}/dashboard`);
   console.log(`   🔍 진단:      ${SERVER_URL}/setup-status\n`);
   if (!ccusageOk) {
@@ -843,6 +837,7 @@ export async function runInit() {
 
   // init 시에도 항상 @latest 시도. 기존 사용자도 install.sh 재실행만으로
   // codeburn/ccusage 최신 fix 자동 반영.
+  console.log("📦 의존성 설치 중...");
   const codeburnOk = await ensureCodeburn();
   if (!codeburnOk) {
     console.error("❌ codeburn 설치 실패. 수동으로 설치 후 다시 시도하세요:");
@@ -850,6 +845,7 @@ export async function runInit() {
     process.exit(1);
   }
   const ccusageOk = await ensureCcusage();
+  if (codeburnOk && ccusageOk) console.log("   ✓ 완료\n");
 
   const existingKey = await loadApiKey();
   if (existingKey) {
@@ -886,7 +882,7 @@ export async function runInit() {
   runHistoricalBackfill(apiKey);
 
   console.log("\n✨ 설치 완료\n");
-  console.log("   백그라운드에서 자동으로 사용량을 보내고 있어요.");
+  console.log("   이제 자동으로 사용량이 수집됩니다.");
   console.log(`   📊 대시보드:  ${SERVER_URL}/dashboard`);
   console.log(`   🔍 진단:      ${SERVER_URL}/setup-status\n`);
   if (!ccusageOk) {

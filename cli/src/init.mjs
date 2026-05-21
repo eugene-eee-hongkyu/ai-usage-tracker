@@ -670,14 +670,11 @@ async function installCcusage() {
 }
 async function ensureCcusage() {
   const hadBefore = checkCcusage();
-  console.log("\uD83D\uDCE6 ccusage (사용량 측정 도구) 준비 중...");
   const installed = await installCcusage();
-  if (installed && checkCcusage()) {
-    console.log("   ✓ 완료");
+  if (installed && checkCcusage())
     return true;
-  }
   if (hadBefore) {
-    console.log("   ⚠ 업데이트 실패 — 기존 버전으로 계속합니다");
+    console.log("   ⚠ ccusage 업데이트 실패 — 기존 버전으로 계속합니다");
     return true;
   }
   const bar = "═".repeat(60);
@@ -693,14 +690,11 @@ async function ensureCcusage() {
 }
 async function ensureCodeburn() {
   const hadBefore = checkCodeburn();
-  console.log("\uD83D\uDCE6 codeburn (데이터 수집 도구) 준비 중...");
   const installed = await installCodeburn();
-  if (installed && checkCodeburn()) {
-    console.log("   ✓ 완료");
+  if (installed && checkCodeburn())
     return true;
-  }
   if (hadBefore) {
-    console.log("   ⚠ 업데이트 실패 — 기존 버전으로 계속합니다");
+    console.log("   ⚠ codeburn 업데이트 실패 — 기존 버전으로 계속합니다");
     return true;
   }
   return false;
@@ -715,8 +709,8 @@ async function runRepair() {
     console.error("   curl -fsSL https://aiusage.z21labs.world/install.sh | bash");
     process.exit(1);
   }
-  console.log(`✓ 인증 확인
-`);
+  console.log("✓ 인증 확인");
+  console.log("\uD83D\uDCE6 의존성 설치 중...");
   const codeburnOk = await ensureCodeburn();
   if (!codeburnOk) {
     console.error("❌ codeburn 사용 불가 상태. 수동 설치 후 다시 시도하세요:");
@@ -724,6 +718,9 @@ async function runRepair() {
     process.exit(1);
   }
   const ccusageOk = await ensureCcusage();
+  if (codeburnOk && ccusageOk)
+    console.log(`   ✓ 완료
+`);
   fs.mkdirSync(path.dirname(API_KEY_FALLBACK), { recursive: true });
   fs.writeFileSync(API_KEY_FALLBACK, apiKey, { mode: 384 });
   fs.mkdirSync(STABLE_DIR, { recursive: true });
@@ -736,7 +733,7 @@ async function runRepair() {
   console.log(`
 ✨ 업데이트 완료
 `);
-  console.log("   백그라운드에서 자동으로 사용량을 보내고 있어요.");
+  console.log("   이제 자동으로 사용량이 수집됩니다.");
   console.log(`   \uD83D\uDCCA 대시보드:  ${SERVER_URL}/dashboard`);
   console.log(`   \uD83D\uDD0D 진단:      ${SERVER_URL}/setup-status
 `);
@@ -750,6 +747,7 @@ async function runInit() {
   preflightOwnership();
   preflightGlobalPackages();
   preflightNodeVersion();
+  console.log("\uD83D\uDCE6 의존성 설치 중...");
   const codeburnOk = await ensureCodeburn();
   if (!codeburnOk) {
     console.error("❌ codeburn 설치 실패. 수동으로 설치 후 다시 시도하세요:");
@@ -757,6 +755,9 @@ async function runInit() {
     process.exit(1);
   }
   const ccusageOk = await ensureCcusage();
+  if (codeburnOk && ccusageOk)
+    console.log(`   ✓ 완료
+`);
   const existingKey = await loadApiKey();
   if (existingKey) {
     const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
@@ -787,7 +788,7 @@ async function runInit() {
   console.log(`
 ✨ 설치 완료
 `);
-  console.log("   백그라운드에서 자동으로 사용량을 보내고 있어요.");
+  console.log("   이제 자동으로 사용량이 수집됩니다.");
   console.log(`   \uD83D\uDCCA 대시보드:  ${SERVER_URL}/dashboard`);
   console.log(`   \uD83D\uDD0D 진단:      ${SERVER_URL}/setup-status
 `);
