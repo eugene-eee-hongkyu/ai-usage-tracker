@@ -273,6 +273,39 @@ export async function GET(req: NextRequest) {
     ? (tRead / (tRead + tWrite + tInput)) * 100
     : 0;
 
+  // period="today" 면 사용자 timezone 기준 strict today (오늘 하루) 의 ccusage 행으로
+  // 핵심 KPI (cost / tokens / cacheHit / outputInputRatio) override. codeburn 의
+  // today period 가 UTC 기준이라 KST/SGT 사용자에서 어제 + 오늘 spillover 가 생기는
+  // 문제를 회피해, hero KPI 가 "오늘 = 오늘 하루" 와 일치하게 함.
+  const strictTodayCc = (() => {
+    if (period !== "today") return null;
+    const tz = user[0].timezone ?? "UTC";
+    let todayDate: string;
+    try {
+      todayDate = new Date().toLocaleDateString("en-CA", { timeZone: tz });
+    } catch {
+      todayDate = new Date().toISOString().slice(0, 10);
+    }
+    const ccDaily = (snapshotRow ? getCcusageDaily(snapshotRow.rawJson) : getCcusageDaily(snap[0].rawJson));
+    const row = ccDaily.find((r) => r.date === todayDate);
+    if (!row) return null;
+    const totalCost = (row as { totalCost?: number }).totalCost ?? 0;
+    const inputTokens = row.inputTokens ?? 0;
+    const outputTokens = row.outputTokens ?? 0;
+    const cacheReadTokens = row.cacheReadTokens ?? 0;
+    const cacheCreationTokens = row.cacheCreationTokens ?? 0;
+    const totalTokens = row.totalTokens ?? (inputTokens + outputTokens + cacheReadTokens + cacheCreationTokens);
+    return {
+      date: todayDate,
+      cost: totalCost,
+      totalTokens,
+      inputTokens,
+      outputTokens,
+      cacheReadTokens,
+      cacheCreationTokens,
+    };
+  })();
+
   const allActivities = d.activities ?? [];
   const activitiesWithRate = allActivities.filter((a) => a.oneShotRate != null);
   const totalTurns = activitiesWithRate.reduce((s, a) => s + (a.turns ?? a.sessions ?? 1), 0);
@@ -668,9 +701,27 @@ export async function GET(req: NextRequest) {
     teamRank,
   };
 
-  // Apply ccusage-corrected cost to overview-derived metrics
-  const finalCost = correctedTotalCost ?? cost;
+  // Apply ccusage-corrected cost to overview-derived metrics.
+  // period="today" 면 strict today (사용자 timezone 기준 오늘 행) ccusage 값으로 override.
+  const finalCost = strictTodayCc
+    ? strictTodayCc.cost
+    : (correctedTotalCost ?? cost);
   const finalCostPerCall = calls > 0 ? finalCost / calls : 0;
+
+  // period="today" 면 cacheHitPct / outputInputRatio / avgDailyTokens 도 ccusage 의
+  // 오늘 행 기반으로 재계산. sessions / calls / oneShotRate 는 ccusage 에 동등한
+  // 일별 metric 이 없어 codeburn (2일 spillover 가능) 유지.
+  const finalCacheHitPct = strictTodayCc
+    ? ((strictTodayCc.cacheReadTokens + strictTodayCc.cacheCreationTokens + strictTodayCc.inputTokens) > 0
+      ? (strictTodayCc.cacheReadTokens / (strictTodayCc.cacheReadTokens + strictTodayCc.cacheCreationTokens + strictTodayCc.inputTokens)) * 100
+      : 0)
+    : cacheHitPct;
+  const finalOutputInputRatio = strictTodayCc
+    ? (strictTodayCc.inputTokens > 0 ? strictTodayCc.outputTokens / strictTodayCc.inputTokens : 0)
+    : outputInputRatio;
+  const finalAvgDailyTokens = strictTodayCc
+    ? strictTodayCc.totalTokens   // strict today = 단일 일이라 avg = total
+    : (activeDays > 0 ? (tRead + tWrite + tInput + tOutput) / activeDays : 0);
 
   // Active blocks — ccusage blocks 기반 wall-clock 집계.
   // gap/active-without-end 는 ingest 단계에서 이미 필터됨.
@@ -952,13 +1003,16 @@ export async function GET(req: NextRequest) {
       cost: finalCost,
       sessions,
       calls,
-      cacheHitPct,
+      cacheHitPct: finalCacheHitPct,
       oneShotRate,
       activeDays,
       costPerCall: finalCostPerCall,
-      outputInputRatio,
+      outputInputRatio: finalOutputInputRatio,
       // 기간 평균 일별 total tokens (cache reads 포함). EFFICIENCY 배지의 token 신호용.
-      avgDailyTokens: activeDays > 0 ? (tRead + tWrite + tInput + tOutput) / activeDays : 0,
+      avgDailyTokens: finalAvgDailyTokens,
+      // period="today" 면 hero 카드용 strict today total tokens (오늘 하루만).
+      // null 이면 frontend 가 chartTokenData.reduce() fallback 사용.
+      totalTokensStrictToday: strictTodayCc?.totalTokens ?? null,
       // period scoreSeries 평균 (period=today 면 단일 entry = 게이지 값과 일치).
       // 배지가 사용 — 게이지와 영원히 동기화.
       periodScore,

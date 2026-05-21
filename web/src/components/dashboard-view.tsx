@@ -58,6 +58,9 @@ interface Overview {
   outputInputRatio: number;
   avgDailyTokens: number;
   periodScore: number | null;
+  // period="today" 면 strict today (사용자 timezone 기준 오늘 하루) 의 총 tokens.
+  // null 이면 fallback (chartTokenData 합산 — codeburn 2일 spillover 가능).
+  totalTokensStrictToday: number | null;
 }
 
 interface Activity {
@@ -1883,9 +1886,17 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
           {viewOnly && (
             <span className="text-indigo-400 font-semibold self-center mr-2">{data.user.name}</span>
           )}
-          {/* hero — activity (tokens) + cost. 사용자 인터뷰 답변에서 가장 자주 보는 두 지표. */}
+          {/* hero — activity (tokens) + cost. 사용자 인터뷰 답변에서 가장 자주 보는 두 지표.
+              period="today" 면 ov.totalTokensStrictToday (오늘 하루) 사용 — codeburn 의
+              today period 가 KST/SGT 사용자에서 어제 + 오늘 spillover 되는 문제 회피. */}
           <span className="flex items-baseline gap-1">
-            <span className="text-cyan-400 font-bold text-2xl tabular-nums">{fmtTokens(chartTokenData.reduce((s, d) => s + d.tokens, 0))}</span>
+            <span className="text-cyan-400 font-bold text-2xl tabular-nums">
+              {fmtTokens(
+                ov.totalTokensStrictToday !== null
+                  ? ov.totalTokensStrictToday
+                  : chartTokenData.reduce((s, d) => s + d.tokens, 0)
+              )}
+            </span>
             <span className="text-neutral-500 text-xs">tokens</span>
           </span>
           <span className="flex items-baseline gap-1">

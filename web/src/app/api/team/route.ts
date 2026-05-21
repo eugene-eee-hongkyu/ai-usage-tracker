@@ -341,12 +341,33 @@ export async function GET(req: NextRequest) {
         };
       }
 
-      // tokens — period 의 daily 날짜 set 에 해당하는 ccusage 행 합산.
-      // 오늘 보정 시 rawDaily 는 ccusage 최신 1행이라 그 날짜의 토큰이 잡힘.
+      // period="today" 면 사용자 timezone 기준 strict today 의 ccusage 행 1개만 사용.
+      // codeburn today period 가 UTC 기준이라 KST/SGT 사용자에서 어제 + 오늘 두 날짜를
+      // spillover 로 포함하는 문제 회피 (사용자 직관 "오늘 = 오늘 하루" 일치).
+      const strictToday = (() => {
+        if (period !== "today") return null;
+        const tz = u.timezone ?? "UTC";
+        let todayDate: string;
+        try {
+          todayDate = new Date().toLocaleDateString("en-CA", { timeZone: tz });
+        } catch {
+          todayDate = new Date().toISOString().slice(0, 10);
+        }
+        const row = ccusageDaily.find((r) => r.date === todayDate);
+        return {
+          date: todayDate,
+          tokens: row?.totalTokens ?? 0,
+          cost: (row as { totalCost?: number } | undefined)?.totalCost ?? 0,
+        };
+      })();
+
+      // tokens — period="today" 면 strict today, 그 외엔 periodDates filter.
       const periodDates = new Set(rawDaily.map((day) => day.date));
-      const totalTokens = ccusageDaily
-        .filter((row) => row.date && periodDates.has(row.date))
-        .reduce((s, row) => s + (row.totalTokens ?? 0), 0);
+      const totalTokens = strictToday
+        ? strictToday.tokens
+        : ccusageDaily
+            .filter((row) => row.date && periodDates.has(row.date))
+            .reduce((s, row) => s + (row.totalTokens ?? 0), 0);
 
       if (period === "all") {
         totalCost = snap.totalCost;
@@ -365,11 +386,15 @@ export async function GET(req: NextRequest) {
         topProject = (d.projects ?? []).sort((a, b) => (b.cost ?? 0) - (a.cost ?? 0))[0]?.name ?? "unknown";
       } else {
         const ov = d.overview ?? d.summary ?? {};
-        // 오늘 보정이 적용된 경우 codeburn overview 는 비어 있거나 어제 UTC 라
-        // 신뢰할 수 없음. cost 는 ccusage 의 today 행 값으로 대체.
-        totalCost = todayOverrideCost !== null
-          ? todayOverrideCost
-          : (ov.cost ?? ov.totalCost ?? 0);
+        // cost 우선순위:
+        //   1) period="today" → strict today ccusage cost (사용자 timezone 기준 오늘 행)
+        //   2) "오늘 보정" override 적용된 경우 → ccusage 의 latest 행 cost
+        //   3) 그 외 → codeburn overview cost
+        totalCost = strictToday
+          ? strictToday.cost
+          : (todayOverrideCost !== null
+            ? todayOverrideCost
+            : (ov.cost ?? ov.totalCost ?? 0));
         sessionsCount = ov.sessions ?? ov.totalSessions ?? 0;
         overallOneShot = computeOneShotRate(d.activities ?? []);
         callsCount = ov.calls ?? 0;
