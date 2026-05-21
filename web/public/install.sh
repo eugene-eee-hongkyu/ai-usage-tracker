@@ -13,9 +13,7 @@ GRP=staff
 BAR="════════════════════════════════════════════════════════════"
 
 echo ""
-echo "🚀 AI Usage Tracker 설치"
-echo ""
-echo "🔍 환경 점검 중..."
+echo "🚀 AI Usage Tracker"
 echo ""
 
 # Portable stat -- returns owner uid
@@ -88,24 +86,19 @@ fi
 
 if [ -n "$CHOWN_CMDS" ]; then
   echo "$BAR"
-  echo "❌ 다른 사용자 소유의 파일이 있습니다 (보통 root)"
-  echo "   원인: 과거에 elevated 권한으로 npm/install 이 실행됨"
+  echo "❌ 권한 정리가 필요해요"
   echo ""
-  printf "%s" "$ISSUES"
-  echo ""
-  echo "🛠  아래 명령을 한 번에 복사·붙여넣기 하세요:"
+  echo "   이전에 sudo 또는 root 권한으로 설치한 흔적이 있어요."
+  echo "   아래 명령을 그대로 복사·붙여넣기 하면 한 번에 정리됩니다:"
   echo ""
   printf "%s" "$CHOWN_CMDS"
   echo ""
-  echo "그 다음 install 을 다시 실행:"
-  echo "    curl -fsSL ${INSTALL_URL} | bash"
+  echo "   그 다음 설치를 다시 실행하세요:"
+  echo "      curl -fsSL ${INSTALL_URL} | bash"
   echo "$BAR"
   echo ""
   exit 1
 fi
-
-echo "✅ 소유권 OK"
-echo ""
 
 # ============================================================
 # Pass 1.5 — 다른 Node 버전 매니저 감지 (asdf/volta/fnm)
@@ -125,25 +118,27 @@ fi
 
 if [ -n "$OTHER_MGR" ]; then
   echo "$BAR"
-  echo "⚠️  $OTHER_MGR 가 감지되었습니다"
+  echo "ℹ️  $OTHER_MGR 가 이미 깔려 있어요 — 그대로 사용합니다"
   echo ""
-  echo "    nvm 자동 설치를 건너뜁니다 (버전 매니저 중복 충돌 방지)."
-  echo "    Node 20 또는 22 설치 후 다시 실행해주세요 (둘 다 동작):"
+  echo "    충돌 방지를 위해 Node 자동 설치를 건너뜁니다."
+  echo "    Node 20 또는 22 가 없다면 먼저 설치 후 다시 실행해주세요:"
   echo ""
   case "$OTHER_MGR" in
     asdf)
-      echo "       asdf install nodejs 22.11.0     # 또는 20.x"
-      echo "       asdf global nodejs 22.11.0"
+      echo "       asdf install nodejs 22.11.0"
+      echo "       asdf global  nodejs 22.11.0"
       ;;
     volta)
-      echo "       volta install node@22           # 또는 node@20"
+      echo "       volta install node@22"
       ;;
     fnm)
-      echo "       fnm install 22                  # 또는 20"
+      echo "       fnm install 22"
       echo "       fnm default 22"
       ;;
   esac
-  echo "       npx --yes github:eugene-eee-hongkyu/ai-usage-tracker repair"
+  echo ""
+  echo "    그 다음 다시 실행:"
+  echo "       curl -fsSL ${INSTALL_URL} | bash"
   echo "$BAR"
   echo ""
   SKIP_NVM=1
@@ -162,21 +157,17 @@ if [ -z "${SKIP_NVM:-}" ] && command -v node >/dev/null 2>&1; then
     REAL_NODE=$(readlink "$NODE_PATH" 2>/dev/null || echo "$NODE_PATH")
     if ! echo "$REAL_NODE" | grep -q "\.nvm"; then
       echo "$BAR"
-      echo "⚠️  Node.js 가 .pkg installer 로 설치되어 있습니다"
-      echo "    경로: $NODE_PATH"
+      echo "⚠️  Node.js 가 시스템 설치 방식 (.pkg) 이에요"
       echo ""
-      echo "    이 방식은 npm global/cache 가 root 소유로 자주 망가져"
-      echo "    이번 같은 권한 사고가 반복될 수 있습니다."
+      echo "    이 방식은 권한 사고가 잦아 nvm 으로 전환을 권장합니다."
+      echo "    전환하면 sudo 없이 깨끗하게 동작합니다."
       echo ""
-      echo "    nvm 으로 전환하면 모든 npm 작업이 ~/.nvm 안에서만 일어나"
-      echo "    sudo 없이 깨끗하게 동작합니다."
-      echo ""
-      echo "    변경되는 것:"
-      echo "      - ~/.zshrc 에 nvm 활성화 라인 추가 (자동 백업본 생성)"
+      echo "    바뀌는 것:"
+      echo "      - ~/.zshrc 에 nvm 한 줄 추가 (백업본 자동 생성)"
       echo "      - 기본 Node: $(node -v) → v22.x.x (nvm)"
-      echo "      - 시스템 Node ($NODE_PATH) 자체는 안 건드림"
+      echo "      - 시스템 Node ($NODE_PATH) 는 건드리지 않음"
       echo ""
-      echo "    롤백:  nvm use system  또는  nvm alias default $(node -v | tr -d v)"
+      echo "    롤백: nvm use system  또는  nvm alias default $(node -v | tr -d v)"
       echo "$BAR"
       echo ""
       if prompt_yn "   nvm 으로 자동 전환하시겠습니까? (Y/n): "; then
@@ -188,32 +179,26 @@ if [ -z "${SKIP_NVM:-}" ] && command -v node >/dev/null 2>&1; then
         echo "💾 백업 중..."
         for rc in "$HOME/.zshrc" "$HOME/.bash_profile" "$HOME/.bashrc"; do
           if [ -f "$rc" ]; then
-            cp "$rc" "$BACKUP_DIR/$(basename "$rc").bak-${TS}"
-            echo "   ✓ $rc → $BACKUP_DIR/$(basename "$rc").bak-${TS}"
+            cp "$rc" "$BACKUP_DIR/$(basename "$rc").bak-${TS}" 2>/dev/null
           fi
         done
         if command -v npm >/dev/null 2>&1; then
           npm list -g --depth=0 > "$BACKUP_DIR/old-node-globals.txt" 2>/dev/null || true
-          echo "   ✓ 글로벌 CLI 목록 → $BACKUP_DIR/old-node-globals.txt"
         fi
+        echo "   완료 (백업: $BACKUP_DIR)"
         echo ""
         echo "📦 nvm 설치 중..."
-        curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.1/install.sh | bash
+        curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.1/install.sh 2>/dev/null | bash > /dev/null 2>&1
         export NVM_DIR="$HOME/.nvm"
         # shellcheck disable=SC1091
         [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
-        nvm install 22
-        nvm use 22
+        nvm install 22 > /dev/null 2>&1
+        nvm use 22 > /dev/null 2>&1
         nvm alias default 22 >/dev/null 2>&1 || true
-        echo ""
-        echo "✅ nvm + Node 22 활성화 ($(node -v))"
-        echo "   기본 Node 가 nvm 으로 설정됨 (새 쉘에서도 자동 적용)"
-        echo "   옛 글로벌 CLI 가 필요하면: cat $BACKUP_DIR/old-node-globals.txt"
+        echo "   완료 ($(node -v))"
       else
         echo ""
-        echo "ℹ️  .pkg Node 그대로 사용합니다 (권한 사고 위험은 인지하셨습니다)"
-        echo "   비대화형 실행이라 묻지 못한 경우, 새 쉘에서 직접 실행하세요:"
-        echo "      curl -fsSL ${INSTALL_URL} | bash"
+        echo "ℹ️  .pkg Node 그대로 진행합니다."
       fi
       echo ""
     fi
@@ -235,51 +220,43 @@ fi
 
 if [ "$NEEDS_NVM" = "1" ]; then
   if [ -n "${SKIP_NVM:-}" ]; then
-    echo "❌ Node $NODE_MAJOR 감지 + 다른 버전 매니저($OTHER_MGR) 존재"
-    echo "   위 매니저 절차로 Node 22 설치 + default 변경 후 다시 실행하세요."
+    echo "❌ Node 버전이 부족합니다 ($NODE_MAJOR < 22)"
+    echo "   $OTHER_MGR 로 Node 22 설치 후 다시 실행해주세요."
     exit 1
   fi
   if command -v node >/dev/null 2>&1; then
-    echo "📦 Node $NODE_MAJOR 감지 — Node 22 (LTS) 로 자동 전환합니다..."
+    echo "📦 Node $NODE_MAJOR → Node 22 (LTS) 전환 중..."
   else
-    echo "📦 Node.js 가 없습니다. nvm 으로 설치합니다..."
+    echo "📦 Node.js 설치 중..."
   fi
-  echo ""
-  # nvm 자체는 이미 있으면 재설치 안 함
   if [ ! -d "${NVM_DIR:-$HOME/.nvm}" ]; then
-    curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.1/install.sh | bash
+    curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.1/install.sh 2>/dev/null | bash > /dev/null 2>&1
   fi
   export NVM_DIR="$HOME/.nvm"
   # shellcheck disable=SC1091
   [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
-  nvm install 22
-  nvm use 22
+  nvm install 22 > /dev/null 2>&1
+  nvm use 22 > /dev/null 2>&1
   nvm alias default 22 >/dev/null 2>&1 || true
-  echo ""
-  echo "✅ Node $(node -v) 활성화 (nvm default)"
+  echo "   완료 ($(node -v))"
 else
-  echo "✅ Node.js 확인됨 ($(node -v))"
+  echo "✓ Node.js $(node -v)"
 fi
 
 echo ""
-echo "🔄 옛 ~/.primus-usage-* 마이그레이션 확인 (primus → z21labs)..."
-echo ""
 
-# Idempotent migrate — 옛 경로 없으면 noop, 있으면 새 위치로 이동
-npx --yes --ignore-cache "$REPO" migrate || echo "   (migrate 단계 일부 실패 — init 계속 진행)"
+# 옛 primus 경로 마이그 — 새 사용자에겐 noop 이라 출력 없음 (migrate.ts 가 silent
+# 처리). 실제 옛 경로 발견 시에만 마이그 메시지 표시.
+npx --yes --ignore-cache "$REPO" migrate 2>/dev/null || true
 
-echo ""
-
-# 기존 API 키 있음 = repair 흐름 (기존 사용자가 자동 복구로 install.sh 재실행한
-# 케이스). init 은 readline prompt 가 있는데, 비대화형 stdin 에선 "재설치할까요?"
-# 가 즉시 N 으로 떨어져 launchd 등록 전에 종료된다.
-# AIUSAGE_FROM_INSTALL_SH=1: preflightNodeVersion 무한 루프 안전장치.
+# 기존 키 있음 = 업데이트 흐름 / 없음 = 신규 설치.
+# AIUSAGE_FROM_INSTALL_SH=1 — preflight 무한 루프 안전장치.
 if [ -f "$HOME/.z21labs/usage-key" ] || [ -f "$HOME/.primus-usage-key" ]; then
-  echo "📥 Usage Tracker repair 실행 (기존 키 감지)..."
+  echo "🔄 이미 설치되어 있어 업데이트합니다..."
   echo ""
   AIUSAGE_FROM_INSTALL_SH=1 npx --yes --ignore-cache "$REPO" repair
 else
-  echo "📥 Usage Tracker init 실행 (신규)..."
+  echo "🚀 처음 설치합니다 — 잠시 후 브라우저에서 로그인 화면이 열립니다."
   echo ""
   AIUSAGE_FROM_INSTALL_SH=1 npx --yes --ignore-cache "$REPO" init
 fi

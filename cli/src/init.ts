@@ -475,9 +475,7 @@ function registerLaunchd(submitPath: string): void {
   }
 
   const nodePath = findStableNodePath();
-  if (nodePath !== process.execPath) {
-    console.log("📍 plist node 경로: " + nodePath + " (nvm 의존성 회피)");
-  }
+  // (내부) nvm 의존성 회피 위해 안정된 node 경로 사용 — 사용자에게는 안 보임.
 
   const envPath = process.env.PATH ?? "/usr/bin:/bin:/usr/sbin:/sbin";
   const plist = `<?xml version="1.0" encoding="UTF-8"?>
@@ -570,7 +568,7 @@ function registerLaunchd(submitPath: string): void {
   // 다음 StartInterval 에서 도므로 치명적 아님).
   spawnSync("launchctl", ["kickstart", "-p", `${gui}/${label}`], { stdio: "ignore" });
 
-  console.log("✅ 자동 동기화 등록 완료 (2시간마다, launchd. sleep 시 wake 즉시 catch-up)");
+  console.log("✓ 자동 수집 등록 — 2시간마다 사용량을 보냅니다 (sleep 후 깨어나도 즉시 보충)");
 }
 
 function registerWindowsTask(submitPath: string): void {
@@ -607,9 +605,9 @@ function registerWindowsTask(submitPath: string): void {
   ], { stdio: "ignore" });
 
   if (result.status === 0) {
-    console.log("✅ 자동 동기화 등록 완료 (0/6/12/18시, Task Scheduler)");
+    console.log("✓ 자동 수집 등록 — 하루 4회 (0/6/12/18시) 사용량을 보냅니다");
   } else {
-    console.log("⚠️  일간 자동 동기화 등록 실패 (선택 사항, 수동으로 등록 가능)");
+    console.log("⚠ 자동 수집 등록에 실패했어요 (수동으로도 가능합니다)");
   }
 }
 
@@ -685,7 +683,7 @@ function runImmediateSync(apiKey: string) {
     },
   });
   child.unref();
-  console.log("📤 현재 데이터 즉시 수집 시작 (백그라운드)");
+  console.log("📤 지금 데이터 수집 중... (백그라운드)");
 }
 
 // codeburn `--from`/`--to` 로 last 8 weeks + last 12 months 의 historical
@@ -703,7 +701,7 @@ function runHistoricalBackfill(apiKey: string) {
     },
   });
   child.unref();
-  console.log("📚 과거 8주 + 12개월 historical backfill 시작 (백그라운드)");
+  console.log("📚 지난 8주 / 12개월 기록도 함께 가져오고 있어요 (백그라운드, 약 5~10분)");
 }
 
 function checkCodeburn(): boolean {
@@ -720,11 +718,12 @@ function checkCodeburn(): boolean {
 // 이미 설치돼 있어도 매번 latest 로 교체 — repair/init 시점에 항상 최신.
 // (#184 같은 fix 가 사용자 PC 에 자동 반영되도록.)
 async function installCodeburn(): Promise<boolean> {
-  console.log("📦 codeburn 0.9.7 (핀 버전) 설치 중...");
   try {
-    execSync("npm install -g codeburn@0.9.7", { stdio: "inherit" });
+    // 사용자에겐 npm 상세 출력 안 보임 — 'inherit' → 'pipe' + 실패시에만 stderr.
+    execSync("npm install -g codeburn@0.9.7", { stdio: ["ignore", "ignore", "pipe"] });
     return true;
-  } catch {
+  } catch (e) {
+    process.stderr.write(`   (codeburn 설치 실패: ${(e as Error).message?.slice(0, 80) ?? ""})\n`);
     return false;
   }
 }
@@ -740,11 +739,11 @@ function checkCcusage(): boolean {
 }
 
 async function installCcusage(): Promise<boolean> {
-  console.log("📦 ccusage 19.0.2 (핀 버전) 설치 중...");
   try {
-    execSync("npm install -g ccusage@19.0.2", { stdio: "inherit" });
+    execSync("npm install -g ccusage@19.0.2", { stdio: ["ignore", "ignore", "pipe"] });
     return true;
-  } catch {
+  } catch (e) {
+    process.stderr.write(`   (ccusage 설치 실패: ${(e as Error).message?.slice(0, 80) ?? ""})\n`);
     return false;
   }
 }
@@ -753,26 +752,22 @@ async function installCcusage(): Promise<boolean> {
 // (codeburn fix 가 사용자 PC 에 자동 반영). 업그레이드 실패해도 기존 설치 있으면 진행.
 async function ensureCcusage(): Promise<boolean> {
   const hadBefore = checkCcusage();
-  console.log(hadBefore
-    ? "📦 ccusage 19.0.2 (핀 버전) 강제 설치 시도..."
-    : "⚠️  ccusage 미설치 — 최신 설치 시도..."
-  );
+  console.log("📦 ccusage (사용량 측정 도구) 준비 중...");
   const installed = await installCcusage();
   if (installed && checkCcusage()) {
-    console.log("✅ ccusage 19.0.2 확인됨\n");
+    console.log("   ✓ 완료");
     return true;
   }
   if (hadBefore) {
-    console.log("⚠️  ccusage 업그레이드 실패 — 기존 버전으로 계속 진행\n");
+    console.log("   ⚠ 업데이트 실패 — 기존 버전으로 계속합니다");
     return true;
   }
   const bar = "═".repeat(60);
   console.log("\n" + bar);
-  console.log("❌ ccusage 설치 실패");
-  console.log("   → 토큰/비용 데이터가 수집되지 않습니다.");
-  console.log("   → 수동 설치 후 repair 를 다시 실행하세요:");
+  console.log("❌ ccusage 설치 실패 — 토큰/비용 데이터가 수집되지 않습니다.");
+  console.log("   수동 설치 후 다시 실행:");
   console.log("       npm install -g ccusage@19.0.2");
-  console.log("       npx --yes github:eugene-eee-hongkyu/ai-usage-tracker repair");
+  console.log("       curl -fsSL https://aiusage.z21labs.world/install.sh | bash");
   console.log(bar + "\n");
   return false;
 }
@@ -780,35 +775,33 @@ async function ensureCcusage(): Promise<boolean> {
 // codeburn 도 동일 패턴. 기존 설치 있어도 @latest 시도.
 async function ensureCodeburn(): Promise<boolean> {
   const hadBefore = checkCodeburn();
-  console.log(hadBefore
-    ? "📦 codeburn 0.9.7 (핀 버전) 강제 설치 시도..."
-    : "⚠️  codeburn 미설치 — 최신 설치 시도..."
-  );
+  console.log("📦 codeburn (데이터 수집 도구) 준비 중...");
   const installed = await installCodeburn();
   if (installed && checkCodeburn()) {
-    console.log("✅ codeburn 0.9.7 확인됨\n");
+    console.log("   ✓ 완료");
     return true;
   }
   if (hadBefore) {
-    console.log("⚠️  codeburn 업그레이드 실패 — 기존 버전으로 계속 진행\n");
+    console.log("   ⚠ 업데이트 실패 — 기존 버전으로 계속합니다");
     return true;
   }
   return false;
 }
 
 export async function runRepair() {
-  console.log(`🔧 Usage Tracker v${CLI_VERSION} 복구 시작\n`);
+  // 사용자가 install.sh 재실행한 케이스 — install.sh 가 이미 "업데이트합니다" 라고 알림.
+  // 여기서는 별도 헤더 없이 바로 진행.
   preflightOwnership();
   preflightGlobalPackages();
   preflightNodeVersion();
 
   const apiKey = await loadApiKey();
   if (!apiKey) {
-    console.error("❌ 설치된 API 키가 없습니다. 먼저 init을 실행하세요:");
-    console.error("   npx --yes github:eugene-eee-hongkyu/ai-usage-tracker init");
+    console.error("❌ 인증 정보가 없습니다. 처음 설치하시려면 다음 명령으로 실행해주세요:");
+    console.error("   curl -fsSL https://aiusage.z21labs.world/install.sh | bash");
     process.exit(1);
   }
-  console.log("✅ API 키 확인됨\n");
+  console.log("✓ 인증 확인\n");
 
   // repair 시 codeburn / ccusage 항상 @latest 로 강제 업그레이드.
   // codeburn fix (#184 timezone 등) 가 사용자 PC 에 자동 반영되도록.
@@ -832,17 +825,18 @@ export async function runRepair() {
   runImmediateSync(apiKey);
   runHistoricalBackfill(apiKey);
 
-  console.log("\n✨ 복구 완료!");
-  console.log("   백그라운드에서 자동으로 사용량이 수집됩니다.");
-  console.log(`   대시보드: ${SERVER_URL}/dashboard\n`);
+  console.log("\n✨ 업데이트 완료\n");
+  console.log("   백그라운드에서 자동으로 사용량을 보내고 있어요.");
+  console.log(`   📊 대시보드:  ${SERVER_URL}/dashboard`);
+  console.log(`   🔍 진단:      ${SERVER_URL}/setup-status\n`);
   if (!ccusageOk) {
-    console.log("⚠️  주의: ccusage 미설치 상태로 저장되어 토큰/비용은 비어 있습니다.\n");
+    console.log("⚠ 주의: ccusage 가 없어 토큰/비용 데이터는 비어 있어요.\n");
   }
   process.exit(0);
 }
 
 export async function runInit() {
-  console.log(`🚀 Usage Tracker v${CLI_VERSION} 설치 시작\n`);
+  // install.sh 가 이미 "처음 설치합니다 — 브라우저에서 로그인" 안내 — 별도 헤더 X.
   preflightOwnership();
   preflightGlobalPackages();
   preflightNodeVersion();
@@ -880,7 +874,7 @@ export async function runInit() {
   }
 
   await saveApiKey(apiKey);
-  console.log("🔑 API 키 저장 완료");
+  console.log("✓ 인증 완료");
 
   // submit.mjs / historical.mjs 를 안정적인 경로에 복사 (npx 캐시 경로는 갱신 시 깨짐)
   fs.mkdirSync(STABLE_DIR, { recursive: true });
@@ -891,11 +885,12 @@ export async function runInit() {
   runBackfill(apiKey);
   runHistoricalBackfill(apiKey);
 
-  console.log("\n✨ 설치 완료!");
-  console.log("   백그라운드에서 자동으로 사용량이 수집됩니다.");
-  console.log(`   대시보드: ${SERVER_URL}/dashboard\n`);
+  console.log("\n✨ 설치 완료\n");
+  console.log("   백그라운드에서 자동으로 사용량을 보내고 있어요.");
+  console.log(`   📊 대시보드:  ${SERVER_URL}/dashboard`);
+  console.log(`   🔍 진단:      ${SERVER_URL}/setup-status\n`);
   if (!ccusageOk) {
-    console.log("⚠️  주의: ccusage 미설치 상태로 저장되어 토큰/비용은 비어 있습니다.\n");
+    console.log("⚠ 주의: ccusage 가 없어 토큰/비용 데이터는 비어 있어요.\n");
   }
   process.exit(0);
 }

@@ -220,13 +220,27 @@ export async function runMigrate(opts: { dryRun?: boolean } = {}): Promise<Migra
 }
 
 export function printMigrateReport(r: MigrateReport, dryRun: boolean): void {
+  // 모두 already-new / no-legacy / n/a 면 사용자에게 의미 없음 — silent.
+  // 실제 마이그가 일어났거나 에러가 있을 때만 출력.
+  const interestingValues = new Set(["migrated", "error"]);
+  const hasInteresting =
+    interestingValues.has(r.dataDir) ||
+    interestingValues.has(r.apiKeyFile) ||
+    interestingValues.has(r.keytar) ||
+    interestingValues.has(r.launchd) ||
+    r.errors.length > 0 ||
+    dryRun;
+  if (!hasInteresting) {
+    return; // silent — 옛 primus 경로가 없거나 이미 새 경로
+  }
+
   const bar = "━".repeat(60);
-  console.log(`🔄 primus → z21labs 마이그레이션${dryRun ? " (dry-run)" : ""}`);
+  console.log(`🔄 옛 데이터 마이그레이션${dryRun ? " (dry-run)" : ""}`);
   console.log(bar);
-  console.log(`  데이터 디렉토리: ${r.dataDir}`);
-  console.log(`  API 키 파일:    ${r.apiKeyFile}`);
-  console.log(`  keytar 서비스:  ${r.keytar}`);
-  console.log(`  launchd plist:  ${r.launchd}`);
+  if (interestingValues.has(r.dataDir)) console.log(`  데이터 디렉토리: ${r.dataDir}`);
+  if (interestingValues.has(r.apiKeyFile)) console.log(`  API 키 파일:    ${r.apiKeyFile}`);
+  if (interestingValues.has(r.keytar)) console.log(`  keytar:        ${r.keytar}`);
+  if (interestingValues.has(r.launchd)) console.log(`  launchd plist:  ${r.launchd}`);
   console.log(bar);
   if (r.notes.length > 0) {
     console.log("");
@@ -235,7 +249,7 @@ export function printMigrateReport(r: MigrateReport, dryRun: boolean): void {
   }
   if (r.errors.length > 0) {
     console.log("");
-    console.log(`⚠️  에러 ${r.errors.length}건:`);
+    console.log(`⚠ 에러 ${r.errors.length}건:`);
     r.errors.forEach((e, i) => console.log(`  ${i + 1}. ${e}`));
   }
   if (dryRun) {

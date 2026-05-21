@@ -368,7 +368,17 @@ function getApiKeyViaLocalServer() {
       }
     });
     server.listen(CLI_PORT, "127.0.0.1", () => {
-      const authUrl = `${SERVER_URL}/api/cli-auth?port=${CLI_PORT}`;
+      const hostname2 = (() => {
+        try {
+          return os.hostname().slice(0, 64);
+        } catch {
+          return "";
+        }
+      })();
+      const params = new URLSearchParams({ port: String(CLI_PORT) });
+      if (hostname2)
+        params.set("device", hostname2);
+      const authUrl = `${SERVER_URL}/api/cli-auth?${params.toString()}`;
       console.log(`
 브라우저에서 GitHub 계정으로 로그인하세요...`);
       console.log(`URL: ${authUrl}
@@ -418,9 +428,6 @@ function registerLaunchd(submitPath) {
     } catch {}
   }
   const nodePath = findStableNodePath();
-  if (nodePath !== process.execPath) {
-    console.log("\uD83D\uDCCD plist node 경로: " + nodePath + " (nvm 의존성 회피)");
-  }
   const envPath = process.env.PATH ?? "/usr/bin:/bin:/usr/sbin:/sbin";
   const plist = `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -500,7 +507,7 @@ function registerLaunchd(submitPath) {
     return;
   }
   spawnSync("launchctl", ["kickstart", "-p", `${gui}/${label}`], { stdio: "ignore" });
-  console.log("✅ 자동 동기화 등록 완료 (2시간마다, launchd. sleep 시 wake 즉시 catch-up)");
+  console.log("✓ 자동 수집 등록 — 2시간마다 사용량을 보냅니다 (sleep 후 깨어나도 즉시 보충)");
 }
 function registerWindowsTask(submitPath) {
   const taskName = "Z21labsUsageTracker";
@@ -536,9 +543,9 @@ function registerWindowsTask(submitPath) {
     "/F"
   ], { stdio: "ignore" });
   if (result.status === 0) {
-    console.log("✅ 자동 동기화 등록 완료 (0/6/12/18시, Task Scheduler)");
+    console.log("✓ 자동 수집 등록 — 하루 4회 (0/6/12/18시) 사용량을 보냅니다");
   } else {
-    console.log("⚠️  일간 자동 동기화 등록 실패 (선택 사항, 수동으로 등록 가능)");
+    console.log("⚠ 자동 수집 등록에 실패했어요 (수동으로도 가능합니다)");
   }
 }
 function registerDailySchedule(submitPath) {
@@ -606,7 +613,7 @@ function runImmediateSync(apiKey) {
     }
   });
   child.unref();
-  console.log("\uD83D\uDCE4 현재 데이터 즉시 수집 시작 (백그라운드)");
+  console.log("\uD83D\uDCE4 지금 데이터 수집 중... (백그라운드)");
 }
 function runHistoricalBackfill(apiKey) {
   if (!fs.existsSync(STABLE_HISTORICAL))
@@ -621,7 +628,7 @@ function runHistoricalBackfill(apiKey) {
     }
   });
   child.unref();
-  console.log("\uD83D\uDCDA 과거 8주 + 12개월 historical backfill 시작 (백그라운드)");
+  console.log("\uD83D\uDCDA 지난 8주 / 12개월 기록도 함께 가져오고 있어요 (백그라운드, 약 5~10분)");
 }
 function checkCodeburn() {
   try {
@@ -633,11 +640,12 @@ function checkCodeburn() {
   }
 }
 async function installCodeburn() {
-  console.log("\uD83D\uDCE6 codeburn 0.9.7 (핀 버전) 설치 중...");
   try {
-    execSync("npm install -g codeburn@0.9.7", { stdio: "inherit" });
+    execSync("npm install -g codeburn@0.9.7", { stdio: ["ignore", "ignore", "pipe"] });
     return true;
-  } catch {
+  } catch (e) {
+    process.stderr.write(`   (codeburn 설치 실패: ${e.message?.slice(0, 80) ?? ""})
+`);
     return false;
   }
 }
@@ -651,69 +659,63 @@ function checkCcusage() {
   }
 }
 async function installCcusage() {
-  console.log("\uD83D\uDCE6 ccusage 19.0.2 (핀 버전) 설치 중...");
   try {
-    execSync("npm install -g ccusage@19.0.2", { stdio: "inherit" });
+    execSync("npm install -g ccusage@19.0.2", { stdio: ["ignore", "ignore", "pipe"] });
     return true;
-  } catch {
+  } catch (e) {
+    process.stderr.write(`   (ccusage 설치 실패: ${e.message?.slice(0, 80) ?? ""})
+`);
     return false;
   }
 }
 async function ensureCcusage() {
   const hadBefore = checkCcusage();
-  console.log(hadBefore ? "\uD83D\uDCE6 ccusage 19.0.2 (핀 버전) 강제 설치 시도..." : "⚠️  ccusage 미설치 — 최신 설치 시도...");
+  console.log("\uD83D\uDCE6 ccusage (사용량 측정 도구) 준비 중...");
   const installed = await installCcusage();
   if (installed && checkCcusage()) {
-    console.log(`✅ ccusage 19.0.2 확인됨
-`);
+    console.log("   ✓ 완료");
     return true;
   }
   if (hadBefore) {
-    console.log(`⚠️  ccusage 업그레이드 실패 — 기존 버전으로 계속 진행
-`);
+    console.log("   ⚠ 업데이트 실패 — 기존 버전으로 계속합니다");
     return true;
   }
   const bar = "═".repeat(60);
   console.log(`
 ` + bar);
-  console.log("❌ ccusage 설치 실패");
-  console.log("   → 토큰/비용 데이터가 수집되지 않습니다.");
-  console.log("   → 수동 설치 후 repair 를 다시 실행하세요:");
+  console.log("❌ ccusage 설치 실패 — 토큰/비용 데이터가 수집되지 않습니다.");
+  console.log("   수동 설치 후 다시 실행:");
   console.log("       npm install -g ccusage@19.0.2");
-  console.log("       npx --yes github:eugene-eee-hongkyu/ai-usage-tracker repair");
+  console.log("       curl -fsSL https://aiusage.z21labs.world/install.sh | bash");
   console.log(bar + `
 `);
   return false;
 }
 async function ensureCodeburn() {
   const hadBefore = checkCodeburn();
-  console.log(hadBefore ? "\uD83D\uDCE6 codeburn 0.9.7 (핀 버전) 강제 설치 시도..." : "⚠️  codeburn 미설치 — 최신 설치 시도...");
+  console.log("\uD83D\uDCE6 codeburn (데이터 수집 도구) 준비 중...");
   const installed = await installCodeburn();
   if (installed && checkCodeburn()) {
-    console.log(`✅ codeburn 0.9.7 확인됨
-`);
+    console.log("   ✓ 완료");
     return true;
   }
   if (hadBefore) {
-    console.log(`⚠️  codeburn 업그레이드 실패 — 기존 버전으로 계속 진행
-`);
+    console.log("   ⚠ 업데이트 실패 — 기존 버전으로 계속합니다");
     return true;
   }
   return false;
 }
 async function runRepair() {
-  console.log(`\uD83D\uDD27 Usage Tracker v${CLI_VERSION} 복구 시작
-`);
   preflightOwnership();
   preflightGlobalPackages();
   preflightNodeVersion();
   const apiKey = await loadApiKey();
   if (!apiKey) {
-    console.error("❌ 설치된 API 키가 없습니다. 먼저 init을 실행하세요:");
-    console.error("   npx --yes github:eugene-eee-hongkyu/ai-usage-tracker init");
+    console.error("❌ 인증 정보가 없습니다. 처음 설치하시려면 다음 명령으로 실행해주세요:");
+    console.error("   curl -fsSL https://aiusage.z21labs.world/install.sh | bash");
     process.exit(1);
   }
-  console.log(`✅ API 키 확인됨
+  console.log(`✓ 인증 확인
 `);
   const codeburnOk = await ensureCodeburn();
   if (!codeburnOk) {
@@ -732,19 +734,19 @@ async function runRepair() {
   runImmediateSync(apiKey);
   runHistoricalBackfill(apiKey);
   console.log(`
-✨ 복구 완료!`);
-  console.log("   백그라운드에서 자동으로 사용량이 수집됩니다.");
-  console.log(`   대시보드: ${SERVER_URL}/dashboard
+✨ 업데이트 완료
+`);
+  console.log("   백그라운드에서 자동으로 사용량을 보내고 있어요.");
+  console.log(`   \uD83D\uDCCA 대시보드:  ${SERVER_URL}/dashboard`);
+  console.log(`   \uD83D\uDD0D 진단:      ${SERVER_URL}/setup-status
 `);
   if (!ccusageOk) {
-    console.log(`⚠️  주의: ccusage 미설치 상태로 저장되어 토큰/비용은 비어 있습니다.
+    console.log(`⚠ 주의: ccusage 가 없어 토큰/비용 데이터는 비어 있어요.
 `);
   }
   process.exit(0);
 }
 async function runInit() {
-  console.log(`\uD83D\uDE80 Usage Tracker v${CLI_VERSION} 설치 시작
-`);
   preflightOwnership();
   preflightGlobalPackages();
   preflightNodeVersion();
@@ -774,7 +776,7 @@ async function runInit() {
     process.exit(1);
   }
   await saveApiKey(apiKey);
-  console.log("\uD83D\uDD11 API 키 저장 완료");
+  console.log("✓ 인증 완료");
   fs.mkdirSync(STABLE_DIR, { recursive: true });
   fs.copyFileSync(path.join(__dirname2, "submit.mjs"), STABLE_SUBMIT);
   fs.copyFileSync(path.join(__dirname2, "historical.mjs"), STABLE_HISTORICAL);
@@ -783,12 +785,14 @@ async function runInit() {
   runBackfill(apiKey);
   runHistoricalBackfill(apiKey);
   console.log(`
-✨ 설치 완료!`);
-  console.log("   백그라운드에서 자동으로 사용량이 수집됩니다.");
-  console.log(`   대시보드: ${SERVER_URL}/dashboard
+✨ 설치 완료
+`);
+  console.log("   백그라운드에서 자동으로 사용량을 보내고 있어요.");
+  console.log(`   \uD83D\uDCCA 대시보드:  ${SERVER_URL}/dashboard`);
+  console.log(`   \uD83D\uDD0D 진단:      ${SERVER_URL}/setup-status
 `);
   if (!ccusageOk) {
-    console.log(`⚠️  주의: ccusage 미설치 상태로 저장되어 토큰/비용은 비어 있습니다.
+    console.log(`⚠ 주의: ccusage 가 없어 토큰/비용 데이터는 비어 있어요.
 `);
   }
   process.exit(0);
