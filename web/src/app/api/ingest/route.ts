@@ -87,10 +87,15 @@ export async function POST(req: NextRequest) {
   const body = await req.json();
   await runIngest(userRow[0].id, teamId, userRow[0].timezone, body);
 
-  // M6e: 매칭된 token 의 last_used_at 갱신 — 디바이스 활동 추적. fallback (users
-  // 단일 hash) 경로면 matchedTokenId=null 이므로 skip.
+  // M6e: 매칭된 token 의 last_used_at + metadata 갱신. fallback (users 단일 hash)
+  // 경로면 matchedTokenId=null 이라 skip — 옛 CLI 가 metadata 안 보내도 안전.
   if (matchedTokenId !== null) {
-    await db.update(apiTokens).set({ lastUsedAt: new Date() }).where(eq(apiTokens.id, matchedTokenId));
+    const envInfo = (body as { envInfo?: unknown })?.envInfo;
+    const metadataUpdate: { lastUsedAt: Date; metadata?: unknown } = { lastUsedAt: new Date() };
+    if (envInfo && typeof envInfo === "object") {
+      metadataUpdate.metadata = envInfo;
+    }
+    await db.update(apiTokens).set(metadataUpdate).where(eq(apiTokens.id, matchedTokenId));
   }
 
   return NextResponse.json({ ok: true });

@@ -8,7 +8,15 @@
 import { spawn, execSync } from "child_process";
 import { existsSync, readFileSync, writeFileSync, unlinkSync, appendFileSync, statSync, truncateSync, mkdirSync, accessSync, constants as fsConstants } from "fs";
 import { join } from "path";
-import { homedir } from "os";
+import { homedir, arch as osArch, release as osRelease } from "os";
+
+// M6e: CLI 자체 버전. init.ts 의 CLI_VERSION 과 동기화 — 양쪽 다 0.2.0.
+// 새 릴리즈 시 두 파일 같이 bump.
+const CLI_VERSION = "0.2.0";
+
+// 직전 sync 실패 정보를 다음 sync 가 함께 보내기 위한 marker.
+// 실패 시 catch 블록에서 write, 성공 시 다음 envInfo 수집에서 read + 삭제.
+const LAST_ERROR_FILE = join(homedir(), ".z21labs", "last-error.json");
 
 // 새 위치 우선, 옛 위치 fallback (마이그 안 된 머신 대응)
 const NEW_STABLE_DIR = join(homedir(), ".z21labs", "usage-tracker");
@@ -206,7 +214,44 @@ function collectEnvInfo() {
     try { accessSync(npmRoot, fsConstants.W_OK); npmRootWritable = true; }
     catch { npmRootWritable = false; }
   }
+
+  // M6e (1순위): OS release / arch / CLI 자체 버전 / Claude Code 버전.
+  const claudeVersion = safeExec("claude --version") ?? safeExec("claude-code --version");
+
+  // M6e (2순위): SessionEnd hook 등록 여부 — ~/.claude/settings.json 파싱.
+  let hookEnabled = null;
+  try {
+    const settingsPath = join(homedir(), ".claude", "settings.json");
+    if (existsSync(settingsPath)) {
+      const cfg = JSON.parse(readFileSync(settingsPath, "utf8"));
+      const hooks = cfg?.hooks;
+      // SessionEnd hook 이 등록되어 있는지 — key 이름 spec 변할 수 있어 keys 검사.
+      hookEnabled = !!(hooks && typeof hooks === "object" && (
+        hooks.SessionEnd != null || hooks.sessionEnd != null || hooks.session_end != null
+      ));
+    } else {
+      hookEnabled = false;
+    }
+  } catch { hookEnabled = null; }
+
+  // M6e (2순위): 직전 sync 실패 marker 가 있으면 같이 보냄. 1회용 — 즉시 삭제.
+  let lastError = null;
+  try {
+    if (existsSync(LAST_ERROR_FILE)) {
+      lastError = JSON.parse(readFileSync(LAST_ERROR_FILE, "utf8"));
+      unlinkSync(LAST_ERROR_FILE);
+    }
+  } catch { /* ignore */ }
+
+  // M6e (2순위): 설치 경로 추정. STABLE_DIR 의 marker / npx flag / dmg env.
+  // 정확 식별 어려워 best-effort 라벨.
+  let installMethod = "unknown";
+  if (process.env.Z21_DMG === "1" || process.env.ELECTRON_RUN_AS_NODE) installMethod = "dmg";
+  else if (process.env.npm_lifecycle_event || process.env.npm_command) installMethod = "npx";
+  else if (existsSync(join(homedir(), ".z21labs", "usage-tracker", "submit.mjs"))) installMethod = "install.sh";
+
   return {
+    // 기존
     platform: process.platform,
     nodeVersion,
     nodeMajor,
@@ -215,6 +260,14 @@ function collectEnvInfo() {
     npmRootWritable,
     codeburnVersion: safeExec("codeburn --version"),
     ccusageVersion: safeExec("ccusage --version"),
+    // M6e 추가
+    osRelease: osRelease(),
+    osArch: osArch(),
+    cliVersion: CLI_VERSION,
+    claudeCodeVersion: claudeVersion,
+    hookEnabled,
+    installMethod,
+    lastError,
     collectedAt: new Date().toISOString(),
   };
 }
@@ -314,10 +367,23 @@ async function main() {
       log(`ingest response: ${resp.status} ${resp.statusText}`);
       if (!resp.ok) {
         process.stderr.write(`[usage-tracker] ingest failed: ${resp.status}\n`);
+        // M6e: 실패 marker — 다음 sync 의 envInfo 에 함께 전달되어 web 에 표시.
+        try {
+          writeFileSync(
+            LAST_ERROR_FILE,
+            JSON.stringify({ kind: "http", status: resp.status, statusText: resp.statusText, at: new Date().toISOString() }),
+          );
+        } catch { /* ignore */ }
       }
     } catch (e) {
       log(`ERROR: ingest network — ${e?.message ?? e}`);
-      // Network error — silent
+      // Network error — silent + lastError marker
+      try {
+        writeFileSync(
+          LAST_ERROR_FILE,
+          JSON.stringify({ kind: "network", message: String(e?.message ?? e), at: new Date().toISOString() }),
+        );
+      } catch { /* ignore */ }
     }
   } finally {
     releaseLock();

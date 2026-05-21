@@ -23,6 +23,7 @@ export async function GET() {
       name: apiTokens.name,
       lastUsedAt: apiTokens.lastUsedAt,
       createdAt: apiTokens.createdAt,
+      metadata: apiTokens.metadata,
     })
     .from(apiTokens)
     .where(and(eq(apiTokens.userId, guard.user.id), isNull(apiTokens.revokedAt)))

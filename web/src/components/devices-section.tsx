@@ -5,11 +5,33 @@
 
 import { useEffect, useState, useCallback } from "react";
 
+interface DeviceMetadata {
+  platform?: string;
+  osRelease?: string;
+  osArch?: string;
+  nodeVersion?: string;
+  cliVersion?: string;
+  claudeCodeVersion?: string | null;
+  codeburnVersion?: string | null;
+  ccusageVersion?: string | null;
+  hookEnabled?: boolean | null;
+  installMethod?: string;
+  lastError?: { kind?: string; status?: number; statusText?: string; message?: string; at?: string } | null;
+}
+
 interface Device {
   id: number;
   name: string;
   lastUsedAt: string | null;
   createdAt: string;
+  metadata?: DeviceMetadata | null;
+}
+
+function platformLabel(p?: string): string {
+  if (p === "darwin") return "macOS";
+  if (p === "win32") return "Windows";
+  if (p === "linux") return "Linux";
+  return p ?? "—";
 }
 
 export function DevicesSection() {
@@ -157,6 +179,39 @@ export function DevicesSection() {
                       )}
                       {!d.lastUsedAt && <> · sync 기록 없음</>}
                     </p>
+                    {d.metadata && Object.keys(d.metadata).length > 0 && (
+                      <div className="text-[11px] text-neutral-500 mt-1 flex flex-wrap gap-x-3 gap-y-0.5">
+                        {d.metadata.platform && (
+                          <span>
+                            {platformLabel(d.metadata.platform)}
+                            {d.metadata.osArch ? ` ${d.metadata.osArch}` : ""}
+                            {d.metadata.osRelease ? ` ${d.metadata.osRelease}` : ""}
+                          </span>
+                        )}
+                        {d.metadata.nodeVersion && <span>Node {d.metadata.nodeVersion}</span>}
+                        {d.metadata.cliVersion && <span>CLI v{d.metadata.cliVersion}</span>}
+                        {d.metadata.claudeCodeVersion && (
+                          <span>Claude {d.metadata.claudeCodeVersion}</span>
+                        )}
+                        {d.metadata.ccusageVersion && (
+                          <span>ccusage {d.metadata.ccusageVersion}</span>
+                        )}
+                        {d.metadata.hookEnabled === false && (
+                          <span className="text-amber-400">⚠ SessionEnd hook 미등록</span>
+                        )}
+                        {d.metadata.installMethod && d.metadata.installMethod !== "unknown" && (
+                          <span>installed via {d.metadata.installMethod}</span>
+                        )}
+                        {d.metadata.lastError && (
+                          <span className="text-red-400">
+                            ⚠ 직전 sync 실패:{" "}
+                            {d.metadata.lastError.kind === "http"
+                              ? `HTTP ${d.metadata.lastError.status}`
+                              : d.metadata.lastError.message?.slice(0, 60) ?? "network"}
+                          </span>
+                        )}
+                      </div>
+                    )}
                   </>
                 )}
               </div>

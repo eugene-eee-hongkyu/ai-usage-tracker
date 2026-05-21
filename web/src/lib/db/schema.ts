@@ -170,6 +170,10 @@ export const apiTokens = pgTable(
     name: text("name").notNull(),
     hash: text("hash").notNull(),
     scopes: jsonb("scopes").notNull().default(sql`'[]'::jsonb`),
+    // M6e (2026-05-21): device-scope 진단 정보. CLI 가 매 ingest 시 envInfo 보내면
+    // 서버가 이 컬럼 UPDATE. 운영 디버그용 (OS / arch / cliVersion / claudeCodeVersion
+    // / hookEnabled / lastError / installMethod 등).
+    metadata: jsonb("metadata").notNull().default(sql`'{}'::jsonb`),
     lastUsedAt: timestamp("last_used_at"),
     revokedAt: timestamp("revoked_at"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
