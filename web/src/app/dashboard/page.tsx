@@ -6,6 +6,7 @@ import { Suspense } from "react";
 import { DashboardView } from "@/components/dashboard-view";
 import { PolicyBanner } from "@/components/policy-banner";
 import { TransparencyCard } from "@/components/transparency-card";
+import { PageFooter } from "@/components/page-footer";
 
 export default function DashboardPage() {
   return (
@@ -18,6 +19,7 @@ export default function DashboardPage() {
           <TransparencyCard />
         </div>
       </div>
+      <PageFooter screen="dashboard" />
     </Suspense>
   );
 }

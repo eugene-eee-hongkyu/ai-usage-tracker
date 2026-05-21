@@ -43,6 +43,7 @@ export const invitations = pgSchema.invitations;
 export const joinRequests = pgSchema.joinRequests;
 export const apiTokens = pgSchema.apiTokens;
 export const auditLogs = pgSchema.auditLogs;
+export const suggestions = pgSchema.suggestions;
 
 // Phase 4.2 (M6a): multi-tenant. teams + team_members 신규.
 export const teams = pgSchema.teams;

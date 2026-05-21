@@ -10,6 +10,7 @@ import {
   type MdToken,
 } from "@/lib/changelog";
 import { Nav } from "@/components/nav";
+import Link from "next/link";
 
 export const dynamic = "force-static";
 
@@ -21,11 +22,19 @@ export default function ChangelogPage() {
     <div className="min-h-screen bg-neutral-950 text-neutral-100">
       <Nav />
       <main className="max-w-3xl mx-auto px-4 py-8 space-y-10">
-        <header>
-          <h1 className="text-2xl font-bold">릴리즈 노트</h1>
-          <p className="text-sm text-neutral-400 mt-1">
-            새로 추가된 기능과 개선 사항을 알려드려요.
-          </p>
+        <header className="flex items-start justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-bold">릴리즈 노트</h1>
+            <p className="text-sm text-neutral-400 mt-1">
+              새로 추가된 기능과 개선 사항을 알려드려요.
+            </p>
+          </div>
+          <Link
+            href="/suggest"
+            className="shrink-0 text-xs px-3 py-1.5 rounded border border-neutral-700 text-neutral-300 hover:border-indigo-500 hover:text-indigo-300 transition-colors inline-flex items-center gap-1.5"
+          >
+            💡 제안하기
+          </Link>
         </header>
 
         {entries.length === 0 ? (
@@ -56,6 +65,7 @@ export default function ChangelogPage() {
                           {parseMarkdown(entry.body).map((t, i) => (
                             <MdNode key={i} token={t} />
                           ))}
+                          <EntryFeedbackLink slug={entry.slug} />
                         </div>
                       </details>
                     </li>
@@ -82,7 +92,21 @@ function EntryArticle({ entry }: { entry: ChangelogEntry }) {
           <MdNode key={i} token={t} />
         ))}
       </div>
+      <EntryFeedbackLink slug={entry.slug} />
     </article>
+  );
+}
+
+function EntryFeedbackLink({ slug }: { slug: string }) {
+  return (
+    <div className="pt-2 text-right">
+      <Link
+        href={`/suggest?entry=${slug}`}
+        className="text-xs text-neutral-500 hover:text-indigo-400 transition-colors"
+      >
+        이 변경에 대한 의견 보내기 →
+      </Link>
+    </div>
   );
 }
 

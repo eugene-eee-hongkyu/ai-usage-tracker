@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { useLocalMode } from "@/lib/use-local-mode";
 import { Nav } from "@/components/nav";
 import { AdminNav } from "@/components/admin-nav";
+import { PageFooter } from "@/components/page-footer";
 import { TeamPlanHealthCard, type TeamPlanSummary } from "@/components/team-plan-health-card";
 import { TeamUsageHero } from "@/components/team-usage-hero";
 import {
@@ -1607,6 +1608,7 @@ export function TeamView({ adminMode = false }: { adminMode?: boolean }) {
           </>
         )}
       </main>
+      <PageFooter screen="team" />
     </div>
   );
 }

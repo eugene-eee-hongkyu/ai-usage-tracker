@@ -7,6 +7,7 @@ import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { Nav } from "@/components/nav";
 import { DevicesSection } from "@/components/devices-section";
+import { PageFooter } from "@/components/page-footer";
 import { useLocalMode } from "@/lib/use-local-mode";
 import { useMessages } from "@/lib/use-i18n";
 
@@ -292,6 +293,7 @@ export default function SetupStatusPage() {
         </div>
 
       </main>
+      <PageFooter screen="settings" />
     </div>
   );
 }

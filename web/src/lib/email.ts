@@ -127,6 +127,59 @@ interface JoinApprovedParams {
   locale?: "ko" | "en";
 }
 
+interface SuggestionParams {
+  fromName: string;
+  fromEmail: string;
+  category: string;       // 'feature' | 'ui' | 'bug' | 'other'
+  contextScreen?: string | null;
+  contextEntry?: string | null;
+  body: string;
+}
+
+const SUGGEST_TO = process.env.SUGGEST_TO_EMAIL ?? "info@z21lab.xyz";
+
+const CATEGORY_LABEL: Record<string, string> = {
+  feature: "새 기능",
+  ui: "UI 개선",
+  bug: "버그",
+  other: "기타",
+};
+
+export async function sendSuggestion(p: SuggestionParams): Promise<SendResult> {
+  const cat = CATEGORY_LABEL[p.category] ?? p.category;
+  const screen = p.contextScreen ? `화면: ${p.contextScreen}` : "";
+  const entry = p.contextEntry ? `릴리즈: ${p.contextEntry}` : "";
+  const meta = [screen, entry].filter(Boolean).join(" / ");
+  const subject = `[AI Usage Tracker · ${cat}] ${p.fromName} 님의 제안`;
+  const safe = (s: string) =>
+    s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  const html = `<!doctype html><html><body style="font-family: -apple-system, system-ui, sans-serif; max-width: 600px; margin: 40px auto; padding: 24px; color: #0f172a; line-height: 1.6;">
+      <h2 style="margin:0 0 16px">새 제안이 도착했습니다</h2>
+      <table style="font-size:13px; color:#475569; border-collapse:collapse; margin-bottom:20px;">
+        <tr><td style="padding:4px 12px 4px 0;">보내는이</td><td><strong style="color:#0f172a;">${safe(p.fromName)}</strong> &lt;${safe(p.fromEmail)}&gt;</td></tr>
+        <tr><td style="padding:4px 12px 4px 0;">카테고리</td><td>${cat}</td></tr>
+        ${meta ? `<tr><td style="padding:4px 12px 4px 0;">컨텍스트</td><td>${safe(meta)}</td></tr>` : ""}
+      </table>
+      <div style="background:#f8fafc; border-left:3px solid #4f46e5; padding:16px; border-radius:4px; white-space:pre-wrap; font-size:14px;">${safe(p.body)}</div>
+      <p style="font-size:11px; color:#94a3b8; margin-top:24px;">aiusage.z21labs.world · 회신은 ${safe(p.fromEmail)} 로 직접</p>
+    </body></html>`;
+  const r = client();
+  if (!r) return { ok: false, error: "RESEND_API_KEY missing" };
+  try {
+    const result = await r.emails.send({
+      from: FROM,
+      to: SUGGEST_TO,
+      replyTo: p.fromEmail,
+      subject,
+      html,
+    });
+    if (result.error) return { ok: false, error: result.error.message };
+    return { ok: true, id: result.data?.id };
+  } catch (e) {
+    return { ok: false, error: (e as Error).message };
+  }
+}
+
 export async function sendJoinApproved(p: JoinApprovedParams): Promise<SendResult> {
   const url = `${APP_URL}/dashboard`;
   const ko = p.locale !== "en";

@@ -323,6 +323,35 @@ export const userBlocks = pgTable(
   })
 );
 
+// 사용자 제안 (Feedback / Feature Request).
+// /suggest 페이지에서 작성 → API 가 DB 에 저장 + Resend 로 info@z21lab.xyz 발송.
+// 메일 발송 실패해도 DB 에는 남김 (재발송 가능). emailedAt=null 이면 미발송.
+// userId nullable 아님 — 로그인 사용자만 작성 가능.
+export const suggestions = pgTable(
+  "suggestions",
+  {
+    id: serial("id").primaryKey(),
+    userId: integer("user_id")
+      .notNull()
+      .references(() => users.id),
+    teamId: integer("team_id").references(() => teams.id),
+    // 카테고리: 'feature' | 'ui' | 'bug' | 'other'
+    category: text("category").notNull(),
+    // 어느 화면에 대한 제안인지 (선택). 'dashboard' | 'team' | 'settings' | 'cli' | 'changelog' | 'other' | null
+    contextScreen: text("context_screen"),
+    // changelog entry 클릭으로 들어온 경우 entry slug (YYYY-MM-DD)
+    contextEntry: text("context_entry"),
+    body: text("body").notNull(),
+    emailedAt: timestamp("emailed_at"),
+    emailError: text("email_error"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (t) => ({
+    userIdx: index("suggestions_user_idx").on(t.userId),
+    createdAtIdx: index("suggestions_created_at_idx").on(t.createdAt),
+  })
+);
+
 // 사용자가 자기 dashboard 를 본 일자별 횟수. lower bar 가설 ("월 1회 보면
 // 성공") 의 직접 측정 + 본인 동기 부여 (visit heatmap 카드).
 // /api/visit POST 가 mount-time 1회 호출되어 (user_id, today) 행을 upsert.
