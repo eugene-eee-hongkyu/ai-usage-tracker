@@ -7,7 +7,6 @@ import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { Nav } from "@/components/nav";
 import { DevicesSection } from "@/components/devices-section";
-import Link from "next/link";
 import { useLocalMode } from "@/lib/use-local-mode";
 import { useMessages } from "@/lib/use-i18n";
 
@@ -107,10 +106,7 @@ export default function SetupStatusPage() {
     <div className="min-h-screen">
       <Nav />
       <main className="max-w-2xl mx-auto px-4 py-6 space-y-6">
-        <div className="flex items-center gap-3">
-          <Link href="/dashboard" className="text-slate-400 hover:text-slate-200 text-sm">{en ? "← Home" : "← 메인"}</Link>
-          <h1 className="font-semibold text-slate-200">{en ? "Setup status" : "세팅 상태"}</h1>
-        </div>
+        <h1 className="font-semibold text-slate-200">{en ? "Setup status" : "세팅 상태"}</h1>
 
         {/* Overall status */}
         <div data-testid="status-overall" className={`rounded-lg p-4 border ${data.ready ? "bg-green-950 border-green-800" : "bg-slate-900 border-slate-700"}`}>
@@ -294,14 +290,6 @@ export default function SetupStatusPage() {
             </details>
           </div>
         </div>
-
-        {data.ready && (
-          <div className="text-center">
-            <Link href="/dashboard" className="text-indigo-400 hover:text-indigo-300 text-sm">
-              {en ? "Back to dashboard →" : "대시보드로 돌아가기 →"}
-            </Link>
-          </div>
-        )}
 
       </main>
     </div>
