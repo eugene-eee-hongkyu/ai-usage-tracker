@@ -736,10 +736,7 @@ export function TeamView({ adminMode = false }: { adminMode?: boolean }) {
                     stroke={color}
                     strokeWidth={1.5}
                     strokeDasharray={m.isEstimated ? "4 3" : undefined}
-                    // 데이터 1점이면 line 이 안 그려져 빈 차트로 보이므로 dot 표시.
-                    dot={(data.dailyUnitCostByMember ?? []).length === 1
-                      ? { r: 3, fill: color, stroke: "none" }
-                      : false}
+                    dot={false}
                     connectNulls={false}
                   />
                 );

@@ -752,12 +752,9 @@ export async function GET(req: NextRequest) {
 
   // 일별 토큰 단가 멤버별 — 각 멤버 monthlyPrice/30 / 일별 토큰 × 1M.
   // 활동 없는 날은 null (line 끊김). declared+estimated 모두 포함, UI 에서 시각 구분.
-  // period="today" 면 가장 최근 1일만 (dailyByMember 와 동일 패턴).
+  // period 와 무관하게 전체 보유 일자 표시 (30일 추세 의도 — 사용자 결정 2026-05-21).
   const allTokenDates = [...dailyTokensMemberMap.keys()].sort();
-  const unitCostDates = period === "today" && allTokenDates.length > 0
-    ? [allTokenDates[allTokenDates.length - 1]]
-    : allTokenDates;
-  const dailyUnitCostByMember = unitCostDates.map((date) => {
+  const dailyUnitCostByMember = allTokenDates.map((date) => {
     const row: Record<string, number | string | null> = { date };
     const tokensMap = dailyTokensMemberMap.get(date) ?? {};
     for (const m of memberUsage) {
