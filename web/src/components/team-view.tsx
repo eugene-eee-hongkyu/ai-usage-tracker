@@ -496,7 +496,18 @@ export function TeamView({ adminMode = false }: { adminMode?: boolean }) {
             <YAxis tick={{ fill: "#525252", fontSize: 10, fontFamily: "monospace" }} axisLine={false} tickLine={false} tickFormatter={(v) => `$${v}`} width={40} />
             <Tooltip content={<MemberTooltip />} />
             {(data.memberNames ?? []).map((key, i) => (
-              <Area key={key} type="monotone" dataKey={key} stroke={MEMBER_COLORS[i % MEMBER_COLORS.length]} strokeWidth={1.5} fill={`url(#grad-${i})`} dot={false} />
+              <Area
+                key={key}
+                type="monotone"
+                dataKey={key}
+                stroke={MEMBER_COLORS[i % MEMBER_COLORS.length]}
+                strokeWidth={1.5}
+                fill={`url(#grad-${i})`}
+                // 데이터 1점이면 area/line 이 안 그려져 빈 차트로 보이므로 dot 표시.
+                dot={(data.dailyByMember ?? []).length === 1
+                  ? { r: 3, fill: MEMBER_COLORS[i % MEMBER_COLORS.length], stroke: "none" }
+                  : false}
+              />
             ))}
           </AreaChart>
         </ResponsiveContainer>
@@ -532,7 +543,17 @@ export function TeamView({ adminMode = false }: { adminMode?: boolean }) {
               contentStyle={{ background: "#171717", border: "1px solid #404040", borderRadius: 6, fontSize: 11, fontFamily: "monospace" }}
               formatter={(v) => [`$${Number(v).toFixed(2)}`, t.teamView.teamSum]}
             />
-            <Area type="monotone" dataKey="cost" stroke="#06b6d4" strokeWidth={2} fill="url(#grad-total)" dot={false} />
+            <Area
+              type="monotone"
+              dataKey="cost"
+              stroke="#06b6d4"
+              strokeWidth={2}
+              fill="url(#grad-total)"
+              // 데이터 1점이면 area/line 이 안 그려져 빈 차트로 보이므로 dot 표시.
+              dot={dailyTotal.length === 1
+                ? { r: 4, fill: "#06b6d4", stroke: "none" }
+                : false}
+            />
           </AreaChart>
         </ResponsiveContainer>
       </div>
@@ -715,7 +736,10 @@ export function TeamView({ adminMode = false }: { adminMode?: boolean }) {
                     stroke={color}
                     strokeWidth={1.5}
                     strokeDasharray={m.isEstimated ? "4 3" : undefined}
-                    dot={false}
+                    // 데이터 1점이면 line 이 안 그려져 빈 차트로 보이므로 dot 표시.
+                    dot={(data.dailyUnitCostByMember ?? []).length === 1
+                      ? { r: 3, fill: color, stroke: "none" }
+                      : false}
                     connectNulls={false}
                   />
                 );

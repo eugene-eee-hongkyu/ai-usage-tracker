@@ -752,8 +752,12 @@ export async function GET(req: NextRequest) {
 
   // 일별 토큰 단가 멤버별 — 각 멤버 monthlyPrice/30 / 일별 토큰 × 1M.
   // 활동 없는 날은 null (line 끊김). declared+estimated 모두 포함, UI 에서 시각 구분.
+  // period="today" 면 가장 최근 1일만 (dailyByMember 와 동일 패턴).
   const allTokenDates = [...dailyTokensMemberMap.keys()].sort();
-  const dailyUnitCostByMember = allTokenDates.map((date) => {
+  const unitCostDates = period === "today" && allTokenDates.length > 0
+    ? [allTokenDates[allTokenDates.length - 1]]
+    : allTokenDates;
+  const dailyUnitCostByMember = unitCostDates.map((date) => {
     const row: Record<string, number | string | null> = { date };
     const tokensMap = dailyTokensMemberMap.get(date) ?? {};
     for (const m of memberUsage) {
@@ -781,9 +785,14 @@ export async function GET(req: NextRequest) {
     .sort((a, b) => b.totalTurns - a.totalTurns)
     .slice(0, 10);
 
-  // Daily by member (for stacked area)
+  // Daily by member (for stacked area).
+  // period="today" 면 가장 최근 1일 (latest date) 만 — codeburn 의 today bucket 이
+  // KST/SGT 사용자에서 어제+오늘 spillover 되는 케이스 제거. 사용자 직관 "오늘 = 1일" 일치.
   const allDates = [...dailyMemberMap.keys()].sort();
-  const dailyByMember = allDates.map((date) => {
+  const dailyDates = period === "today" && allDates.length > 0
+    ? [allDates[allDates.length - 1]]
+    : allDates;
+  const dailyByMember = dailyDates.map((date) => {
     const row: Record<string, number | string> = { date };
     for (const name of memberNames) {
       row[name] = dailyMemberMap.get(date)?.[name] ?? 0;
