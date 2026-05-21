@@ -63,6 +63,9 @@ export const teams = sqliteTable(
     slug: text("slug").notNull(),
     ownerId: integer("owner_id", { mode: "number" }).notNull(),
     namePending: integer("name_pending", { mode: "boolean" }).notNull().default(false),
+    // M6f/M6g (2026-05-21): LOCAL_MODE 는 single-team 이라 사실상 사용 X, schema 일관성 위해 보유.
+    autoJoinDomains: text("auto_join_domains", { mode: "json" }).notNull().default(sql`'[]'`),
+    autoJoinEnabled: integer("auto_join_enabled", { mode: "boolean" }).notNull().default(true),
     createdAt: integer("created_at", { mode: "timestamp_ms" })
       .notNull()
       .default(sql`(unixepoch() * 1000)`),
