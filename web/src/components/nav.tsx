@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useSession, signOut } from "next-auth/react";
-import { Suspense, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useLocalModeInfo } from "@/lib/use-local-mode";
 import { useMessages } from "@/lib/use-i18n";
 import { LocaleSwitcher } from "@/components/locale-switcher";
@@ -15,6 +15,23 @@ function NavInner() {
   const [open, setOpen] = useState(false);
   const { isLocalMode, companyUrl } = useLocalModeInfo();
   const { m, locale } = useMessages();
+  const [latestChangelogDate, setLatestChangelogDate] = useState<string>("");
+  const [hasNewChangelog, setHasNewChangelog] = useState(false);
+
+  useEffect(() => {
+    if (isLocalMode) return;
+    fetch("/api/changelog/latest")
+      .then((r) => r.json())
+      .then((d: { latest: string | null }) => {
+        if (!d.latest) return;
+        setLatestChangelogDate(d.latest);
+        try {
+          const lastSeen = localStorage.getItem("changelog_last_seen");
+          setHasNewChangelog(!lastSeen || lastSeen < d.latest);
+        } catch { /* ignore */ }
+      })
+      .catch(() => { /* ignore */ });
+  }, [isLocalMode]);
 
   // 메뉴 구성 — 모드별 분기:
   //   서버 (Vercel)        : 개인 / 팀 / 셋업
@@ -92,10 +109,22 @@ function NavInner() {
         </button>
         {open && !isLocalMode && (
           <div className="absolute right-0 top-8 bg-slate-800 border border-slate-700 rounded shadow-lg z-50 whitespace-nowrap">
+            <Link
+              href={withLocale("/changelog")}
+              data-testid="nav-changelog"
+              onClick={() => {
+                setOpen(false);
+                try { localStorage.setItem("changelog_last_seen", latestChangelogDate); } catch { /* ignore */ }
+              }}
+              className="flex items-center gap-2 px-4 py-2 text-sm text-slate-300 hover:bg-slate-700 w-full text-left"
+            >
+              <span>릴리즈 노트</span>
+              {hasNewChangelog && <span className="w-1.5 h-1.5 rounded-full bg-red-500" />}
+            </Link>
             <button
               data-testid="nav-logout"
               onClick={() => signOut({ callbackUrl: "/login" })}
-              className="block px-4 py-2 text-sm text-slate-300 hover:bg-slate-700 w-full text-left"
+              className="block px-4 py-2 text-sm text-slate-300 hover:bg-slate-700 w-full text-left border-t border-slate-700"
             >
               {m.nav.logout}
             </button>
