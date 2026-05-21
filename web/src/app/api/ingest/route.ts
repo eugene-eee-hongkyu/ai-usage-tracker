@@ -2,7 +2,7 @@
 // 핵심 로직은 [lib/sync/run-ingest.ts] 로 추출되어 향후 CLI in-process binary 도 같은 함수 호출 가능.
 
 import { NextRequest, NextResponse } from "next/server";
-import { db, users, teamMembers, IS_LOCAL_MODE } from "@/lib/db";
+import { db, users, teamMembers, apiTokens, IS_LOCAL_MODE } from "@/lib/db";
 import { ensureLocalUser } from "@/lib/local-user";
 import { runIngest } from "@/lib/sync/run-ingest";
 import { eq, and, isNull, asc } from "drizzle-orm";
@@ -16,22 +16,51 @@ export async function POST(req: NextRequest) {
     suspendedAt: Date | null;
     deletedAt: Date | null;
   }>;
+  let matchedTokenId: number | null = null;
   if (IS_LOCAL_MODE) {
     const u = await ensureLocalUser();
     userRow = [{ id: u.id, timezone: u.timezone, suspendedAt: null, deletedAt: null }];
   } else {
     const apiKey = req.headers.get("x-api-key");
     if (!apiKey) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
-    userRow = await db
+    const hash = crypto.createHash("sha256").update(apiKey).digest("hex");
+    // M6e (2026-05-21): 1차 — api_tokens.hash 매칭 (device-scope, revoke 가능).
+    const tokenRow = await db
       .select({
-        id: users.id,
+        tokenId: apiTokens.id,
+        userId: users.id,
         timezone: users.timezone,
         suspendedAt: users.suspendedAt,
         deletedAt: users.deletedAt,
       })
-      .from(users)
-      .where(eq(users.apiKeyHash, crypto.createHash("sha256").update(apiKey).digest("hex")))
+      .from(apiTokens)
+      .innerJoin(users, eq(users.id, apiTokens.userId))
+      .where(and(eq(apiTokens.hash, hash), isNull(apiTokens.revokedAt)))
       .limit(1);
+    if (tokenRow[0]) {
+      matchedTokenId = tokenRow[0].tokenId;
+      userRow = [
+        {
+          id: tokenRow[0].userId,
+          timezone: tokenRow[0].timezone,
+          suspendedAt: tokenRow[0].suspendedAt,
+          deletedAt: tokenRow[0].deletedAt,
+        },
+      ];
+    } else {
+      // Fallback (2026-05-21~ 1~2주 dual mode): users.api_key_hash 단일 컬럼 매칭.
+      // 백필 누락 또는 옛 init 흐름에서 발급된 키 안전망. 추후 phase 에서 제거.
+      userRow = await db
+        .select({
+          id: users.id,
+          timezone: users.timezone,
+          suspendedAt: users.suspendedAt,
+          deletedAt: users.deletedAt,
+        })
+        .from(users)
+        .where(eq(users.apiKeyHash, hash))
+        .limit(1);
+    }
   }
 
   if (!userRow[0]) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
@@ -57,6 +86,12 @@ export async function POST(req: NextRequest) {
 
   const body = await req.json();
   await runIngest(userRow[0].id, teamId, userRow[0].timezone, body);
+
+  // M6e: 매칭된 token 의 last_used_at 갱신 — 디바이스 활동 추적. fallback (users
+  // 단일 hash) 경로면 matchedTokenId=null 이므로 skip.
+  if (matchedTokenId !== null) {
+    await db.update(apiTokens).set({ lastUsedAt: new Date() }).where(eq(apiTokens.id, matchedTokenId));
+  }
 
   return NextResponse.json({ ok: true });
 }

@@ -8,6 +8,7 @@ export interface Messages {
     setup: string;
     logout: string;
     admin: string;
+    devices: string;
   };
   about: {
     title: string;        // ⓘ aria-label
@@ -301,6 +302,7 @@ export interface Messages {
     errorOther: string;
     githubStart: string;
     googleStart: string;
+    singleOauthHint: string;
   };
   onboardTeam: {
     greeting: string;          // "Welcome{nameSuffix}"
@@ -686,6 +688,7 @@ export const en: Messages = {
     setup: "Setup",
     logout: "Logout",
     admin: "Admin",
+    devices: "My devices",
   },
   about: {
     title: "Version info",
@@ -987,6 +990,8 @@ export const en: Messages = {
     errorOther: "An error occurred during login.",
     githubStart: "Continue with GitHub",
     googleStart: "Continue with Google",
+    singleOauthHint:
+      "Use a single OAuth account across all your laptops. Multiple OAuth accounts (e.g. different emails) will appear as separate users.",
   },
   onboardTeam: {
     greeting: "Welcome",

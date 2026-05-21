@@ -32,6 +32,9 @@ function LoginContent() {
         <h1 className="text-3xl font-bold text-slate-100">AI Usage Tracker</h1>
         <p className="text-slate-400">{m.login.tagline}</p>
         <p className="text-xs text-slate-500">{m.login.teamOnly}</p>
+        <p className="text-[11px] text-slate-600 max-w-xs mx-auto pt-2">
+          {m.login.singleOauthHint}
+        </p>
       </div>
 
       {error === "domain" && (

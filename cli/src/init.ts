@@ -406,7 +406,19 @@ function getApiKeyViaLocalServer(): Promise<string> {
     });
 
     server.listen(CLI_PORT, "127.0.0.1", () => {
-      const authUrl = `${SERVER_URL}/api/cli-auth?port=${CLI_PORT}`;
+      // M6e (2026-05-21): 이 노트북 라벨로 hostname 전달. server 가 api_tokens.name
+      // 으로 저장 → 사용자가 web 의 /me/devices 에서 어떤 노트북인지 식별 가능.
+      // hostname 못 가져오면 server side 자동 라벨 (Device #N) 사용.
+      const hostname = (() => {
+        try {
+          return os.hostname().slice(0, 64);
+        } catch {
+          return "";
+        }
+      })();
+      const params = new URLSearchParams({ port: String(CLI_PORT) });
+      if (hostname) params.set("device", hostname);
+      const authUrl = `${SERVER_URL}/api/cli-auth?${params.toString()}`;
       console.log("\n브라우저에서 GitHub 계정으로 로그인하세요...");
       console.log(`URL: ${authUrl}\n`);
       openBrowser(authUrl);

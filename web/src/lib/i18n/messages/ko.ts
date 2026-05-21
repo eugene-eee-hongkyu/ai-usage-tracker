@@ -10,6 +10,7 @@ export const ko: DeepPartial<Messages> = {
     setup: "셋업",
     logout: "로그아웃",
     admin: "어드민",
+    devices: "내 디바이스",
   },
   about: {
     title: "버전 정보",
@@ -307,6 +308,8 @@ export const ko: DeepPartial<Messages> = {
     errorOther: "로그인 중 오류가 발생했습니다.",
     githubStart: "GitHub로 시작하기",
     googleStart: "Google로 시작하기",
+    singleOauthHint:
+      "노트북이 여러 대여도 같은 OAuth 계정 하나로 로그인하세요. 다른 계정 (예: 다른 이메일) 으로 로그인하면 시스템상 다른 사람으로 잡힙니다.",
   },
   onboardTeam: {
     greeting: "환영합니다",
