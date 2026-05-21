@@ -1531,8 +1531,9 @@ export function TeamView({ adminMode = false }: { adminMode?: boolean }) {
               />
             )}
 
-            {/* Row 1: Daily Cost Trend — stacked (per-member) + total */}
-            {(data.dailyByMember ?? []).length > 1 && (
+            {/* Row 1: Daily Cost Trend — stacked (per-member) + total.
+                period="today" 면 1점 데이터 (단일 dot 표시). > 0 이면 렌더. */}
+            {(data.dailyByMember ?? []).length > 0 && (
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
 
                 {/* Stacked per-member */}
