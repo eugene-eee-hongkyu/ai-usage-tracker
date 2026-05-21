@@ -111,6 +111,7 @@ export default function AdminSettingsPage() {
         </p>
       </header>
       <TeamRenameSection />
+      <AutoJoinSection />
       {/* 권한 부여 */}
       <section className="bg-slate-900 border border-slate-800 rounded-lg p-5 space-y-3">
         <header>
@@ -226,6 +227,84 @@ export default function AdminSettingsPage() {
         </select>
       </section>
     </div>
+  );
+}
+
+// 자동 가입 toggle — owner email 도메인의 미초대 신규자 자동 가입 켜고 끄기.
+function AutoJoinSection() {
+  const [enabled, setEnabled] = useState<boolean | null>(null);
+  const [domains, setDomains] = useState<string[]>([]);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetch("/api/admin/team/auto-join")
+      .then(async (r) => {
+        if (!r.ok) {
+          const e = (await r.json().catch(() => ({}))) as { error?: string };
+          throw new Error(e.error ?? `HTTP ${r.status}`);
+        }
+        return r.json();
+      })
+      .then((d: { autoJoinEnabled: boolean; autoJoinDomains: string[] }) => {
+        setEnabled(d.autoJoinEnabled);
+        setDomains(d.autoJoinDomains ?? []);
+      })
+      .catch((e) => setError((e as Error).message));
+  }, []);
+
+  async function toggle() {
+    if (enabled === null) return;
+    setSubmitting(true);
+    setError(null);
+    try {
+      const r = await fetch("/api/admin/team/auto-join", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ enabled: !enabled }),
+      });
+      if (!r.ok) {
+        const e = (await r.json().catch(() => ({}))) as { error?: string };
+        throw new Error(e.error ?? `HTTP ${r.status}`);
+      }
+      setEnabled(!enabled);
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <section className="bg-slate-900 border border-slate-800 rounded-lg p-5 space-y-3">
+      <header>
+        <h2 className="text-sm font-bold text-slate-200">자동 가입</h2>
+        <p className="text-xs text-slate-500 mt-1">
+          아래 도메인의 새 OAuth 사용자는 초대 없이 이 팀의 member 로 자동 가입됩니다. 도메인은 owner 가 OAuth 로
+          로그인할 때 자동 등록되며 (공용 메일 제외), 변경하려면 별도 SQL 작업이 필요합니다.
+        </p>
+      </header>
+      {error && <p className="text-xs text-red-400">{error}</p>}
+      <div className="flex items-center justify-between gap-4">
+        <div className="min-w-0">
+          <p className="text-xs text-slate-500">자동 가입 도메인</p>
+          <p className="text-sm text-slate-200 truncate">
+            {domains.length === 0 ? <span className="text-slate-500">없음</span> : domains.join(", ")}
+          </p>
+        </div>
+        <button
+          onClick={toggle}
+          disabled={enabled === null || submitting}
+          className={`px-4 py-2 text-sm rounded font-semibold disabled:opacity-50 ${
+            enabled
+              ? "bg-emerald-700 hover:bg-emerald-600 text-emerald-50"
+              : "bg-slate-700 hover:bg-slate-600 text-slate-200"
+          }`}
+        >
+          {enabled === null ? "..." : enabled ? "✓ 자동 가입 ON" : "자동 가입 OFF"}
+        </button>
+      </div>
+    </section>
   );
 }
 

@@ -20,6 +20,7 @@ import { requireOwner } from "@/lib/auth-guards";
 import { writeAudit } from "@/lib/audit";
 import { sendInvitation } from "@/lib/email";
 import { eq, and, isNull, inArray } from "drizzle-orm";
+import { isPublicEmailDomain } from "@/lib/public-domains";
 import crypto from "crypto";
 
 export const dynamic = "force-dynamic";
@@ -87,6 +88,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "invitation_pending", invitationId: pendingInv[0].id }, { status: 409 });
   }
 
+  // M6g: ownerEmail 도메인 자동 등록 (public domain 제외).
+  const ownerDomain = ownerEmail.split("@")[1]?.toLowerCase();
+  const autoJoinDomains =
+    ownerDomain && !isPublicEmailDomain(ownerDomain) ? [ownerDomain] : [];
+
   // 1) 새 팀 INSERT — owner_id 는 임시로 admin (guard.user.id) 박음. ehongarykr 가 가입 후
   //    별도 액션으로 owner 권한 이양 (M6c). 또는 가입 시 자동 이양 — 후속.
   const teamInserted = await db
@@ -96,6 +102,7 @@ export async function POST(req: NextRequest) {
       slug,
       ownerId: guard.user.id, // 임시 — 가입 후 ehongarykr 의 id 로 교체 (M6c)
       namePending,
+      autoJoinDomains,
     })
     .returning({ id: teams.id });
   const newTeamId = teamInserted[0].id;

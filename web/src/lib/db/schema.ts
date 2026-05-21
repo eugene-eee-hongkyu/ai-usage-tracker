@@ -64,11 +64,13 @@ export const teams = pgTable(
     // true 면 가입 후 /onboard-team 으로 강제 redirect 되어 회사명 입력 받음.
     // 기본 false — 기존 팀과 명시적으로 teamName 받은 신규 팀은 false.
     namePending: boolean("name_pending").notNull().default(false),
-    // M6f (2026-05-21): 자동 가입 도메인 목록. 미초대 OAuth 신규자의 email 도메인이
-    // 이 배열에 포함되면 이 팀의 member 로 즉시 가입 (Slack/Linear 패턴, DNS verification
-    // 없음 — OAuth ownership 으로 충분). 예: ["iskra.world","z21labs.xyz"].
-    // 관리는 별도 phase (현재는 SQL 직접 또는 prod admin 작업).
+    // M6f (2026-05-21): 자동 가입 도메인 목록. owner 가 OAuth 가입한 시점의 email
+    // 도메인이 자동 등록 (public domain 블랙리스트 제외). 외부 admin UI 에서 추가
+    // 안 함 — single source of truth = owner OAuth 도메인.
     autoJoinDomains: jsonb("auto_join_domains").notNull().default(sql`'[]'::jsonb`),
+    // M6g (2026-05-21): 자동 가입 toggle. false 면 도메인 매칭 무시 + /join 으로.
+    // Team Owner 또는 Platform Admin 만 변경 가능.
+    autoJoinEnabled: boolean("auto_join_enabled").notNull().default(true),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     deletedAt: timestamp("deleted_at"),
   },

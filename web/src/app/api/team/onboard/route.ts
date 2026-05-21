@@ -12,9 +12,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import { db, teams, IS_LOCAL_MODE } from "@/lib/db";
+import { db, teams, users, IS_LOCAL_MODE } from "@/lib/db";
 import { writeAudit } from "@/lib/audit";
 import { eq, and, isNull, ne } from "drizzle-orm";
+import { isPublicEmailDomain } from "@/lib/public-domains";
 
 export const dynamic = "force-dynamic";
 
@@ -51,7 +52,12 @@ export async function PATCH(req: NextRequest) {
 
   // 본인 팀 상태 확인 — namePending true 일 때만.
   const teamRow = await db
-    .select({ id: teams.id, namePending: teams.namePending, name: teams.name })
+    .select({
+      id: teams.id,
+      namePending: teams.namePending,
+      name: teams.name,
+      autoJoinDomains: teams.autoJoinDomains,
+    })
     .from(teams)
     .where(and(eq(teams.id, sessUser.currentTeamId), isNull(teams.deletedAt)))
     .limit(1);
@@ -70,9 +76,34 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ error: "slug_taken", slug }, { status: 409 });
   }
 
+  // M6g: 본인 (= 이 팀의 owner) email 도메인을 auto_join_domains 에 자동 등록.
+  // public domain (gmail.com 등) 은 제외. 이미 있는 도메인이면 skip.
+  const ownerEmailRow = await db
+    .select({ email: users.email })
+    .from(users)
+    .where(eq(users.id, sessUser.id))
+    .limit(1);
+  const ownerDomain = ownerEmailRow[0]?.email?.split("@")[1]?.toLowerCase() ?? null;
+  const existingDomains = Array.isArray(teamRow[0].autoJoinDomains)
+    ? (teamRow[0].autoJoinDomains as string[])
+    : [];
+  let nextDomains = existingDomains;
+  if (
+    ownerDomain &&
+    !isPublicEmailDomain(ownerDomain) &&
+    !existingDomains.includes(ownerDomain)
+  ) {
+    nextDomains = [...existingDomains, ownerDomain];
+  }
+
   await db
     .update(teams)
-    .set({ name: trimmed, slug, namePending: false })
+    .set({
+      name: trimmed,
+      slug,
+      namePending: false,
+      autoJoinDomains: nextDomains,
+    })
     .where(eq(teams.id, sessUser.currentTeamId));
 
   await writeAudit({
@@ -81,7 +112,7 @@ export async function PATCH(req: NextRequest) {
     action: "team.onboard.set_name",
     targetType: "team",
     targetId: sessUser.currentTeamId,
-    metadata: { name: trimmed, slug },
+    metadata: { name: trimmed, slug, autoJoinDomains: nextDomains },
     ip: req.headers.get("x-forwarded-for") ?? null,
   });
 

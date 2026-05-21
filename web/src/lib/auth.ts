@@ -205,7 +205,8 @@ export const authOptions: NextAuthOptions = {
         // 그 팀 member 로 즉시 자동 가입. invitation 없어도 OAuth ownership 으로 충분.
         const emailDomain = email.split("@")[1]?.toLowerCase();
         if (emailDomain) {
-          // jsonb @> '["domain"]' — 배열 contains 매칭. team 1개 매칭 가정 (첫 번째 사용).
+          // jsonb @> '["domain"]' — 배열 contains 매칭 + auto_join_enabled=true.
+          // team 1개 매칭 가정 (첫 번째 사용).
           const autoTeamRows = await db
             .select({ id: teams.id })
             .from(teams)
@@ -213,6 +214,7 @@ export const authOptions: NextAuthOptions = {
               and(
                 isNull(teams.deletedAt),
                 eq(teams.namePending, false),
+                eq(teams.autoJoinEnabled, true),
                 sql`${teams.autoJoinDomains} @> ${JSON.stringify([emailDomain])}::jsonb`
               )
             )
