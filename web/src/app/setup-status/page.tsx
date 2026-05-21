@@ -77,7 +77,7 @@ export default function SetupStatusPage() {
     <div className="min-h-screen">
       <Nav />
       <div data-testid="status-fetch-error" className="flex flex-col items-center justify-center h-64 gap-4">
-        <p className="text-slate-300 text-sm">{en ? "Failed to load setup status." : "셋업 상태를 불러오지 못했어요."}</p>
+        <p className="text-slate-300 text-sm">{en ? "Failed to load setup status." : "세팅 상태를 불러오지 못했어요."}</p>
         <p className="text-slate-500 text-xs">{en ? "Check your network/session and try again." : "네트워크·세션을 확인하고 다시 시도해주세요."}</p>
         <button
           data-testid="status-retry"
@@ -109,7 +109,7 @@ export default function SetupStatusPage() {
       <main className="max-w-2xl mx-auto px-4 py-6 space-y-6">
         <div className="flex items-center gap-3">
           <Link href="/dashboard" className="text-slate-400 hover:text-slate-200 text-sm">{en ? "← Home" : "← 메인"}</Link>
-          <h1 className="font-semibold text-slate-200">{en ? "Setup status" : "셋업 상태"}</h1>
+          <h1 className="font-semibold text-slate-200">{en ? "Setup status" : "세팅 상태"}</h1>
         </div>
 
         {/* Overall status */}
@@ -120,7 +120,7 @@ export default function SetupStatusPage() {
               <p className="font-semibold text-slate-100">
                 {data.ready
                   ? (en ? "Operating normally" : "정상 작동 중")
-                  : (en ? "Setup in progress" : "셋업 진행 중")}
+                  : (en ? "Setup in progress" : "세팅 진행 중")}
               </p>
               <p className="text-sm text-slate-400 mt-0.5">
                 {data.ready

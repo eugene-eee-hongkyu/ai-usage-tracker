@@ -7,7 +7,7 @@ export const ko: DeepPartial<Messages> = {
   nav: {
     personal: "개인",
     team: "팀",
-    setup: "셋업",
+    setup: "세팅",
     logout: "로그아웃",
     admin: "어드민",
   },
@@ -745,7 +745,7 @@ export const ko: DeepPartial<Messages> = {
       retry: "다시 시도",
     },
     saving: "저장 중…",
-    saved: "셋업 완료!",
+    saved: "세팅 완료!",
     error: "문제가 발생했습니다",
   },
 };
