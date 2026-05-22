@@ -32,8 +32,11 @@ interface CardData {
     savingsAmount: number;
     savingsPct: number;
   } | null;
+  // hookEnabled (SessionEnd hook 등록 여부) 필드는 frontend 에서 안 씀.
+  // install/repair 흐름에 hook 등록 함수 자체가 없고 (cron 기반 수집) 신규
+  // 사용자는 항상 false 라 misleading 신호였음. backend 응답엔 남아 있어도
+  // TypeScript narrower interface 라 무시됨.
   env: {
-    hookEnabled: boolean | null;
     ccusageMissing: boolean;
     npmRootWritable: boolean | null;
     deviceCount: number;
@@ -301,8 +304,6 @@ function UserCard({
       <div className="px-3 py-2.5 space-y-0.5 text-[11px] font-mono">
         <p className="text-[10px] text-slate-600 uppercase tracking-wider mb-1">Env</p>
         <div className="text-slate-400">
-          {markCheck(card.env.hookEnabled)} Hook
-          <span className="text-slate-700 mx-1.5">·</span>
           {card.env.ccusageMissing ? <span className="text-rose-400">✗</span> : <span className="text-emerald-400">✓</span>} ccusage
           <span className="text-slate-700 mx-1.5">·</span>
           {markCheck(card.env.npmRootWritable)} npm 쓰기

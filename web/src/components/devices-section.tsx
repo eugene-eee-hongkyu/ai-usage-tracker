@@ -14,7 +14,6 @@ interface DeviceMetadata {
   claudeCodeVersion?: string | null;
   codeburnVersion?: string | null;
   ccusageVersion?: string | null;
-  hookEnabled?: boolean | null;
   installMethod?: string;
   lastError?: { kind?: string; status?: number; statusText?: string; message?: string; at?: string } | null;
 }
@@ -196,9 +195,11 @@ export function DevicesSection() {
                         {d.metadata.ccusageVersion && (
                           <span>ccusage {d.metadata.ccusageVersion}</span>
                         )}
-                        {d.metadata.hookEnabled === false && (
-                          <span className="text-amber-400">⚠ SessionEnd hook 미등록</span>
-                        )}
+                        {/* 옛 "⚠ SessionEnd hook 미등록" 경고 제거 (2026-05-22).
+                            install/repair 흐름에 hook 등록 함수 자체가 없고
+                            (cron 기반 수집) 신규 사용자는 항상 false 라
+                            misleading. 데이터 수집은 launchd/Task Scheduler 가
+                            담당. */}
                         {d.metadata.installMethod && d.metadata.installMethod !== "unknown" && (
                           <span>installed via {d.metadata.installMethod}</span>
                         )}
