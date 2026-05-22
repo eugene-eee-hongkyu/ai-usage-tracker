@@ -6,7 +6,6 @@
 export const dynamic = "force-dynamic";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 
 interface CardData {
   userId: number;
@@ -83,7 +82,6 @@ const SYNC_COLOR_CLASS: Record<CardData["syncColor"], string> = {
 };
 
 export default function PlatformAdminAllUsersPage() {
-  const router = useRouter();
   const [users, setUsers] = useState<CardData[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [switchingTeamId, setSwitchingTeamId] = useState<number | null>(null);
@@ -105,14 +103,18 @@ export default function PlatformAdminAllUsersPage() {
     if (switchingTeamId !== null) return;
     setSwitchingTeamId(card.teamId);
     try {
-      // 기존 platform view-as API 재사용 — 해당 사용자의 팀으로 진입 후 dashboard 로.
+      // 기존 platform view-as API 재사용 — 해당 사용자의 팀으로 진입.
       const r = await fetch("/api/admin/platform/switch-team", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ teamId: card.teamId }),
       });
       if (!r.ok) throw new Error(String(r.status));
-      router.push(`/dashboard?targetUserId=${card.userId}`);
+      // admin/members 가 localStorage 에서 선택 user 읽어 dashboard 표시.
+      // /dashboard 는 본인 (eugene) 만 표시 — cross-tenant 멤버 보려면 admin/members 사용.
+      try { localStorage.setItem("teamMemberSelectedUserId", String(card.userId)); } catch { /* ignore */ }
+      // 세션 재로드 위해 full nav (router.push 만 하면 session.viewAsTeamName 갱신 지연).
+      window.location.href = "/admin/members";
     } catch (e) {
       console.error("switch-team failed", e);
       setSwitchingTeamId(null);

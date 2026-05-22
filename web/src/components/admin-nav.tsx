@@ -6,12 +6,16 @@ import { useSession } from "next-auth/react";
 import { useMessages } from "@/lib/use-i18n";
 
 // admin context 의 app-level nav — [ADMIN] 배지 + 회사명 + 팀/팀원/랭킹 탭.
+// Platform Admin view-as 모드면 view-as 팀명 우선 표시 (실제 보고 있는 팀 = view-as team).
 export function AdminNav() {
   const path = usePathname();
   const { m } = useMessages();
   const { data: session } = useSession();
-  const teamName =
-    (session?.user as { currentTeamName?: string | null } | undefined)?.currentTeamName ?? null;
+  const u = session?.user as {
+    currentTeamName?: string | null;
+    viewAsTeamName?: string | null;
+  } | undefined;
+  const teamName = u?.viewAsTeamName ?? u?.currentTeamName ?? null;
 
   const tabs = [
     { href: "/admin/team", label: m.adminNav.team },

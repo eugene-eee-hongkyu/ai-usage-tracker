@@ -49,10 +49,13 @@ function NavInner() {
   // dashboard / team 등 내부 링크에 현재 locale 유지.
   const withLocale = (href: string) => (href.includes("?") ? href : `${href}?locale=${locale}`);
 
-  const teamName =
-    !isLocalMode
-      ? ((session?.user as { currentTeamName?: string | null } | undefined)?.currentTeamName ?? null)
-      : null;
+  // view-as 모드면 view-as 팀명 우선. nexa view-as 중인데 'iskra.world' 로 표시되던 버그 fix.
+  const teamName = !isLocalMode
+    ? (() => {
+      const u = session?.user as { currentTeamName?: string | null; viewAsTeamName?: string | null } | undefined;
+      return u?.viewAsTeamName ?? u?.currentTeamName ?? null;
+    })()
+    : null;
 
   return (
     <header className="border-b border-slate-800 px-4 py-3 flex items-center justify-between gap-2">
