@@ -204,6 +204,7 @@ export async function GET(req: NextRequest) {
       slug: teams.slug,
       ownerId: teams.ownerId,
       namePending: teams.namePending,
+      maxMembers: teams.maxMembers,
       createdAt: teams.createdAt,
       deletedAt: teams.deletedAt,
     })

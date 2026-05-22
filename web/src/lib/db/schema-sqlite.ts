@@ -66,6 +66,8 @@ export const teams = sqliteTable(
     // M6f/M6g (2026-05-21): LOCAL_MODE 는 single-team 이라 사실상 사용 X, schema 일관성 위해 보유.
     autoJoinDomains: text("auto_join_domains", { mode: "json" }).notNull().default(sql`'[]'`),
     autoJoinEnabled: integer("auto_join_enabled", { mode: "boolean" }).notNull().default(true),
+    // LOCAL_MODE 는 single-team 이라 사실상 안 쓰지만 schema 일관성.
+    maxMembers: integer("max_members", { mode: "number" }).notNull().default(5),
     createdAt: integer("created_at", { mode: "timestamp_ms" })
       .notNull()
       .default(sql`(unixepoch() * 1000)`),

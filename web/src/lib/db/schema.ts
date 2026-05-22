@@ -71,6 +71,9 @@ export const teams = pgTable(
     // M6g (2026-05-21): 자동 가입 toggle. false 면 도메인 매칭 무시 + /join 으로.
     // Team Owner 또는 Platform Admin 만 변경 가능.
     autoJoinEnabled: boolean("auto_join_enabled").notNull().default(true),
+    // 2026-05-22: 회사별 활성 멤버 수 cap. auth.ts auto-join + invitations POST
+    // 에서 가드. Platform Admin 만 변경 (PATCH /api/admin/teams/[id]).
+    maxMembers: integer("max_members").notNull().default(5),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     deletedAt: timestamp("deleted_at"),
   },

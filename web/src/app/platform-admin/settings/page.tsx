@@ -25,6 +25,7 @@ interface TeamRow {
   slug: string;
   ownerId: number;
   namePending?: boolean;
+  maxMembers: number;
   createdAt: string;
   deletedAt: string | null;
   memberCount?: number;
@@ -140,7 +141,14 @@ function TeamsOverviewSection() {
                       )}
                     </p>
                     <p className="text-xs text-slate-500">
-                      생성: {new Date(t.createdAt).toLocaleDateString("ko")} · 멤버 {t.memberCount ?? 0}명
+                      생성: {new Date(t.createdAt).toLocaleDateString("ko")} ·{" "}
+                      <MemberCapInline
+                        teamId={t.id}
+                        teamName={t.name}
+                        memberCount={t.memberCount ?? 0}
+                        maxMembers={t.maxMembers}
+                        onSaved={fetchTeams}
+                      />
                       {t.deletedAt && (
                         <span className="text-amber-400 ml-2">
                           ● 삭제됨 ({new Date(t.deletedAt).toLocaleDateString("ko")})
@@ -189,6 +197,123 @@ function TeamsOverviewSection() {
         </div>
       )}
     </section>
+  );
+}
+
+// 멤버 cap 인라인 표시 + 편집. Platform Admin 만 (전체 settings 페이지 자체가
+// platform-admin layout 가드로 막혀 있어 호출 자체가 차단). cap 줄여도 기존
+// 멤버는 그대로 — 다음 auto-join / invitation 부터 막힘.
+function MemberCapInline({
+  teamId,
+  teamName,
+  memberCount,
+  maxMembers,
+  onSaved,
+}: {
+  teamId: number;
+  teamName: string;
+  memberCount: number;
+  maxMembers: number;
+  onSaved: () => void | Promise<void>;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [value, setValue] = useState(String(maxMembers));
+  const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  const atCap = memberCount >= maxMembers;
+  const overCap = memberCount > maxMembers; // cap 줄인 직후 일시적 상태
+
+  async function save() {
+    const n = parseInt(value, 10);
+    if (!Number.isInteger(n) || n < 1 || n > 1000) {
+      setErr("1~1000 정수만");
+      return;
+    }
+    setSaving(true);
+    setErr(null);
+    try {
+      const r = await fetch(`/api/admin/teams/${teamId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ maxMembers: n }),
+      });
+      if (!r.ok) {
+        const data = (await r.json().catch(() => ({}))) as { error?: string };
+        setErr(data.error ?? "실패");
+        return;
+      }
+      setEditing(false);
+      await onSaved();
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  if (!editing) {
+    return (
+      <span>
+        멤버{" "}
+        <span
+          className={
+            overCap
+              ? "text-amber-300 font-mono"
+              : atCap
+                ? "text-amber-400 font-mono"
+                : "text-slate-300 font-mono"
+          }
+        >
+          {memberCount}/{maxMembers}
+        </span>
+        {atCap && !overCap && <span className="text-amber-400 ml-1">·  cap 도달</span>}
+        {overCap && <span className="text-amber-300 ml-1">· cap 초과 (신규 가입만 차단)</span>}
+        <button
+          onClick={() => {
+            setValue(String(maxMembers));
+            setErr(null);
+            setEditing(true);
+          }}
+          className="ml-2 text-[10px] px-1.5 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300"
+          title={`${teamName} 의 멤버 cap 변경`}
+        >
+          cap 변경
+        </button>
+      </span>
+    );
+  }
+
+  return (
+    <span className="inline-flex items-center gap-1.5">
+      <span className="text-slate-400">멤버 {memberCount} /</span>
+      <input
+        type="number"
+        min={1}
+        max={1000}
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        disabled={saving}
+        className="w-16 bg-slate-950 border border-slate-700 rounded px-1.5 py-0.5 text-xs text-slate-100 font-mono"
+        autoFocus
+      />
+      <button
+        onClick={save}
+        disabled={saving}
+        className="text-[10px] px-2 py-0.5 rounded bg-indigo-700 hover:bg-indigo-600 text-indigo-50 disabled:opacity-40"
+      >
+        {saving ? "저장…" : "저장"}
+      </button>
+      <button
+        onClick={() => {
+          setEditing(false);
+          setErr(null);
+        }}
+        disabled={saving}
+        className="text-[10px] px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300"
+      >
+        취소
+      </button>
+      {err && <span className="text-[10px] text-red-400 ml-1">{err}</span>}
+    </span>
   );
 }
 

@@ -5,12 +5,12 @@
 // LOCAL_MODE 차단 (.dmg 는 1인용, admin 기능 없음).
 
 import { NextRequest, NextResponse } from "next/server";
-import { db, invitations, users, teamMembers, IS_LOCAL_MODE } from "@/lib/db";
+import { db, invitations, users, teamMembers, teams, IS_LOCAL_MODE } from "@/lib/db";
 import { requireMembershipAdmin } from "@/lib/auth-guards";
 import { writeAudit } from "@/lib/audit";
 import { sendInvitation } from "@/lib/email";
 import { getEffectiveTeamId } from "@/lib/effective-team";
-import { eq, and, isNull } from "drizzle-orm";
+import { eq, and, isNull, sql, gt } from "drizzle-orm";
 import crypto from "crypto";
 
 export const dynamic = "force-dynamic";
@@ -90,6 +90,44 @@ export async function POST(req: NextRequest) {
     .limit(1);
   if (pending[0]) {
     return NextResponse.json({ error: "invitation_pending", invitationId: pending[0].id }, { status: 409 });
+  }
+
+  // 2026-05-22: 회사별 멤버 cap 가드. 활성 멤버 + 미만료/미수락 pending 합산이
+  // cap 이상이면 거부. 이미 같은 이메일 pending 은 위 분기에서 차단.
+  const teamRow = await db
+    .select({ maxMembers: teams.maxMembers, name: teams.name })
+    .from(teams)
+    .where(eq(teams.id, effectiveTeamId))
+    .limit(1);
+  if (teamRow[0]) {
+    const cap = teamRow[0].maxMembers;
+    const activeCount = await db
+      .select({ c: sql<number>`count(*)::int` })
+      .from(teamMembers)
+      .where(and(eq(teamMembers.teamId, effectiveTeamId), isNull(teamMembers.deletedAt)));
+    const pendingCount = await db
+      .select({ c: sql<number>`count(*)::int` })
+      .from(invitations)
+      .where(
+        and(
+          eq(invitations.teamId, effectiveTeamId),
+          isNull(invitations.acceptedAt),
+          isNull(invitations.cancelledAt),
+          gt(invitations.expiresAt, new Date())
+        )
+      );
+    const used = (activeCount[0]?.c ?? 0) + (pendingCount[0]?.c ?? 0);
+    if (used >= cap) {
+      return NextResponse.json(
+        {
+          error: "team_cap_reached",
+          cap,
+          activeMembers: activeCount[0]?.c ?? 0,
+          pendingInvites: pendingCount[0]?.c ?? 0,
+        },
+        { status: 409 }
+      );
+    }
   }
 
   const token = crypto.randomBytes(32).toString("hex");

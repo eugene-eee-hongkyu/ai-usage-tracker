@@ -208,7 +208,7 @@ export const authOptions: NextAuthOptions = {
           // jsonb @> '["domain"]' — 배열 contains 매칭 + auto_join_enabled=true.
           // team 1개 매칭 가정 (첫 번째 사용).
           const autoTeamRows = await db
-            .select({ id: teams.id })
+            .select({ id: teams.id, maxMembers: teams.maxMembers })
             .from(teams)
             .where(
               and(
@@ -221,6 +221,25 @@ export const authOptions: NextAuthOptions = {
             .limit(1);
           if (autoTeamRows[0]) {
             const autoTeamId = autoTeamRows[0].id;
+            const cap = autoTeamRows[0].maxMembers;
+            // 2026-05-22: 회사별 멤버 cap 가드. cap 초과면 auto-join 거부 +
+            // /join 으로 폴백 (사람 판단 경로 — 어드민이 cap 늘리거나 별도 안내).
+            const activeCount = await db
+              .select({ c: sql<number>`count(*)::int` })
+              .from(teamMembers)
+              .where(and(eq(teamMembers.teamId, autoTeamId), isNull(teamMembers.deletedAt)));
+            if ((activeCount[0]?.c ?? 0) >= cap) {
+              await writeAudit({
+                teamId: autoTeamId,
+                actorUserId: null,
+                actorType: "system",
+                action: "auth.signup.auto_join_blocked_cap",
+                targetType: null,
+                targetId: null,
+                metadata: { email, provider, domain: emailDomain, cap, activeCount: activeCount[0]?.c ?? 0 },
+              });
+              return `/join?email=${encodeURIComponent(email)}&name=${encodeURIComponent(user.name ?? "")}&reason=cap`;
+            }
             const inserted = await db
               .insert(users)
               .values({
