@@ -139,6 +139,7 @@ export async function GET() {
     email: string;
     lastSyncedAt: string | null;
     syncColor: "green" | "yellow" | "red" | "none";
+    planTier: PlanTier;
     today: {
       tokens: number;
       cost: number;
@@ -245,6 +246,7 @@ export async function GET() {
       email: r.userEmail,
       lastSyncedAt: r.lastSyncedAt?.toISOString() ?? null,
       syncColor: syncColor(r.lastSyncedAt),
+      planTier: declared,
       today,
       planSavings,
       env: {

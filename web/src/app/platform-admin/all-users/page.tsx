@@ -16,6 +16,8 @@ interface CardData {
   email: string;
   lastSyncedAt: string | null;
   syncColor: "green" | "yellow" | "red" | "none";
+  // 사용자가 선언한 plan tier. null 이면 미입력 (자동 추정 별도).
+  planTier: "pro" | "max5" | "max20" | "team_standard" | "team_premium" | "team" | "api" | null;
   today: {
     tokens: number;
     cost: number;
@@ -73,6 +75,20 @@ function fmtAbsoluteTime(iso: string | null): string {
     year: "numeric", month: "2-digit", day: "2-digit",
     hour: "2-digit", minute: "2-digit",
   });
+}
+
+// 25-05-22 14:30:45 짧은 형식 — 카드 header 의 상대시간 (1h 전) 아래에 보조 표시.
+function fmtShortAbsolute(iso: string | null): string {
+  if (!iso) return "—";
+  const dt = new Date(iso);
+  if (isNaN(dt.getTime())) return "—";
+  const yy = String(dt.getFullYear()).slice(-2);
+  const mm = String(dt.getMonth() + 1).padStart(2, "0");
+  const dd = String(dt.getDate()).padStart(2, "0");
+  const hh = String(dt.getHours()).padStart(2, "0");
+  const mi = String(dt.getMinutes()).padStart(2, "0");
+  const ss = String(dt.getSeconds()).padStart(2, "0");
+  return `${yy}-${mm}-${dd} ${hh}:${mi}:${ss}`;
 }
 
 const SYNC_COLOR_CLASS: Record<CardData["syncColor"], string> = {
@@ -194,13 +210,18 @@ function UserCard({
           <div className="text-[11px] text-slate-500 font-mono truncate">{card.teamName}</div>
         </div>
         <div
-          className={`text-[11px] font-mono shrink-0 ${SYNC_COLOR_CLASS[card.syncColor]}`}
+          className="shrink-0 text-right"
           title={fmtAbsoluteTime(card.lastSyncedAt)}
         >
-          {card.syncColor === "green" && "✓ "}
-          {card.syncColor === "yellow" && "⚠ "}
-          {card.syncColor === "red" && "✗ "}
-          {fmtTimeAgo(card.lastSyncedAt)}
+          <div className={`text-[11px] font-mono ${SYNC_COLOR_CLASS[card.syncColor]}`}>
+            {card.syncColor === "green" && "✓ "}
+            {card.syncColor === "yellow" && "⚠ "}
+            {card.syncColor === "red" && "✗ "}
+            {fmtTimeAgo(card.lastSyncedAt)}
+          </div>
+          <div className="text-[10px] font-mono text-slate-600 mt-0.5 whitespace-nowrap">
+            {fmtShortAbsolute(card.lastSyncedAt)}
+          </div>
         </div>
       </div>
 
@@ -246,8 +267,14 @@ function UserCard({
         </div>
       )}
 
-      {/* PLAN 절감 */}
-      {card.planSavings ? (
+      {/* PLAN 절감 — API tier 면 별도 라벨, 그 외 절감액. */}
+      {card.planTier === "api" ? (
+        <div className="px-3 py-2.5 border-b border-slate-800">
+          <p className="text-[10px] text-slate-600 font-mono uppercase tracking-wider mb-1">Plan 절감</p>
+          <p className="text-sm font-mono text-amber-300 font-bold">API 사용 중</p>
+          <p className="text-[11px] font-mono text-slate-500 mt-0.5">PAYG · 플랜 비교 N/A</p>
+        </div>
+      ) : card.planSavings ? (
         <div className="px-3 py-2.5 border-b border-slate-800">
           <p className="text-[10px] text-slate-600 font-mono uppercase tracking-wider mb-1">Plan 절감</p>
           <div className="text-xs font-mono">
@@ -270,7 +297,7 @@ function UserCard({
       ) : (
         <div className="px-3 py-2.5 border-b border-slate-800">
           <p className="text-[10px] text-slate-600 font-mono uppercase tracking-wider mb-1">Plan 절감</p>
-          <p className="text-xs font-mono text-slate-600">tier 미입력 또는 API 종량제</p>
+          <p className="text-xs font-mono text-slate-600">tier 미입력</p>
         </div>
       )}
 
