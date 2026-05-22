@@ -907,48 +907,50 @@ export async function GET(req: NextRequest) {
     monthlyCostUsd: planBlocksMonthlyCost,
   });
 
-  // user_blocks 기반 1차 집계
-  const planBlockTotalTokens = planBlockRows.reduce((s, b) => s + Number(b.totalTokens ?? 0), 0);
-  const planBlockActiveDates = new Set(
-    planBlockRows.map((b) => b.startedAt.toISOString().slice(0, 10))
-  );
-  const planBlockActiveDays = planBlockActiveDates.size;
-  const planBlockCount = planBlockRows.length;
+  // Period 단위 ccusage daily 집계 — totalWindowTokens / cache hit / non-cache 의
+  // 단일 출처. 이전엔 user_blocks 합 (+ overview fallback) 으로 5h 단위, codeburn
+  // cacheHit 로 비례 분해했으나 단위 혼재 + "오늘 = N tokens" 가 hero (ccusage
+  // daily) 와 다른 숫자 표시되는 혼란 발생. ccusage daily 로 통일 (2026-05-22 결정).
+  const ccusagePeriodAgg = (() => {
+    if (strictTodayCc) {
+      return {
+        totalTokens: strictTodayCc.totalTokens,
+        inputTokens: strictTodayCc.inputTokens,
+        outputTokens: strictTodayCc.outputTokens,
+        cacheReadTokens: strictTodayCc.cacheReadTokens,
+        cacheCreationTokens: strictTodayCc.cacheCreationTokens,
+      };
+    }
+    const periodDates = new Set(dailyTokens.map((d) => d.date));
+    const rows = ccusageRows.filter((r) => r.date && periodDates.has(r.date));
+    return {
+      totalTokens: rows.reduce((s, r) => s + (r.totalTokens ?? 0), 0),
+      inputTokens: rows.reduce((s, r) => s + (r.inputTokens ?? 0), 0),
+      outputTokens: rows.reduce((s, r) => s + (r.outputTokens ?? 0), 0),
+      cacheReadTokens: rows.reduce((s, r) => s + (r.cacheReadTokens ?? 0), 0),
+      cacheCreationTokens: rows.reduce((s, r) => s + (r.cacheCreationTokens ?? 0), 0),
+    };
+  })();
+  const totalWindowTokens = ccusagePeriodAgg.totalTokens;
+  // period 내 활성일 = ccusage daily 의 활동 일자 수. periodDays 로 cap (boundary 방어).
+  const effectiveActiveDays = Math.min(periodDays, activeDays);
 
-  // today/8days fallback — user_blocks 는 5h 블록이 종료될 때만 저장됨.
-  // 진행 중인 active 블록은 미저장이라 "오늘" period 에 user_blocks 가 비어
-  // overview 에 데이터가 있어도 hero 카드가 빈 상태로 보이는 버그. period
-  // 윈도우에서 user_blocks total 이 overview total 보다 명백히 작으면
-  // overview 의 ov.tokens 합으로 fallback.
-  const overviewTotalTokens = tRead + tWrite + tInput + tOutput;
-  const useOverviewFallback = overviewTotalTokens > planBlockTotalTokens * 1.5;
-  const totalWindowTokens = useOverviewFallback
-    ? overviewTotalTokens
-    : planHealth.totalWindowTokens;
-  // periodDays 로 cap — codeburn/ccusage merge 가 boundary day 포함해 9/8일
-  // 같은 비정상 값이 들어오는 케이스 방어.
-  const effectiveActiveDays = Math.min(
-    periodDays,
-    useOverviewFallback ? Math.max(planBlockActiveDays, activeDays) : planBlockActiveDays
-  );
-  const effectiveBlockCount = useOverviewFallback
-    // overview 기반일 때 block count 추정 = activeDays × (typical 1.5 blocks/day)
-    // — 1일 활동 시간 5~8시간 가정.
-    ? Math.max(planBlockCount, Math.ceil(effectiveActiveDays * 1.5))
-    : planBlockCount;
-
-  // 캐시 제외 토큰 사용률 — totalWindowTokens 는 cache_read 포함이라 5h 한도와
-  // 직접 비교 시 100% 훌쩍 초과. period 의 cacheHitPct 로 비례 분해해 cache 제외
-  // 토큰 추정 후 (한도 × 블록수) 분모로 평균 블록 사용률 산출. 100% cap.
-  const cacheHitPctForPeriod = cacheHitPct > 0 ? cacheHitPct : null;
-  const blockCountInPeriod = effectiveBlockCount;
-  const limit5h = planHealth.declaredLimits?.estimated5hTokenLimit ?? 0;
-  const nonCacheTotalWindowTokens = cacheHitPctForPeriod !== null
-    ? Math.round(totalWindowTokens * (1 - cacheHitPctForPeriod / 100))
+  // cache hit / non-cache — ccusage daily 의 cache 필드로 직접 계산.
+  const ccCacheDenom =
+    ccusagePeriodAgg.cacheReadTokens +
+    ccusagePeriodAgg.cacheCreationTokens +
+    ccusagePeriodAgg.inputTokens;
+  const cacheHitPctForPeriod = ccCacheDenom > 0
+    ? (ccusagePeriodAgg.cacheReadTokens / ccCacheDenom) * 100
     : null;
-  const realUsagePct = (nonCacheTotalWindowTokens !== null && limit5h > 0 && blockCountInPeriod > 0)
-    ? Math.min(100, Math.round((nonCacheTotalWindowTokens / (limit5h * blockCountInPeriod)) * 100))
+  const nonCacheTotalWindowTokens = ccusagePeriodAgg.totalTokens > 0
+    ? ccusagePeriodAgg.inputTokens + ccusagePeriodAgg.outputTokens
     : null;
+  // realUsagePct — 5h cap 단위 분석. ccusage daily 통일로 산정 불가, 항상 null.
+  const realUsagePct = null;
+  // blockCountInPeriod — 응답 shape 유지용 (user_blocks 데이터는 ingest 가 계속
+  // 누적, 향후 카드 부활 시 즉시 사용 가능). UI 에선 더 이상 표시 안 함.
+  const blockCountInPeriod = planBlockRows.length;
 
   // priceForPeriod — 월 요금을 period 일수에 비례 배분.
   // tier 미입력 사용자도 추정 (P90 + cost) 으로 단가 계산. UI 에서 (추정) 명시.

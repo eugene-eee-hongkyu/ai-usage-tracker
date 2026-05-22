@@ -91,7 +91,6 @@ interface MemberStat {
   ccusageMissing?: boolean;
   monthVisits: number;        // 이번달 (UTC) 방문 횟수
   avgDwellSec: number;        // 이번달 평균 체류 (초)
-  tokensPerMinute: number | null;  // user_blocks 기반 분당 토큰. 블록 없으면 null
   avgDailyTokens: number;     // period 활성일 평균 total tokens (사용량 신호)
 }
 

@@ -26,7 +26,6 @@ interface UsageHeroProps {
   declaredTierLabel: string | null;
   priceForPeriod: number | null;  // monthlyPriceUsd × periodDays/30
   totalWindowTokens: number;
-  realUsagePct: number | null;
   nonCacheTotalWindowTokens: number | null;
   cacheHitPctForPeriod: number | null;
   // viewOnly = 어드민이 멤버 dashboard 봄. tier select / hint 숨기고 read-only 라벨만.
@@ -137,7 +136,6 @@ export function UsageHero({
   priceForPeriod,
   totalWindowTokens,
   hasActivity = true,
-  realUsagePct,
   nonCacheTotalWindowTokens,
   cacheHitPctForPeriod,
   viewOnly = false,
@@ -477,12 +475,10 @@ export function UsageHero({
                   <p>
                     {periodLabel}: <span className="text-neutral-300">{fmtTokens(totalWindowTokens)}</span> {m.common.tokens}
                   </p>
-                  {realUsagePct !== null && nonCacheTotalWindowTokens !== null && (
+                  {nonCacheTotalWindowTokens !== null && (
                     <p data-testid="usage-hero-real-usage" className="pt-1 border-t border-neutral-800/60 mt-1">
-                      <span className="text-neutral-600">{m.usageHero.cacheExcludedRate} </span>
-                      <span className="text-neutral-200 font-bold">{realUsagePct}%</span>
                       <span className="text-neutral-600">
-                        {" "}· non-cache <span className="text-neutral-400">{fmtTokens(nonCacheTotalWindowTokens)}</span>
+                        non-cache <span className="text-neutral-400">{fmtTokens(nonCacheTotalWindowTokens)}</span>
                         {cacheHitPctForPeriod !== null && (
                           <> · cache hit {cacheHitPctForPeriod.toFixed(1)}%</>
                         )}

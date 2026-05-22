@@ -161,7 +161,6 @@ export interface Messages {
     tierModalStep2: string;
     tierModalStep3: string;
     tierModalDismiss: string;       // 나중에 입력
-    cacheExcludedRate: string;      // 캐시 제외 사용률
     sonnetAnchorHint: string;       // Sonnet API 입력 $3 / 1M 기준 — ? 누르면 10단계 위치 표시
     unitCostBreakdownTitle: string; // 토큰 단가 10단계 — 낮은 단가 = 높은 레벨
     unitCostReadingTitle: string;   // 읽는 법
@@ -590,15 +589,6 @@ export interface Messages {
     dayCellScore: string;
     dayCellCost: string;
     todaySuffix: string;
-    activeBlocksEmpty: string;
-    patternCriteriaSuffix: string;
-    patternDisclaimer: string;
-    activeBlocks: string;
-    avgLength: string;
-    tokensPerMin: string;
-    longestBlock: string;
-    deltaWindowTitle: string;
-    lengthDistribution: string;
     dwellHeatmapLabel: string;
     dwellMonthVisits: string;
     inProgressAt: string;
@@ -608,14 +598,6 @@ export interface Messages {
     efficiencyTodayLabel: string;
     efficiencyAvgLabel: string;
     efficiencyFormula: string;
-    patternImmersive: string;
-    patternDistributed: string;
-    patternBalanced: string;
-    patternSporadic: string;
-    patternImmersiveTooltip: string;
-    patternDistributedTooltip: string;
-    patternBalancedTooltip: string;
-    patternSporadicTooltip: string;
     dayOffsetYesterday: string;
     dayOffset2: string;
     dayOffsetN: string;
@@ -842,7 +824,6 @@ export const en: Messages = {
     tierModalStep2: "2. Or in the terminal run {cmd} → type {slash}",
     tierModalStep3: "3. Pick the plan shown there in the select above",
     tierModalDismiss: "Enter later",
-    cacheExcludedRate: "Cache-excluded usage",
     sonnetAnchorHint: "Anchor: Sonnet API input $3 / 1M — press ? to see the 10 levels",
     unitCostBreakdownTitle: "Unit Cost — 10 levels (lower price = higher level)",
     unitCostReadingTitle: "How to read",
@@ -1341,15 +1322,6 @@ export const en: Messages = {
     dayCellScore: "{date} · {score} pts · {label}",
     dayCellCost: "{date} · ${cost}",
     todaySuffix: " · today",
-    activeBlocksEmpty: "Not enough data — shown once 5+ blocks accumulate.",
-    patternCriteriaSuffix: " criteria",
-    patternDisclaimer: "Pattern is for self-awareness, not good/bad.",
-    activeBlocks: "Active blocks",
-    avgLength: "Avg length",
-    tokensPerMin: "Tokens / min",
-    longestBlock: "Longest block",
-    deltaWindowTitle: "vs. previous same-length window",
-    lengthDistribution: "Length distribution",
     dwellHeatmapLabel: "Dwell heatmap ({weeks} weeks, total minutes/day",
     dwellMonthVisits: " · this month {n} visits · avg {time}",
     inProgressAt: " (in progress · {hh}:{mm})",
@@ -1359,18 +1331,6 @@ export const en: Messages = {
     efficiencyTodayLabel: "Today's efficiency",
     efficiencyAvgLabel: "{period} avg efficiency",
     efficiencyFormula: "cache 42 + one-shot 18 + cost 10 + usage 30",
-    patternImmersive: "Immersive",
-    patternDistributed: "Distributed",
-    patternBalanced: "Balanced",
-    patternSporadic: "Sporadic",
-    patternImmersiveTooltip:
-      "Median 4h+ or 50%+ blocks ≥4h. Deep focus pattern — once started, fills nearly the entire 5h billing block.",
-    patternDistributedTooltip:
-      "Median <1h or 50%+ blocks <1h. Short, frequent sessions. Small work units or distributed work.",
-    patternBalancedTooltip:
-      "Median 1–4h with a mix of short and long blocks. Depth adjusted to task type.",
-    patternSporadicTooltip:
-      "Fewer than 10 active blocks. Occasional use — small sample size, lower reliability of other indicators.",
     dayOffsetYesterday: "yesterday",
     dayOffset2: "2 days ago",
     dayOffsetN: "{n} days ago",

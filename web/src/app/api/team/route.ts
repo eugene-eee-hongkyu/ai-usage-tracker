@@ -653,24 +653,14 @@ export async function GET(req: NextRequest) {
     });
     memberHealthList.push({ userId: u.id, name: u.name, health, isEstimated: isEstimatedMember });
 
-    // user_blocks 기반 1차 집계
-    const memActiveDates = new Set(blocks.map((b) => b.startedAt.toISOString().slice(0, 10)));
-    const blockActiveDays = memActiveDates.size;
-    const blockTotalTokens = blocks.reduce((s, b) => s + b.totalTokens, 0);
-
-    // today/8days fallback — user_blocks 가 5h 종료 후 저장이라 진행 중 블록은
-    // 미포함. overview 가 명백히 크면 ov 값 사용 (개인 dashboard 와 동일 패턴).
+    // ccusage daily 기반 활용지수·토큰단가 입력값. 이전엔 user_blocks 합 (overview
+    // fallback) 으로 5h 단위였으나 단위 통일 (2026-05-22 결정) — memberStats.totalTokens
+    // 는 이미 ccusage daily strict today / periodDates filter 통과한 값.
     const member = memberStatsById.get(u.id);
-    const ovTokens = member?.totalTokens ?? 0;
-    const ovActiveDays = member?.memberActiveDays ?? 0;
-    const useOvFallback = ovTokens > blockTotalTokens * 1.5;
-    const effectiveTokens = useOvFallback ? ovTokens : blockTotalTokens;
+    const effectiveTokens = member?.totalTokens ?? 0;
     // periodDays 로 cap — codeburn/ccusage merge 가 boundary day 포함해
     // 9/8일 같은 비정상 값 방어.
-    const effectiveActiveDays = Math.min(
-      periodDays,
-      useOvFallback ? Math.max(blockActiveDays, ovActiveDays) : blockActiveDays
-    );
+    const effectiveActiveDays = Math.min(periodDays, member?.memberActiveDays ?? 0);
 
     // 활용지수 — 활성 멤버만 (effectiveActiveDays > 0).
     let memScore = 0;
