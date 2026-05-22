@@ -1,4 +1,5 @@
-// /admin/audit — audit log viewer + Integrity badge.
+// /platform-admin/audit — audit log viewer + Integrity badge.
+// 이전 경로: /admin/audit. 2026-05-22 어드민 / 플랫폼 어드민 화면 분리로 이동.
 // 페이지 진입 시 자동 verify_audit_chain() 호출 (cron 없음, 사용자 결정 2026-05-18).
 
 "use client";

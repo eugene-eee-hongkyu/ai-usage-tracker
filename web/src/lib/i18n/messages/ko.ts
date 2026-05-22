@@ -10,6 +10,7 @@ export const ko: DeepPartial<Messages> = {
     setup: "세팅",
     logout: "로그아웃",
     admin: "어드민",
+    platformAdmin: "플랫폼 어드민",
   },
   about: {
     title: "버전 정보",

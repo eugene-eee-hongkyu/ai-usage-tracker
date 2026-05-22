@@ -1,5 +1,7 @@
-// /admin/platform — Platform Admin (ADMIN_EMAIL env 화이트리스트) 전용.
-// eugene 만 접근. 모든 팀 현황 + view-as switcher + 새 팀 생성/초대.
+// /platform-admin/settings — Platform Admin (ADMIN_EMAIL env 화이트리스트) 전용.
+// 이전 경로: /admin/platform. 2026-05-22 어드민 / 플랫폼 어드민 화면 분리 결정으로
+// /platform-admin/* 하위로 이동. 기능 동일 — 모든 팀 현황 + view-as switcher + 새
+// 팀 생성/초대.
 //
 // 권한 위계:
 //   Platform Admin (session.user.isPlatformAdmin)  ← 이 페이지 접근 가능
@@ -8,7 +10,7 @@
 //   Member
 //
 // "팀 권한 변경" / "비활성 사용자" / "데이터 보관 기간" 같은 자기 팀 단위 설정은
-// /admin/settings 에 남는다.
+// /admin/settings 에 남는다 (어드민 영역).
 
 "use client";
 
@@ -29,13 +31,13 @@ interface TeamRow {
   members?: Array<{ userId: number; email: string; name: string; role: string }>;
 }
 
-export default function AdminPlatformPage() {
+export default function PlatformAdminSettingsPage() {
   return (
     <div className="space-y-8">
       <header>
-        <h1 className="text-lg font-bold text-slate-100">Platform Admin</h1>
+        <h1 className="text-lg font-bold text-slate-100">Settings</h1>
         <p className="text-xs text-slate-500 mt-1">
-          ADMIN_EMAIL env 화이트리스트 사용자 전용. 모든 팀 현황 · view-as 진입 · 새 팀 생성 + 첫 owner 초대.
+          모든 팀 현황 · view-as 진입 · 새 팀 생성 + 첫 owner 초대.
         </p>
       </header>
       <TeamsOverviewSection />

@@ -138,6 +138,16 @@ function NavInner() {
                 {m.nav.admin}
               </Link>
             )}
+            {session?.user?.isPlatformAdmin && (
+              <Link
+                href={withLocale("/platform-admin/audit")}
+                data-testid="nav-platform-admin"
+                onClick={() => setOpen(false)}
+                className="block px-4 py-2 text-sm text-rose-300 hover:bg-slate-700 border-t border-slate-700 w-full text-left"
+              >
+                {m.nav.platformAdmin}
+              </Link>
+            )}
           </div>
         )}
       </div>
