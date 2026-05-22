@@ -1660,22 +1660,13 @@ export function TeamView({ adminMode = false }: { adminMode?: boolean }) {
             </div>
 
             {/* Row 1.5: Daily Cost Trend — stacked (per-member) + total.
-                period="today" 면 1점 데이터 (단일 dot 표시). > 0 이면 렌더. */}
+                period="today" 면 1점 데이터 (단일 dot 표시). > 0 이면 렌더.
+                cost ≈ tokens × 평균 단가 라 token trend 짝은 모양이 거의
+                동일 → 자세히 보기 안 (core tools / shell 아래) 로 분리. */}
             {(data.dailyByMember ?? []).length > 0 && (
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                 {byMemberBlock}
                 {totalBlock}
-              </div>
-            )}
-
-            {/* Row 1.6: Daily Token Trend — Row 1.5 의 token 짝.
-                자세히 보기 안에 있던 걸 cost 차트 바로 아래로 승격
-                (2026-05-22) — cost / tokens 두 단위가 같은 위치에서 비교되는
-                게 사용자 직관에 맞음. */}
-            {dailyByMemberTokens.length > 0 && (
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                {byMemberTokenBlock}
-                {totalTokenBlock}
               </div>
             )}
 
@@ -1752,7 +1743,18 @@ export function TeamView({ adminMode = false }: { adminMode?: boolean }) {
               </div>
             )}
 
-            </>)}  {/* detailsOpen 토글 닫기 — efficiency · Row 4 · Row 5 · Top Sessions */}
+            {/* Row 6: By Member (tokens) + Team Total (tokens) — main 의 cost
+                trend 와 모양이 거의 같아 자세히 보기 안으로 분리. raw 토큰
+                사용량을 확인하고 싶을 때 (모델 mix 변화, cache hit 변화로
+                cost 와 다른 곡선이 되는 경우) 만 펼침. */}
+            {dailyByMemberTokens.length > 0 && (
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                {byMemberTokenBlock}
+                {totalTokenBlock}
+              </div>
+            )}
+
+            </>)}  {/* detailsOpen 토글 닫기 — efficiency · Row 4 · Row 5 · Top Sessions · Row 6 tokens */}
 
             {/* Team Plan Health (admin only) — full width, 매니저 의사결정용 */}
             {adminUser && data.teamPlanHealth && (
