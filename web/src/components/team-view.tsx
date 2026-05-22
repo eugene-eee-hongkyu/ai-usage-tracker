@@ -1599,6 +1599,16 @@ export function TeamView({ adminMode = false }: { adminMode?: boolean }) {
           </div>
         ) : (
           <>
+            {/* admin 한테는 Team Plan Health + 30일 방문 패턴 카드를 토글
+                두 개 (기본·세부 팀정보) 위로. 매니저 의사결정 카드 (full-
+                width) 가 먼저 보이고 차트 detail 은 아래 토글로 drill-down.
+                비-admin 한테는 두 카드 자체가 안 보임 (adminUser 조건). */}
+            {adminUser && data.teamPlanHealth && (
+              <TeamPlanHealthCard summary={data.teamPlanHealth} />
+            )}
+
+            {dailyVisitsBlock}
+
             {/* 기본 팀정보 자세히 보기 토글 (admin only) — TeamUsageHero +
                 Row 1·2·2.5 + headline 묶음. 멤버도 보는 정보라 admin 에게는
                 default 닫힘. 비-admin 은 토글 없이 항상 펼쳐짐. */}
@@ -1756,12 +1766,9 @@ export function TeamView({ adminMode = false }: { adminMode?: boolean }) {
 
             </>)}  {/* detailsOpen 토글 닫기 — efficiency · Row 4 · Row 5 · Top Sessions · Row 6 tokens */}
 
-            {/* Team Plan Health (admin only) — full width, 매니저 의사결정용 */}
-            {adminUser && data.teamPlanHealth && (
-              <TeamPlanHealthCard summary={data.teamPlanHealth} />
-            )}
-
-            {dailyVisitsBlock}
+            {/* Team Plan Health + dailyVisitsBlock 은 fragment 최상단으로
+                이동 (admin 한테 토글 두 개가 맨 아래에 위치하도록). 비-admin
+                한테는 두 카드 자체가 adminUser 조건으로 안 보여 무관. */}
 
             {/* (Row 7 Industry Comparison 카드는 page top "team-card-headline"
                  으로 흡수·이동 — Q1/Q2/Q3 일괄 해결) */}
