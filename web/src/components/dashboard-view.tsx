@@ -1766,28 +1766,11 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
           본인 view 만. viewOnly 면 어드민 컨텍스트라 별도 banner 불필요. */}
       {!viewOnly && <PrivacyBanner />}
 
-      {/* Usage Hero — Power Index (활용 지수) + Plan 활용률 동등 크기 2-card.
-          인터뷰 4/4 일치: "사용량/cost 만 본다, 효율 점수는 약하다".
-          최상단 hero — F-pattern top-left + Dashboard UX best practice. */}
-      {data.powerIndex && (
-        <UsageHero
-          powerIndex={data.powerIndex.score}
-          activeDays={data.powerIndex.activeDays}
-          avgDailyTokens={data.powerIndex.avgDailyTokens}
-          periodDays={data.planHealth?.periodDays ?? 30}
-          periodLabel={periodLabel(period, t)}
-          declaredTier={data.user.planTier ?? null}
-          declaredTierLabel={data.planHealth?.declaredLimits?.label ?? null}
-          priceForPeriod={data.planHealth?.priceForPeriod ?? null}
-          totalWindowTokens={data.planHealth?.totalWindowTokens ?? 0}
-          nonCacheTotalWindowTokens={data.planHealth?.nonCacheTotalWindowTokens ?? null}
-          cacheHitPctForPeriod={data.planHealth?.cacheHitPctForPeriod ?? null}
-          viewOnly={viewOnly}
-          isEstimatedTier={data.planHealth?.isEstimatedTier ?? false}
-          hasActivity={chartData.some((d) => (d.cost ?? 0) > 0)}
-          apiRecommendation={data.planHealth?.apiRecommendation ?? null}
-        />
-      )}
+      {/* Usage Hero (활용지수 + 토큰단가 / API 추천) 는 더 이상 최상단에 두지
+          않는다. 사용자 인터뷰에서 진입 후 가장 먼저 확인하는 건 "얼마나 썼나"
+          (Daily Activity/Cost) 와 "내 플랜 대비 잘 쓰고 있나" (일별 토큰 단가 +
+          Plan 절감) → 활용지수·토큰단가는 한 단계 더 깊은 지표라 main 안쪽
+          Row 1.5 다음으로 내림 (아래 embedded=true 렌더 참조). */}
 
       {/* Overview Bar — 사용자 인터뷰에서 "activity + cost 만 본다" 답이 다수.
           폰트 키우고 hero 수준으로 시각 승격. */}
@@ -1813,9 +1796,9 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
             <span className="text-yellow-400 font-bold text-2xl tabular-nums">${ov.cost.toFixed(2)}</span>
             <span className="text-neutral-500 text-xs">cost</span>
           </span>
-          {/* secondary — calls / sessions / cache / 1-shot 은 기존 사이즈 유지 */}
-          <span className="text-sm"><span className="text-blue-400 font-bold">{ov.calls.toLocaleString()}</span><span className="text-neutral-500 ml-1 text-xs">calls</span></span>
-          <span className="text-sm"><span className="text-cyan-400 font-bold">{ov.sessions}</span><span className="text-neutral-500 ml-1 text-xs">sessions</span></span>
+          {/* secondary — 효율 지표 (cache hit / 1-shot) 만. calls·sessions 는
+              "얼마나 썼나" 는 token·cost 로 이미 알 수 있고 hero 띠는 한 줄
+              유지 우선이라 제거. */}
           <span className="text-sm"><span className="text-emerald-400 font-bold">{ov.cacheHitPct.toFixed(1)}%</span><span className="text-neutral-500 ml-1 text-xs">cache hit</span></span>
           <span className="text-sm"><span className="text-violet-400 font-bold">{Math.round(ov.oneShotRate * 100)}%</span><span className="text-neutral-500 ml-1 text-xs">1-shot</span></span>
           <span className="text-neutral-600 text-xs self-center ml-auto flex items-center gap-3">
@@ -1941,6 +1924,29 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
             {unitCostBlock}
             {planSavingsBlock}
           </div>
+        )}
+
+        {/* Row 1.6: 활용지수 + 토큰단가 (또는 API 추천). embedded 모드 — main
+            grid 안에서 다른 카드 row 들과 동일 스타일. */}
+        {data.powerIndex && (
+          <UsageHero
+            embedded
+            powerIndex={data.powerIndex.score}
+            activeDays={data.powerIndex.activeDays}
+            avgDailyTokens={data.powerIndex.avgDailyTokens}
+            periodDays={data.planHealth?.periodDays ?? 30}
+            periodLabel={periodLabel(period, t)}
+            declaredTier={data.user.planTier ?? null}
+            declaredTierLabel={data.planHealth?.declaredLimits?.label ?? null}
+            priceForPeriod={data.planHealth?.priceForPeriod ?? null}
+            totalWindowTokens={data.planHealth?.totalWindowTokens ?? 0}
+            nonCacheTotalWindowTokens={data.planHealth?.nonCacheTotalWindowTokens ?? null}
+            cacheHitPctForPeriod={data.planHealth?.cacheHitPctForPeriod ?? null}
+            viewOnly={viewOnly}
+            isEstimatedTier={data.planHealth?.isEstimatedTier ?? false}
+            hasActivity={chartData.some((d) => (d.cost ?? 0) > 0)}
+            apiRecommendation={data.planHealth?.apiRecommendation ?? null}
+          />
         )}
 
         {/* Row 2: Efficiency + Activity Heatmap */}

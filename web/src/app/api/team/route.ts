@@ -787,6 +787,21 @@ export async function GET(req: NextRequest) {
     return row;
   });
 
+  // Daily by member (tokens) — same shape as dailyByMember 지만 토큰 단위.
+  // 자세히 보기 안쪽 By Member Tokens / Team Total Tokens 차트용.
+  const dailyTokenDatesAll = [...dailyTokensMemberMap.keys()].sort();
+  const dailyTokenDates = period === "today" && dailyTokenDatesAll.length > 0
+    ? [dailyTokenDatesAll[dailyTokenDatesAll.length - 1]]
+    : dailyTokenDatesAll;
+  const dailyByMemberTokens = dailyTokenDates.map((date) => {
+    const row: Record<string, number | string> = { date };
+    const tokensMap = dailyTokensMemberMap.get(date) ?? {};
+    for (const name of memberNames) {
+      row[name] = tokensMap[name] ?? 0;
+    }
+    return row;
+  });
+
   const topSessions = allTopSessions
     .sort((a, b) => b.cost - a.cost)
     .slice(0, 15);
@@ -925,6 +940,7 @@ export async function GET(req: NextRequest) {
     daily,
     teamActivities,
     dailyByMember,
+    dailyByMemberTokens,
     memberNames,
     topSessions,
     teamModels,

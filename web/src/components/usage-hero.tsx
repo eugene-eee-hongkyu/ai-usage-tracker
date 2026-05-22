@@ -45,6 +45,10 @@ interface UsageHeroProps {
   // tier 미입력 + activity 0 케이스 — 팝업 메시지 분기.
   // false 이면 tier 입력 권유보다 CLI sync 확인 안내가 우선 actionable.
   hasActivity?: boolean;
+  // main 컨테이너 안쪽 (Row 2 위치) 에 카드로 렌더할 때 full-bleed 배경/패딩
+  // 제거. dashboard 첫 진입 시 "활용지수/토큰단가" 가 Daily Cost/Plan 절감
+  // 아래로 내려가는 새 레이아웃에서 사용.
+  embedded?: boolean;
 }
 
 function tierOptions(m: Messages): Array<{ value: string; label: string }> {
@@ -151,6 +155,7 @@ export function UsageHero({
   apiRecommendation,
   viewOnly = false,
   isEstimatedTier = false,
+  embedded = false,
 }: UsageHeroProps) {
   const { m } = useMessages();
   const power = powerGrade(powerIndex, m);
@@ -286,8 +291,11 @@ export function UsageHero({
         </div>
       </div>
     )}
-    <div data-testid="dash-usage-hero" className="bg-neutral-950 border-b border-neutral-800">
-      <div className="max-w-6xl mx-auto px-4 py-5">
+    <div
+      data-testid="dash-usage-hero"
+      className={embedded ? "" : "bg-neutral-950 border-b border-neutral-800"}
+    >
+      <div className={embedded ? "" : "max-w-6xl mx-auto px-4 py-5"}>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
 
           {/* Power Index */}

@@ -137,6 +137,7 @@ interface TeamData {
   daily: Array<{ date: string; cost: number }>;
   teamActivities: TeamActivity[];
   dailyByMember: Array<Record<string, number | string>>;
+  dailyByMemberTokens?: Array<Record<string, number | string>>;
   memberNames: string[];
   topSessions: TopSession[];
   teamModels?: Array<{ name: string; cost: number; calls: number; cacheHitPct: number }>;
@@ -310,6 +311,21 @@ function MemberTooltip({ active, payload, label }: { active?: boolean; payload?:
       {sorted.map((p) => (
         <div key={p.dataKey} style={{ color: p.color }}>
           {memberLabel(p.dataKey)} : ${p.value.toFixed(2)}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function MemberTokenTooltip({ active, payload, label }: { active?: boolean; payload?: MemberTooltipPayload[]; label?: string }) {
+  if (!active || !payload?.length) return null;
+  const sorted = [...payload].sort((a, b) => b.value - a.value);
+  return (
+    <div style={{ background: "#171717", border: "1px solid #404040", borderRadius: 6, fontSize: 11, fontFamily: "monospace", padding: "6px 10px" }}>
+      <div style={{ color: "#737373", marginBottom: 4 }}>{label}</div>
+      {sorted.map((p) => (
+        <div key={p.dataKey} style={{ color: p.color }}>
+          {memberLabel(p.dataKey)} : {fmtTokens(p.value)}
         </div>
       ))}
     </div>
@@ -550,6 +566,110 @@ export function TeamView({ adminMode = false }: { adminMode?: boolean }) {
               fill="url(#grad-total)"
               // 데이터 1점이면 area/line 이 안 그려져 빈 차트로 보이므로 dot 표시.
               dot={dailyTotal.length === 1
+                ? { r: 4, fill: "#06b6d4", stroke: "none" }
+                : false}
+            />
+          </AreaChart>
+        </ResponsiveContainer>
+      </div>
+    </div>
+  );
+
+  // By Member (tokens) — 자세히 보기 안쪽. dailyByMember 와 같은 wide-format
+  // 행이지만 값이 토큰. cost stacked area 와 동일 UX, Y축만 토큰.
+  const dailyByMemberTokens = data.dailyByMemberTokens ?? [];
+  const dailyTotalTokens = dailyByMemberTokens.map((row) => ({
+    date: String(row.date),
+    tokens: (data.memberNames ?? []).reduce((s, key) => s + (Number(row[key]) || 0), 0),
+  }));
+
+  const byMemberTokenBlock = (
+    <div data-testid="team-card-by-member-tokens" className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-cyan-500 rounded">
+      <div className="px-3 py-2 border-b border-neutral-800 flex items-center justify-between">
+        <span className="text-xs font-mono font-bold text-cyan-400 uppercase tracking-wider">By Member (tokens)</span>
+        <div className="flex flex-wrap gap-x-3 gap-y-1 justify-end">
+          {(data.memberNames ?? []).map((key, i) => (
+            <span key={key} className="flex items-center gap-1 text-[10px] font-mono text-neutral-400">
+              <span className="w-2 h-2 rounded-full inline-block" style={{ background: MEMBER_COLORS[i % MEMBER_COLORS.length] }} />
+              {memberLabel(key)}
+            </span>
+          ))}
+        </div>
+      </div>
+      <div className="p-3">
+        <ResponsiveContainer width="100%" height={160}>
+          <AreaChart
+            data={dailyByMemberTokens.map((row) => ({
+              ...row,
+              date: fmtDate(String(row.date)),
+            }))}
+            margin={{ top: 4, right: 8, left: 0, bottom: 0 }}
+          >
+            <defs>
+              {(data.memberNames ?? []).map((key, i) => (
+                <linearGradient key={key} id={`grad-tok-${i}`} x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor={MEMBER_COLORS[i % MEMBER_COLORS.length]} stopOpacity={0.4} />
+                  <stop offset="95%" stopColor={MEMBER_COLORS[i % MEMBER_COLORS.length]} stopOpacity={0.05} />
+                </linearGradient>
+              ))}
+            </defs>
+            <CartesianGrid strokeDasharray="3 3" stroke="#262626" />
+            <XAxis dataKey="date" tick={{ fill: "#525252", fontSize: 10, fontFamily: "monospace" }} axisLine={false} tickLine={false} interval="preserveStartEnd" />
+            <YAxis tick={{ fill: "#525252", fontSize: 10, fontFamily: "monospace" }} axisLine={false} tickLine={false} tickFormatter={(v) => fmtTokens(Number(v))} width={48} />
+            <Tooltip content={<MemberTokenTooltip />} />
+            {(data.memberNames ?? []).map((key, i) => (
+              <Area
+                key={key}
+                type="monotone"
+                dataKey={key}
+                stroke={MEMBER_COLORS[i % MEMBER_COLORS.length]}
+                strokeWidth={1.5}
+                fill={`url(#grad-tok-${i})`}
+                dot={dailyByMemberTokens.length === 1
+                  ? { r: 3, fill: MEMBER_COLORS[i % MEMBER_COLORS.length], stroke: "none" }
+                  : false}
+              />
+            ))}
+          </AreaChart>
+        </ResponsiveContainer>
+      </div>
+    </div>
+  );
+
+  const totalTokenBlock = (
+    <div data-testid="team-card-total-tokens" className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-cyan-500 rounded">
+      <div className="px-3 py-2 border-b border-neutral-800">
+        <span className="text-xs font-mono font-bold text-cyan-400 uppercase tracking-wider">Team Total (tokens)</span>
+      </div>
+      <div className="p-3">
+        <ResponsiveContainer width="100%" height={160}>
+          <AreaChart
+            data={dailyTotalTokens.map((row) => ({
+              date: fmtDate(row.date),
+              tokens: row.tokens,
+            }))}
+            margin={{ top: 4, right: 8, left: 0, bottom: 0 }}
+          >
+            <defs>
+              <linearGradient id="grad-total-tok" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="5%" stopColor="#06b6d4" stopOpacity={0.35} />
+                <stop offset="95%" stopColor="#06b6d4" stopOpacity={0.03} />
+              </linearGradient>
+            </defs>
+            <CartesianGrid strokeDasharray="3 3" stroke="#262626" />
+            <XAxis dataKey="date" tick={{ fill: "#525252", fontSize: 10, fontFamily: "monospace" }} axisLine={false} tickLine={false} interval="preserveStartEnd" />
+            <YAxis tick={{ fill: "#525252", fontSize: 10, fontFamily: "monospace" }} axisLine={false} tickLine={false} tickFormatter={(v) => fmtTokens(Number(v))} width={48} />
+            <Tooltip
+              contentStyle={{ background: "#171717", border: "1px solid #404040", borderRadius: 6, fontSize: 11, fontFamily: "monospace" }}
+              formatter={(v) => [fmtTokens(Number(v)), t.teamView.teamSum]}
+            />
+            <Area
+              type="monotone"
+              dataKey="tokens"
+              stroke="#06b6d4"
+              strokeWidth={2}
+              fill="url(#grad-total-tok)"
+              dot={dailyTotalTokens.length === 1
                 ? { r: 4, fill: "#06b6d4", stroke: "none" }
                 : false}
             />
@@ -1627,7 +1747,17 @@ export function TeamView({ adminMode = false }: { adminMode?: boolean }) {
               </div>
             )}
 
-            </>)}  {/* detailsOpen 토글 닫기 — efficiency · Row 4 · Row 5 · Top Sessions */}
+            {/* Row 6 (자세히 보기 맨 아래): By Member (tokens) + Team Total
+                (tokens). Row 1 의 cost 차트와 동일 구도지만 토큰 단위 — 비용
+                보다 raw 활동량을 보고 싶을 때. period="today" 면 1점 dot. */}
+            {dailyByMemberTokens.length > 0 && (
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                {byMemberTokenBlock}
+                {totalTokenBlock}
+              </div>
+            )}
+
+            </>)}  {/* detailsOpen 토글 닫기 — efficiency · Row 4 · Row 5 · Top Sessions · Row 6 tokens */}
 
             {/* Team Plan Health (admin only) — full width, 매니저 의사결정용 */}
             {adminUser && data.teamPlanHealth && (
