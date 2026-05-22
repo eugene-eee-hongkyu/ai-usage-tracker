@@ -1949,13 +1949,9 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
           />
         )}
 
-        {/* Row 2: Efficiency + Activity Heatmap */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-
-          {efficiencyBlock}
-
-          {activityHeatmapBlock}
-        </div>
+        {/* Row 2: Activity Heatmap (full-width). Efficiency 카드는
+            자세히 보기 안으로 이동 — 사용자 인터뷰 "효율 점수 안 본다". */}
+        {activityHeatmapBlock}
 
         {/* 자세히 보기 토글 — divider + 중앙 라벨 풀폭 패턴 (Medium / Notion 식).
             "여기부터 details" 메타포 + 위·아래 영역 시각 단절. by model · by
@@ -1982,6 +1978,10 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
         </div>
 
         {detailsOpen && (<>
+
+        {/* Efficiency 카드 — Row 2 에서 자세히 보기 안으로 이동 (사용자 인터뷰
+            "효율 점수 안 본다"). 진단용으로 자세히 보기에 유지. */}
+        {efficiencyBlock}
 
         {/* Row 3: By Model + By Project — 비용 분해 그룹 (어디에 썼나) */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">

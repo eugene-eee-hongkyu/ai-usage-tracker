@@ -694,8 +694,12 @@ export function TeamView({ adminMode = false }: { adminMode?: boolean }) {
         <div className="space-y-1">
           {byTokens.map((m) => {
             const idx = members.findIndex((x) => x.userId === m.userId);
+            const isSelf = session?.user?.name === m.name;
             return (
-              <div key={m.userId} className="flex items-center gap-1.5 text-xs font-mono">
+              <div
+                key={m.userId}
+                className={`flex items-center gap-1.5 text-xs font-mono ${isSelf ? "bg-emerald-500/5 ring-1 ring-inset ring-emerald-500/30 rounded px-1 -mx-1 py-0.5" : ""}`}
+              >
                 <div className="w-16 h-1.5 bg-neutral-800 rounded overflow-hidden shrink-0">
                   <div
                     className="h-full rounded"
@@ -707,6 +711,7 @@ export function TeamView({ adminMode = false }: { adminMode?: boolean }) {
                 </div>
                 <span className="flex-1 text-neutral-300 truncate flex items-center gap-1.5">
                   <span className="truncate">{m.name}</span>
+                  {isSelf && <span className="text-[10px] text-emerald-400">← 나</span>}
                   <CcusageMissingBadge missing={m.ccusageMissing} userId={m.userId} />
                 </span>
                 <span className="w-16 text-cyan-300 text-right tabular-nums">{fmtTokens(m.totalTokens)}</span>
@@ -734,8 +739,12 @@ export function TeamView({ adminMode = false }: { adminMode?: boolean }) {
         <div className="space-y-1">
           {byCost.map((m) => {
             const idx = members.findIndex((x) => x.userId === m.userId);
+            const isSelf = session?.user?.name === m.name;
             return (
-              <div key={m.userId} className="flex items-center gap-1.5 text-xs font-mono">
+              <div
+                key={m.userId}
+                className={`flex items-center gap-1.5 text-xs font-mono ${isSelf ? "bg-emerald-500/5 ring-1 ring-inset ring-emerald-500/30 rounded px-1 -mx-1 py-0.5" : ""}`}
+              >
                 <div className="w-16 h-1.5 bg-neutral-800 rounded overflow-hidden shrink-0">
                   <div
                     className="h-full rounded"
@@ -745,7 +754,10 @@ export function TeamView({ adminMode = false }: { adminMode?: boolean }) {
                     }}
                   />
                 </div>
-                <span className="flex-1 text-neutral-300 truncate">{m.name}</span>
+                <span className="flex-1 text-neutral-300 truncate flex items-center gap-1.5">
+                  <span className="truncate">{m.name}</span>
+                  {isSelf && <span className="text-[10px] text-emerald-400">← 나</span>}
+                </span>
                 <span className="w-16 text-yellow-400 text-right tabular-nums">${m.totalCost.toFixed(2)}</span>
                 <span className="w-12 text-neutral-600 text-right tabular-nums">{m.sessionsCount}s</span>
               </div>
@@ -779,12 +791,19 @@ export function TeamView({ adminMode = false }: { adminMode?: boolean }) {
             return rows.map((m) => {
               const idx = (data.memberNames ?? []).indexOf(m.memberKey);
               const color = MEMBER_COLORS[(idx >= 0 ? idx : 0) % MEMBER_COLORS.length];
+              const isSelf = session?.user?.name === m.name;
               return (
-                <div key={m.userId} className="flex items-center gap-1.5 text-xs font-mono">
+                <div
+                  key={m.userId}
+                  className={`flex items-center gap-1.5 text-xs font-mono ${isSelf ? "bg-emerald-500/5 ring-1 ring-inset ring-emerald-500/30 rounded px-1 -mx-1 py-0.5" : ""}`}
+                >
                   <div className="w-16 h-1.5 bg-neutral-800 rounded overflow-hidden shrink-0">
                     <div className="h-full rounded" style={{ width: `${(m.powerIndex / maxScore) * 100}%`, background: color }} />
                   </div>
-                  <span className="flex-1 text-neutral-300 truncate">{m.name}</span>
+                  <span className="flex-1 text-neutral-300 truncate flex items-center gap-1.5">
+                    <span className="truncate">{m.name}</span>
+                    {isSelf && <span className="text-[10px] text-emerald-400">← 나</span>}
+                  </span>
                   <span className="w-16 text-cyan-300 text-right tabular-nums font-bold">{m.powerIndex}</span>
                 </div>
               );
@@ -1599,6 +1618,12 @@ export function TeamView({ adminMode = false }: { adminMode?: boolean }) {
           </div>
         ) : (
           <>
+            {/* 팀 헤드라인 (효율 점수 + 업계 비교) 을 fragment 최상단으로
+                (2026-05-22). hero 합산 바 다음 가장 큰 임팩트 카드 — 매니저
+                + 멤버 모두 진입 시 첫 인상. teamScore/industryComparison
+                데이터 없으면 null (자체 가드). */}
+            {headlineBlock}
+
             {/* admin 한테는 Team Plan Health + 30일 방문 패턴 카드를 토글
                 두 개 (기본·세부 팀정보) 위로. 매니저 의사결정 카드 (full-
                 width) 가 먼저 보이고 차트 detail 은 아래 토글로 drill-down.
@@ -1691,9 +1716,7 @@ export function TeamView({ adminMode = false }: { adminMode?: boolean }) {
 
             </div>
 
-            {headlineBlock}
-
-            </>)}  {/* basicInfoOpen 토글 닫기 — TeamUsageHero · Row 1·2·2.5 · headline */}
+            </>)}  {/* basicInfoOpen 토글 닫기 — TeamUsageHero · Row 1·2·2.5 (headline 은 위로 승격) */}
 
             {/* 세부 팀정보 자세히 보기 토글 — efficiency + Row 4 + Row 5 묶음.
                 admin 에게는 위 기본 토글과 구분되도록 '세부' 라벨 사용. */}
