@@ -13,12 +13,7 @@
 
 import { NextResponse } from "next/server";
 
-// 핀 정책 단일 출처. install.sh / cli/src/init.ts 와 동기화 유지.
-const PINNED = {
-  CODEBURN: "0.9.7",
-  CCUSAGE: "19.0.2",
-  NODE_RECOMMENDED: "22",
-} as const;
+import { PINNED } from "@/lib/pinned-versions";
 
 export async function GET() {
   const isLocal = process.env.LOCAL_MODE === "1" || process.env.NEXT_PUBLIC_LOCAL_MODE === "1";
