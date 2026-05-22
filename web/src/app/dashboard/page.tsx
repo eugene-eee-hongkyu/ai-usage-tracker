@@ -2,15 +2,37 @@
 
 export const dynamic = "force-dynamic";
 
-import { Suspense } from "react";
+import { Suspense, useEffect, useRef } from "react";
+import { useSession } from "next-auth/react";
 import { DashboardView } from "@/components/dashboard-view";
 import { PolicyBanner } from "@/components/policy-banner";
 import { TransparencyCard } from "@/components/transparency-card";
 import { PageFooter } from "@/components/page-footer";
 
+// /dashboard = "본인" 화면. Platform Admin 이 다른 팀 view-as 상태로 여기 들어오면
+// 본인 (eugene) 의 view-as 팀 (예: nexa) scope 에서 user_snapshots 가 없어 빈 화면
+// + 옛 admin 배너가 잘못 표시되는 케이스 발생. 본인 화면은 view-as 의미 X — 자동
+// exit-view 후 reload.
+function ViewAsAutoExit() {
+  const { data: session, status } = useSession();
+  const triggered = useRef(false);
+  useEffect(() => {
+    if (triggered.current) return;
+    if (status !== "authenticated") return;
+    const viewAsTeamId = (session?.user as { viewAsTeamId?: number | null } | undefined)?.viewAsTeamId;
+    if (!viewAsTeamId) return;
+    triggered.current = true;
+    fetch("/api/admin/platform/exit-view", { method: "POST" })
+      .then(() => window.location.reload())
+      .catch(() => { triggered.current = false; });
+  }, [session, status]);
+  return null;
+}
+
 export default function DashboardPage() {
   return (
     <Suspense fallback={null}>
+      <ViewAsAutoExit />
       {/* admin-v1 M5: 사내 trust 카드 — IC 가 보는 dashboard. admin 권한 무관. */}
       <PolicyBanner />
       <DashboardView />

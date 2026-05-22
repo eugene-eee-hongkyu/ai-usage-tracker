@@ -1201,11 +1201,18 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
             date: row.date.slice(5),
             unitCost: row.unitCost,
           }));
-          const hasData = planUnitCostData.some((u) => u.unitCost != null);
+          // API tier (PAYG) 면 plan 단가 자체가 의미 없음 (monthlyPrice=0). 차트 미표시.
+          const isApiTier = data.planHealth?.declaredLimits?.tier === "api";
+          if (isApiTier) {
+            return (
+              <p className="text-neutral-600 text-xs font-mono leading-relaxed">
+                API 종량제 사용자입니다. Plan 단가 비교는 N/A.
+              </p>
+            );
+          }
+          // unitCost 가 0 이거나 null 만 있으면 데이터 부족.
+          const hasData = planUnitCostData.some((u) => u.unitCost != null && u.unitCost > 0);
           if (!hasData) {
-            // empty state 는 코드상 monthlyCost30d=0 + tier 미입력 케이스만 발생
-            // (tier 있으면 정상, tier 없고 activity 있으면 자동 추정으로 채움).
-            // 즉 사용자의 실제 문제는 "데이터 sync 안 됨" — actionable 메시지.
             return (
               <p className="text-neutral-600 text-xs font-mono">
                 {t.dashboard.cards.noActivityHint}
@@ -1339,6 +1346,25 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
         {(() => {
           const apiCost = chartData.reduce((s, d) => s + (d.cost ?? 0), 0);
           const planCost = data.planHealth?.priceForPeriod ?? null;
+          const isApiTier = data.planHealth?.declaredLimits?.tier === "api";
+          // API tier (PAYG) — plan 가격이 0 이라 절감 개념 N/A. 실제 사용 비용만 표시.
+          if (isApiTier) {
+            const fmt = (v: number) =>
+              v >= 100 ? `$${Math.round(v).toLocaleString()}` :
+              v >= 1 ? `$${v.toFixed(2)}` : `$${v.toFixed(2)}`;
+            return (
+              <div className="space-y-2">
+                <p className="text-[11px] text-neutral-500 font-mono uppercase tracking-wider">API 종량제</p>
+                <div className="flex items-baseline gap-2">
+                  <span className="text-amber-300 text-3xl font-mono font-bold tracking-tight">{fmt(apiCost)}</span>
+                  <span className="text-xs text-neutral-500 font-mono">실제 사용 비용</span>
+                </div>
+                <p className="text-[11px] text-neutral-600 font-mono leading-relaxed">
+                  Plan 가격 비교 N/A — Anthropic API 직접 결제 (PAYG). Plan 절감 개념 적용 X.
+                </p>
+              </div>
+            );
+          }
           if (planCost == null || planCost <= 0) {
             // activity 0 + tier 미입력 케이스만 도달.
             return (
