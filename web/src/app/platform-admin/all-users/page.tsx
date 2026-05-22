@@ -162,13 +162,6 @@ export default function PlatformAdminAllUsersPage() {
 
   const activeCount = users.filter((u) => (u.today?.tokens ?? 0) > 0).length;
 
-  // Daily Activity 막대 + rank pill: team-scope peer-normalize (Datadog Host Map
-  // 패턴). cross-team max 로 normalize 하면 외부 회사 도입 시 다른 회사 사람의
-  // 사용량이 우리 팀 카드 막대를 짓누름 → 항상 같은 팀 안에서만 비교.
-  // outlier (eugene 400M vs 다른사람 5M) 는 log10(1+x) scale 로 완화. 막대
-  // 길이는 "peer 대비 어디" 의 정성적 신호, 정확한 양은 옆 숫자가 담당.
-  const teamStats = computeTeamStats(users);
-
   return (
     <div className="space-y-4">
       <header className="flex items-baseline justify-between gap-3 flex-wrap">
@@ -184,77 +177,25 @@ export default function PlatformAdminAllUsersPage() {
       </header>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {users.map((u) => {
-          const stats = teamStats.get(u.teamId);
-          const myTokens = u.today?.tokens ?? 0;
-          const activityViz =
-            stats && myTokens > 0
-              ? {
-                  // log10(1+x) — outlier 완화. shared axis = 같은 팀 max.
-                  widthPct: Math.round(
-                    (Math.log10(1 + myTokens) / Math.log10(1 + stats.maxTokens)) * 100
-                  ),
-                  rank: stats.rankByUser.get(u.userId) ?? null,
-                  activeInTeam: stats.activeInTeam,
-                }
-              : null;
-          return (
-            <UserCard
-              key={`${u.teamId}-${u.userId}`}
-              card={u}
-              activityViz={activityViz}
-              onClick={handleCardClick}
-              switching={switchingTeamId === u.teamId}
-            />
-          );
-        })}
+        {users.map((u) => (
+          <UserCard
+            key={`${u.teamId}-${u.userId}`}
+            card={u}
+            onClick={handleCardClick}
+            switching={switchingTeamId === u.teamId}
+          />
+        ))}
       </div>
     </div>
   );
 }
 
-interface TeamActivityStats {
-  maxTokens: number;
-  activeInTeam: number;
-  // userId → rank (1-based, 활동 사용자 중)
-  rankByUser: Map<number, number>;
-}
-
-function computeTeamStats(users: CardData[]): Map<number, TeamActivityStats> {
-  const byTeam = new Map<number, CardData[]>();
-  for (const u of users) {
-    if ((u.today?.tokens ?? 0) <= 0) continue;
-    if (!byTeam.has(u.teamId)) byTeam.set(u.teamId, []);
-    byTeam.get(u.teamId)!.push(u);
-  }
-  const result = new Map<number, TeamActivityStats>();
-  for (const [teamId, members] of byTeam) {
-    const sorted = [...members].sort((a, b) => (b.today!.tokens) - (a.today!.tokens));
-    const rankByUser = new Map<number, number>();
-    sorted.forEach((m, i) => rankByUser.set(m.userId, i + 1));
-    result.set(teamId, {
-      maxTokens: sorted[0].today!.tokens,
-      activeInTeam: sorted.length,
-      rankByUser,
-    });
-  }
-  return result;
-}
-
-interface ActivityViz {
-  widthPct: number;          // log-scaled, 0-100
-  rank: number | null;       // 1-based, team-scope
-  activeInTeam: number;
-}
-
 function UserCard({
   card,
-  activityViz,
   onClick,
   switching,
 }: {
   card: CardData;
-  activityViz: ActivityViz | null;
   onClick: (c: CardData) => void;
   switching: boolean;
 }) {
@@ -317,41 +258,10 @@ function UserCard({
         )}
       </div>
 
-      {/* DAILY ACTIVITY — peer-normalized bar (team scope, log10 scale) + rank
-          pill. 옛 width:100% 하드코딩 (모든 카드 가득참 = 정보 0) 제거. UX
-          research 참고: Datadog Host Map shared scale + GitHub-style rank.
-          activityViz null 이면 (오늘 활동 0 또는 팀 내 동료 0) 섹션 자체 숨김
-          — Vercel "history 없으면 viz 안 보임" 패턴. */}
-      {!isInactive && activityViz && (
-        <div className="px-3 py-2.5 border-b border-slate-800">
-          <div className="flex items-center justify-between mb-1.5">
-            <p className="text-[10px] text-slate-600 font-mono uppercase tracking-wider">Daily Activity</p>
-            {activityViz.activeInTeam > 1 && activityViz.rank !== null && (
-              <span
-                className={`text-[10px] font-mono px-1.5 py-0.5 rounded ${
-                  activityViz.rank === 1
-                    ? "bg-cyan-900/40 text-cyan-300 border border-cyan-700/60"
-                    : "bg-slate-800 text-slate-400 border border-slate-700"
-                }`}
-                title={`팀 내 오늘 활동 순위 (활동 사용자 ${activityViz.activeInTeam}명 중)`}
-              >
-                rank {activityViz.rank}/{activityViz.activeInTeam}
-              </span>
-            )}
-          </div>
-          <div className="flex items-center gap-2 text-xs font-mono">
-            <span className="text-slate-500 w-12 shrink-0">오늘</span>
-            <div className="flex-1 h-1.5 bg-slate-800 rounded overflow-hidden">
-              <div
-                className="h-full bg-cyan-500 rounded"
-                style={{ width: `${Math.max(2, activityViz.widthPct)}%` }}
-                title={`팀 max 대비 ${activityViz.widthPct}% (log scale)`}
-              />
-            </div>
-            <span className="text-cyan-300 w-16 text-right">{fmtTokens(card.today!.tokens)}</span>
-          </div>
-        </div>
-      )}
+      {/* Daily Activity 막대 + rank pill 제거 (2026-05-22).
+          이 화면은 "잘 돌아가고 있나" health-check 가 본질이고 "누가 더 많이
+          썼나" 는 ranking 카테고리라 화면 정체성과 mismatch. 활동량 정보는
+          위 hero 줄 tokens·cost 숫자 + 카드 정렬 (활동순) 로 충분. */}
 
       {/* PLAN 절감 — API tier 면 별도 라벨, 그 외 절감액. */}
       {card.planTier === "api" ? (
