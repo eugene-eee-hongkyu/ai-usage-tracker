@@ -6,6 +6,7 @@
 export const dynamic = "force-dynamic";
 
 import { useEffect, useState } from "react";
+import { useSession } from "next-auth/react";
 
 interface CardData {
   userId: number;
@@ -82,6 +83,9 @@ const SYNC_COLOR_CLASS: Record<CardData["syncColor"], string> = {
 };
 
 export default function PlatformAdminAllUsersPage() {
+  const { data: session } = useSession();
+  const myCurrentTeamId = (session?.user as { currentTeamId?: number | null } | undefined)?.currentTeamId ?? null;
+  const myViewAsTeamId = (session?.user as { viewAsTeamId?: number | null } | undefined)?.viewAsTeamId ?? null;
   const [users, setUsers] = useState<CardData[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [switchingTeamId, setSwitchingTeamId] = useState<number | null>(null);
@@ -103,20 +107,28 @@ export default function PlatformAdminAllUsersPage() {
     if (switchingTeamId !== null) return;
     setSwitchingTeamId(card.teamId);
     try {
-      // 기존 platform view-as API 재사용 — 해당 사용자의 팀으로 진입.
-      const r = await fetch("/api/admin/platform/switch-team", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ teamId: card.teamId }),
-      });
-      if (!r.ok) throw new Error(String(r.status));
+      // 본인 팀 멤버 클릭 — view-as 불필요. switch-team 부르면 'already_current_team'
+      // 400 반환. view-as cookie 가 다른 팀으로 남아 있으면 먼저 exit.
+      // 다른 팀 멤버 클릭 — switch-team 으로 view-as 진입.
+      const sameTeam = myCurrentTeamId !== null && card.teamId === myCurrentTeamId;
+      if (sameTeam) {
+        if (myViewAsTeamId && myViewAsTeamId !== myCurrentTeamId) {
+          await fetch("/api/admin/platform/exit-view", { method: "POST" });
+        }
+      } else {
+        const r = await fetch("/api/admin/platform/switch-team", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ teamId: card.teamId }),
+        });
+        if (!r.ok) throw new Error(String(r.status));
+      }
       // admin/members 가 localStorage 에서 선택 user 읽어 dashboard 표시.
-      // /dashboard 는 본인 (eugene) 만 표시 — cross-tenant 멤버 보려면 admin/members 사용.
       try { localStorage.setItem("teamMemberSelectedUserId", String(card.userId)); } catch { /* ignore */ }
       // 세션 재로드 위해 full nav (router.push 만 하면 session.viewAsTeamName 갱신 지연).
       window.location.href = "/admin/members";
     } catch (e) {
-      console.error("switch-team failed", e);
+      console.error("card click navigation failed", e);
       setSwitchingTeamId(null);
     }
   }
