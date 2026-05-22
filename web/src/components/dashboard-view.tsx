@@ -1012,29 +1012,59 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
     // 머무를 때 — sync 강제 안내 대신 "admin 설정 완료 + (원하면) CLI 설치" 배너 +
     // admin 패널 진입 링크. Membership/Billing Admin 은 위 redirect 단계에서 이미
     // /setup 으로 보내졌으므로 여기 도달 불가.
+    // Platform Admin 이 view-as 모드 (다른 회사 보고 있음) 인데 그 회사에 본인이
+    // 멤버가 아니라 dashboard 가 비어 있는 케이스 — 별도 안내. (2026-05-22)
+    const viewAsTeamName = (session?.user as { viewAsTeamName?: string | null } | undefined)?.viewAsTeamName ?? null;
     if (isOwnerLike) {
       return (
         <div className="min-h-screen bg-neutral-950">
           <NavComponent />
           <main className="max-w-md mx-auto px-4 py-20 text-center space-y-6">
-            <h1 className="text-2xl font-bold text-neutral-100">
-              {t.dashboardAdminBanner.title}
-            </h1>
-            <p className="text-neutral-400 text-sm">{t.dashboardAdminBanner.body}</p>
-            <div className="flex flex-col gap-2">
-              <a
-                href="/admin/members"
-                className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 rounded text-sm font-semibold text-white"
-              >
-                Admin
-              </a>
-              <a
-                href="/setup"
-                className="px-5 py-2.5 bg-neutral-800 hover:bg-neutral-700 rounded text-sm font-mono text-neutral-200"
-              >
-                {t.dashboardAdminBanner.cta}
-              </a>
-            </div>
+            {viewAsTeamName ? (
+              <>
+                <h1 className="text-2xl font-bold text-neutral-100">
+                  Platform view-as: {viewAsTeamName}
+                </h1>
+                <p className="text-neutral-400 text-sm">
+                  본인 dashboard 는 본인 팀의 데이터 입니다. {viewAsTeamName} 팀의 멤버 사용량을 보려면 어드민 → 팀원 으로 가세요.
+                </p>
+                <div className="flex flex-col gap-2">
+                  <a
+                    href="/admin/members"
+                    className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 rounded text-sm font-semibold text-white"
+                  >
+                    어드민 → 팀원
+                  </a>
+                  <a
+                    href="/platform-admin/all-users"
+                    className="px-5 py-2.5 bg-neutral-800 hover:bg-neutral-700 rounded text-sm font-mono text-neutral-200"
+                  >
+                    All Users 로
+                  </a>
+                </div>
+              </>
+            ) : (
+              <>
+                <h1 className="text-2xl font-bold text-neutral-100">
+                  {t.dashboardAdminBanner.title}
+                </h1>
+                <p className="text-neutral-400 text-sm">{t.dashboardAdminBanner.body}</p>
+                <div className="flex flex-col gap-2">
+                  <a
+                    href="/admin/members"
+                    className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 rounded text-sm font-semibold text-white"
+                  >
+                    Admin
+                  </a>
+                  <a
+                    href="/setup"
+                    className="px-5 py-2.5 bg-neutral-800 hover:bg-neutral-700 rounded text-sm font-mono text-neutral-200"
+                  >
+                    {t.dashboardAdminBanner.cta}
+                  </a>
+                </div>
+              </>
+            )}
           </main>
         </div>
       );
