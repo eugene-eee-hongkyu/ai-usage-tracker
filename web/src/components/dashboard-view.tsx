@@ -130,6 +130,15 @@ interface PlanHealthApiResponse {
   priceForPeriod: number | null;
   periodDays: number;
   isEstimatedTier?: boolean;
+  apiRecommendation?: {
+    monthlyCost30d: number;
+    recommendedTier: "api" | "pro" | "max5" | "max20" | "team_standard" | "team_premium" | "team";
+    recommendedTierLabel: string;
+    planMonthlyPrice: number;
+    savingsAmount: number;
+    savingsPct: number;
+    edgeCase: "low" | "normal" | "high";
+  } | null;
 }
 
 interface DashboardData {
@@ -1776,6 +1785,7 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
           viewOnly={viewOnly}
           isEstimatedTier={data.planHealth?.isEstimatedTier ?? false}
           hasActivity={chartData.some((d) => (d.cost ?? 0) > 0)}
+          apiRecommendation={data.planHealth?.apiRecommendation ?? null}
         />
       )}
 
@@ -1923,16 +1933,15 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
           </div>
         </div>
 
-        {/* Row 1.5: 일별 토큰 단가 (plan amortized, emerald) + API 환산 단가 (amber).
-            team-view 의 BY MEMBER / 일별 토큰 단가 카드와 동일 공식·시각 패턴.
-            이전: 코스트 추세 (Daily Cost 와 중복) + 일별 단가 (API 환산 공식).
-            변경: 코스트 추세 삭제 + plan amortized 신규 + API 환산은 별도 카드로 분리. */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-
-          {unitCostBlock}
-
-          {planSavingsBlock}
-        </div>
+        {/* Row 1.5: 일별 토큰 단가 + Plan 절감.
+            API tier (PAYG) 사용자는 단가 비교가 의미 없고 hero 의 추천 플랜 카드가
+            대체하므로 이 row 자체를 숨김. */}
+        {data.planHealth?.declaredLimits?.tier !== "api" && (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            {unitCostBlock}
+            {planSavingsBlock}
+          </div>
+        )}
 
         {/* Row 2: Efficiency + Activity Heatmap */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">

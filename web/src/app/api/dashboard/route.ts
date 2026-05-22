@@ -982,6 +982,61 @@ export async function GET(req: NextRequest) {
     ? (monthlyPriceUsd * periodDays) / 30
     : null;
 
+  // API tier (PAYG) 사용자 추천 플랜 — UsageHero 의 토큰 단가 자리에 표시.
+  // 지난 30일 실제 cost 기준 cheapest plan 추천 + 절감액 계산. plan 가격이 API 비용
+  // 보다 비싸면 (= 사용량 적음) 'low' edge case → API 종량제 유지 권장.
+  type ApiRecommendation = {
+    monthlyCost30d: number;
+    recommendedTier: Exclude<PlanTier, null> | "api";
+    recommendedTierLabel: string;
+    planMonthlyPrice: number;
+    savingsAmount: number;
+    savingsPct: number;
+    edgeCase: "low" | "normal" | "high";
+  };
+  let apiRecommendation: ApiRecommendation | null = null;
+  if (declaredLimits?.tier === "api") {
+    // 30일 cost — userBlocks 합산. 위 isEstimatedTier 블록에서 이미 계산했을 수도
+    // 있으나 declaredLimits 가 있어 거기 안 들어감. 별도 query.
+    const cost30dStart = new Date(Date.now() - 30 * 86_400_000);
+    const cost30dRows = await db
+      .select({ costUsd: userBlocks.costUsd })
+      .from(userBlocks)
+      .where(and(
+        eq(userBlocks.userId, user[0].id),
+        gte(userBlocks.startedAt, cost30dStart),
+        userBlocksTeamScope,
+      ));
+    const monthlyCost30d = cost30dRows.reduce((s, r) => s + Number(r.costUsd ?? 0), 0);
+    const recommended = estimateTierFromMonthlyCost(monthlyCost30d);
+    if (monthlyCost30d < 20 || recommended === "unknown") {
+      // 사용량이 Pro 최저 (\$20/월) 보다 적음 — 어떤 plan 도 종량제보다 비쌈.
+      apiRecommendation = {
+        monthlyCost30d,
+        recommendedTier: "api",
+        recommendedTierLabel: "API 종량제 유지",
+        planMonthlyPrice: 0,
+        savingsAmount: 0,
+        savingsPct: 0,
+        edgeCase: "low",
+      };
+    } else {
+      const recLimits = getPlanLimits(recommended);
+      const savings = monthlyCost30d - recLimits.monthlyPriceUsd;
+      const savingsPct = monthlyCost30d > 0 ? Math.round((savings / monthlyCost30d) * 100) : 0;
+      apiRecommendation = {
+        monthlyCost30d,
+        recommendedTier: recommended,
+        recommendedTierLabel: recLimits.label,
+        planMonthlyPrice: recLimits.monthlyPriceUsd,
+        savingsAmount: savings,
+        savingsPct,
+        // Max 20x 추천인데 사용량이 plan 가격의 2배 이상이면 '한도 자주 도달' 경고.
+        edgeCase: recommended === "max20" && monthlyCost30d > 400 ? "high" : "normal",
+      };
+    }
+  }
+
   // Power Index — period 비례 정규화. fallback 적용된 값 사용.
   const powerActiveDays = effectiveActiveDays;
   const powerAvgDailyTokens = effectiveActiveDays > 0 ? totalWindowTokens / effectiveActiveDays : 0;
@@ -1032,6 +1087,8 @@ export async function GET(req: NextRequest) {
       cacheHitPctForPeriod,
       priceForPeriod,
       periodDays,
+      // API tier (PAYG) 사용자 추천. 다른 tier 면 null.
+      apiRecommendation,
     },
     powerIndex: {
       score: powerIndexValue,

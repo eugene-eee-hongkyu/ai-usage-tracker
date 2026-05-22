@@ -28,6 +28,16 @@ interface UsageHeroProps {
   totalWindowTokens: number;
   nonCacheTotalWindowTokens: number | null;
   cacheHitPctForPeriod: number | null;
+  // API tier (PAYG) 사용자 추천 — 있으면 토큰 단가 카드 자리에 대신 표시.
+  apiRecommendation?: {
+    monthlyCost30d: number;
+    recommendedTier: "api" | "pro" | "max5" | "max20" | "team_standard" | "team_premium" | "team";
+    recommendedTierLabel: string;
+    planMonthlyPrice: number;
+    savingsAmount: number;
+    savingsPct: number;
+    edgeCase: "low" | "normal" | "high";
+  } | null;
   // viewOnly = 어드민이 멤버 dashboard 봄. tier select / hint 숨기고 read-only 라벨만.
   viewOnly?: boolean;
   // tier 가 자동 추정값이면 (declared 없음) UI 에 "(추정)" 라벨 + 시각 구분.
@@ -138,6 +148,7 @@ export function UsageHero({
   hasActivity = true,
   nonCacheTotalWindowTokens,
   cacheHitPctForPeriod,
+  apiRecommendation,
   viewOnly = false,
   isEstimatedTier = false,
 }: UsageHeroProps) {
@@ -374,7 +385,12 @@ export function UsageHero({
             })()}
           </div>
 
-          {/* 토큰 단가 */}
+          {/* 우측 카드 — 일반 사용자는 토큰 단가, API tier (PAYG) 사용자는 추천 플랜.
+              API 종량제에선 토큰 단가가 항상 N/A 라 의미 X, 대신 "어떤 plan 이 더
+              싼지 + 얼마 절감" 같은 actionable 안내가 가치 큼. */}
+          {apiRecommendation ? (
+            <ApiRecommendationCard rec={apiRecommendation} periodLabel={periodLabel} />
+          ) : (
           <div data-testid="usage-hero-unit-cost" className="bg-neutral-900 border-l-2 border-l-yellow-500 border border-neutral-800 rounded p-4">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-2">
               <div className="flex items-center gap-2 flex-wrap">
@@ -535,10 +551,81 @@ export function UsageHero({
               </div>
             )}
           </div>
+          )}
 
         </div>
       </div>
     </div>
     </>
+  );
+}
+
+function ApiRecommendationCard({
+  rec,
+  periodLabel,
+}: {
+  rec: NonNullable<UsageHeroProps["apiRecommendation"]>;
+  periodLabel: string;
+}) {
+  const fmtMoney = (v: number) =>
+    v >= 100 ? `$${Math.round(v).toLocaleString()}` :
+    v >= 10 ? `$${v.toFixed(0)}` :
+    v >= 1 ? `$${v.toFixed(1)}` : `$${v.toFixed(2)}`;
+
+  // 색 모티프: 일반은 emerald (Plan 절감 톤). high (over Max 20x) 는 amber.
+  const accent = rec.edgeCase === "high" ? "amber" : "emerald";
+  const borderClass = accent === "amber" ? "border-l-amber-500" : "border-l-emerald-500";
+  const headerColor = accent === "amber" ? "text-amber-400" : "text-emerald-400";
+
+  if (rec.edgeCase === "low") {
+    return (
+      <div data-testid="usage-hero-api-recommend" className={`bg-neutral-900 border-l-2 ${borderClass} border border-neutral-800 rounded p-4`}>
+        <div className="mb-2">
+          <span className={`text-xs font-mono font-bold ${headerColor} uppercase tracking-wider`}>추천 플랜</span>
+          <span className="text-[12px] font-mono text-neutral-600 ml-2">API 종량제 · 지난 30일</span>
+        </div>
+        <p className="text-2xl font-bold text-neutral-200 font-mono mb-2">API 종량제 유지</p>
+        <div className="text-xs font-mono text-neutral-500 space-y-1 leading-relaxed">
+          <p>지난 30일 API 비용: <span className="text-neutral-300 font-bold">{fmtMoney(rec.monthlyCost30d)}</span></p>
+          <p className="text-neutral-600 pt-1 border-t border-neutral-800/60">
+            사용량이 적어서 종량제가 더 쌉니다 (Pro 최저 $20/월 보다 적게 사용 중).
+          </p>
+        </div>
+        {/* periodLabel 사용 안 함 — 추천은 항상 30일 기준. */}
+        <p className="hidden">{periodLabel}</p>
+      </div>
+    );
+  }
+
+  // normal / high
+  return (
+    <div data-testid="usage-hero-api-recommend" className={`bg-neutral-900 border-l-2 ${borderClass} border border-neutral-800 rounded p-4`}>
+      <div className="flex items-center justify-between gap-2 mb-2">
+        <span className={`text-xs font-mono font-bold ${headerColor} uppercase tracking-wider`}>추천 플랜</span>
+        <span className="text-[12px] font-mono text-neutral-600">API 종량제 · 지난 30일</span>
+      </div>
+      <div className="flex items-baseline gap-2 flex-wrap mb-1">
+        <span className="text-2xl sm:text-3xl font-bold text-neutral-100 font-mono tracking-tight">{rec.recommendedTierLabel}</span>
+        <span className="text-sm text-neutral-500 font-mono">({fmtMoney(rec.planMonthlyPrice)}/월)</span>
+      </div>
+      <p className="text-xs text-neutral-500 font-mono">가 맞아 보여요</p>
+
+      <div className="mt-3 pt-3 border-t border-neutral-800 text-xs font-mono space-y-1">
+        <p className="text-neutral-500">
+          현재 API 종량제: <span className="text-amber-300 font-bold">{fmtMoney(rec.monthlyCost30d)}</span> / 월
+        </p>
+        <p className="text-neutral-500">
+          {rec.recommendedTierLabel} 플랜:  <span className="text-neutral-300 font-bold">{fmtMoney(rec.planMonthlyPrice)}</span> / 월
+        </p>
+        <p className={`pt-1 mt-1 border-t border-neutral-800/60 ${accent === "amber" ? "text-amber-300" : "text-emerald-400"} font-bold`}>
+          ▼ 매월 {fmtMoney(rec.savingsAmount)} 절감 ({rec.savingsPct}%)
+        </p>
+        {rec.edgeCase === "high" && (
+          <p className="text-amber-400/70 pt-1 leading-relaxed text-[11px]">
+            ⚠ {rec.recommendedTierLabel} 한도를 자주 넘길 가능성 있어요 (월 사용량 ${"{"}plan 가격×2{"}"} 초과).
+          </p>
+        )}
+      </div>
+    </div>
   );
 }
