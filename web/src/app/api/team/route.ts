@@ -789,11 +789,11 @@ export async function GET(req: NextRequest) {
 
   // Daily by member (tokens) — same shape as dailyByMember 지만 토큰 단위.
   // 자세히 보기 안쪽 By Member Tokens / Team Total Tokens 차트용.
-  const dailyTokenDatesAll = [...dailyTokensMemberMap.keys()].sort();
-  const dailyTokenDates = period === "today" && dailyTokenDatesAll.length > 0
-    ? [dailyTokenDatesAll[dailyTokenDatesAll.length - 1]]
-    : dailyTokenDatesAll;
-  const dailyByMemberTokens = dailyTokenDates.map((date) => {
+  // period (today/8days/month/30days/all) 에 맞춰 자르려면 cost 차트와 동일한
+  // dailyDates 윈도우를 사용한다. dailyTokensMemberMap 자체는 일별 토큰 단가
+  // 차트 (항상 30일 추세) 가 전체 보유 일자를 그대로 써야 해서 필터 안 함 —
+  // 이 차트만 별도로 잘라낸다.
+  const dailyByMemberTokens = dailyDates.map((date) => {
     const row: Record<string, number | string> = { date };
     const tokensMap = dailyTokensMemberMap.get(date) ?? {};
     for (const name of memberNames) {
