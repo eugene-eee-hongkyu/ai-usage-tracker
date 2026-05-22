@@ -479,7 +479,7 @@ export function TeamView({ adminMode = false }: { adminMode?: boolean }) {
   const byMemberBlock = (
     <div data-testid="team-card-by-member" className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-cyan-500 rounded">
       <div className="px-3 py-2 border-b border-neutral-800 flex items-center justify-between">
-        <span className="text-xs font-mono font-bold text-cyan-400 uppercase tracking-wider">By Member</span>
+        <span className="text-xs font-mono font-bold text-cyan-400 uppercase tracking-wider">By Member (cost)</span>
         <div className="flex flex-wrap gap-x-3 gap-y-1 justify-end">
           {(data.memberNames ?? []).map((key, i) => (
             <span key={key} className="flex items-center gap-1 text-[10px] font-mono text-neutral-400">
@@ -534,7 +534,7 @@ export function TeamView({ adminMode = false }: { adminMode?: boolean }) {
   const totalBlock = (
     <div data-testid="team-card-total" className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-cyan-500 rounded">
       <div className="px-3 py-2 border-b border-neutral-800">
-        <span className="text-xs font-mono font-bold text-cyan-400 uppercase tracking-wider">Team Total</span>
+        <span className="text-xs font-mono font-bold text-cyan-400 uppercase tracking-wider">Team Total (cost)</span>
       </div>
       <div className="p-3">
         <ResponsiveContainer width="100%" height={160}>
@@ -1650,29 +1650,34 @@ export function TeamView({ adminMode = false }: { adminMode?: boolean }) {
               />
             )}
 
-            {/* Row 1: Daily Cost Trend — stacked (per-member) + total.
+            {/* Row 1 (위치 swap): Activity (tokens 합산) + Cost (cost 합산).
+                팀활용지수·팀토큰단가 hero 다음으로 "팀이 얼마나 썼나" 합산
+                지표가 먼저 오는 게 사용자 인터뷰에서 가장 자주 보는 두 지표.
+                ↓ 그 아래에 trend 차트 (cost / tokens) 가 따라온다. */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              {activityBlock}
+              {costBlock}
+            </div>
+
+            {/* Row 1.5: Daily Cost Trend — stacked (per-member) + total.
                 period="today" 면 1점 데이터 (단일 dot 표시). > 0 이면 렌더. */}
             {(data.dailyByMember ?? []).length > 0 && (
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-
-                {/* Stacked per-member */}
                 {byMemberBlock}
-
-                {/* Total aggregated */}
                 {totalBlock}
-
               </div>
             )}
 
-            {/* Row 2: Activity (tokens) + Cost */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-
-              {/* Activity (tokens) */}
-              {activityBlock}
-
-              {/* Cost */}
-              {costBlock}
-            </div>
+            {/* Row 1.6: Daily Token Trend — Row 1.5 의 token 짝.
+                자세히 보기 안에 있던 걸 cost 차트 바로 아래로 승격
+                (2026-05-22) — cost / tokens 두 단위가 같은 위치에서 비교되는
+                게 사용자 직관에 맞음. */}
+            {dailyByMemberTokens.length > 0 && (
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                {byMemberTokenBlock}
+                {totalTokenBlock}
+              </div>
+            )}
 
             {/* Row 2.5: 활용지수 순위 + 일별 토큰 단가 (멤버별) */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -1747,17 +1752,7 @@ export function TeamView({ adminMode = false }: { adminMode?: boolean }) {
               </div>
             )}
 
-            {/* Row 6 (자세히 보기 맨 아래): By Member (tokens) + Team Total
-                (tokens). Row 1 의 cost 차트와 동일 구도지만 토큰 단위 — 비용
-                보다 raw 활동량을 보고 싶을 때. period="today" 면 1점 dot. */}
-            {dailyByMemberTokens.length > 0 && (
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                {byMemberTokenBlock}
-                {totalTokenBlock}
-              </div>
-            )}
-
-            </>)}  {/* detailsOpen 토글 닫기 — efficiency · Row 4 · Row 5 · Top Sessions · Row 6 tokens */}
+            </>)}  {/* detailsOpen 토글 닫기 — efficiency · Row 4 · Row 5 · Top Sessions */}
 
             {/* Team Plan Health (admin only) — full width, 매니저 의사결정용 */}
             {adminUser && data.teamPlanHealth && (
