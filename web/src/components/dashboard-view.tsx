@@ -137,7 +137,7 @@ interface PlanHealthApiResponse {
     planMonthlyPrice: number;
     savingsAmount: number;
     savingsPct: number;
-    edgeCase: "low" | "normal" | "high";
+    edgeCase: "low" | "normal";
   } | null;
 }
 

@@ -36,7 +36,7 @@ interface UsageHeroProps {
     planMonthlyPrice: number;
     savingsAmount: number;
     savingsPct: number;
-    edgeCase: "low" | "normal" | "high";
+    edgeCase: "low" | "normal";
   } | null;
   // viewOnly = 어드민이 멤버 dashboard 봄. tier select / hint 숨기고 read-only 라벨만.
   viewOnly?: boolean;
@@ -580,16 +580,14 @@ function ApiRecommendationCard({
     v >= 10 ? `$${v.toFixed(0)}` :
     v >= 1 ? `$${v.toFixed(1)}` : `$${v.toFixed(2)}`;
 
-  // 색 모티프: 일반은 emerald (Plan 절감 톤). high (over Max 20x) 는 amber.
-  const accent = rec.edgeCase === "high" ? "amber" : "emerald";
-  const borderClass = accent === "amber" ? "border-l-amber-500" : "border-l-emerald-500";
-  const headerColor = accent === "amber" ? "text-amber-400" : "text-emerald-400";
+  // 색 모티프: 항상 emerald (Plan 절감 톤). 옛 'high' edge case (amber 경고)
+  // 제거 — monthlyCost30d 가 cache 친 환산 cost 라 한도 도달 신호로 부정확.
 
   if (rec.edgeCase === "low") {
     return (
-      <div data-testid="usage-hero-api-recommend" className={`bg-neutral-900 border-l-2 ${borderClass} border border-neutral-800 rounded p-4`}>
+      <div data-testid="usage-hero-api-recommend" className="bg-neutral-900 border-l-2 border-l-emerald-500 border border-neutral-800 rounded p-4">
         <div className="mb-2">
-          <span className={`text-xs font-mono font-bold ${headerColor} uppercase tracking-wider`}>추천 플랜</span>
+          <span className="text-xs font-mono font-bold text-emerald-400 uppercase tracking-wider">추천 플랜</span>
           <span className="text-[12px] font-mono text-neutral-600 ml-2">API 종량제 · 지난 30일</span>
         </div>
         <p className="text-2xl font-bold text-neutral-200 font-mono mb-2">API 종량제 유지</p>
@@ -605,11 +603,11 @@ function ApiRecommendationCard({
     );
   }
 
-  // normal / high
+  // normal
   return (
-    <div data-testid="usage-hero-api-recommend" className={`bg-neutral-900 border-l-2 ${borderClass} border border-neutral-800 rounded p-4`}>
+    <div data-testid="usage-hero-api-recommend" className="bg-neutral-900 border-l-2 border-l-emerald-500 border border-neutral-800 rounded p-4">
       <div className="flex items-center justify-between gap-2 mb-2">
-        <span className={`text-xs font-mono font-bold ${headerColor} uppercase tracking-wider`}>추천 플랜</span>
+        <span className="text-xs font-mono font-bold text-emerald-400 uppercase tracking-wider">추천 플랜</span>
         <span className="text-[12px] font-mono text-neutral-600">API 종량제 · 지난 30일</span>
       </div>
       <div className="flex items-baseline gap-2 flex-wrap mb-1">
@@ -625,14 +623,9 @@ function ApiRecommendationCard({
         <p className="text-neutral-500">
           {rec.recommendedTierLabel} 플랜:  <span className="text-neutral-300 font-bold">{fmtMoney(rec.planMonthlyPrice)}</span> / 월
         </p>
-        <p className={`pt-1 mt-1 border-t border-neutral-800/60 ${accent === "amber" ? "text-amber-300" : "text-emerald-400"} font-bold`}>
+        <p className="pt-1 mt-1 border-t border-neutral-800/60 text-emerald-400 font-bold">
           ▼ 매월 {fmtMoney(rec.savingsAmount)} 절감 ({rec.savingsPct}%)
         </p>
-        {rec.edgeCase === "high" && (
-          <p className="text-amber-400/70 pt-1 leading-relaxed text-[11px]">
-            ⚠ {rec.recommendedTierLabel} 한도를 자주 넘길 가능성 있어요 (월 사용량 ${"{"}plan 가격×2{"}"} 초과).
-          </p>
-        )}
       </div>
     </div>
   );

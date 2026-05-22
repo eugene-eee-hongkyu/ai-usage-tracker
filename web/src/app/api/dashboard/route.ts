@@ -992,7 +992,11 @@ export async function GET(req: NextRequest) {
     planMonthlyPrice: number;
     savingsAmount: number;
     savingsPct: number;
-    edgeCase: "low" | "normal" | "high";
+    // "high" 분기 제거 (2026-05-22). 옛 분기는 cost > $400 → "Max 20x 한도
+    // 자주 도달 위험" 메시지였으나, cache leverage 사용자별 5×~100× 다양해서
+    // monthlyCost30d 가 부풀려진 cache 친 cost 라 한도 도달과 무관. eugene
+    // 5h 0번 / 1주 1번 사례로 misleading 확인 → low | normal 만.
+    edgeCase: "low" | "normal";
   };
   let apiRecommendation: ApiRecommendation | null = null;
   if (declaredLimits?.tier === "api") {
@@ -1031,8 +1035,7 @@ export async function GET(req: NextRequest) {
         planMonthlyPrice: recLimits.monthlyPriceUsd,
         savingsAmount: savings,
         savingsPct,
-        // Max 20x 추천인데 사용량이 plan 가격의 2배 이상이면 '한도 자주 도달' 경고.
-        edgeCase: recommended === "max20" && monthlyCost30d > 400 ? "high" : "normal",
+        edgeCase: "normal",
       };
     }
   }
