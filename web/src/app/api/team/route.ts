@@ -705,6 +705,48 @@ export async function GET(req: NextRequest) {
   }
   const teamPlanHealth = summarizeTeamPlans(memberHealthList);
 
+  // 팀 본전 회수 (이번 달, period 무관) — 사용자 needs 2 (뽕) 팀버전. 멤버
+  // 에게도 노출 (admin only 인 TeamPlanHealthCard 의 detail 표는 별도). 가입
+  // plan 총액 vs 이번 달 cost. 활성/전체 멤버 + 상위 1명 비중.
+  const teamRecovery = (() => {
+    const planTotal = teamPlanHealth.currentMonthlyCostUsd;
+    if (planTotal <= 0) return null;
+    const now = new Date();
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    const monthStartYmd = monthStart.toISOString().slice(0, 10);
+    const todayYmd = now.toISOString().slice(0, 10);
+    // dailyMemberMap: date → memberKey ("name__userId") → cost. ccusage 우선.
+    const memberMonthCost = new Map<string, number>();
+    for (const [date, costsByMember] of dailyMemberMap.entries()) {
+      if (date < monthStartYmd || date > todayYmd) continue;
+      for (const [memberKey, cost] of Object.entries(costsByMember)) {
+        memberMonthCost.set(memberKey, (memberMonthCost.get(memberKey) ?? 0) + cost);
+      }
+    }
+    let thisMonthCost = 0;
+    let topName: string | null = null;
+    let topCost = 0;
+    for (const [memberKey, cost] of memberMonthCost.entries()) {
+      thisMonthCost += cost;
+      if (cost > topCost) {
+        topCost = cost;
+        topName = memberKey.split("__")[0];
+      }
+    }
+    const activeMembers = memberMonthCost.size;
+    const totalMembers = allUsers.length;
+    const topSharePct = thisMonthCost > 0 ? Math.round((topCost / thisMonthCost) * 100) : 0;
+    return {
+      planTotalUsd: planTotal,
+      thisMonthCostUsd: thisMonthCost,
+      recoveryPct: Math.round((thisMonthCost / planTotal) * 100),
+      activeMembers,
+      totalMembers,
+      topShareName: activeMembers > 0 ? topName : null,
+      topSharePct,
+    };
+  })();
+
   const teamUsage = {
     periodDays,
     // 팀 활용지수 — 활성 멤버 평균. 활성 멤버 없으면 0.
@@ -949,6 +991,7 @@ export async function GET(req: NextRequest) {
     industryComparison,
     teamScore,
     teamPlanHealth,
+    teamRecovery,
     teamUsage,
     memberUsage,
     dailyUnitCostByMember,

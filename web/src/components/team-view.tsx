@@ -152,6 +152,15 @@ interface TeamData {
     windowDays: number;
   } | null;
   teamPlanHealth?: TeamPlanSummary;
+  teamRecovery?: {
+    planTotalUsd: number;
+    thisMonthCostUsd: number;
+    recoveryPct: number;
+    activeMembers: number;
+    totalMembers: number;
+    topShareName: string | null;
+    topSharePct: number;
+  } | null;
   teamUsage?: {
     periodDays: number;
     powerIndex: number;
@@ -1684,6 +1693,53 @@ export function TeamView({ adminMode = false }: { adminMode?: boolean }) {
                 totalWindowTokensSum={data.teamUsage.totalWindowTokensSum}
               />
             )}
+
+            {/* 팀 본전 회수 카드 — 모든 멤버에게 노출 (admin only 인 Team Plan
+                Health detail 표는 별도). 가입 plan 총액 vs 이번 달 사용 cost
+                + 활성 멤버 + 상위 1명 비중. period 무관 항상 이번 달. */}
+            {data.teamRecovery && data.teamRecovery.planTotalUsd > 0 && (() => {
+              const r = data.teamRecovery;
+              const fmt = (v: number) =>
+                v >= 1000 ? `$${(v / 1000).toFixed(1)}k`.replace(".0k", "k") :
+                v >= 100 ? `$${Math.round(v).toLocaleString()}` :
+                v >= 1 ? `$${v.toFixed(0)}` : `$${v.toFixed(2)}`;
+              const recovered = r.recoveryPct >= 100;
+              return (
+                <div data-testid="team-card-recovery" className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-emerald-500 rounded p-4">
+                  <p className="text-[10px] font-mono text-neutral-500 uppercase tracking-wider mb-1.5">
+                    팀 본전 회수 (이번 달)
+                  </p>
+                  <div className="flex items-baseline gap-3 flex-wrap mb-2">
+                    <span className={`text-3xl sm:text-4xl font-mono font-bold tracking-tight ${
+                      recovered ? "text-emerald-400" : "text-neutral-200"
+                    }`}>
+                      {r.recoveryPct}%
+                    </span>
+                    {recovered ? (
+                      <span className="text-emerald-300 text-sm font-mono">
+                        ▼ {fmt(r.thisMonthCostUsd - r.planTotalUsd)} 절감
+                      </span>
+                    ) : (
+                      <span className="text-neutral-400 text-sm font-mono">
+                        본전까지 {fmt(r.planTotalUsd - r.thisMonthCostUsd)}
+                      </span>
+                    )}
+                  </div>
+                  <div className="text-xs font-mono text-neutral-500 space-y-0.5">
+                    <p>팀 Plan 총액 <span className="text-neutral-300">{fmt(r.planTotalUsd)}</span> · 사용가치 <span className="text-neutral-300">{fmt(r.thisMonthCostUsd)}</span></p>
+                    <p>
+                      활성 <span className="text-neutral-300">{r.activeMembers}/{r.totalMembers}명</span>
+                      {r.topShareName && r.topSharePct > 0 && (
+                        <>
+                          {" · "}상위 1명 비중 <span className="text-neutral-300">{r.topSharePct}%</span>{" "}
+                          <span className="text-neutral-600">({r.topShareName})</span>
+                        </>
+                      )}
+                    </p>
+                  </div>
+                </div>
+              );
+            })()}
 
             {/* Row 1 (위치 swap): Activity (tokens 합산) + Cost (cost 합산).
                 팀활용지수·팀토큰단가 hero 다음으로 "팀이 얼마나 썼나" 합산
