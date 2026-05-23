@@ -699,7 +699,117 @@ function TipBtn({ label, onClick, variant = "action", testid }: { label: string;
   );
 }
 
+// 팀 내 내 위치 카드 — 4 metric (사용량/cost/cache hit/활용지수) 본인 등수
+// + 값 + 팀 평균 + 1위 이름·값. 본인이 팀 멤버일 때만 (rank 계산 가능).
+// 작은 N (4명) 가정. percentile 보다 ordinal "N/M명" + 본인 행 강조.
+function TeamPositionCard({
+  team,
+  currentUserName,
+  periodLabel,
+}: {
+  team: TeamRankPayload;
+  currentUserName: string;
+  periodLabel: string;
+}) {
+  const members = team.byEfficiency ?? [];
+  const usage = team.memberUsage ?? [];
+  if (members.length === 0) return null;
+  // 본인 매칭 — name 기반 (동명이인 quirk team-view 와 동일).
+  const me = members.find((m) => m.name === currentUserName);
+  if (!me) return null;
+
+  // 각 metric 별 정렬 (desc) + 본인 rank/평균/1위.
+  function buildRow<T>(
+    label: string,
+    pool: T[],
+    extract: (m: T) => { name: string; value: number },
+    isHigherBetter: boolean,
+    fmt: (v: number) => string,
+    valueColor: string,
+  ) {
+    if (pool.length === 0) return null;
+    const sorted = [...pool].sort((a, b) => {
+      const va = extract(a).value;
+      const vb = extract(b).value;
+      return isHigherBetter ? vb - va : va - vb;
+    });
+    const myIdx = sorted.findIndex((m) => extract(m).name === currentUserName);
+    if (myIdx === -1) return null;
+    const myVal = extract(sorted[myIdx]).value;
+    const total = sorted.length;
+    const rank = myIdx + 1;
+    const avg = sorted.reduce((s, m) => s + extract(m).value, 0) / sorted.length;
+    const first = sorted[0];
+    const isMeFirst = extract(first).name === currentUserName;
+    const isTop1 = rank === 1;
+    return { label, rank, total, myVal, avg, firstName: extract(first).name, firstVal: extract(first).value, isMeFirst, isTop1, fmt, valueColor };
+  }
+
+  const rows = [
+    buildRow("사용량", members, (m) => ({ name: m.name, value: m.totalTokens }), true,
+      (v) => v >= 1_000_000_000 ? `${(v / 1_000_000_000).toFixed(1)}B` : v >= 1_000_000 ? `${(v / 1_000_000).toFixed(1)}M` : v >= 1_000 ? `${(v / 1_000).toFixed(1)}k` : String(v),
+      "text-cyan-300"),
+    buildRow("비용", members, (m) => ({ name: m.name, value: m.totalCost }), true,
+      (v) => `$${v.toFixed(2)}`, "text-yellow-300"),
+    buildRow("cache hit", members, (m) => ({ name: m.name, value: m.cacheHitPct }), true,
+      (v) => `${v.toFixed(1)}%`, "text-emerald-300"),
+    buildRow("활용 지수", usage, (m) => ({ name: m.name, value: m.powerIndex }), true,
+      (v) => String(v), "text-cyan-300"),
+  ].filter((r): r is NonNullable<typeof r> => r !== null);
+
+  if (rows.length === 0) return null;
+
+  return (
+    <div data-testid="dash-card-team-position" className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-indigo-500 rounded">
+      <div className="px-3 py-2 border-b border-neutral-800 flex items-center justify-between">
+        <span className="text-xs font-mono font-bold text-indigo-400 uppercase tracking-wider">
+          팀 내 내 위치 · {periodLabel} · {members.length}명 중
+        </span>
+      </div>
+      <div className="p-3 space-y-1.5">
+        {rows.map((r) => (
+          <div key={r.label} className="flex items-baseline gap-3 text-xs font-mono">
+            <span className="text-neutral-500 w-16 shrink-0">{r.label}</span>
+            <span className="text-neutral-200 w-12 shrink-0 tabular-nums">
+              {r.rank}/{r.total}
+            </span>
+            <span className={`${r.valueColor} w-20 shrink-0 tabular-nums font-bold`}>{r.fmt(r.myVal)}</span>
+            <span className="text-neutral-500 hidden sm:inline flex-1 truncate">
+              팀 평균 <span className="text-neutral-400">{r.fmt(r.avg)}</span>
+              <span className="text-neutral-700 mx-1.5">·</span>
+              {r.isMeFirst ? (
+                <span className="text-emerald-400">★ 팀 1위 (나)</span>
+              ) : (
+                <>팀 1위 <span className="text-neutral-400">{r.firstName}</span> <span className="text-neutral-500">{r.fmt(r.firstVal)}</span></>
+              )}
+            </span>
+            {r.isTop1 && !r.isMeFirst && <span className="text-emerald-400">★</span>}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 interface TeamMember { userId: string; name: string }
+
+// 팀 내 내 위치 카드용 — /api/team 응답 일부.
+interface TeamRankMember {
+  userId: number;
+  name: string;
+  totalCost: number;
+  totalTokens: number;
+  cacheHitPct: number;
+}
+interface TeamRankMemberUsage {
+  userId: number;
+  name: string;
+  powerIndex: number;
+}
+interface TeamRankPayload {
+  byEfficiency: TeamRankMember[];
+  memberUsage?: TeamRankMemberUsage[];
+}
 
 export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dashboard_period", adminMode = false }: { targetUserId?: string; onMemberSelect?: (userId: string) => void; storageKey?: string; adminMode?: boolean }) {
   const viewOnly = !!targetUserId;
@@ -731,6 +841,9 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
   }, [period, storageKey, periodReady]);
   const [data, setData] = useState<DashboardData | null>(null);
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
+  // 팀 내 내 위치 카드 데이터 — 본인 화면일 때 (viewOnly 아님) /api/team 호출.
+  // period 따라 등수 달라지니 같이 refetch.
+  const [teamRankData, setTeamRankData] = useState<TeamRankPayload | null>(null);
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState(false);
   const [syncCopied, setSyncCopied] = useState(false);
@@ -849,6 +962,28 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
       })
       .catch(() => {});
   }, [viewOnly, session]);
+
+  // 팀 내 내 위치 카드 — 본인 화면 (viewOnly 아님) 에서만. period 따라 등수
+  // 달라지니 period 의존. /api/team 이 session-scoped 라 LOCAL_MODE 에서는
+  // 호출 안 함.
+  useEffect(() => {
+    if (viewOnly || !session || isLocalMode) return;
+    if (!periodReady) return;
+    const ctrl = new AbortController();
+    fetch(`/api/team?period=${period}`, { signal: ctrl.signal })
+      .then((r) => r.json())
+      .then((d) => {
+        if (d?.error) return;
+        setTeamRankData({
+          byEfficiency: d.byEfficiency ?? [],
+          memberUsage: d.memberUsage ?? [],
+        });
+      })
+      .catch((e: unknown) => {
+        if (e instanceof DOMException && e.name === "AbortError") return;
+      });
+    return () => ctrl.abort();
+  }, [viewOnly, session, period, periodReady, isLocalMode]);
 
   useEffect(() => {
     if (!session) return;
@@ -1979,6 +2114,17 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
             {unitCostBlock}
             {planSavingsBlock}
           </div>
+        )}
+
+        {/* 팀 내 내 위치 카드 — 사용자 needs 3 (peer 비교) 직격. 본인 화면일
+            때만 (viewOnly 아님) 표시. /api/team 별도 호출로 가져온 데이터.
+            본인이 멤버 아니면 null (TeamPositionCard 내부 가드). */}
+        {!viewOnly && teamRankData && session?.user?.name && (
+          <TeamPositionCard
+            team={teamRankData}
+            currentUserName={session.user.name}
+            periodLabel={periodLabel(period, t)}
+          />
         )}
 
         {/* Row 1.6: 활용지수 + 토큰단가 (또는 API 추천). embedded 모드 — main
