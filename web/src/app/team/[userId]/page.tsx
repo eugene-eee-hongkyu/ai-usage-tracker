@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter, useParams } from "next/navigation";
 import { Nav } from "@/components/nav";
+import { ViewAsBanner } from "@/components/view-as-banner";
 import Link from "next/link";
 import { ActivityCalendar } from "react-activity-calendar";
 import { useLocalMode } from "@/lib/use-local-mode";
@@ -50,7 +51,7 @@ export default function MemberProfilePage() {
 
   if (notFound) return (
     <div className="min-h-screen">
-      <Nav />
+      <Nav /><ViewAsBanner />
       <main className="max-w-3xl mx-auto px-4 py-12 text-center space-y-4" data-testid="member-not-found">
         <Link href="/team" className="text-slate-400 hover:text-slate-200 text-sm inline-block">{t.memberProfile.teamRanking}</Link>
         <p className="text-slate-300 text-lg">{t.memberProfile.notFound}</p>
@@ -64,7 +65,7 @@ export default function MemberProfilePage() {
 
   if (!data) return (
     <div className="min-h-screen">
-      <Nav />
+      <Nav /><ViewAsBanner />
       <div className="flex items-center justify-center h-64">
         <div className="animate-pulse text-slate-500">{t.memberProfile.loading}</div>
       </div>
@@ -75,7 +76,7 @@ export default function MemberProfilePage() {
   if (data.summary.sessionsCount === 0 && data.daily.length === 0) {
     return (
       <div className="min-h-screen">
-        <Nav />
+        <Nav /><ViewAsBanner />
         <main className="max-w-3xl mx-auto px-4 py-12 text-center space-y-4" data-testid="member-empty">
           <Link href="/team" className="text-slate-400 hover:text-slate-200 text-sm inline-block">{t.memberProfile.teamRanking}</Link>
           <h1 className="font-semibold text-slate-200">{data.user.name}{t.memberProfile.profileSuffix}</h1>
@@ -107,7 +108,7 @@ export default function MemberProfilePage() {
 
   return (
     <div className="min-h-screen">
-      <Nav />
+      <Nav /><ViewAsBanner />
       <main className="max-w-3xl mx-auto px-4 py-6 space-y-6">
         <div className="flex items-center gap-3">
           <Link href="/team" className="text-slate-400 hover:text-slate-200 text-sm">{t.memberProfile.teamRanking}</Link>
