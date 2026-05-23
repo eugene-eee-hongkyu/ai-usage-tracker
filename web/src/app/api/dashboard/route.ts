@@ -1092,6 +1092,53 @@ export async function GET(req: NextRequest) {
       periodDays,
       // API tier (PAYG) 사용자 추천. 다른 tier 면 null.
       apiRecommendation,
+      // 본전 회수 (이번 달 단위, period 무관) — 사용자 인터뷰 "월 요금제
+      // 뽕 뽑기" 핵심 framing. monthlyPriceUsd 있을 때만 (declared 또는
+      // 추정 tier). API tier / tier 미입력 / activity 0 은 null.
+      monthRecovery: (() => {
+        const price = effectiveLimits?.monthlyPriceUsd ?? null;
+        if (!price || price <= 0) return null;
+        const now = new Date();
+        const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+        const monthStartYmd = monthStart.toISOString().slice(0, 10);
+        const todayYmd = now.toISOString().slice(0, 10);
+        const monthRows = ccusageRows
+          .filter((r) => r.date && r.date >= monthStartYmd && r.date <= todayYmd)
+          .sort((a, b) => (a.date ?? "").localeCompare(b.date ?? ""));
+        const daysElapsed = now.getDate();
+        const daysTotal = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+        if (monthRows.length === 0) {
+          return {
+            monthlyPriceUsd: price,
+            monthCostUsd: 0,
+            recoveryPct: 0,
+            breakEvenDate: null as string | null,
+            monthDaysElapsed: daysElapsed,
+            monthDaysTotal: daysTotal,
+            remainingEstimateUsd: 0,
+          };
+        }
+        let cumulative = 0;
+        let breakEvenDate: string | null = null;
+        for (const r of monthRows) {
+          const c = (r as { totalCost?: number }).totalCost ?? 0;
+          cumulative += c;
+          if (breakEvenDate === null && cumulative >= price) {
+            breakEvenDate = r.date!;
+          }
+        }
+        const avgDaily = cumulative / daysElapsed;
+        const remaining = avgDaily * (daysTotal - daysElapsed);
+        return {
+          monthlyPriceUsd: price,
+          monthCostUsd: cumulative,
+          recoveryPct: Math.round((cumulative / price) * 100),
+          breakEvenDate,
+          monthDaysElapsed: daysElapsed,
+          monthDaysTotal: daysTotal,
+          remainingEstimateUsd: remaining,
+        };
+      })(),
     },
     powerIndex: {
       score: powerIndexValue,
