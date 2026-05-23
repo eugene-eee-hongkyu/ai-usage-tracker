@@ -768,22 +768,27 @@ function TeamPositionCard({
       </div>
       <div className="p-3 space-y-1.5">
         {rows.map((r) => (
-          <div key={r.label} className="flex items-baseline gap-2 text-xs font-mono">
-            <span className="text-neutral-500 w-16 shrink-0 whitespace-nowrap">{r.label}</span>
-            <span className="text-neutral-200 w-10 shrink-0 tabular-nums whitespace-nowrap">
+          <div
+            key={r.label}
+            className="grid grid-cols-[5rem_2.5rem_5rem_1fr_auto] gap-x-3 items-baseline text-xs font-mono"
+          >
+            <span className="text-neutral-500 whitespace-nowrap truncate">{r.label}</span>
+            <span className="text-neutral-200 tabular-nums whitespace-nowrap">
               {r.rank}/{r.total}
             </span>
-            <span className={`${r.valueColor} w-16 shrink-0 tabular-nums font-bold text-right whitespace-nowrap`}>{r.fmt(r.myVal)}</span>
-            <span className="text-neutral-500 hidden md:inline flex-1 truncate min-w-0">
+            <span className={`${r.valueColor} tabular-nums font-bold text-right whitespace-nowrap`}>{r.fmt(r.myVal)}</span>
+            <span className="text-neutral-500 truncate min-w-0">
               팀 평균 <span className="text-neutral-400">{r.fmt(r.avg)}</span>
               <span className="text-neutral-700 mx-1.5">·</span>
               {r.isMeFirst ? (
                 <span className="text-emerald-400">★ 팀 1위 (나)</span>
               ) : (
-                <>팀 1위 <span className="text-neutral-400">{r.firstName}</span> <span className="text-neutral-500">{r.fmt(r.firstVal)}</span></>
+                <>팀 1위 <span className="text-neutral-400">{r.firstName}</span> <span className="text-neutral-500 ml-1">{r.fmt(r.firstVal)}</span></>
               )}
             </span>
-            {r.isTop1 && !r.isMeFirst && <span className="text-emerald-400">★</span>}
+            <span className="text-emerald-400 w-3 text-center">
+              {r.isTop1 && !r.isMeFirst ? "★" : ""}
+            </span>
           </div>
         ))}
       </div>
@@ -963,11 +968,11 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
       .catch(() => {});
   }, [viewOnly, session]);
 
-  // 팀 내 내 위치 카드 — 본인 화면 (viewOnly 아님) 에서만. period 따라 등수
-  // 달라지니 period 의존. /api/team 이 session-scoped 라 LOCAL_MODE 에서는
-  // 호출 안 함.
+  // 팀 내 내 위치 카드 — 본인 화면 + admin view-as 둘 다. view-as 일 때는
+  // viewAs 팀 (target user 의 팀) 데이터 옴 (/api/team 이 effectiveTeamId
+  // 사용). period 따라 등수 달라지니 period 의존. LOCAL_MODE 는 skip.
   useEffect(() => {
-    if (viewOnly || !session || isLocalMode) return;
+    if (!session || isLocalMode) return;
     if (!periodReady) return;
     const ctrl = new AbortController();
     fetch(`/api/team?period=${period}`, { signal: ctrl.signal })
@@ -983,7 +988,7 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
         if (e instanceof DOMException && e.name === "AbortError") return;
       });
     return () => ctrl.abort();
-  }, [viewOnly, session, period, periodReady, isLocalMode]);
+  }, [session, period, periodReady, isLocalMode]);
 
   useEffect(() => {
     if (!session) return;
@@ -2164,21 +2169,25 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
 
         {/* Row 2: 팀 내 내 위치 + 활동 히트맵 (반셀 2열). 사용자 피드백:
             팀 내 내 위치가 full-width 차지할 필요 없음 → 활동 히트맵 옆.
-            본인 화면일 때만 (viewOnly 아님). 팀 데이터 없거나 멤버 아니면
-            히트맵만 full-width 로 fallback. Efficiency 카드는 자세히 보기로
-            이동 (사용자 안 본다). */}
-        {!viewOnly && teamRankData && session?.user?.name ? (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            <TeamPositionCard
-              team={teamRankData}
-              currentUserName={session.user.name}
-              periodLabel={periodLabel(period, t)}
-            />
-            {activityHeatmapBlock}
-          </div>
-        ) : (
-          activityHeatmapBlock
-        )}
+            본인 화면 (session.user.name) + admin view-as (data.user.name)
+            둘 다. 팀 데이터 없거나 매칭 row 없으면 히트맵만 full-width
+            fallback. Efficiency 카드는 자세히 보기로 이동 (사용자 안 본다). */}
+        {(() => {
+          const targetName = viewOnly ? data.user.name : session?.user?.name;
+          if (teamRankData && targetName) {
+            return (
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <TeamPositionCard
+                  team={teamRankData}
+                  currentUserName={targetName}
+                  periodLabel={periodLabel(period, t)}
+                />
+                {activityHeatmapBlock}
+              </div>
+            );
+          }
+          return activityHeatmapBlock;
+        })()}
 
         {/* 자세히 보기 토글 — divider + 중앙 라벨 풀폭 패턴 (Medium / Notion 식).
             "여기부터 details" 메타포 + 위·아래 영역 시각 단절. by model · by
