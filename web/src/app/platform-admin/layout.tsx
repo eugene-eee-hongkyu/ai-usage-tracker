@@ -8,32 +8,19 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { useSession } from "next-auth/react";
 import { useLocalMode } from "@/lib/use-local-mode";
 import { usePermissions } from "@/lib/use-permissions";
 import { Nav } from "@/components/nav";
+import { ViewAsBanner } from "@/components/view-as-banner";
 
 export default function PlatformAdminLayout({ children }: { children: React.ReactNode }) {
   const path = usePathname();
   const router = useRouter();
-  const { data: session, status } = useSession();
+  const { status } = useSession();
   const isLocalMode = useLocalMode();
   const { isPlatformAdmin, loading } = usePermissions();
-  const [exiting, setExiting] = useState(false);
-  const viewAsTeamId = (session?.user as { viewAsTeamId?: number | null } | undefined)?.viewAsTeamId ?? null;
-  const viewAsTeamName = (session?.user as { viewAsTeamName?: string | null } | undefined)?.viewAsTeamName ?? null;
-
-  async function handleExitView() {
-    if (exiting) return;
-    setExiting(true);
-    try {
-      await fetch("/api/admin/platform/exit-view", { method: "POST" });
-      window.location.reload();
-    } finally {
-      setExiting(false);
-    }
-  }
 
   useEffect(() => {
     if (isLocalMode === null) return;
@@ -59,27 +46,8 @@ export default function PlatformAdminLayout({ children }: { children: React.Reac
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100">
+      <ViewAsBanner />
       <Nav />
-      {viewAsTeamId && viewAsTeamName && (
-        <div
-          role="alert"
-          className="bg-orange-600/90 border-b border-orange-800 px-4 py-2 flex items-center justify-between text-sm"
-        >
-          <span className="text-orange-50 font-medium">
-            Platform view-as: <span className="font-bold">{viewAsTeamName}</span>
-            <span className="ml-2 text-orange-200/80 text-xs">
-              이 화면의 모든 admin 액션은 <b>{viewAsTeamName}</b> 팀에 적용됩니다.
-            </span>
-          </span>
-          <button
-            onClick={handleExitView}
-            disabled={exiting}
-            className="px-3 py-1 rounded bg-orange-800 hover:bg-orange-900 text-orange-50 text-xs font-medium disabled:opacity-50"
-          >
-            {exiting ? "Exiting…" : "Exit view"}
-          </button>
-        </div>
-      )}
       <div className="max-w-7xl mx-auto px-4 py-6">
         <div className="flex items-center gap-2 mb-6 border-b border-slate-800 pb-3">
           <span className="text-xs uppercase tracking-wider text-rose-400 font-semibold">
