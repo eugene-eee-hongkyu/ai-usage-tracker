@@ -1865,9 +1865,9 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
         </div>
         <div className="p-3 space-y-1.5">
           {rows.map((r, i) => (
-            <div key={r.label} className="grid grid-cols-[3.5rem_1fr_5rem] gap-x-3 items-baseline text-xs font-mono">
-              <span className="text-neutral-500 whitespace-nowrap">{i + 1}. {r.label}</span>
-              <span className={`${r.color} truncate font-bold`} title={r.name}>{r.name}</span>
+            <div key={r.label} className="grid grid-cols-[6rem_minmax(0,1fr)_5rem] gap-x-3 items-baseline text-xs font-mono">
+              <span className="text-neutral-500 whitespace-nowrap truncate">{i + 1}. {r.label}</span>
+              <span className={`${r.color} truncate font-bold min-w-0`} title={r.name}>{r.name}</span>
               <span className="text-yellow-400 text-right tabular-nums font-bold whitespace-nowrap">{fmtCost(r.cost)}</span>
             </div>
           ))}

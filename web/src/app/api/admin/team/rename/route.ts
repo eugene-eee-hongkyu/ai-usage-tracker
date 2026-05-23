@@ -13,6 +13,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db, teams, IS_LOCAL_MODE } from "@/lib/db";
 import { requireUser } from "@/lib/auth-guards";
 import { writeAudit } from "@/lib/audit";
+import { getEffectiveTeamId } from "@/lib/effective-team";
 import { eq, and, isNull, ne } from "drizzle-orm";
 
 export const dynamic = "force-dynamic";
@@ -47,7 +48,11 @@ export async function PATCH(req: NextRequest) {
   const slug = slugify(trimmed);
   if (!slug) return NextResponse.json({ error: "team_name_invalid_chars" }, { status: 400 });
 
-  const teamId = guard.user.currentTeamId;
+  // view-as 모드면 view-as 팀에 적용 (Platform Admin 의 의도). 일반 사용자는
+  // currentTeamId 그대로. 옛 동작은 currentTeamId 하드코딩 — view-as 중 본인
+  // 팀 이름 바뀌는 버그.
+  const teamId = await getEffectiveTeamId({ user: guard.user }, req);
+  if (!teamId) return NextResponse.json({ error: "no_team" }, { status: 403 });
 
   // namePending=true 인 팀은 onboard 흐름. 여기서 거부 — 사용자가 /onboard-team 으로 가야.
   const teamRow = await db

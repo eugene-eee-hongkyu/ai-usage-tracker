@@ -29,12 +29,15 @@ export async function GET(req: NextRequest) {
   const dir = url.searchParams.get("dir") ?? "desc";
 
   // team 격리 — team_members 의 user_id 만 조회. M6c: 같은 user 가 N팀 가능하지만
-  // 이 list 는 effectiveTeam 의 멤버만.
+  // 이 list 는 effectiveTeam 의 멤버만. role 도 가져와 user.teamRole 로 노출
+  // (UI 가 owner / admin / member 를 정확히 표시 — users.role 은 cross-team
+  // 시스템 권한이라 team role 과 별개).
   const memberIdRows = await db
-    .select({ userId: teamMembers.userId })
+    .select({ userId: teamMembers.userId, role: teamMembers.role })
     .from(teamMembers)
     .where(and(eq(teamMembers.teamId, effectiveTeamId), isNull(teamMembers.deletedAt)));
   const memberUserIds = memberIdRows.map((r) => r.userId);
+  const teamRoleByUser = new Map<number, string>(memberIdRows.map((r) => [r.userId, r.role]));
   if (memberUserIds.length === 0) {
     return NextResponse.json({ users: [], page, pageSize: PAGE_SIZE, total: 0, totalPages: 0 });
   }
@@ -81,7 +84,12 @@ export async function GET(req: NextRequest) {
     .offset((page - 1) * PAGE_SIZE);
 
   // Platform Admin 표시 — ADMIN_EMAIL env 화이트리스트 매칭. DB 컬럼 아닌 derived.
-  const rowsWithOwner = rows.map((r) => ({ ...r, isPlatformAdmin: isAdmin(r.email) }));
+  // teamRole — effective team 에서의 role (owner / admin / member).
+  const rowsWithOwner = rows.map((r) => ({
+    ...r,
+    isPlatformAdmin: isAdmin(r.email),
+    teamRole: teamRoleByUser.get(r.id) ?? null,
+  }));
 
   // total count
   const countResult = await db

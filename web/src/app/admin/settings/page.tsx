@@ -309,10 +309,14 @@ function AutoJoinSection() {
 }
 
 // 팀 이름 변경 — Settings 페이지 상단 섹션. Team Owner 또는 Platform Admin 만.
+// view-as 모드면 view-as 팀 이름 표시 (backend rename API 도 effective team 적용).
 function TeamRenameSection() {
   const { data: session } = useSession();
-  const currentName =
-    (session?.user as { currentTeamName?: string | null } | undefined)?.currentTeamName ?? "";
+  const u = session?.user as {
+    currentTeamName?: string | null;
+    viewAsTeamName?: string | null;
+  } | undefined;
+  const currentName = u?.viewAsTeamName ?? u?.currentTeamName ?? "";
   const [name, setName] = useState(currentName);
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState<{ ok: boolean; msg: string } | null>(null);

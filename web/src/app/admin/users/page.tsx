@@ -16,6 +16,9 @@ interface UserRow {
   name: string;
   avatarUrl: string | null;
   role: string;
+  // effective team 의 team_members.role (owner / admin / member). users.role
+  // 은 cross-team 시스템 권한이라 별개 — UI 는 teamRole 우선 표시.
+  teamRole?: string | null;
   permissions: { membershipAdmin?: boolean; billingAdmin?: boolean };
   suspendedAt: string | null;
   deletedAt: string | null;
@@ -301,8 +304,12 @@ export default function AdminUsersPage() {
                         <span className="inline-block px-1.5 py-0.5 bg-amber-900/40 text-amber-300 rounded text-xs font-semibold">
                           Platform Admin
                         </span>
+                      ) : u.teamRole === "owner" ? (
+                        <span className="inline-block px-1.5 py-0.5 bg-emerald-900/40 text-emerald-300 rounded text-xs font-semibold">
+                          Owner
+                        </span>
                       ) : (
-                        u.role
+                        u.teamRole ?? u.role
                       )}
                     </td>
                     <td className="px-4 py-2.5 text-xs text-slate-400">
