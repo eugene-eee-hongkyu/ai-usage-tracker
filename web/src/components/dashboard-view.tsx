@@ -1866,8 +1866,17 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
         <div className="p-3 space-y-1.5">
           {rows.map((r, i) => (
             <div key={r.label} className="grid grid-cols-[6rem_minmax(0,1fr)_5rem] gap-x-3 items-baseline text-xs font-mono">
-              <span className="text-neutral-500 whitespace-nowrap truncate">{i + 1}. {r.label}</span>
-              <span className={`${r.color} truncate font-bold min-w-0`} title={r.name}>{r.name}</span>
+              <span className="text-neutral-500 whitespace-nowrap overflow-hidden text-ellipsis">{i + 1}. {r.label}</span>
+              {/* ellipsis 위치: 끝이 아니라 앞 — 프로젝트 path 처럼 뒤쪽 segment
+                  (예: coding/four-pillars) 가 정보 가치 크고 앞쪽 (/Users/eugene/
+                  Downloads/) 은 잘려도 됨. CSS direction:rtl 트릭. */}
+              <span
+                className={`${r.color} font-bold min-w-0 overflow-hidden whitespace-nowrap block`}
+                style={{ direction: "rtl", textAlign: "left", textOverflow: "ellipsis" }}
+                title={r.name}
+              >
+                <bdi>{r.name}</bdi>
+              </span>
               <span className="text-yellow-400 text-right tabular-nums font-bold whitespace-nowrap">{fmtCost(r.cost)}</span>
             </div>
           ))}
