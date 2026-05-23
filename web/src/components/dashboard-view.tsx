@@ -1837,6 +1837,104 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
     </div>
   );
 
+  // 비용 원인 Top 3 — 사용자 needs 1 (얼마나 썼나 + 어디에) 직접. period
+  // 따라 Project / Model / Activity 각 1위만 1줄씩. 자세히 보기 안 흩어진
+  // BY MODEL / BY PROJECT / BY ACTIVITY 의 핵심 summary. 모든 기간 토글
+  // 에서 의미 (오늘 / 8일 / 30일 / 이번달 / 전체).
+  const costCauseTop3Block = (() => {
+    const topProject = (data.projects ?? []).sort((a, b) => b.cost - a.cost)[0];
+    const topModel = (data.models ?? []).sort((a, b) => b.cost - a.cost)[0];
+    const topActivity = (data.activities ?? []).sort((a, b) => b.cost - a.cost)[0];
+    const hasAny = topProject || topModel || topActivity;
+    if (!hasAny) return null;
+    const fmtCost = (v: number) =>
+      v >= 1000 ? `$${(v / 1000).toFixed(1)}k`.replace(".0k", "k") :
+      v >= 100 ? `$${Math.round(v).toLocaleString()}` :
+      v >= 1 ? `$${v.toFixed(2)}` : `$${v.toFixed(2)}`;
+    type Row = { label: string; name: string; cost: number; color: string };
+    const rows: Row[] = [];
+    if (topProject) rows.push({ label: "Project", name: topProject.name, cost: topProject.cost, color: "text-yellow-300" });
+    if (topModel) rows.push({ label: "Model", name: topModel.name, cost: topModel.cost, color: "text-pink-300" });
+    if (topActivity) rows.push({ label: "Activity", name: topActivity.name, cost: topActivity.cost, color: "text-violet-300" });
+    return (
+      <div data-testid="dash-card-cost-top3" className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-amber-500 rounded">
+        <div className="px-3 py-2 border-b border-neutral-800">
+          <span className="text-xs font-mono font-bold text-amber-400 uppercase tracking-wider">
+            비용 원인 Top 3 · {periodLabel(period, t)}
+          </span>
+        </div>
+        <div className="p-3 space-y-1.5">
+          {rows.map((r, i) => (
+            <div key={r.label} className="grid grid-cols-[3.5rem_1fr_5rem] gap-x-3 items-baseline text-xs font-mono">
+              <span className="text-neutral-500 whitespace-nowrap">{i + 1}. {r.label}</span>
+              <span className={`${r.color} truncate font-bold`} title={r.name}>{r.name}</span>
+              <span className="text-yellow-400 text-right tabular-nums font-bold whitespace-nowrap">{fmtCost(r.cost)}</span>
+            </div>
+          ))}
+          <p className="text-[10px] font-mono text-neutral-600 pt-1.5 border-t border-neutral-800/60 mt-1">
+            선택한 기간 기준으로 비용이 가장 많이 발생한 원인. 자세한 분포는 자세히 보기 안 By Model / Project / Activity 참고.
+          </p>
+        </div>
+      </div>
+    );
+  })();
+
+  // L. CACHE HIT STREAK 카드 — 사용자 피드백 efficiency 옆 자리.
+  // data.efficiencyScore.streak + teamRank 데이터 재사용. period 무관 항상
+  // 현재 시점 streak.
+  const cacheStreakBlock = (() => {
+    const s = data.efficiencyScore;
+    if (!s) return null;
+    return (
+      <div data-testid="dash-card-cache-streak" className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-orange-500 rounded">
+        <div className="px-3 py-2 border-b border-neutral-800">
+          <span className="text-xs font-mono font-bold text-orange-400 uppercase tracking-wider">
+            Cache Hit Streak
+          </span>
+        </div>
+        <div className="p-4 space-y-3">
+          <div className="flex items-center gap-4">
+            <span className="text-4xl leading-none">🔥</span>
+            <div className="flex flex-col">
+              <div className="flex items-baseline gap-2">
+                <span className={`text-4xl font-mono font-bold leading-none ${s.streak >= 7 ? "text-orange-400" : s.streak >= 1 ? "text-neutral-200" : "text-neutral-600"}`}>
+                  {s.streak}
+                </span>
+                <span className="text-sm font-mono text-neutral-400">{t.common.daysShort}</span>
+              </div>
+              <span className="text-[11px] font-mono text-neutral-500 mt-1">
+                cache hit ≥ 90% 연속 · {t.dashboardView.streakSkip}
+              </span>
+            </div>
+          </div>
+          {s.teamRank ? (
+            <div className="pt-2 border-t border-neutral-800/60">
+              <p className="text-[10px] font-mono text-neutral-500 uppercase tracking-wider mb-1.5">
+                {t.dashboardView.weekTeamCacheRank}
+              </p>
+              <div className="flex items-center gap-3">
+                <span className="text-2xl leading-none">{rankMedal(s.teamRank.position) || "🏅"}</span>
+                <div className="flex flex-col">
+                  <div className="flex items-baseline gap-1.5">
+                    <span className="text-2xl font-mono font-bold leading-none text-sky-300">
+                      {s.teamRank.position}
+                    </span>
+                    <span className="text-xs font-mono text-neutral-500">
+                      {tmpl(t.dashboardView.rankOutOf, { n: s.teamRank.total })}
+                    </span>
+                  </div>
+                  <span className="text-[11px] font-mono text-neutral-500 mt-0.5">
+                    {tmpl(t.dashboardView.rankMeTeam, { self: s.teamRank.selfCacheHitPct.toFixed(1), team: s.teamRank.teamAvgCacheHitPct.toFixed(1) })}
+                  </span>
+                </div>
+              </div>
+            </div>
+          ) : null}
+        </div>
+      </div>
+    );
+  })();
+
   // Daily Cost block — main Row 1 (Daily Activity 옆) + 자세히 보기 안
   // Efficiency 옆 두 곳에서 재사용 (사용자 피드백: 진단성 차트로도 옆에).
   const dailyCostBlock = (
@@ -2189,6 +2287,16 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
           return activityHeatmapBlock;
         })()}
 
+        {/* Row 2.5 (신설): 비용 원인 Top 3 (반셀) + 빈 자리.
+            사용자 needs 1 ('얼마나 + 어디에 썼나') 직접 답 카드. 팀 내 내
+            위치 아래 자연스러운 위치. 옆 자리는 추후 다른 카드 추가 자리. */}
+        {costCauseTop3Block && (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            {costCauseTop3Block}
+            <div />
+          </div>
+        )}
+
         {/* 자세히 보기 토글 — divider + 중앙 라벨 풀폭 패턴 (Medium / Notion 식).
             "여기부터 details" 메타포 + 위·아래 영역 시각 단절. by model · by
             project · top sessions · by activity · core tools · shell · MCP ·
@@ -2215,12 +2323,12 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
 
         {detailsOpen && (<>
 
-        {/* Efficiency + Daily Cost — 반셀 2열 (사용자 피드백: efficiency 옆에
-            데일리 cost 차트). main 의 Daily Cost 와 동일 데이터, 진단용으로
-            efficiency 옆에 한 번 더 컨텍스트. */}
+        {/* Efficiency + Cache Hit Streak — 반셀 2열. 옛 Daily Cost (main Row 1
+            과 중복) 자리에 STREAK 으로 교체 — 사용자 피드백. Streak 게이미피
+            케이션 + 팀 cache hit 랭킹이 efficiency 진단 옆에 자연스럽게 시너지. */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           {efficiencyBlock}
-          {dailyCostBlock}
+          {cacheStreakBlock ?? <div />}
         </div>
 
         {/* Row 3: By Model + By Project — 비용 분해 그룹 (어디에 썼나) */}
