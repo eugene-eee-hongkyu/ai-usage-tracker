@@ -768,13 +768,13 @@ function TeamPositionCard({
       </div>
       <div className="p-3 space-y-1.5">
         {rows.map((r) => (
-          <div key={r.label} className="flex items-baseline gap-3 text-xs font-mono">
-            <span className="text-neutral-500 w-16 shrink-0">{r.label}</span>
-            <span className="text-neutral-200 w-12 shrink-0 tabular-nums">
+          <div key={r.label} className="flex items-baseline gap-2 text-xs font-mono">
+            <span className="text-neutral-500 w-16 shrink-0 whitespace-nowrap">{r.label}</span>
+            <span className="text-neutral-200 w-10 shrink-0 tabular-nums whitespace-nowrap">
               {r.rank}/{r.total}
             </span>
-            <span className={`${r.valueColor} w-20 shrink-0 tabular-nums font-bold`}>{r.fmt(r.myVal)}</span>
-            <span className="text-neutral-500 hidden sm:inline flex-1 truncate">
+            <span className={`${r.valueColor} w-16 shrink-0 tabular-nums font-bold text-right whitespace-nowrap`}>{r.fmt(r.myVal)}</span>
+            <span className="text-neutral-500 hidden md:inline flex-1 truncate min-w-0">
               팀 평균 <span className="text-neutral-400">{r.fmt(r.avg)}</span>
               <span className="text-neutral-700 mx-1.5">·</span>
               {r.isMeFirst ? (
@@ -1588,6 +1588,22 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
                         </span>
                       </p>
                     )}
+                    {/* period 별 절감 보조 — 사용자가 토글한 period 의 절감액
+                        (이번 달 본전 회수와 별개 정보). period=month 면 본전
+                        회수와 중복이라 안 보임. */}
+                    {period !== "month" && savedPct !== null && positive && (
+                      <p className="pt-1 border-t border-neutral-800/60 mt-1">
+                        이번 {periodLabel(period, t)} 절감{" "}
+                        <span className="text-emerald-400">▼ {fmtExact(saved)}</span>{" "}
+                        <span className="text-neutral-600">({savedPct}%)</span>
+                      </p>
+                    )}
+                    {period !== "month" && savedPct !== null && !positive && (
+                      <p className="pt-1 border-t border-neutral-800/60 mt-1">
+                        이번 {periodLabel(period, t)}{" "}
+                        <span className="text-rose-400">▲ {fmtExact(Math.abs(saved))} 초과</span>
+                      </p>
+                    )}
                   </div>
                 </div>
               ) : (
@@ -1812,6 +1828,44 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
             </>
           );
         })()}
+      </div>
+    </div>
+  );
+
+  // Daily Cost block — main Row 1 (Daily Activity 옆) + 자세히 보기 안
+  // Efficiency 옆 두 곳에서 재사용 (사용자 피드백: 진단성 차트로도 옆에).
+  const dailyCostBlock = (
+    <div data-testid="dash-card-daily-cost" className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-yellow-500 rounded">
+      <div className="px-3 py-2 border-b border-neutral-800 flex items-center justify-between">
+        <span className="text-xs font-mono font-bold text-yellow-400 uppercase tracking-wider">Daily Cost</span>
+        {chartData.length > 45 && (
+          <span className="flex items-center gap-1 text-[10px] font-mono bg-yellow-900/40 text-yellow-300 border border-yellow-700/60 rounded px-1.5 py-0.5">
+            ↕ scroll · {chartData.length}
+          </span>
+        )}
+      </div>
+      <div className="p-3">
+        {chartData.length === 0 ? (
+          <div className="h-32 flex items-center justify-center text-neutral-600 text-xs font-mono">no data</div>
+        ) : (
+          <div className={chartData.length > 45 ? "overflow-y-auto max-h-[300px] no-scrollbar" : ""}>
+            <div className="space-y-1">
+              {(() => {
+                const maxCost = Math.max(...chartData.map((d) => d.cost), 0.01);
+                return chartData.map((d) => (
+                  <div key={d.date} className="flex items-center gap-1.5 text-xs font-mono">
+                    <span className="w-12 text-neutral-500 shrink-0 whitespace-nowrap">{d.date}</span>
+                    <div className="flex-1 h-1.5 bg-neutral-800 rounded overflow-hidden">
+                      <div className="h-full bg-yellow-500 rounded" style={{ width: `${(d.cost / maxCost) * 100}%` }} />
+                    </div>
+                    <span className="text-yellow-400 w-16 text-right shrink-0">{fmt$(d.cost)}</span>
+                    {d.sessions > 0 && <span className="text-neutral-600 w-8 text-right shrink-0">{d.sessions}s</span>}
+                  </div>
+                ));
+              })()}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -2070,40 +2124,9 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
             </div>
           </div>
 
-          {/* Daily Cost */}
-          <div data-testid="dash-card-daily-cost" className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-yellow-500 rounded">
-            <div className="px-3 py-2 border-b border-neutral-800 flex items-center justify-between">
-              <span className="text-xs font-mono font-bold text-yellow-400 uppercase tracking-wider">Daily Cost</span>
-              {chartData.length > 45 && (
-                <span className="flex items-center gap-1 text-[10px] font-mono bg-yellow-900/40 text-yellow-300 border border-yellow-700/60 rounded px-1.5 py-0.5">
-                  ↕ scroll · {chartData.length}
-                </span>
-              )}
-            </div>
-            <div className="p-3">
-              {chartData.length === 0 ? (
-                <div className="h-32 flex items-center justify-center text-neutral-600 text-xs font-mono">no data</div>
-              ) : (
-                <div className={chartData.length > 45 ? "overflow-y-auto max-h-[300px] no-scrollbar" : ""}>
-                  <div className="space-y-1">
-                    {(() => {
-                      const maxCost = Math.max(...chartData.map((d) => d.cost), 0.01);
-                      return chartData.map((d) => (
-                        <div key={d.date} className="flex items-center gap-1.5 text-xs font-mono">
-                          <span className="w-12 text-neutral-500 shrink-0 whitespace-nowrap">{d.date}</span>
-                          <div className="flex-1 h-1.5 bg-neutral-800 rounded overflow-hidden">
-                            <div className="h-full bg-yellow-500 rounded" style={{ width: `${(d.cost / maxCost) * 100}%` }} />
-                          </div>
-                          <span className="text-yellow-400 w-16 text-right shrink-0">{fmt$(d.cost)}</span>
-                          {d.sessions > 0 && <span className="text-neutral-600 w-8 text-right shrink-0">{d.sessions}s</span>}
-                        </div>
-                      ));
-                    })()}
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
+          {/* Daily Cost — main Row 1. 같은 dailyCostBlock 변수가 자세히
+              보기 안 Efficiency 옆에서도 재사용. */}
+          {dailyCostBlock}
         </div>
 
         {/* Row 1.5: 일별 토큰 단가 + Plan 절감.
@@ -2114,17 +2137,6 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
             {unitCostBlock}
             {planSavingsBlock}
           </div>
-        )}
-
-        {/* 팀 내 내 위치 카드 — 사용자 needs 3 (peer 비교) 직격. 본인 화면일
-            때만 (viewOnly 아님) 표시. /api/team 별도 호출로 가져온 데이터.
-            본인이 멤버 아니면 null (TeamPositionCard 내부 가드). */}
-        {!viewOnly && teamRankData && session?.user?.name && (
-          <TeamPositionCard
-            team={teamRankData}
-            currentUserName={session.user.name}
-            periodLabel={periodLabel(period, t)}
-          />
         )}
 
         {/* Row 1.6: 활용지수 + 토큰단가 (또는 API 추천). embedded 모드 — main
@@ -2150,9 +2162,23 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
           />
         )}
 
-        {/* Row 2: Activity Heatmap (full-width). Efficiency 카드는
-            자세히 보기 안으로 이동 — 사용자 인터뷰 "효율 점수 안 본다". */}
-        {activityHeatmapBlock}
+        {/* Row 2: 팀 내 내 위치 + 활동 히트맵 (반셀 2열). 사용자 피드백:
+            팀 내 내 위치가 full-width 차지할 필요 없음 → 활동 히트맵 옆.
+            본인 화면일 때만 (viewOnly 아님). 팀 데이터 없거나 멤버 아니면
+            히트맵만 full-width 로 fallback. Efficiency 카드는 자세히 보기로
+            이동 (사용자 안 본다). */}
+        {!viewOnly && teamRankData && session?.user?.name ? (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <TeamPositionCard
+              team={teamRankData}
+              currentUserName={session.user.name}
+              periodLabel={periodLabel(period, t)}
+            />
+            {activityHeatmapBlock}
+          </div>
+        ) : (
+          activityHeatmapBlock
+        )}
 
         {/* 자세히 보기 토글 — divider + 중앙 라벨 풀폭 패턴 (Medium / Notion 식).
             "여기부터 details" 메타포 + 위·아래 영역 시각 단절. by model · by
@@ -2180,9 +2206,13 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
 
         {detailsOpen && (<>
 
-        {/* Efficiency 카드 — Row 2 에서 자세히 보기 안으로 이동 (사용자 인터뷰
-            "효율 점수 안 본다"). 진단용으로 자세히 보기에 유지. */}
-        {efficiencyBlock}
+        {/* Efficiency + Daily Cost — 반셀 2열 (사용자 피드백: efficiency 옆에
+            데일리 cost 차트). main 의 Daily Cost 와 동일 데이터, 진단용으로
+            efficiency 옆에 한 번 더 컨텍스트. */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          {efficiencyBlock}
+          {dailyCostBlock}
+        </div>
 
         {/* Row 3: By Model + By Project — 비용 분해 그룹 (어디에 썼나) */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
