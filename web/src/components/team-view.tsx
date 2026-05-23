@@ -13,7 +13,7 @@ import {
   AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
   LineChart, Line,
 } from "recharts";
-import { ScoreGauge, scoreLabel } from "@/components/score-gauge";
+import { scoreLabel } from "@/components/score-gauge";
 import { computeTokenLevel, computeDailyEfficiencyScore } from "@/lib/rules";
 import { useMessages } from "@/lib/use-i18n";
 import type { Messages } from "@/lib/i18n";
@@ -455,6 +455,13 @@ export function TeamView({ adminMode = false }: { adminMode?: boolean }) {
   );
 
   const adminUser = adminMode && data.isAdminUser;
+  // 동적 팀명 — viewAsTeamName 우선 (admin view-as), 없으면 본인 팀.
+  // i18n template "{team}" 치환용. fallback "팀".
+  const sessionUser = session?.user as {
+    currentTeamName?: string | null;
+    viewAsTeamName?: string | null;
+  } | undefined;
+  const teamDisplayName = sessionUser?.viewAsTeamName || sessionUser?.currentTeamName || "팀";
   const members = data.byEfficiency;
   const sum = data.teamSummary;
   const byCost = [...members].sort((a, b) => b.totalCost - a.totalCost);
@@ -898,10 +905,11 @@ export function TeamView({ adminMode = false }: { adminMode?: boolean }) {
     </div>
   );
 
-  // Team Headline — 효율 점수 + 업계 비교. page top 에서 Efficiency
-  // 직전으로 이동 — TeamUsageHero (활용지수/단가) 가 page top 차지.
-  const headlineBlock = data.teamScore && data.industryComparison && data.industryComparison.activeDayCount > 0 ? (() => {
-    const ts = data.teamScore;
+  // Team Industry Comparison — $/active day bullet vs 외부 벤치마크. 옛 효율
+  // 점수 gauge column 은 사용자 피드백으로 efficiencyBlock 안으로 이동.
+  // 카드 제목은 동적 팀명 (z21labs 하드코딩 제거). 반셀 (lg:col-span-1) 로
+  // 본전 회수 카드 옆에 위치.
+  const headlineBlock = data.industryComparison && data.industryComparison.activeDayCount > 0 ? (() => {
     const ic = data.industryComparison;
     const fmt = (n: number) => `$${n < 10 ? n.toFixed(2) : Math.round(n)}`;
     const enterpriseAvg = 13;
@@ -913,62 +921,44 @@ export function TeamView({ adminMode = false }: { adminMode?: boolean }) {
       { label: t.teamView.industryEnterpriseAvg, value: 13, benchmark: true },
       { label: t.teamView.industryEnterpriseTop10, value: 30 },
       { label: t.teamView.industryTop1, value: 92 },
-      { label: t.teamView.teamLabel, value: ic.activeDayAvg, star: true },
+      { label: tmpl(t.teamView.teamLabel, { team: teamDisplayName }), value: ic.activeDayAvg, star: true },
     ];
     return (
       <div data-testid="team-card-headline" className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-emerald-500 rounded">
         <div className="px-3 py-2 border-b border-neutral-800">
           <span className="text-xs font-mono font-bold text-emerald-400 uppercase tracking-wider">
-            {t.teamView.headlineTitle}
+            {tmpl(t.teamView.headlineTitle, { team: teamDisplayName })}
           </span>
         </div>
-        <div className="p-4 grid grid-cols-12 gap-x-6 gap-y-4 items-center">
-          <div data-testid="team-headline-score" className="col-span-12 sm:col-span-3 flex flex-col items-center">
-            <ScoreGauge score={ts.score} />
-            <div className="mt-1.5 text-[11px] font-mono">
-              <span className={`font-bold ${
-                ts.score === null ? "text-neutral-500" :
-                ts.score >= 90 ? "text-emerald-400" :
-                ts.score >= 70 ? "text-lime-400" :
-                ts.score >= 40 ? "text-orange-400" : "text-rose-400"
-              }`}>{scoreLabel(ts.score, t)}</span>
-              <span className="text-neutral-500">{tmpl(t.teamView.teamAvgN, { n: data.byEfficiency.length })}</span>
-            </div>
-            <span className="text-[10px] font-mono text-neutral-600 mt-0.5">
-              cache {ts.cacheHitPct.toFixed(1)}% · ${ts.costPerCall.toFixed(3)}/call
+        <div className="p-4 space-y-3">
+          <div data-testid="team-headline-multiplier" className="flex items-baseline gap-2 flex-wrap">
+            <span className="text-3xl font-mono font-bold text-emerald-400">
+              {multiplier.toFixed(1)}<span className="text-xl ml-0.5">x</span>
             </span>
-          </div>
-          <div data-testid="team-headline-multiplier" className="col-span-12 sm:col-span-3 flex flex-col items-center">
-            <div className="flex items-baseline gap-1">
-              <span className="text-5xl font-mono font-bold text-emerald-400">
-                {multiplier.toFixed(1)}
-              </span>
-              <span className="text-2xl font-mono text-emerald-400">x</span>
-            </div>
-            <span className="text-[11px] font-mono text-neutral-400 mt-1.5 text-center">
+            <span className="text-[11px] font-mono text-neutral-400">
               {tmpl(t.teamView.vsEnterpriseAvg, { n: enterpriseAvg })}
             </span>
-            <span className="text-[10px] font-mono text-emerald-300 mt-0.5">
+            <span className="text-[10px] font-mono text-emerald-300 ml-auto">
               {t.teamView.activeUsageDescription}
             </span>
           </div>
-          <div data-testid="team-headline-bullet" className="col-span-12 sm:col-span-6">
+          <div data-testid="team-headline-bullet">
             <div className="text-[10px] font-mono text-neutral-500 mb-1.5 uppercase tracking-wider">
               {t.teamView.perActiveDayCompare}
             </div>
             <div className="space-y-1 text-[11px] font-mono">
               {bulletRows.map((row) => (
                 <div key={row.label} className="flex items-center gap-2">
-                  <span className={`w-32 shrink-0 ${row.star ? "text-emerald-300 font-bold" : row.benchmark ? "text-yellow-300" : "text-neutral-400"}`}>
+                  <span className={`w-28 shrink-0 truncate ${row.star ? "text-emerald-300 font-bold" : row.benchmark ? "text-yellow-300" : "text-neutral-400"}`}>
                     {row.star && "★ "}{row.label}
                   </span>
-                  <div className="flex-1 h-2.5 bg-neutral-800 rounded overflow-hidden relative">
+                  <div className="flex-1 h-2 bg-neutral-800 rounded overflow-hidden relative min-w-0">
                     <div
                       className={`h-full rounded ${row.star ? "bg-emerald-500" : row.benchmark ? "bg-yellow-500/70" : "bg-neutral-600"}`}
                       style={{ width: `${Math.min(100, (row.value / bulletMax) * 100)}%` }}
                     />
                   </div>
-                  <span className={`w-14 text-right tabular-nums ${row.star ? "text-emerald-300 font-bold" : "text-neutral-400"}`}>
+                  <span className={`w-12 text-right tabular-nums shrink-0 ${row.star ? "text-emerald-300 font-bold" : "text-neutral-400"}`}>
                     {fmt(row.value)}
                   </span>
                 </div>
@@ -1121,13 +1111,31 @@ export function TeamView({ adminMode = false }: { adminMode?: boolean }) {
   })() : null;
 
   // Row 3: Efficiency (full-width) — 컬럼 6개 가독성 위해 1줄 차지.
+  // 옛 headlineBlock 의 효율 점수 gauge 를 header 옆으로 흡수 (사용자 피드백:
+  // 헤드라인은 업계 비교만, 효율 점수는 efficiency 쪽에).
   const efficiencyBlock = (
     <div data-testid="team-card-efficiency" className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-fuchsia-500 rounded">
-      <div className="px-3 py-2 border-b border-neutral-800 flex items-center justify-between gap-2">
+      <div className="px-3 py-2 border-b border-neutral-800 flex items-center justify-between gap-2 flex-wrap">
         <span className="text-xs font-mono font-bold text-fuchsia-400 uppercase tracking-wider">Efficiency</span>
-        {gradeSummary && (
-          <span className="text-[10px] font-mono text-neutral-500 shrink-0">{gradeSummary}</span>
-        )}
+        <div className="flex items-center gap-3">
+          {data.teamScore && data.teamScore.score !== null && (
+            <span
+              data-testid="team-eff-score-badge"
+              className={`text-[11px] font-mono font-bold px-1.5 py-0.5 rounded border ${
+                data.teamScore.score >= 90 ? "bg-emerald-900/40 text-emerald-300 border-emerald-700/60" :
+                data.teamScore.score >= 70 ? "bg-lime-900/40 text-lime-300 border-lime-700/60" :
+                data.teamScore.score >= 40 ? "bg-orange-900/40 text-orange-300 border-orange-700/60" :
+                "bg-rose-900/40 text-rose-300 border-rose-700/60"
+              }`}
+              title={`팀 효율 점수 (${data.teamScore.windowDays}일) — cache ${data.teamScore.cacheHitPct.toFixed(1)}% · $${data.teamScore.costPerCall.toFixed(3)}/call`}
+            >
+              팀 효율 {data.teamScore.score}/100 · {scoreLabel(data.teamScore.score, t)}
+            </span>
+          )}
+          {gradeSummary && (
+            <span className="text-[10px] font-mono text-neutral-500 shrink-0">{gradeSummary}</span>
+          )}
+        </div>
       </div>
       <div className="p-3 overflow-x-auto">
         <table className="w-full text-xs font-mono border-collapse table-fixed">
@@ -1627,11 +1635,10 @@ export function TeamView({ adminMode = false }: { adminMode?: boolean }) {
           </div>
         ) : (
           <>
-            {/* 팀 헤드라인 (효율 점수 + 업계 비교) 을 fragment 최상단으로
-                (2026-05-22). hero 합산 바 다음 가장 큰 임팩트 카드 — 매니저
-                + 멤버 모두 진입 시 첫 인상. teamScore/industryComparison
-                데이터 없으면 null (자체 가드). */}
-            {headlineBlock}
+            {/* 옛 fragment 최상단 headlineBlock 위치 제거 (2026-05-22).
+                사용자 피드백 — 업계 비교 카드는 맨 위 X. 팀 본전 회수 옆
+                반셀로 (TeamUsageHero 아래 같은 row). 효율 점수 gauge 는
+                efficiencyBlock 안으로 이동. */}
 
             {/* admin 한테는 Team Plan Health + 30일 방문 패턴 카드를 토글
                 두 개 (기본·세부 팀정보) 위로. 매니저 의사결정 카드 (full-
@@ -1694,49 +1701,83 @@ export function TeamView({ adminMode = false }: { adminMode?: boolean }) {
               />
             )}
 
-            {/* 팀 본전 회수 카드 — 모든 멤버에게 노출 (admin only 인 Team Plan
-                Health detail 표는 별도). 가입 plan 총액 vs 이번 달 사용 cost
-                + 활성 멤버 + 상위 1명 비중. period 무관 항상 이번 달. */}
-            {data.teamRecovery && data.teamRecovery.planTotalUsd > 0 && (() => {
+            {/* 팀 본전 회수 + 업계 비교 — 반셀 2열 (사용자 피드백). 팀 본전
+                회수는 모든 멤버에게 노출 (admin only 인 Team Plan Health
+                detail 표는 별도). period 무관 항상 이번 달. 둘 중 하나만 있어도
+                해당 카드만 표시. */}
+            {(() => {
               const r = data.teamRecovery;
-              const fmt = (v: number) =>
-                v >= 1000 ? `$${(v / 1000).toFixed(1)}k`.replace(".0k", "k") :
-                v >= 100 ? `$${Math.round(v).toLocaleString()}` :
-                v >= 1 ? `$${v.toFixed(0)}` : `$${v.toFixed(2)}`;
-              const recovered = r.recoveryPct >= 100;
+              const hasRecovery = r && r.planTotalUsd > 0;
+              const recoveryCard = hasRecovery ? (() => {
+                const fmt = (v: number) =>
+                  v >= 1000 ? `$${(v / 1000).toFixed(1)}k`.replace(".0k", "k") :
+                  v >= 100 ? `$${Math.round(v).toLocaleString()}` :
+                  v >= 1 ? `$${v.toFixed(0)}` : `$${v.toFixed(2)}`;
+                const recovered = r!.recoveryPct >= 100;
+                return (
+                  <div data-testid="team-card-recovery" className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-emerald-500 rounded">
+                    <div className="px-3 py-2 border-b border-neutral-800">
+                      <span className="text-xs font-mono font-bold text-emerald-400 uppercase tracking-wider">
+                        팀 본전 회수 (이번 달)
+                      </span>
+                    </div>
+                    <div className="p-4">
+                      <div className="flex items-baseline gap-3 flex-wrap mb-2">
+                        <span className={`text-3xl sm:text-4xl font-mono font-bold tracking-tight ${
+                          recovered ? "text-emerald-400" : "text-neutral-200"
+                        }`}>
+                          {r!.recoveryPct}%
+                        </span>
+                        {recovered ? (
+                          <span className="text-emerald-300 text-sm font-mono">
+                            ▼ {fmt(r!.thisMonthCostUsd - r!.planTotalUsd)} 절감
+                          </span>
+                        ) : (
+                          <span className="text-neutral-400 text-sm font-mono">
+                            본전까지 {fmt(r!.planTotalUsd - r!.thisMonthCostUsd)}
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-xs font-mono text-neutral-500 space-y-0.5">
+                        <p>팀 Plan 총액 <span className="text-neutral-300">{fmt(r!.planTotalUsd)}</span> · 사용가치 <span className="text-neutral-300">{fmt(r!.thisMonthCostUsd)}</span></p>
+                        <p>
+                          활성 <span className="text-neutral-300">{r!.activeMembers}/{r!.totalMembers}명</span>
+                          {r!.topShareName && r!.topSharePct > 0 && (
+                            <>
+                              {" · "}상위 1명 비중 <span className="text-neutral-300">{r!.topSharePct}%</span>{" "}
+                              <span className="text-neutral-600">({r!.topShareName})</span>
+                            </>
+                          )}
+                        </p>
+                        <p className="text-[10px] text-neutral-600 pt-1">
+                          Plan 가입 멤버 기준 (API 종량제 멤버 cost 제외).
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })() : (
+                // API 전용 팀 (또는 모든 멤버 tier 미입력) — 안내 카드.
+                r && r.planTotalUsd === 0 ? (
+                  <div data-testid="team-card-recovery-na" className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-neutral-700 rounded">
+                    <div className="px-3 py-2 border-b border-neutral-800">
+                      <span className="text-xs font-mono font-bold text-neutral-400 uppercase tracking-wider">
+                        팀 본전 회수 (이번 달)
+                      </span>
+                    </div>
+                    <div className="p-4 text-xs font-mono text-neutral-500 space-y-1">
+                      <p className="text-neutral-300">API 종량제 / tier 미입력</p>
+                      <p>가입 Plan 멤버 없음 — 본전 회수 N/A.</p>
+                      <p>API 멤버는 개인 화면 &lsquo;추천 플랜&rsquo; 카드 참조.</p>
+                    </div>
+                  </div>
+                ) : null
+              );
+              if (!recoveryCard && !headlineBlock) return null;
               return (
-                <div data-testid="team-card-recovery" className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-emerald-500 rounded p-4">
-                  <p className="text-[10px] font-mono text-neutral-500 uppercase tracking-wider mb-1.5">
-                    팀 본전 회수 (이번 달)
-                  </p>
-                  <div className="flex items-baseline gap-3 flex-wrap mb-2">
-                    <span className={`text-3xl sm:text-4xl font-mono font-bold tracking-tight ${
-                      recovered ? "text-emerald-400" : "text-neutral-200"
-                    }`}>
-                      {r.recoveryPct}%
-                    </span>
-                    {recovered ? (
-                      <span className="text-emerald-300 text-sm font-mono">
-                        ▼ {fmt(r.thisMonthCostUsd - r.planTotalUsd)} 절감
-                      </span>
-                    ) : (
-                      <span className="text-neutral-400 text-sm font-mono">
-                        본전까지 {fmt(r.planTotalUsd - r.thisMonthCostUsd)}
-                      </span>
-                    )}
-                  </div>
-                  <div className="text-xs font-mono text-neutral-500 space-y-0.5">
-                    <p>팀 Plan 총액 <span className="text-neutral-300">{fmt(r.planTotalUsd)}</span> · 사용가치 <span className="text-neutral-300">{fmt(r.thisMonthCostUsd)}</span></p>
-                    <p>
-                      활성 <span className="text-neutral-300">{r.activeMembers}/{r.totalMembers}명</span>
-                      {r.topShareName && r.topSharePct > 0 && (
-                        <>
-                          {" · "}상위 1명 비중 <span className="text-neutral-300">{r.topSharePct}%</span>{" "}
-                          <span className="text-neutral-600">({r.topShareName})</span>
-                        </>
-                      )}
-                    </p>
-                  </div>
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                  {recoveryCard ?? <div />}
+                  {headlineBlock ?? <div />}
                 </div>
               );
             })()}

@@ -706,20 +706,30 @@ export async function GET(req: NextRequest) {
   const teamPlanHealth = summarizeTeamPlans(memberHealthList);
 
   // 팀 본전 회수 (이번 달, period 무관) — 사용자 needs 2 (뽕) 팀버전. 멤버
-  // 에게도 노출 (admin only 인 TeamPlanHealthCard 의 detail 표는 별도). 가입
-  // plan 총액 vs 이번 달 cost. 활성/전체 멤버 + 상위 1명 비중.
+  // 에게도 노출 (admin only 인 TeamPlanHealthCard 의 detail 표는 별도).
+  //
+  // planTotal: 멤버 가입 Plan 가격 합 (API tier 는 0 이라 자동 제외).
+  // thisMonthCost: Plan 가입 멤버의 이번 달 ccusage cost 합 (API tier 멤버
+  //   cost 제외 — 본전 회수와 무관, 부풀려짐 방지). 사용자 피드백 (혼합 팀
+  //   정확도) 반영.
+  // planTotal = 0 이면 전체 API tier / tier 미입력 → null. UI 가 안내 카드로.
   const teamRecovery = (() => {
     const planTotal = teamPlanHealth.currentMonthlyCostUsd;
-    if (planTotal <= 0) return null;
     const now = new Date();
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
     const monthStartYmd = monthStart.toISOString().slice(0, 10);
     const todayYmd = now.toISOString().slice(0, 10);
-    // dailyMemberMap: date → memberKey ("name__userId") → cost. ccusage 우선.
+    // API tier 멤버 set — memberKey 기준. memberUsage 에서 effectiveTier 'api'.
+    const apiMemberKeys = new Set(
+      memberUsage
+        .filter((m) => m.effectiveTier === "api")
+        .map((m) => m.memberKey)
+    );
     const memberMonthCost = new Map<string, number>();
     for (const [date, costsByMember] of dailyMemberMap.entries()) {
       if (date < monthStartYmd || date > todayYmd) continue;
       for (const [memberKey, cost] of Object.entries(costsByMember)) {
+        if (apiMemberKeys.has(memberKey)) continue; // API 멤버 cost 제외
         memberMonthCost.set(memberKey, (memberMonthCost.get(memberKey) ?? 0) + cost);
       }
     }
@@ -736,10 +746,11 @@ export async function GET(req: NextRequest) {
     const activeMembers = memberMonthCost.size;
     const totalMembers = allUsers.length;
     const topSharePct = thisMonthCost > 0 ? Math.round((topCost / thisMonthCost) * 100) : 0;
+    // planTotal=0 이어도 객체 반환 (UI 에서 API 전용 안내 카드 분기 가능).
     return {
       planTotalUsd: planTotal,
       thisMonthCostUsd: thisMonthCost,
-      recoveryPct: Math.round((thisMonthCost / planTotal) * 100),
+      recoveryPct: planTotal > 0 ? Math.round((thisMonthCost / planTotal) * 100) : 0,
       activeMembers,
       totalMembers,
       topShareName: activeMembers > 0 ? topName : null,
