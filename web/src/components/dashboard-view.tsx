@@ -241,6 +241,67 @@ function tmpl(template: string, vars: Record<string, string | number>): string {
   return template.replace(/\{(\w+)\}/g, (_, k) => String(vars[k] ?? ""));
 }
 
+// — Daily chart date fill —
+// 사용하지 않은 날도 0 으로 (dimmed) 표시. Stephen Few "data honesty" +
+// Datadog GAUGE zero-fill + GitHub contributions 패턴. "all" period 는 데이터
+// 있는 날만 (전 기간 grid 의미 약함).
+function enumerateDateRange(start: string, end: string): string[] {
+  const out: string[] = [];
+  const cur = new Date(start + "T00:00:00Z");
+  const endD = new Date(end + "T00:00:00Z");
+  while (cur <= endD) {
+    out.push(cur.toISOString().slice(0, 10));
+    cur.setUTCDate(cur.getUTCDate() + 1);
+  }
+  return out;
+}
+
+function lastNDates(todayKey: string, n: number): string[] {
+  const out: string[] = [];
+  const end = new Date(todayKey + "T00:00:00Z");
+  for (let i = n - 1; i >= 0; i--) {
+    const d = new Date(end);
+    d.setUTCDate(d.getUTCDate() - i);
+    out.push(d.toISOString().slice(0, 10));
+  }
+  return out;
+}
+
+function monthToDateRange(todayKey: string): string[] {
+  const out: string[] = [];
+  const end = new Date(todayKey + "T00:00:00Z");
+  const start = new Date(end);
+  start.setUTCDate(1);
+  while (start <= end) {
+    out.push(start.toISOString().slice(0, 10));
+    start.setUTCDate(start.getUTCDate() + 1);
+  }
+  return out;
+}
+
+function expectedDateRange(
+  period: Period,
+  userTz: string,
+  snapshot: SnapshotInfo | null | undefined,
+): string[] | null {
+  if (period === "all") return null;
+  // snapshot 뷰 — API 가 계산한 dataRange 사용. 데이터 양 끝의 빈 날까지 채우진
+  // 못하지만 (snapshot 은 데이터만 저장) snapshot view 는 보조 동선이라 OK.
+  if (snapshot?.dataRangeStart && snapshot?.dataRangeEnd) {
+    return enumerateDateRange(snapshot.dataRangeStart, snapshot.dataRangeEnd);
+  }
+  if (snapshot?.periodStart) return [snapshot.periodStart];
+  // live (no snapshot) — period 별 기대 범위.
+  let todayKey: string;
+  try { todayKey = new Date().toLocaleDateString("en-CA", { timeZone: userTz }); }
+  catch { todayKey = new Date().toISOString().slice(0, 10); }
+  if (period === "today") return [todayKey];
+  if (period === "8days") return lastNDates(todayKey, 8);
+  if (period === "30days") return lastNDates(todayKey, 30);
+  if (period === "month") return monthToDateRange(todayKey);
+  return null;
+}
+
 function EfficiencyScoreSection({ score, period, periodScore }: EfficiencyScoreSectionProps) {
   const { m } = useMessages();
   const calData = score.daily.map((d) => ({
@@ -1253,10 +1314,27 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
   }
 
   const ov = data.overview;
-  const chartData = data.daily.map((d) => ({ date: d.date.slice(5), cost: d.cost, sessions: d.sessions }));
-  const tokenMap: Record<string, number> = {};
-  for (const t of data.dailyTokens ?? []) tokenMap[t.date.slice(5)] = t.totalTokens;
-  const chartTokenData = chartData.map((d) => ({ date: d.date, tokens: tokenMap[d.date] ?? 0 }));
+  // period 별 기대 날짜로 fill — 사용 안 한 날도 0 (dimmed) 으로 표시.
+  // "all" period 는 fill 없이 데이터 있는 날만.
+  const expectedDates = expectedDateRange(period, userTz, data.snapshot);
+  const dailyCostByFull: Record<string, { cost: number; sessions: number }> = {};
+  for (const d of data.daily) dailyCostByFull[d.date] = { cost: d.cost, sessions: d.sessions };
+  const tokenByFull: Record<string, number> = {};
+  for (const t of data.dailyTokens ?? []) tokenByFull[t.date] = t.totalTokens;
+  const sourceFullDates: string[] = expectedDates ?? data.daily.map((d) => d.date);
+  const chartData = sourceFullDates.map((fullDate) => {
+    const row = dailyCostByFull[fullDate];
+    return {
+      date: fullDate.slice(5),
+      cost: row?.cost ?? 0,
+      sessions: row?.sessions ?? 0,
+      empty: !row,
+    };
+  });
+  const chartTokenData = sourceFullDates.map((fullDate) => {
+    const tokens = tokenByFull[fullDate] ?? 0;
+    return { date: fullDate.slice(5), tokens, empty: tokens === 0 };
+  });
   const maxProjectCost = Math.max(...data.projects.map((p) => p.cost), 0.01);
   const maxSessionCost = Math.max(...data.topSessions.map((s) => s.cost), 0.01);
 
@@ -1965,12 +2043,14 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
               {(() => {
                 const maxCost = Math.max(...chartData.map((d) => d.cost), 0.01);
                 return chartData.map((d) => (
-                  <div key={d.date} className="flex items-center gap-1.5 text-xs font-mono">
-                    <span className="w-12 text-neutral-500 shrink-0 whitespace-nowrap">{d.date}</span>
+                  <div key={d.date} className={`flex items-center gap-1.5 text-xs font-mono ${d.empty ? "opacity-40" : ""}`}>
+                    <span className={`w-12 shrink-0 whitespace-nowrap ${d.empty ? "text-neutral-700" : "text-neutral-500"}`}>{d.date}</span>
                     <div className="flex-1 h-1.5 bg-neutral-800 rounded overflow-hidden">
-                      <div className="h-full bg-yellow-500 rounded" style={{ width: `${(d.cost / maxCost) * 100}%` }} />
+                      {!d.empty && (
+                        <div className="h-full bg-yellow-500 rounded" style={{ width: `${(d.cost / maxCost) * 100}%` }} />
+                      )}
                     </div>
-                    <span className="text-yellow-400 w-16 text-right shrink-0">{fmt$(d.cost)}</span>
+                    <span className={`w-16 text-right shrink-0 ${d.empty ? "text-neutral-700" : "text-yellow-400"}`}>{d.empty ? "—" : fmt$(d.cost)}</span>
                     {d.sessions > 0 && <span className="text-neutral-600 w-8 text-right shrink-0">{d.sessions}s</span>}
                   </div>
                 ));
@@ -2213,7 +2293,7 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
               )}
             </div>
             <div className="p-3">
-              {chartTokenData.length === 0 || chartTokenData.every((d) => d.tokens === 0) ? (
+              {chartTokenData.length === 0 ? (
                 <div className="h-32 flex items-center justify-center text-neutral-600 text-xs font-mono">no data</div>
               ) : (
                 <div className={chartTokenData.length > 45 ? "overflow-y-auto max-h-[300px] no-scrollbar" : ""}>
@@ -2221,12 +2301,14 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
                     {(() => {
                       const maxTokens = Math.max(...chartTokenData.map((d) => d.tokens), 1);
                       return chartTokenData.map((d) => (
-                        <div key={d.date} className="flex items-center gap-1.5 text-xs font-mono">
-                          <span className="w-12 text-neutral-500 shrink-0 whitespace-nowrap">{d.date}</span>
+                        <div key={d.date} className={`flex items-center gap-1.5 text-xs font-mono ${d.empty ? "opacity-40" : ""}`}>
+                          <span className={`w-12 shrink-0 whitespace-nowrap ${d.empty ? "text-neutral-700" : "text-neutral-500"}`}>{d.date}</span>
                           <div className="flex-1 h-1.5 bg-neutral-800 rounded overflow-hidden">
-                            <div className="h-full bg-cyan-500 rounded" style={{ width: `${(d.tokens / maxTokens) * 100}%` }} />
+                            {!d.empty && (
+                              <div className="h-full bg-cyan-500 rounded" style={{ width: `${(d.tokens / maxTokens) * 100}%` }} />
+                            )}
                           </div>
-                          <span className="text-cyan-300 w-16 text-right shrink-0">{fmtTokens(d.tokens)}</span>
+                          <span className={`w-16 text-right shrink-0 ${d.empty ? "text-neutral-700" : "text-cyan-300"}`}>{d.empty ? "—" : fmtTokens(d.tokens)}</span>
                         </div>
                       ));
                     })()}
