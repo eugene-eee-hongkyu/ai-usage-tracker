@@ -15,6 +15,7 @@ import {
 } from "@/lib/plan-health";
 import { computeEfficiencyScore, computeDailyEfficiencyScore, computePowerIndex } from "@/lib/rules";
 import { isAdmin } from "@/lib/admin";
+import { getCcusageDaily, normalizeCcusageRow } from "@/lib/ccusage-row";
 import { and, eq, gte, isNull, inArray } from "drizzle-orm";
 
 type Period = "today" | "month" | "8days" | "30days" | "all";
@@ -304,13 +305,8 @@ export async function GET(req: NextRequest) {
       const dAll = getPeriodData(snap.rawJson, "all");
 
       // ccusage daily extraction — stale check / token 합산 / 오늘 보정 모두에서 사용.
-      // ccusage 19.x 에서 row 키가 'date' → 'period' 로 breaking change. 한 팀 안에
-      // 옛/새 형식 사용자 섞일 수 있으므로 normalize. (dashboard route 와 동일 패턴)
-      const ccusageDaily = (
-        ((snap.rawJson as Record<string, unknown>).ccusageDaily as
-          | { daily?: Array<{ date?: string; period?: string; totalTokens?: number; totalCost?: number }> }
-          | undefined)?.daily ?? []
-      ).map((r) => ({ ...r, date: r.date ?? r.period }));
+      // getCcusageDaily 가 ccusage 19.x ('period' 키) / 옛 ('date' 키) 양쪽 normalize.
+      const ccusageDaily = getCcusageDaily(snap.rawJson);
 
       // "오늘" 보정 — codeburn 은 UTC 기준이라 KST/SGT 사용자에서 UTC 자정 ~ 사용자
       // 자정 사이엔 today.daily 가 비어있거나 어제 (UTC) 날짜로 들어옴. ccusage 의
@@ -967,7 +963,9 @@ export async function GET(req: NextRequest) {
     const snap = snapsByUser.get(u.id)?.[0]?.snap;
     if (!snap) continue;
     const raw = snap.rawJson as Record<string, unknown>;
-    const ccusage = (raw.ccusageDaily as { daily?: Array<{ date?: string; totalCost?: number }> } | undefined)?.daily ?? [];
+    // ccusage row 의 날짜 키 정규화 (ccusage 19.x 의 'period' 도 받기) — 빠뜨리면
+    // NEXA 처럼 row 가 모두 skip 되어 1명/1일 평균이 팀 전체 평균으로 노출됨.
+    const ccusage = getCcusageDaily(raw);
     const codeburn = ((raw.all as { daily?: Array<{ date?: string; cost?: number }> } | undefined)?.daily) ?? [];
     const source: Array<{ date?: string; totalCost?: number; cost?: number }> =
       ccusage.length > 0 ? ccusage : codeburn;
@@ -1017,7 +1015,8 @@ export async function GET(req: NextRequest) {
     const snap = snapsByUser.get(u.id)?.[0]?.snap;
     if (!snap) continue;
     const raw = snap.rawJson as Record<string, unknown>;
-    const ccu = (raw.ccusageDaily as { daily?: Array<{ date?: string; inputTokens?: number; outputTokens?: number; cacheReadTokens?: number; cacheCreationTokens?: number }> } | undefined)?.daily ?? [];
+    // ccusage row 의 날짜 키 정규화 — industryComparison 과 동일 사유.
+    const ccu = getCcusageDaily(raw);
     const cb = ((raw.all as { daily?: Array<{ date?: string; cost?: number; calls?: number; editTurns?: number; oneShotTurns?: number }> } | undefined)?.daily) ?? [];
     let userHadActivity = false;
     for (const r of ccu) {

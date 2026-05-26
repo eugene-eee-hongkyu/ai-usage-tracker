@@ -15,6 +15,7 @@ import {
   estimateTierFromMonthlyCost,
   type PlanTier,
 } from "@/lib/plan-health";
+import { type CcusageDailyRow, normalizeCcusageRow, getCcusageDaily } from "@/lib/ccusage-row";
 
 type Period = "today" | "month" | "8days" | "30days" | "all";
 
@@ -79,28 +80,8 @@ interface RawPeriodData {
   mcpServers?: RawNameCalls[];
 }
 
-interface CcusageDailyRow {
-  date?: string;
-  period?: string;  // ccusage 19.x breaking change: row field 'date' → 'period'. 양쪽 모두 호환 위해 정의.
-  inputTokens?: number;
-  outputTokens?: number;
-  cacheCreationTokens?: number;
-  cacheReadTokens?: number;
-  totalTokens?: number;
-}
-
-// ccusage 19.x 에서 daily row 의 키가 'date' → 'period' 로 breaking change.
-// 본 함수에서 normalize 하여 caller 가 항상 `.date` 사용 가능.
-function normalizeCcusageRow(row: CcusageDailyRow): CcusageDailyRow {
-  return { ...row, date: row.date ?? row.period };
-}
-
-function getCcusageDaily(raw: unknown): CcusageDailyRow[] {
-  if (typeof raw !== "object" || raw === null) return [];
-  const r = raw as Record<string, unknown>;
-  const cu = r.ccusageDaily as { daily?: CcusageDailyRow[] } | undefined;
-  return (cu?.daily ?? []).map(normalizeCcusageRow);
-}
+// ccusage daily row helper 는 web/src/lib/ccusage-row.ts 로 이동.
+// type CcusageDailyRow / normalizeCcusageRow / getCcusageDaily 가 거기서 export 됨.
 
 function getPeriodData(raw: unknown, period: string): RawPeriodData {
   if (typeof raw !== "object" || raw === null) return {};

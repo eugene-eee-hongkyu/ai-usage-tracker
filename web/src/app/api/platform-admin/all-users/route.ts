@@ -18,19 +18,9 @@ import { db, users, teamMembers, teams, userSnapshots, apiTokens, IS_LOCAL_MODE 
 import { eq, and, isNull, sql } from "drizzle-orm";
 import { getPlanLimits, type PlanTier } from "@/lib/plan-health";
 import { PINNED } from "@/lib/pinned-versions";
+import { type CcusageDailyRow, getCcusageDaily } from "@/lib/ccusage-row";
 
 export const dynamic = "force-dynamic";
-
-interface CcusageDailyRow {
-  date?: string;
-  period?: string;  // ccusage 19.x
-  inputTokens?: number;
-  outputTokens?: number;
-  cacheReadTokens?: number;
-  cacheCreationTokens?: number;
-  totalTokens?: number;
-  totalCost?: number;
-}
 
 interface EnvInfo {
   platform?: string;
@@ -46,13 +36,6 @@ interface EnvInfo {
   hookEnabled?: boolean;
   cliVersion?: string;
   installMethod?: string;
-}
-
-function getCcusageDaily(raw: unknown): CcusageDailyRow[] {
-  if (typeof raw !== "object" || raw === null) return [];
-  const r = raw as Record<string, unknown>;
-  const cu = r.ccusageDaily as { daily?: CcusageDailyRow[] } | undefined;
-  return (cu?.daily ?? []).map((row) => ({ ...row, date: row.date ?? row.period }));
 }
 
 function ccusageMissing(raw: unknown): boolean {

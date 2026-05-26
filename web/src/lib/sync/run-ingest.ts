@@ -4,6 +4,7 @@
 
 import { and, eq, lt, sql } from "drizzle-orm";
 import { db, userSnapshots, users, periodSnapshots, userBlocks } from "../db";
+import { normalizeCcusageRow } from "../ccusage-row";
 
 interface CcusageBlockRow {
   id?: string;
@@ -229,7 +230,11 @@ export async function runIngest(
     bodyObj.ccusageDaily = prevCcusage;
   }
 
-  const ccusageDaily = (bodyObj.ccusageDaily as { daily?: Array<{ date?: string }> } | undefined)?.daily ?? [];
+  // ccusage 19.x 부터 row 의 날짜 키가 'date' → 'period'. normalize 안 하면 week/month/day
+  // scoped snapshot 의 ccusageDaily 가 빈 array 로 박혀 dashboard period filter 가 손상.
+  const ccusageDaily = (
+    (bodyObj.ccusageDaily as { daily?: Array<{ date?: string; period?: string }> } | undefined)?.daily ?? []
+  ).map(normalizeCcusageRow);
   const filterCcusage = (startYmd: string, endYmd: string) =>
     ccusageDaily.filter((d) => d.date && d.date >= startYmd && d.date <= endYmd);
 
