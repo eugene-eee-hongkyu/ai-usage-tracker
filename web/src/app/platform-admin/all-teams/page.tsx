@@ -8,6 +8,7 @@
 export const dynamic = "force-dynamic";
 
 import { useEffect, useState } from "react";
+import { useSession } from "next-auth/react";
 import { TeamComparisonRow, type TeamRowData } from "@/components/team-comparison-row";
 
 type Period = "today" | "8days" | "month" | "30days" | "all";
@@ -29,9 +30,42 @@ interface TeamFetched {
 const DEFAULT_PERIOD: Period = "month";
 
 export default function PlatformAdminAllTeamsPage() {
+  const { data: session } = useSession();
+  const myCurrentTeamId =
+    (session?.user as { currentTeamId?: number | null } | undefined)?.currentTeamId ?? null;
+  const myViewAsTeamId =
+    (session?.user as { viewAsTeamId?: number | null } | undefined)?.viewAsTeamId ?? null;
   const [period, setPeriod] = useState<Period>(DEFAULT_PERIOD);
   const [teams, setTeams] = useState<TeamFetched[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [navigatingTeamId, setNavigatingTeamId] = useState<number | null>(null);
+
+  // 팀명 클릭 → 해당 팀 view-as 진입 (본인 팀이면 view-as exit) → /team 으로 full nav.
+  // /platform-admin/all-users 의 handleCardClick 패턴 동일 (route 만 /team).
+  async function handleTeamClick(teamId: number) {
+    if (navigatingTeamId !== null) return;
+    setNavigatingTeamId(teamId);
+    try {
+      const sameTeam = myCurrentTeamId !== null && teamId === myCurrentTeamId;
+      if (sameTeam) {
+        if (myViewAsTeamId && myViewAsTeamId !== myCurrentTeamId) {
+          await fetch("/api/admin/platform/exit-view", { method: "POST" });
+        }
+      } else {
+        const r = await fetch("/api/admin/platform/switch-team", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ teamId }),
+        });
+        if (!r.ok) throw new Error(String(r.status));
+      }
+      // session.viewAsTeamName 갱신 지연 회피 위해 full nav.
+      window.location.href = "/team";
+    } catch (e) {
+      console.error("team navigation failed", e);
+      setNavigatingTeamId(null);
+    }
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -110,7 +144,13 @@ export default function PlatformAdminAllTeamsPage() {
       {teams && teams.map((t) => (
         <div key={t.teamId} className="bg-slate-950">
           {t.data ? (
-            <TeamComparisonRow teamName={t.teamName} data={t.data} period={period} />
+            <TeamComparisonRow
+              teamName={t.teamName}
+              data={t.data}
+              period={period}
+              onTeamNameClick={() => handleTeamClick(t.teamId)}
+              isNavigating={navigatingTeamId === t.teamId}
+            />
           ) : (
             <section className="border border-rose-900/40 rounded bg-rose-950/10 p-4">
               <h2 className="text-base font-bold text-slate-200">{t.teamName}</h2>

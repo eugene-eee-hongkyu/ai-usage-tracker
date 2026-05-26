@@ -105,10 +105,14 @@ export function TeamComparisonRow({
   teamName,
   data,
   period,
+  onTeamNameClick,
+  isNavigating,
 }: {
   teamName: string;
   data: TeamRowData;
   period: Period;
+  onTeamNameClick?: () => void;
+  isNavigating?: boolean;
 }) {
   const { m: t } = useMessages();
 
@@ -298,7 +302,21 @@ export function TeamComparisonRow({
   return (
     <section className="space-y-3" data-testid={`team-row-${slug}`}>
       <header className="flex items-baseline gap-3 border-b border-neutral-800 pb-2">
-        <h2 className="text-lg font-bold text-slate-100">{teamName}</h2>
+        {onTeamNameClick ? (
+          <button
+            type="button"
+            onClick={onTeamNameClick}
+            disabled={isNavigating}
+            data-testid={`team-row-name-${slug}`}
+            className="text-lg font-bold text-slate-100 hover:text-emerald-300 hover:underline transition-colors disabled:opacity-50 disabled:cursor-wait"
+            title={`${teamName} 팀 화면으로 이동`}
+          >
+            {teamName}
+            {isNavigating && <span className="ml-2 text-xs font-mono text-slate-500">이동 중…</span>}
+          </button>
+        ) : (
+          <h2 className="text-lg font-bold text-slate-100">{teamName}</h2>
+        )}
         {data.teamUsage && (
           <span className="text-xs font-mono text-neutral-500">
             활용지수 <span className="text-emerald-400 font-bold">{data.teamUsage.powerIndex.toFixed(1)}</span>
