@@ -793,7 +793,31 @@ export async function runRepair() {
     console.error("   curl -fsSL https://aiusage.z21labs.world/install.sh | bash");
     process.exit(1);
   }
-  console.log("✓ 인증 확인");
+
+  // M6f (2026-05-26): repair self-heal — 옛 키가 revoke 되었거나 server 측에서 정리됐을
+  // 가능성을 verify endpoint 로 확인. 401 받으면 키 정리 + OAuth init 으로 fallback.
+  // 영진님 케이스 (revoked token "Legacy device" 가 keychain 에 남아있어 install.ps1
+  // 재실행해도 repair 만 돌고 silent fail) 해결.
+  try {
+    const verifyResp = await fetch(`${SERVER_URL}/api/auth/verify`, {
+      method: "GET",
+      headers: { "x-api-key": apiKey },
+    });
+    if (verifyResp.status === 401) {
+      console.log("⚠ 저장된 인증 정보가 만료됐거나 폐기됐어요. 다시 로그인합니다...");
+      await deleteApiKey();
+      return runInit();
+    }
+    if (!verifyResp.ok) {
+      // 5xx 등 일시 오류 — 그냥 repair 계속 (다음 sync 에서 자연 재시도)
+      console.log(`⚠ 인증 확인 일시 실패 (${verifyResp.status}). 그대로 진행합니다.`);
+    } else {
+      console.log("✓ 인증 확인");
+    }
+  } catch (e) {
+    // 네트워크 오류 — repair 계속 (offline 환경 가능)
+    console.log(`⚠ 인증 확인 네트워크 오류 (${(e as Error).message ?? "unknown"}). 그대로 진행합니다.`);
+  }
 
   // repair 시 codeburn / ccusage 항상 @latest 로 강제 업그레이드.
   // codeburn fix (#184 timezone 등) 가 사용자 PC 에 자동 반영되도록.

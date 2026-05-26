@@ -1575,7 +1575,24 @@ async function runRepair() {
     console.error("   curl -fsSL https://aiusage.z21labs.world/install.sh | bash");
     process.exit(1);
   }
-  console.log("✓ 인증 확인");
+  try {
+    const verifyResp = await fetch(`${SERVER_URL}/api/auth/verify`, {
+      method: "GET",
+      headers: { "x-api-key": apiKey }
+    });
+    if (verifyResp.status === 401) {
+      console.log("⚠ 저장된 인증 정보가 만료됐거나 폐기됐어요. 다시 로그인합니다...");
+      await deleteApiKey();
+      return runInit();
+    }
+    if (!verifyResp.ok) {
+      console.log(`⚠ 인증 확인 일시 실패 (${verifyResp.status}). 그대로 진행합니다.`);
+    } else {
+      console.log("✓ 인증 확인");
+    }
+  } catch (e) {
+    console.log(`⚠ 인증 확인 네트워크 오류 (${e.message ?? "unknown"}). 그대로 진행합니다.`);
+  }
   console.log("\uD83D\uDCE6 의존성 설치 중...");
   const codeburnOk = await ensureCodeburn();
   if (!codeburnOk) {
