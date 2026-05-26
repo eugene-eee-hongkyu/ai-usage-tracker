@@ -111,6 +111,9 @@ export const userSnapshots = sqliteTable(
     teamId: integer("team_id", { mode: "number" })
       .notNull()
       .references(() => teams.id),
+    // M6f (2026-05-25): PG 와 schema sync. LOCAL_MODE 는 api_tokens 자체가 없어
+    // 항상 NULL — 단일 user/단일 머신 환경이라 device 분리 의미 없음. FK 없음.
+    tokenId: integer("token_id", { mode: "number" }),
     rawJson: text("raw_json", { mode: "json" }).notNull(),
     totalCost: real("total_cost").notNull().default(0),
     sessionsCount: integer("sessions_count", { mode: "number" }).notNull().default(0),
@@ -143,6 +146,8 @@ export const periodSnapshots = sqliteTable(
     teamId: integer("team_id", { mode: "number" })
       .notNull()
       .references(() => teams.id),
+    // M6f: schema sync. LOCAL_MODE 에선 항상 NULL.
+    tokenId: integer("token_id", { mode: "number" }),
     periodType: text("period_type").notNull(),
     periodStart: text("period_start").notNull(),
     capturedAt: integer("captured_at", { mode: "timestamp_ms" })
