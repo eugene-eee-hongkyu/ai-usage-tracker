@@ -5,7 +5,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db, users, teamMembers, apiTokens, IS_LOCAL_MODE } from "@/lib/db";
 import { ensureLocalUser } from "@/lib/local-user";
 import { runIngest } from "@/lib/sync/run-ingest";
-import { eq, and, isNull, asc } from "drizzle-orm";
+import { eq, and, isNull, asc, desc } from "drizzle-orm";
 import crypto from "crypto";
 
 export async function POST(req: NextRequest) {
@@ -60,6 +60,17 @@ export async function POST(req: NextRequest) {
         .from(users)
         .where(eq(users.apiKeyHash, hash))
         .limit(1);
+      // M6f (2026-05-25): device-scope row 분리를 위해 fallback 도 token-binding 강제.
+      // 그 user 의 가장 최근 active token 을 채택 — backfill 행 1개와 일관 (row 한 자리만 사용).
+      if (userRow[0]) {
+        const recentToken = await db
+          .select({ id: apiTokens.id })
+          .from(apiTokens)
+          .where(and(eq(apiTokens.userId, userRow[0].id), isNull(apiTokens.revokedAt)))
+          .orderBy(desc(apiTokens.lastUsedAt), desc(apiTokens.createdAt))
+          .limit(1);
+        if (recentToken[0]) matchedTokenId = recentToken[0].id;
+      }
     }
   }
 
@@ -85,7 +96,7 @@ export async function POST(req: NextRequest) {
   }
 
   const body = await req.json();
-  await runIngest(userRow[0].id, teamId, userRow[0].timezone, body);
+  await runIngest(userRow[0].id, teamId, matchedTokenId, userRow[0].timezone, body);
 
   // M6e: 매칭된 token 의 last_used_at + metadata 갱신. fallback (users 단일 hash)
   // 경로면 matchedTokenId=null 이라 skip — 옛 CLI 가 metadata 안 보내도 안전.

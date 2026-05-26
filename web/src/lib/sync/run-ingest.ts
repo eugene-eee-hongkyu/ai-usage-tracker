@@ -148,11 +148,16 @@ function deriveUserTodayFromBody(body: unknown): string | null {
 
 /**
  * codeburn + ccusage 데이터를 받아 user_snapshots / period_snapshots / user_blocks 를 갱신.
- * 호출 측 책임: 인증, userId 확정. 이 함수는 그 후 데이터 write 만.
+ * 호출 측 책임: 인증, userId / tokenId 확정. 이 함수는 그 후 데이터 write 만.
+ *
+ * tokenId: M6f (2026-05-25) device-scope 도입. (user, team, token) 단위로 row 분리 → 같은
+ * user 의 노트북 N대 데이터가 서로 덮어쓰지 않음. dashboard 가 device 별로 보거나 합산 선택.
+ * fallback (옛 users.api_key_hash 경로) 면 null — (user, team, null) 단일 legacy row.
  */
 export async function runIngest(
   userId: number,
   teamId: number,
+  tokenId: number | null,
   userTimezone: string | null,
   body: unknown
 ): Promise<void> {
@@ -186,11 +191,19 @@ export async function runIngest(
   const rawDayData = bodyObj.today as Record<string, unknown> | null | undefined;
 
   // Read existing snapshot up-front: needed both for boundary-crossing promotion
-  // AND for the ccusage merge logic below.
+  // AND for the ccusage merge logic below. (user, team, token) 단위 — 같은 device 의 prev.
   const existing = await db
     .select()
     .from(userSnapshots)
-    .where(and(eq(userSnapshots.userId, userId), eq(userSnapshots.teamId, teamId)))
+    .where(
+      and(
+        eq(userSnapshots.userId, userId),
+        eq(userSnapshots.teamId, teamId),
+        tokenId === null
+          ? sql`${userSnapshots.tokenId} IS NULL`
+          : eq(userSnapshots.tokenId, tokenId),
+      )
+    )
     .limit(1);
 
   const prev = existing[0];
@@ -240,6 +253,7 @@ export async function runIngest(
       .values({
         userId,
         teamId,
+        tokenId,
         periodType: "weekly",
         periodStart: prev.currentWeekStart,
         capturedAt: prev.updatedAt ?? now,
@@ -255,6 +269,7 @@ export async function runIngest(
       .values({
         userId,
         teamId,
+        tokenId,
         periodType: "monthly",
         periodStart: prev.currentMonthStart,
         capturedAt: prev.updatedAt ?? now,
@@ -270,6 +285,7 @@ export async function runIngest(
       .values({
         userId,
         teamId,
+        tokenId,
         periodType: "daily",
         periodStart: prev.currentDayStart,
         capturedAt: prev.updatedAt ?? now,
@@ -283,6 +299,7 @@ export async function runIngest(
     .values({
       userId,
       teamId,
+      tokenId,
       rawJson: body,
       totalCost,
       sessionsCount,
@@ -298,7 +315,7 @@ export async function runIngest(
       updatedAt: now,
     })
     .onConflictDoUpdate({
-      target: [userSnapshots.userId, userSnapshots.teamId],
+      target: [userSnapshots.userId, userSnapshots.teamId, userSnapshots.tokenId],
       set: {
         rawJson: sql`excluded.raw_json`,
         totalCost: sql`excluded.total_cost`,

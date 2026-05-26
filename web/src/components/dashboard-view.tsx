@@ -172,6 +172,21 @@ interface DashboardData {
   // blocks: API 에서 여전히 보내지만 (user_blocks 데이터 누적 유지) UI 에서 안 씀.
   blocks?: unknown;
   efficiencyScore?: EfficiencyScoreSummary | null;
+  // M6f (2026-05-25): device-scope. user 가 노트북 N대 쓰면 N entries.
+  devices?: DeviceMeta[];
+  selectedDeviceId?: number | null;
+}
+
+interface DeviceMeta {
+  tokenId: number;
+  name: string;
+  platform: string | null;
+  osVersion: string | null;
+  hostname: string | null;
+  lastUsedAt: string | null;
+  snapshotUpdatedAt: string | null;
+  hasData: boolean;
+  totalCost: number;
 }
 
 interface EfficiencyScoreSummary {
@@ -948,13 +963,16 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
   const [weekOffset, setWeekOffset] = useState(0);
   const [monthOffset, setMonthOffset] = useState(0);
   const [dayOffset, setDayOffset] = useState(0);
+  // M6f: 사용자가 노트북 N대 쓰면 device chip 으로 선택. null = server 가 가장 최근 device 자동 결정.
+  const [deviceId, setDeviceId] = useState<number | null>(null);
 
-  const apiUrl = (p: Period, wOff: number, mOff: number, dOff: number) => {
+  const apiUrl = (p: Period, wOff: number, mOff: number, dOff: number, devId: number | null) => {
     const params = new URLSearchParams({ period: p });
     if (targetUserId) params.set("userId", targetUserId);
     if (p === "8days" && wOff > 0) params.set("weekOffset", String(wOff));
     if (p === "month" && mOff > 0) params.set("monthOffset", String(mOff));
     if (p === "today" && dOff > 0) params.set("dayOffset", String(dOff));
+    if (devId !== null) params.set("deviceId", String(devId));
     return `/api/dashboard?${params.toString()}`;
   };
 
@@ -1056,7 +1074,7 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
     if (!periodReady) return;
     const ctrl = new AbortController();
     setLoading(true);
-    fetch(apiUrl(period, weekOffset, monthOffset, dayOffset), { signal: ctrl.signal })
+    fetch(apiUrl(period, weekOffset, monthOffset, dayOffset, deviceId), { signal: ctrl.signal })
       .then((r) => r.json())
       .then((d) => {
         if (d?.error) { setFetchError(true); setLoading(false); return; }
@@ -1071,7 +1089,7 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
       });
     return () => ctrl.abort();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [session, period, weekOffset, monthOffset, dayOffset, targetUserId, periodReady]);
+  }, [session, period, weekOffset, monthOffset, dayOffset, deviceId, targetUserId, periodReady]);
 
   useEffect(() => {
     if (data?.user?.timezone) setUserTz(data.user.timezone);
@@ -1083,7 +1101,7 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
     if (!isLocalMode) return;
     if (data?.overview) return;
     const id = setInterval(() => {
-      fetch(apiUrl(period, weekOffset, monthOffset, dayOffset))
+      fetch(apiUrl(period, weekOffset, monthOffset, dayOffset, deviceId))
         .then((r) => r.json())
         .then((d) => {
           if (d?.error) return;
@@ -1093,7 +1111,7 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
     }, 5000);
     return () => clearInterval(id);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isLocalMode, data?.overview, period, weekOffset, monthOffset, dayOffset, targetUserId]);
+  }, [isLocalMode, data?.overview, period, weekOffset, monthOffset, dayOffset, deviceId, targetUserId]);
 
   const saveTz = async (tz: string) => {
     setUserTz(tz);
@@ -1108,13 +1126,13 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
   useEffect(() => {
     if (!session || !data || data.overview) return;
     const timer = setInterval(() => {
-      fetch(apiUrl(period, weekOffset, monthOffset, dayOffset))
+      fetch(apiUrl(period, weekOffset, monthOffset, dayOffset, deviceId))
         .then((r) => r.json())
         .then((d) => { if (d.overview) setData(d); });
     }, 4000);
     return () => clearInterval(timer);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [session, data, period, weekOffset, monthOffset, dayOffset]);
+  }, [session, data, period, weekOffset, monthOffset, dayOffset, deviceId]);
 
   if (status === "loading" || (!data && !fetchError)) return (
     <div className="min-h-screen bg-neutral-950">
@@ -1134,7 +1152,7 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
           data-testid="dash-retry"
           onClick={() => {
             setFetchError(false); setLoading(true);
-            fetch(apiUrl(period, weekOffset, monthOffset, dayOffset)).then((r) => r.json()).then((d) => {
+            fetch(apiUrl(period, weekOffset, monthOffset, dayOffset, deviceId)).then((r) => r.json()).then((d) => {
               if (!d?.error) { setData(d); setLoading(false); }
             });
           }}
@@ -2196,7 +2214,67 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
             </select>
           )}
         </div>
+        {/* M6f: device chip row — user 가 노트북 N대 사용 시 표시. 1개면 숨김.
+            클릭하면 그 device 의 데이터로 dashboard 갱신. server 가 selectedDeviceId 결정 → 동기화. */}
+        {(data.devices?.length ?? 0) >= 2 && (
+          <div className="max-w-6xl mx-auto px-4 pb-2 flex flex-wrap gap-1.5 items-center">
+            <span className="text-[10px] font-mono text-neutral-600 uppercase tracking-wider mr-1">device:</span>
+            {data.devices!.map((dev) => {
+              const isSelected = (deviceId ?? data.selectedDeviceId) === dev.tokenId;
+              const sinceMs = dev.snapshotUpdatedAt ? Date.now() - new Date(dev.snapshotUpdatedAt).getTime() : null;
+              const ageLabel = sinceMs === null
+                ? "no data"
+                : sinceMs < 3_600_000 ? `${Math.floor(sinceMs / 60_000)}m ago`
+                : sinceMs < 86_400_000 ? `${Math.floor(sinceMs / 3_600_000)}h ago`
+                : `${Math.floor(sinceMs / 86_400_000)}d ago`;
+              const isStale = sinceMs !== null && sinceMs > 3 * 86_400_000;
+              const icon = dev.platform === "darwin" ? "🍎" : dev.platform === "win32" ? "🪟" : dev.platform === "linux" ? "🐧" : "💻";
+              return (
+                <button
+                  key={dev.tokenId}
+                  data-testid={`dash-device-${dev.tokenId}`}
+                  onClick={() => setDeviceId(dev.tokenId)}
+                  className={`text-xs font-mono border rounded px-2 py-1 transition-colors flex items-center gap-1.5 ${
+                    isSelected
+                      ? "bg-indigo-600 text-white border-indigo-500"
+                      : "bg-neutral-800 text-neutral-300 border-neutral-700 hover:border-neutral-500"
+                  }`}
+                >
+                  <span>{icon}</span>
+                  <span className="truncate max-w-[160px]">{dev.name}</span>
+                  <span className={`text-[10px] ${isStale ? "text-amber-400" : isSelected ? "text-indigo-100" : "text-neutral-500"}`}>
+                    · {ageLabel}{isStale ? " ⚠" : ""}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        )}
       </div>
+
+      {/* M6f: stale device 경고 — multi-device 사용자에서 한쪽 노트북이 3일+ sync 안 되면
+          launchd / Task Scheduler 미동작 가능. 본인 view 만 표시 (admin view-as 면 숨김). */}
+      {!viewOnly && (data.devices?.length ?? 0) >= 2 && (() => {
+        const staleDevices = (data.devices ?? []).filter((dev) => {
+          if (!dev.snapshotUpdatedAt) return true; // 데이터 없음도 stale 취급
+          return Date.now() - new Date(dev.snapshotUpdatedAt).getTime() > 3 * 86_400_000;
+        });
+        if (staleDevices.length === 0) return null;
+        return (
+          <div data-testid="dash-stale-device-warning" className="bg-amber-900/20 border-b border-amber-700/40">
+            <div className="max-w-6xl mx-auto px-4 py-2 flex items-start gap-2 text-xs font-mono">
+              <span className="text-amber-400 text-sm shrink-0">⚠</span>
+              <div className="flex-1 text-amber-200">
+                <span className="font-semibold">
+                  {staleDevices.map((d) => d.name).join(", ")}
+                </span>{" "}
+                <span className="text-amber-300/80">— 3일+ sync 안 됨. 해당 노트북에서 Claude Code 사용 중이라면 install 재실행 필요.</span>
+                <a href="/setup-status" className="ml-2 underline hover:text-amber-100">디바이스 확인</a>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Privacy banner — dismiss 가능. 진우님 "프롬프트 저장 여부 궁금" 응답 반영.
           본인 view 만. viewOnly 면 어드민 컨텍스트라 별도 banner 불필요. */}

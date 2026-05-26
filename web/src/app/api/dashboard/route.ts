@@ -3,7 +3,7 @@ export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import { db, userSnapshots, users, periodSnapshots, dailyVisits, userBlocks, teamMembers, IS_LOCAL_MODE } from "@/lib/db";
+import { db, userSnapshots, users, periodSnapshots, dailyVisits, userBlocks, teamMembers, apiTokens, IS_LOCAL_MODE } from "@/lib/db";
 import { getAuthedEmail } from "@/lib/local-user";
 import { getEffectiveTeamId } from "@/lib/effective-team";
 import { and, asc, desc, eq, gte, isNull, lt, inArray } from "drizzle-orm";
@@ -124,6 +124,7 @@ export async function GET(req: NextRequest) {
 
   const period = (req.nextUrl.searchParams.get("period") ?? "8days") as Period;
   const requestedUserId = req.nextUrl.searchParams.get("userId");
+  const requestedDeviceId = req.nextUrl.searchParams.get("deviceId");
   const weekOffset = parseInt(req.nextUrl.searchParams.get("weekOffset") ?? "0") || 0;
   const monthOffset = parseInt(req.nextUrl.searchParams.get("monthOffset") ?? "0") || 0;
   const dayOffset = parseInt(req.nextUrl.searchParams.get("dayOffset") ?? "0") || 0;
@@ -171,13 +172,71 @@ export async function GET(req: NextRequest) {
     .limit(1);
   if (!user[0]) return NextResponse.json({ error: "not found" }, { status: 404 });
 
+  // M6f (2026-05-25): device-scope. user 의 active token list + 각 token 의 snapshot 메타.
+  // dashboard 는 한 device 만 표시 — default 는 가장 최근 sync 한 device.
+  const devicesRaw = await db
+    .select({
+      tokenId: apiTokens.id,
+      name: apiTokens.name,
+      metadata: apiTokens.metadata,
+      tokenLastUsedAt: apiTokens.lastUsedAt,
+      tokenCreatedAt: apiTokens.createdAt,
+      snapshotUpdatedAt: userSnapshots.updatedAt,
+      snapshotTotalCost: userSnapshots.totalCost,
+    })
+    .from(apiTokens)
+    .leftJoin(
+      userSnapshots,
+      and(
+        eq(userSnapshots.tokenId, apiTokens.id),
+        eq(userSnapshots.userId, user[0].id),
+        IS_LOCAL_MODE ? undefined : eq(userSnapshots.teamId, effectiveTeamId!),
+      )
+    )
+    .where(and(eq(apiTokens.userId, user[0].id), isNull(apiTokens.revokedAt)))
+    .orderBy(desc(apiTokens.lastUsedAt));
+
+  const devices = devicesRaw.map((d) => {
+    const meta = (d.metadata ?? {}) as { platform?: string; osVersion?: string; hostname?: string };
+    return {
+      tokenId: d.tokenId,
+      name: d.name,
+      platform: meta.platform ?? null,
+      osVersion: meta.osVersion ?? null,
+      hostname: meta.hostname ?? null,
+      lastUsedAt: d.tokenLastUsedAt,
+      snapshotUpdatedAt: d.snapshotUpdatedAt,
+      hasData: !!d.snapshotUpdatedAt,
+      totalCost: d.snapshotTotalCost ?? 0,
+    };
+  });
+
+  // selectedTokenId 결정: query param 우선, 없으면 가장 최근 ingest 한 device.
+  let selectedTokenId: number | null = null;
+  if (requestedDeviceId) {
+    const reqId = parseInt(requestedDeviceId);
+    if (!Number.isNaN(reqId) && devices.find((d) => d.tokenId === reqId)) {
+      selectedTokenId = reqId;
+    }
+  }
+  if (selectedTokenId === null) {
+    // hasData 인 것 중 가장 최근 snapshotUpdatedAt 우선, 없으면 첫 active token.
+    const withData = devicesRaw
+      .filter((d) => d.snapshotUpdatedAt)
+      .sort((a, b) => (b.snapshotUpdatedAt!.getTime() - a.snapshotUpdatedAt!.getTime()));
+    selectedTokenId = withData[0]?.tokenId ?? devicesRaw[0]?.tokenId ?? null;
+  }
+
+  const tokenScopeForSnap = selectedTokenId !== null ? eq(userSnapshots.tokenId, selectedTokenId) : undefined;
+  const tokenScopeForPeriod = selectedTokenId !== null ? eq(periodSnapshots.tokenId, selectedTokenId) : undefined;
+
   const snap = await db
     .select()
     .from(userSnapshots)
     .where(
       IS_LOCAL_MODE
-        ? eq(userSnapshots.userId, user[0].id)
-        : and(eq(userSnapshots.userId, user[0].id), eq(userSnapshots.teamId, effectiveTeamId!))
+        ? and(eq(userSnapshots.userId, user[0].id), tokenScopeForSnap)
+        : and(eq(userSnapshots.userId, user[0].id), eq(userSnapshots.teamId, effectiveTeamId!), tokenScopeForSnap)
     )
     .limit(1);
 
@@ -187,21 +246,21 @@ export async function GET(req: NextRequest) {
   const dailyVisitsTeamScope = IS_LOCAL_MODE ? undefined : eq(dailyVisits.teamId, effectiveTeamId!);
   const userBlocksTeamScope = IS_LOCAL_MODE ? undefined : eq(userBlocks.teamId, effectiveTeamId!);
 
-  // Available snapshot list (always returned for dropdown population)
+  // Available snapshot list (always returned for dropdown population) — 선택한 device 의 snapshot 만
   const availableWeeklyRows = await db
     .select({ periodStart: periodSnapshots.periodStart, capturedAt: periodSnapshots.capturedAt })
     .from(periodSnapshots)
-    .where(and(eq(periodSnapshots.userId, user[0].id), eq(periodSnapshots.periodType, "weekly"), teamScope))
+    .where(and(eq(periodSnapshots.userId, user[0].id), eq(periodSnapshots.periodType, "weekly"), teamScope, tokenScopeForPeriod))
     .orderBy(desc(periodSnapshots.periodStart));
   const availableMonthlyRows = await db
     .select({ periodStart: periodSnapshots.periodStart, capturedAt: periodSnapshots.capturedAt })
     .from(periodSnapshots)
-    .where(and(eq(periodSnapshots.userId, user[0].id), eq(periodSnapshots.periodType, "monthly"), teamScope))
+    .where(and(eq(periodSnapshots.userId, user[0].id), eq(periodSnapshots.periodType, "monthly"), teamScope, tokenScopeForPeriod))
     .orderBy(desc(periodSnapshots.periodStart));
   const availableDailyRows = await db
     .select({ periodStart: periodSnapshots.periodStart, capturedAt: periodSnapshots.capturedAt })
     .from(periodSnapshots)
-    .where(and(eq(periodSnapshots.userId, user[0].id), eq(periodSnapshots.periodType, "daily"), teamScope))
+    .where(and(eq(periodSnapshots.userId, user[0].id), eq(periodSnapshots.periodType, "daily"), teamScope, tokenScopeForPeriod))
     .orderBy(desc(periodSnapshots.periodStart));
 
   const availableSnapshots = {
@@ -210,13 +269,13 @@ export async function GET(req: NextRequest) {
     daily: availableDailyRows.map((r) => ({ periodStart: r.periodStart, capturedAt: r.capturedAt })),
   };
 
-  // Load snapshot if requested
+  // Load snapshot if requested — token filter 도 같이 (선택 device 의 snapshot)
   let snapshotRow: { periodType: string; periodStart: string; capturedAt: Date; rawJson: unknown } | null = null;
   if (weekOffset > 0 && period === "8days") {
     const rows = await db
       .select()
       .from(periodSnapshots)
-      .where(and(eq(periodSnapshots.userId, user[0].id), eq(periodSnapshots.periodType, "weekly"), teamScope))
+      .where(and(eq(periodSnapshots.userId, user[0].id), eq(periodSnapshots.periodType, "weekly"), teamScope, tokenScopeForPeriod))
       .orderBy(desc(periodSnapshots.periodStart))
       .limit(1)
       .offset(weekOffset - 1);
@@ -225,7 +284,7 @@ export async function GET(req: NextRequest) {
     const rows = await db
       .select()
       .from(periodSnapshots)
-      .where(and(eq(periodSnapshots.userId, user[0].id), eq(periodSnapshots.periodType, "monthly"), teamScope))
+      .where(and(eq(periodSnapshots.userId, user[0].id), eq(periodSnapshots.periodType, "monthly"), teamScope, tokenScopeForPeriod))
       .orderBy(desc(periodSnapshots.periodStart))
       .limit(1)
       .offset(monthOffset - 1);
@@ -234,7 +293,7 @@ export async function GET(req: NextRequest) {
     const rows = await db
       .select()
       .from(periodSnapshots)
-      .where(and(eq(periodSnapshots.userId, user[0].id), eq(periodSnapshots.periodType, "daily"), teamScope))
+      .where(and(eq(periodSnapshots.userId, user[0].id), eq(periodSnapshots.periodType, "daily"), teamScope, tokenScopeForPeriod))
       .orderBy(desc(periodSnapshots.periodStart))
       .limit(1)
       .offset(dayOffset - 1);
@@ -253,6 +312,8 @@ export async function GET(req: NextRequest) {
       projects: [],
       topSessions: [],
       availableSnapshots,
+      devices,
+      selectedDeviceId: selectedTokenId,
     });
   }
 
@@ -1162,5 +1223,7 @@ export async function GET(req: NextRequest) {
     snapshot: snapshotInfo,
     blocks,
     efficiencyScore,
+    devices,
+    selectedDeviceId: selectedTokenId,
   });
 }

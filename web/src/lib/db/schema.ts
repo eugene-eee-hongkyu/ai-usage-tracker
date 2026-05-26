@@ -252,6 +252,11 @@ export const userSnapshots = pgTable(
     userId: integer("user_id")
       .notNull()
       .references(() => users.id),
+    // M6f (2026-05-25): device-scope snapshot. (user_id, team_id, token_id) 가 row 식별.
+    // 같은 user 의 노트북 N대가 각자 row 1개씩 보유. dashboard 는 device 선택.
+    // nullable: fallback (users.api_key_hash 매칭) 경로에서 token 결정 못 했을 때만.
+    // 안정화 (1-2주) 후 NOT NULL 강제 + COALESCE 인덱스 → 정상 인덱스 재구성 예정.
+    tokenId: integer("token_id").references(() => apiTokens.id),
     rawJson: jsonb("raw_json").notNull(),
     totalCost: real("total_cost").notNull().default(0),
     sessionsCount: integer("sessions_count").notNull().default(0),
@@ -267,7 +272,10 @@ export const userSnapshots = pgTable(
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
   },
   (t) => ({
-    userTeamUniq: uniqueIndex("user_snapshots_user_team_uniq").on(t.userId, t.teamId),
+    // 실제 DB 의 unique index 는 (user_id, team_id, COALESCE(token_id, 0)) expression.
+    // Drizzle 의 uniqueIndex 는 expression 표현이 까다로워, 같은 효과를 내는 column-list 로
+    // 선언 (런타임 동작은 DB 의 expression index 가 책임). drizzle migrate 는 미사용.
+    userTeamTokenUniq: uniqueIndex("user_snapshots_user_team_token_uniq").on(t.userId, t.teamId, t.tokenId),
     teamIdx: index("user_snapshots_team_idx").on(t.teamId),
   })
 );
@@ -283,13 +291,16 @@ export const periodSnapshots = pgTable(
     userId: integer("user_id")
       .notNull()
       .references(() => users.id),
+    // M6f (2026-05-25): device-scope snapshot. user_snapshots 와 동일 의도.
+    tokenId: integer("token_id").references(() => apiTokens.id),
     periodType: text("period_type").notNull(),
     periodStart: date("period_start").notNull(),
     capturedAt: timestamp("captured_at").defaultNow().notNull(),
     rawJson: jsonb("raw_json").notNull(),
   },
   (t) => ({
-    uniq: uniqueIndex("period_snapshots_uniq").on(t.userId, t.teamId, t.periodType, t.periodStart),
+    // 실제 DB index 는 (user_id, team_id, period_type, period_start, COALESCE(token_id, 0)).
+    uniq: uniqueIndex("period_snapshots_uniq").on(t.userId, t.teamId, t.periodType, t.periodStart, t.tokenId),
     teamIdx: index("period_snapshots_team_idx").on(t.teamId),
   })
 );
