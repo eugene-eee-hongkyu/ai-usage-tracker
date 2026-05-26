@@ -15,7 +15,7 @@ import {
   estimateTierFromMonthlyCost,
   type PlanTier,
 } from "@/lib/plan-health";
-import { type CcusageDailyRow, normalizeCcusageRow, getCcusageDaily } from "@/lib/ccusage-row";
+import { getCcusageDaily } from "@/lib/ccusage-row";
 
 type Period = "today" | "month" | "8days" | "30days" | "all";
 

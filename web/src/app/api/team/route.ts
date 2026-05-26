@@ -15,7 +15,7 @@ import {
 } from "@/lib/plan-health";
 import { computeEfficiencyScore, computeDailyEfficiencyScore, computePowerIndex } from "@/lib/rules";
 import { isAdmin } from "@/lib/admin";
-import { getCcusageDaily, normalizeCcusageRow } from "@/lib/ccusage-row";
+import { getCcusageDaily } from "@/lib/ccusage-row";
 import { and, eq, gte, isNull, inArray } from "drizzle-orm";
 
 type Period = "today" | "month" | "8days" | "30days" | "all";

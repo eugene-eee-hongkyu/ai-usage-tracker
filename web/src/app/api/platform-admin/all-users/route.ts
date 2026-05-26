@@ -18,7 +18,7 @@ import { db, users, teamMembers, teams, userSnapshots, apiTokens, IS_LOCAL_MODE 
 import { eq, and, isNull, sql } from "drizzle-orm";
 import { getPlanLimits, type PlanTier } from "@/lib/plan-health";
 import { PINNED } from "@/lib/pinned-versions";
-import { type CcusageDailyRow, getCcusageDaily } from "@/lib/ccusage-row";
+import { getCcusageDaily } from "@/lib/ccusage-row";
 
 export const dynamic = "force-dynamic";
 
