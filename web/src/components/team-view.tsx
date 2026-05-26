@@ -717,7 +717,7 @@ export function TeamView({ adminMode = false }: { adminMode?: boolean }) {
             const isSelf = session?.user?.name === m.name;
             return (
               <div
-                key={m.userId}
+                key={`${m.userId}-${m.tokenId ?? "null"}`}
                 className={`flex items-center gap-1.5 text-xs font-mono ${isSelf ? "bg-emerald-500/5 ring-1 ring-inset ring-emerald-500/30 rounded px-1 -mx-1 py-0.5" : ""}`}
               >
                 <div className="w-16 h-1.5 bg-neutral-800 rounded overflow-hidden shrink-0">
@@ -762,7 +762,7 @@ export function TeamView({ adminMode = false }: { adminMode?: boolean }) {
             const isSelf = session?.user?.name === m.name;
             return (
               <div
-                key={m.userId}
+                key={`${m.userId}-${m.tokenId ?? "null"}`}
                 className={`flex items-center gap-1.5 text-xs font-mono ${isSelf ? "bg-emerald-500/5 ring-1 ring-inset ring-emerald-500/30 rounded px-1 -mx-1 py-0.5" : ""}`}
               >
                 <div className="w-16 h-1.5 bg-neutral-800 rounded overflow-hidden shrink-0">
@@ -1185,7 +1185,7 @@ export function TeamView({ adminMode = false }: { adminMode?: boolean }) {
                 : t.grades.noActivity;
               return (
                 <tr
-                  key={m.userId}
+                  key={`${m.userId}-${m.tokenId ?? "null"}`}
                   data-testid={`team-eff-row-${m.userId}`}
                   data-self={isSelf || undefined}
                   className={`border-b border-neutral-800/50 hover:bg-neutral-800/30 transition-colors ${
@@ -1515,7 +1515,7 @@ export function TeamView({ adminMode = false }: { adminMode?: boolean }) {
                     : "text-neutral-300";
                 const dailyRow = grid.byUser[String(m.userId)] ?? null;
                 return (
-                  <tr key={m.userId} data-testid={`team-eng-row-${m.userId}`} className="border-b border-neutral-800/40 hover:bg-neutral-800/30 transition-colors">
+                  <tr key={`${m.userId}-${m.tokenId ?? "null"}`} data-testid={`team-eng-row-${m.userId}`} className="border-b border-neutral-800/40 hover:bg-neutral-800/30 transition-colors">
                     <td className="py-1.5 text-neutral-300 whitespace-nowrap overflow-hidden text-ellipsis">{m.name}{m.deviceLabel ? ` · ${m.deviceLabel}` : ""}</td>
                     <td className={`py-1.5 px-2 text-right tabular-nums whitespace-nowrap ${timeClass}`}>
                       {m.lastSyncedAt ? fmtSyncTime(m.lastSyncedAt) : "—"}
