@@ -3,7 +3,7 @@ export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import { db, userSnapshots, users, dailyVisits, userBlocks, teamMembers, apiTokens, IS_LOCAL_MODE } from "@/lib/db";
+import { db, userSnapshots, users, dailyVisits, userBlocks, teamMembers, apiTokens, teams, IS_LOCAL_MODE } from "@/lib/db";
 import { getAuthedEmail } from "@/lib/local-user";
 import { getEffectiveTeamId } from "@/lib/effective-team";
 import {
@@ -120,14 +120,38 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
 
   // team 격리. owner 면 viewAs cookie, 일반 user 는 currentTeamId. LOCAL_MODE 는 null.
-  const effectiveTeamId = IS_LOCAL_MODE
+  // ?teamId=N — platform admin (ADMIN_EMAIL) 전용 override. /platform-admin/all-teams 가
+  // 팀별 fetch 할 때 사용. view-as cookie 는 단일 값이라 동시에 N팀 못 박는다.
+  const adminTeamIdParam = req.nextUrl.searchParams.get("teamId");
+  let effectiveTeamId = IS_LOCAL_MODE
     ? null
     : await getEffectiveTeamId(session, req);
+  if (!IS_LOCAL_MODE && adminTeamIdParam) {
+    if (!isAdmin(authedEmail)) {
+      return NextResponse.json({ error: "forbidden" }, { status: 403 });
+    }
+    const parsed = parseInt(adminTeamIdParam, 10);
+    if (!Number.isFinite(parsed) || parsed <= 0) {
+      return NextResponse.json({ error: "invalid_team_id" }, { status: 400 });
+    }
+    effectiveTeamId = parsed;
+  }
   if (!IS_LOCAL_MODE && !effectiveTeamId) {
     return NextResponse.json({ error: "no_team" }, { status: 403 });
   }
 
   const period = (req.nextUrl.searchParams.get("period") ?? "all") as Period;
+
+  // 팀명 — headline 카드의 "{team} 카드" 라벨용. all-teams 페이지에서 admin
+  // 이 다른 팀을 fetch 할 때 session.viewAsTeamName 이 안 맞아 빈 값이 됨.
+  const teamNameRow = IS_LOCAL_MODE || !effectiveTeamId
+    ? null
+    : (await db
+        .select({ name: teams.name })
+        .from(teams)
+        .where(eq(teams.id, effectiveTeamId))
+        .limit(1))[0] ?? null;
+  const teamName = teamNameRow?.name ?? null;
 
   // 멤버 list — effectiveTeam 의 멤버만. user_snapshots / user_blocks / daily_visits
   // 도 모두 team-scoped (team_id 컬럼 NOT NULL).
@@ -1071,5 +1095,6 @@ export async function GET(req: NextRequest) {
       ),
     },
     isAdminUser: IS_LOCAL_MODE ? false : isAdmin(authedEmail),
+    teamName,
   });
 }
