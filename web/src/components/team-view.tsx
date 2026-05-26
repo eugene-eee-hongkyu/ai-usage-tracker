@@ -76,6 +76,10 @@ const MEMBER_COLORS = [
 
 interface MemberStat {
   userId: number;
+  // M6f (2026-05-26): multi-device 사용자는 같은 userId 의 row 가 N개 (device 별 분리).
+  // tokenId / deviceLabel 로 row 식별. 1-device 사용자는 deviceLabel = null.
+  tokenId: number | null;
+  deviceLabel: string | null;
   name: string;
   avatarUrl: string | null;
   lastSyncedAt: string | null;
@@ -726,7 +730,7 @@ export function TeamView({ adminMode = false }: { adminMode?: boolean }) {
                   />
                 </div>
                 <span className="flex-1 text-neutral-300 truncate flex items-center gap-1.5">
-                  <span className="truncate">{m.name}</span>
+                  <span className="truncate">{m.name}{m.deviceLabel ? ` · ${m.deviceLabel}` : ""}</span>
                   {isSelf && <span className="text-[10px] text-emerald-400">← 나</span>}
                   <CcusageMissingBadge missing={m.ccusageMissing} userId={m.userId} />
                 </span>
@@ -771,7 +775,7 @@ export function TeamView({ adminMode = false }: { adminMode?: boolean }) {
                   />
                 </div>
                 <span className="flex-1 text-neutral-300 truncate flex items-center gap-1.5">
-                  <span className="truncate">{m.name}</span>
+                  <span className="truncate">{m.name}{m.deviceLabel ? ` · ${m.deviceLabel}` : ""}</span>
                   {isSelf && <span className="text-[10px] text-emerald-400">← 나</span>}
                 </span>
                 <span className="w-16 text-yellow-400 text-right tabular-nums">${m.totalCost.toFixed(2)}</span>
@@ -1093,7 +1097,7 @@ export function TeamView({ adminMode = false }: { adminMode?: boolean }) {
           {ranked.map((m, i) => (
             <div key={`${m.userId}-${i}`} className="flex items-center gap-2.5 text-xs font-mono">
               <span className="w-4 text-neutral-600 tabular-nums shrink-0 text-right">{i + 1}</span>
-              <span className="flex-1 text-neutral-300 truncate min-w-0">{m.name}</span>
+              <span className="flex-1 text-neutral-300 truncate min-w-0">{m.name}{m.deviceLabel ? ` · ${m.deviceLabel}` : ""}</span>
               <div className="w-20 sm:w-28 h-2 bg-neutral-800/60 rounded-full overflow-hidden shrink-0">
                 <div
                   className="h-full bg-cyan-500 rounded-full transition-all"
@@ -1194,7 +1198,7 @@ export function TeamView({ adminMode = false }: { adminMode?: boolean }) {
                         className="w-2 h-2 rounded-full shrink-0"
                         style={{ background: MEMBER_COLORS[i % MEMBER_COLORS.length] }}
                       />
-                      <span className={isSelf ? "font-bold text-emerald-300" : ""}>{m.name}</span>
+                      <span className={isSelf ? "font-bold text-emerald-300" : ""}>{m.name}{m.deviceLabel ? ` · ${m.deviceLabel}` : ""}</span>
                       {isSelf && <span className="text-[10px] font-mono text-emerald-400/80">{t.teamView.selfMark}</span>}
                       <SyncBadge lastSyncedAt={m.lastSyncedAt} userId={m.userId} m={t} />
                       <CcusageMissingBadge missing={m.ccusageMissing} userId={m.userId} />
@@ -1512,7 +1516,7 @@ export function TeamView({ adminMode = false }: { adminMode?: boolean }) {
                 const dailyRow = grid.byUser[String(m.userId)] ?? null;
                 return (
                   <tr key={m.userId} data-testid={`team-eng-row-${m.userId}`} className="border-b border-neutral-800/40 hover:bg-neutral-800/30 transition-colors">
-                    <td className="py-1.5 text-neutral-300 whitespace-nowrap overflow-hidden text-ellipsis">{m.name}</td>
+                    <td className="py-1.5 text-neutral-300 whitespace-nowrap overflow-hidden text-ellipsis">{m.name}{m.deviceLabel ? ` · ${m.deviceLabel}` : ""}</td>
                     <td className={`py-1.5 px-2 text-right tabular-nums whitespace-nowrap ${timeClass}`}>
                       {m.lastSyncedAt ? fmtSyncTime(m.lastSyncedAt) : "—"}
                     </td>

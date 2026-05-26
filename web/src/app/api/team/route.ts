@@ -3,7 +3,7 @@ export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import { db, userSnapshots, users, dailyVisits, userBlocks, teamMembers, IS_LOCAL_MODE } from "@/lib/db";
+import { db, userSnapshots, users, dailyVisits, userBlocks, teamMembers, apiTokens, IS_LOCAL_MODE } from "@/lib/db";
 import { getAuthedEmail } from "@/lib/local-user";
 import { getEffectiveTeamId } from "@/lib/effective-team";
 import {
@@ -147,16 +147,37 @@ export async function GET(req: NextRequest) {
   const dailyVisitsTeamScope = IS_LOCAL_MODE ? undefined : eq(dailyVisits.teamId, effectiveTeamId!);
   const userBlocksTeamScope = IS_LOCAL_MODE ? undefined : eq(userBlocks.teamId, effectiveTeamId!);
 
-  const allSnaps = IS_LOCAL_MODE
-    ? await db.select().from(userSnapshots)
+  // M6f (2026-05-26): multi-device 사용자는 token 별 row 가 N개. team 화면도 device
+  // 별 row 로 분리 표시 — 가중평균 위험 회피 + 개인 dashboard 의 device chip 모델과 일관.
+  // api_tokens leftJoin 으로 device label (api_tokens.name) 같이.
+  const allSnapsWithToken = IS_LOCAL_MODE
+    ? await db
+        .select({
+          snap: userSnapshots,
+          tokenName: apiTokens.name,
+          tokenPlatform: apiTokens.metadata,
+        })
+        .from(userSnapshots)
+        .leftJoin(apiTokens, eq(apiTokens.id, userSnapshots.tokenId))
     : teamMemberIds.length > 0
       ? await db
-          .select()
+          .select({
+            snap: userSnapshots,
+            tokenName: apiTokens.name,
+            tokenPlatform: apiTokens.metadata,
+          })
           .from(userSnapshots)
+          .leftJoin(apiTokens, eq(apiTokens.id, userSnapshots.tokenId))
           .where(and(inArray(userSnapshots.userId, teamMemberIds), userSnapTeamScope))
       : [];
 
-  const snapMap = new Map(allSnaps.map((s) => [s.userId, s]));
+  // user_id → 그 user 의 모든 device snap (배열). multi-device 사용자는 len>=2.
+  const snapsByUser = new Map<number, Array<{ snap: typeof userSnapshots.$inferSelect; tokenName: string | null; tokenPlatform: unknown }>>();
+  for (const row of allSnapsWithToken) {
+    const list = snapsByUser.get(row.snap.userId) ?? [];
+    list.push({ snap: row.snap, tokenName: row.tokenName, tokenPlatform: row.tokenPlatform });
+    snapsByUser.set(row.snap.userId, list);
+  }
 
   // 이번 달 visit/dwell 집계 (UTC 기준 YYYY-MM-01 부터). engagement 카드의
   // monthVisits/avgDwellSec 표시용.
@@ -240,9 +261,12 @@ export async function GET(req: NextRequest) {
   const shellAgg = new Map<string, number>();
 
   const memberStats = allUsers
-    .map((u) => {
-      const snap = snapMap.get(u.id);
-      if (!snap) return null;
+    .flatMap((u) => {
+      // multi-device 사용자는 device 별 row N개. snap 없으면 빈 array → flatMap 으로 자연 skip.
+      const userSnaps = snapsByUser.get(u.id) ?? [];
+      if (userSnaps.length === 0) return [];
+      return userSnaps.map(({ snap, tokenName, tokenPlatform }) => {
+      // Inner row builder — 기존 single-snap 로직 그대로 + snap 변수가 device 별.
 
       let totalCost: number;
       let sessionsCount: number;
@@ -316,9 +340,23 @@ export async function GET(req: NextRequest) {
       const monthVisits = v.count;
       const avgDwellSec = v.count > 0 ? Math.round(v.dwell / v.count) : 0;
 
+      // M6f: multi-device 사용자만 deviceLabel 채움. 1-device 사용자는 null → UI 는 표시 안 함.
+      const isMultiDevice = userSnaps.length >= 2;
+      const platformHint = (() => {
+        if (!isMultiDevice) return null;
+        const meta = tokenPlatform as { platform?: string } | null | undefined;
+        const p = meta?.platform;
+        if (p === "darwin") return "Mac";
+        if (p === "win32") return "Windows";
+        if (p === "linux") return "Linux";
+        return tokenName ?? null;
+      })();
+
       if (isStale) {
         return {
           userId: u.id,
+          tokenId: snap.tokenId ?? null,
+          deviceLabel: platformHint,
           name: u.name,
           avatarUrl: u.avatarUrl,
           lastSyncedAt: u.lastSyncedAt?.toISOString() ?? null,
@@ -442,9 +480,10 @@ export async function GET(req: NextRequest) {
         entry.members.add(u.id);
       }
 
-      // Aggregate daily by member — key by id to handle duplicate names.
+      // Aggregate daily by member — key by id + tokenId to handle duplicate names + multi-device.
       // rawDaily 는 오늘 보정이 적용된 daily (period=today + KST/SGT 사용자).
-      const memberKey = `${u.name}__${u.id}`;
+      // multi-device 사용자는 device 별 분리된 daily — memberKey 도 device 별 분리.
+      const memberKey = `${u.name}${platformHint ? ` · ${platformHint}` : ""}__${u.id}__${snap.tokenId ?? "null"}`;
       for (const day of rawDaily) {
         if (!dailyMemberMap.has(day.date)) {
           dailyMemberMap.set(day.date, {});
@@ -514,6 +553,8 @@ export async function GET(req: NextRequest) {
 
       return {
         userId: u.id,
+        tokenId: snap.tokenId ?? null,
+        deviceLabel: platformHint,
         name: u.name,
         avatarUrl: u.avatarUrl,
         lastSyncedAt: u.lastSyncedAt?.toISOString() ?? null,
@@ -534,8 +575,8 @@ export async function GET(req: NextRequest) {
         avgDwellSec,
         tokensPerMinute,
       };
-    })
-    .filter((m): m is NonNullable<typeof m> => m !== null);
+      });
+    });
 
   const byEfficiency = [...memberStats].sort((a, b) => b.efficiencyScore - a.efficiencyScore);
 
@@ -629,7 +670,10 @@ export async function GET(req: NextRequest) {
   let teamActiveDaysSum = 0;
   let teamAvgDailyTokensSum = 0;
   for (const u of allUsers) {
-    const snap = snapMap.get(u.id);
+    // M6f: multi-device 사용자도 1 user = 1 plan tier. 가장 최근 ingest device 의 snap
+    // (배열 첫 entry) 를 대표로 사용 — Plan Health 분석은 user 단위 (가격/tier).
+    // 추후 phase: 같은 user 의 모든 device ccusageDaily union 후 합산 (정확성 ↑).
+    const snap = snapsByUser.get(u.id)?.[0]?.snap;
     const blocks = planBlocksByUser.get(u.id) ?? [];
     const declared = (u.planTier ?? null) as PlanTier;
 
@@ -890,7 +934,8 @@ export async function GET(req: NextRequest) {
   const teamActiveDayCosts: number[] = [];
   const perDevMonthly: number[] = [];
   for (const u of allUsers) {
-    const snap = snapMap.get(u.id);
+    // M6f: multi-device 사용자는 첫 snap 사용 (대표). 추후 union 처리 phase.
+    const snap = snapsByUser.get(u.id)?.[0]?.snap;
     if (!snap) continue;
     const raw = snap.rawJson as Record<string, unknown>;
     const ccusage = (raw.ccusageDaily as { daily?: Array<{ date?: string; totalCost?: number }> } | undefined)?.daily ?? [];
@@ -939,7 +984,8 @@ export async function GET(req: NextRequest) {
   let teamEditTurns = 0, teamOneShotTurns = 0;
   const teamActiveMembers = new Set<number>();
   for (const u of allUsers) {
-    const snap = snapMap.get(u.id);
+    // M6f: multi-device 사용자는 첫 snap 사용 (대표). 추후 union 처리 phase.
+    const snap = snapsByUser.get(u.id)?.[0]?.snap;
     if (!snap) continue;
     const raw = snap.rawJson as Record<string, unknown>;
     const ccu = (raw.ccusageDaily as { daily?: Array<{ date?: string; inputTokens?: number; outputTokens?: number; cacheReadTokens?: number; cacheCreationTokens?: number }> } | undefined)?.daily ?? [];
