@@ -97,6 +97,9 @@ export async function GET(req: NextRequest) {
   }
 
   // Redirect to CLI's local server with the raw key (HTTP loopback, no plaintext over wire).
-  const redirectUrl = `http://127.0.0.1:${port}/?apiKey=${apiKey}`;
+  // email 도 같이 — 사용자가 "어떤 OAuth 계정으로 로그인했는지" 콘솔/브라우저 페이지에서
+  // 즉시 확인 (의도와 다른 계정으로 로그인했으면 바로 인지하고 재실행).
+  const params = new URLSearchParams({ apiKey, email: session.user.email, device: deviceName });
+  const redirectUrl = `http://127.0.0.1:${port}/?${params.toString()}`;
   return NextResponse.redirect(redirectUrl);
 }

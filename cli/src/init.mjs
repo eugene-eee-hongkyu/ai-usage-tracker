@@ -358,9 +358,16 @@ function getApiKeyViaLocalServer() {
     const server = http.createServer((req, res) => {
       const url = new URL(req.url ?? "/", `http://127.0.0.1:${CLI_PORT}`);
       const apiKey = url.searchParams.get("apiKey");
+      const email = url.searchParams.get("email") ?? "";
+      const device = url.searchParams.get("device") ?? "";
       res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
       if (apiKey) {
-        res.end("<html><body style='font-family:sans-serif;padding:2em'><h2>&#x2705; Authentication Complete</h2><p>You can close this window.</p></body></html>");
+        const emailLine = email ? `<p style='font-size:0.9em;color:#555'>계정: <b>${email}</b></p>` : "";
+        const deviceLine = device ? `<p style='font-size:0.9em;color:#555'>디바이스: <b>${device}</b></p>` : "";
+        res.end("<html><body style='font-family:sans-serif;padding:2em'><h2>&#x2705; Authentication Complete</h2>" + emailLine + deviceLine + "<p>이 창을 닫고 터미널로 돌아가세요. 터미널에 <code>✨ 설치 완료</code> 메시지가 떠야 정상입니다.</p>" + "</body></html>");
+        if (email)
+          console.log(`
+✓ OAuth 로그인 완료 — 계정: ${email}${device ? ` · 디바이스: ${device}` : ""}`);
         server.close();
         resolve(apiKey);
       } else {
@@ -748,8 +755,9 @@ async function runRepair() {
   runImmediateSync(apiKey);
   runHistoricalBackfill(apiKey);
   console.log(`
-✨ 업데이트 완료
-`);
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
+  console.log("✨ 업데이트 완료 — 이 메시지가 보이면 정상입니다");
+  console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
   console.log("   이제 자동으로 사용량이 수집됩니다.");
   console.log(`   \uD83D\uDCCA 대시보드:  ${SERVER_URL}/dashboard`);
   console.log(`   \uD83D\uDD0D 진단:      ${SERVER_URL}/setup-status
@@ -794,7 +802,7 @@ async function runInit() {
     process.exit(1);
   }
   await saveApiKey(apiKey);
-  console.log("✓ 인증 완료");
+  console.log("✓ 인증 키 저장");
   fs.mkdirSync(STABLE_DIR, { recursive: true });
   fs.copyFileSync(path.join(__dirname2, "submit.mjs"), STABLE_SUBMIT);
   fs.copyFileSync(path.join(__dirname2, "historical.mjs"), STABLE_HISTORICAL);
@@ -803,8 +811,9 @@ async function runInit() {
   runBackfill(apiKey);
   runHistoricalBackfill(apiKey);
   console.log(`
-✨ 설치 완료
-`);
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
+  console.log("✨ 설치 완료 — 이 메시지가 보이면 정상입니다");
+  console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
   console.log("   이제 자동으로 사용량이 수집됩니다.");
   console.log(`   \uD83D\uDCCA 대시보드:  ${SERVER_URL}/dashboard`);
   console.log(`   \uD83D\uDD0D 진단:      ${SERVER_URL}/setup-status

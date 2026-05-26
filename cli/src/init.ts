@@ -391,13 +391,24 @@ function getApiKeyViaLocalServer(): Promise<string> {
     const server = http.createServer((req, res) => {
       const url = new URL(req.url ?? "/", `http://127.0.0.1:${CLI_PORT}`);
       const apiKey = url.searchParams.get("apiKey");
+      // M6f (2026-05-26): cli-auth route 가 redirect 시 email + device 도 전달.
+      // 사용자가 "어떤 OAuth 계정으로 로그인했는지" 즉시 인지 가능.
+      const email = url.searchParams.get("email") ?? "";
+      const device = url.searchParams.get("device") ?? "";
 
       res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
       if (apiKey) {
+        const emailLine = email ? `<p style='font-size:0.9em;color:#555'>계정: <b>${email}</b></p>` : "";
+        const deviceLine = device ? `<p style='font-size:0.9em;color:#555'>디바이스: <b>${device}</b></p>` : "";
         res.end(
           "<html><body style='font-family:sans-serif;padding:2em'>" +
-          "<h2>&#x2705; Authentication Complete</h2><p>You can close this window.</p></body></html>"
+          "<h2>&#x2705; Authentication Complete</h2>" +
+          emailLine + deviceLine +
+          "<p>이 창을 닫고 터미널로 돌아가세요. 터미널에 <code>✨ 설치 완료</code> 메시지가 떠야 정상입니다.</p>" +
+          "</body></html>"
         );
+        // 터미널에도 어떤 계정으로 로그인됐는지 명시 — 의도와 다르면 즉시 인지.
+        if (email) console.log(`\n✓ OAuth 로그인 완료 — 계정: ${email}${device ? ` · 디바이스: ${device}` : ""}`);
         server.close();
         resolve(apiKey);
       } else {
@@ -843,7 +854,10 @@ export async function runRepair() {
   runImmediateSync(apiKey);
   runHistoricalBackfill(apiKey);
 
-  console.log("\n✨ 업데이트 완료\n");
+  // 최종 종료 표시 — 사용자가 "어디서 끝났는지" 헷갈리지 않도록 강조 블록.
+  console.log("\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+  console.log("✨ 업데이트 완료 — 이 메시지가 보이면 정상입니다");
+  console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
   console.log("   이제 자동으로 사용량이 수집됩니다.");
   console.log(`   📊 대시보드:  ${SERVER_URL}/dashboard`);
   console.log(`   🔍 진단:      ${SERVER_URL}/setup-status\n`);
@@ -894,7 +908,7 @@ export async function runInit() {
   }
 
   await saveApiKey(apiKey);
-  console.log("✓ 인증 완료");
+  console.log("✓ 인증 키 저장");
 
   // submit.mjs / historical.mjs 를 안정적인 경로에 복사 (npx 캐시 경로는 갱신 시 깨짐)
   fs.mkdirSync(STABLE_DIR, { recursive: true });
@@ -905,7 +919,10 @@ export async function runInit() {
   runBackfill(apiKey);
   runHistoricalBackfill(apiKey);
 
-  console.log("\n✨ 설치 완료\n");
+  // 최종 종료 표시 — 사용자가 "어디서 끝났는지" 헷갈리지 않도록 강조 블록.
+  console.log("\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+  console.log("✨ 설치 완료 — 이 메시지가 보이면 정상입니다");
+  console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
   console.log("   이제 자동으로 사용량이 수집됩니다.");
   console.log(`   📊 대시보드:  ${SERVER_URL}/dashboard`);
   console.log(`   🔍 진단:      ${SERVER_URL}/setup-status\n`);
