@@ -480,10 +480,15 @@ export async function GET(req: NextRequest) {
         entry.members.add(u.id);
       }
 
-      // Aggregate daily by member — key by id + tokenId to handle duplicate names + multi-device.
+      // Aggregate daily by member — key by id to handle duplicate names.
       // rawDaily 는 오늘 보정이 적용된 daily (period=today + KST/SGT 사용자).
-      // multi-device 사용자는 device 별 분리된 daily — memberKey 도 device 별 분리.
-      const memberKey = `${u.name}${platformHint ? ` · ${platformHint}` : ""}__${u.id}__${snap.tokenId ?? "null"}`;
+      // M6f 변경: device 별 분리 시도했으나 차트 frontend lookup key 와 mismatch 로
+      // 차트가 비어 보임 (memberNames line 861 + memberUsage line 733 형식 모두
+      // 옛 user 단위 가정). 임시: memberKey 는 user 단위 유지 → 영진님 케이스에서
+      // 두 device 의 daily 데이터가 한 line 으로 합산 표시. row 분리 (메인 list) 는
+      // 그대로 유지. 추후 phase 에서 차트도 device 별 분리하려면 frontend / memberUsage
+      // 까지 정합성 맞춰야 함.
+      const memberKey = `${u.name}__${u.id}`;
       for (const day of rawDaily) {
         if (!dailyMemberMap.has(day.date)) {
           dailyMemberMap.set(day.date, {});
