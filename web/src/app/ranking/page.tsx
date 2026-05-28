@@ -39,9 +39,9 @@ interface RankingResponse {
 // 비용은 wide (전체 width) 강조. 그 아래 2x2 grid 에 나머지 4개.
 const GRID_METRICS: Array<{ value: Metric; label: string }> = [
   { value: "tokens", label: "사용량" },
-  { value: "streak", label: "🔥 streak 연속 활성일" },
+  { value: "streak", label: "연속 활성일" },
   { value: "cacheHit", label: "캐시 히트" },
-  { value: "saving", label: "💸 캐시 절약액" },
+  { value: "saving", label: "캐시 절약액" },
 ];
 
 const ALL_METRICS: Metric[] = ["cost", "tokens", "cacheHit", "saving", "streak"];
@@ -190,8 +190,8 @@ function MetricCard({
 
   return (
     <section className="bg-slate-900 border border-slate-800 rounded-lg overflow-hidden">
-      <div className="px-4 py-2.5 border-b border-slate-800 flex items-center justify-between">
-        <span className="text-xs font-mono font-bold uppercase tracking-wider text-slate-200">
+      <div className="px-4 py-3 border-b border-slate-800 flex items-center justify-between">
+        <span className="text-base font-bold text-slate-100">
           {label}
         </span>
         <span className="text-[10px] font-mono text-slate-500">Top {top.length}</span>
