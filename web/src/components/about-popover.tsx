@@ -14,6 +14,15 @@ interface AboutData {
   node: string;
   codeburn: string;
   ccusage: string;
+  buildSha: string;
+  buildRef: string;
+}
+
+const CLIENT_BUILD_SHA = process.env.NEXT_PUBLIC_BUILD_SHA ?? "dev";
+const CLIENT_BUILD_REF = process.env.NEXT_PUBLIC_BUILD_REF ?? "local";
+
+function shortSha(sha: string): string {
+  return sha === "dev" || sha === "local" ? sha : sha.slice(0, 7);
 }
 
 export function AboutPopover() {
@@ -59,20 +68,46 @@ export function AboutPopover() {
             {data ? (data.mode === "local" ? m.about.headerLocal : m.about.headerCloud) : m.about.loading}
           </p>
           {data ? (
-            <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 font-mono">
-              {data.app && (
-                <>
-                  <dt className="text-slate-500">App</dt>
-                  <dd className="text-slate-200">v{data.app}</dd>
-                </>
+            <>
+              <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 font-mono">
+                {data.app && (
+                  <>
+                    <dt className="text-slate-500">App</dt>
+                    <dd className="text-slate-200">v{data.app}</dd>
+                  </>
+                )}
+                <dt className="text-slate-500">Node</dt>
+                <dd className="text-slate-200">{data.node}</dd>
+                <dt className="text-slate-500">codeburn</dt>
+                <dd className="text-slate-200">{data.codeburn}</dd>
+                <dt className="text-slate-500">ccusage</dt>
+                <dd className="text-slate-200">{data.ccusage}</dd>
+                <dt className="text-slate-500">Page</dt>
+                <dd className="text-slate-200" title={`${CLIENT_BUILD_REF} @ ${CLIENT_BUILD_SHA}`}>
+                  {shortSha(CLIENT_BUILD_SHA)}
+                </dd>
+                <dt className="text-slate-500">Server</dt>
+                <dd
+                  className={CLIENT_BUILD_SHA !== data.buildSha ? "text-amber-400" : "text-slate-200"}
+                  title={`${data.buildRef} @ ${data.buildSha}`}
+                >
+                  {shortSha(data.buildSha)}
+                </dd>
+              </dl>
+              {CLIENT_BUILD_SHA !== data.buildSha && CLIENT_BUILD_SHA !== "dev" && (
+                <div className="mt-3 pt-2 border-t border-slate-700">
+                  <p className="text-amber-400 text-[11px] mb-2">
+                    이전 버전을 보고 있어요. 새로고침하면 최신 화면으로 갱신됩니다.
+                  </p>
+                  <button
+                    onClick={() => window.location.reload()}
+                    className="w-full px-2 py-1 bg-amber-500/20 hover:bg-amber-500/30 text-amber-200 rounded text-[11px] font-mono border border-amber-500/40 transition-colors"
+                  >
+                    새로고침
+                  </button>
+                </div>
               )}
-              <dt className="text-slate-500">Node</dt>
-              <dd className="text-slate-200">{data.node}</dd>
-              <dt className="text-slate-500">codeburn</dt>
-              <dd className="text-slate-200">{data.codeburn}</dd>
-              <dt className="text-slate-500">ccusage</dt>
-              <dd className="text-slate-200">{data.ccusage}</dd>
-            </dl>
+            </>
           ) : (
             <p className="text-slate-500">···</p>
           )}

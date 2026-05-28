@@ -5,6 +5,14 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // 빌드 시점 git SHA + branch 를 client 번들에 inline. AboutPopover 가 이 값을
+  // 서버 /api/about 의 최신 SHA 와 비교해 "옛 페이지 캐시" 감지.
+  // Vercel 빌드 시 VERCEL_GIT_COMMIT_SHA 자동 설정. 로컬 빌드는 'dev' fallback.
+  env: {
+    NEXT_PUBLIC_BUILD_SHA: process.env.VERCEL_GIT_COMMIT_SHA ?? "dev",
+    NEXT_PUBLIC_BUILD_REF: process.env.VERCEL_GIT_COMMIT_REF ?? "local",
+  },
+
   // .pkg/.msi 인스톨러용 standalone 빌드 — node embedded 형태로 패키징 가능.
   // .next/standalone/server.js 가 entry point. Vercel 배포에는 영향 없음
   // (Vercel 도 standalone 권장). NEXT_BUILD_STANDALONE 환경변수로 끄고 싶으면 분기.

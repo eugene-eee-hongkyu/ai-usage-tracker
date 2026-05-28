@@ -24,5 +24,9 @@ export async function GET() {
     node: process.env.RUNTIME_NODE_VERSION ?? PINNED.NODE_RECOMMENDED,
     codeburn: process.env.RUNTIME_CODEBURN_VERSION ?? PINNED.CODEBURN,
     ccusage: process.env.RUNTIME_CCUSAGE_VERSION ?? PINNED.CCUSAGE,
+    // 빌드 시점 SHA — popover 가 client 번들에 박힌 NEXT_PUBLIC_BUILD_SHA 와
+    // 비교해 stale page 감지. next.config.mjs 의 env 매핑과 동일 출처.
+    buildSha: process.env.NEXT_PUBLIC_BUILD_SHA ?? process.env.VERCEL_GIT_COMMIT_SHA ?? "dev",
+    buildRef: process.env.NEXT_PUBLIC_BUILD_REF ?? process.env.VERCEL_GIT_COMMIT_REF ?? "local",
   });
 }
