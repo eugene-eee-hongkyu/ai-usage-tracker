@@ -36,15 +36,14 @@ interface RankingResponse {
   period: string;
 }
 
-// 4 카드 (2x2 grid). streak 는 차원이 달라 hero 로 분리.
-const METRICS: Array<{ value: Metric; label: string }> = [
-  { value: "cost", label: "비용" },
+// 비용은 wide (전체 width) 강조. 그 아래 2x2 grid 에 나머지 4개.
+const GRID_METRICS: Array<{ value: Metric; label: string }> = [
   { value: "tokens", label: "사용량" },
+  { value: "streak", label: "🔥 streak 연속 활성일" },
   { value: "cacheHit", label: "캐시 히트" },
-  { value: "saving", label: "캐시 절약액" },
+  { value: "saving", label: "💸 캐시 절약액" },
 ];
 
-// 모든 metric (streak 포함) — fetch 용
 const ALL_METRICS: Metric[] = ["cost", "tokens", "cacheHit", "saving", "streak"];
 
 // Claude Max20 플랜 월 가격 (회수율 산출 분모)
@@ -145,9 +144,13 @@ export default function RankingPage() {
 
         {!loading && !error && (
           <div className="space-y-4">
-            {/* 4 metric — 2x2 grid (cost/tokens/cacheHit/saving) */}
+            {/* 비용 — 가장 중요. 전체 width. row 에 Max20 회수율 컬럼 추가 */}
+            {byMetric.cost && (
+              <MetricCard metric="cost" label="비용" data={byMetric.cost} />
+            )}
+            {/* 나머지 4 metric — 2x2 grid (사용량/streak/캐시히트/캐시절약액) */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-              {METRICS.map((mt) => (
+              {GRID_METRICS.map((mt) => (
                 <MetricCard
                   key={mt.value}
                   metric={mt.value}
@@ -156,12 +159,6 @@ export default function RankingPage() {
                 />
               ))}
             </div>
-            {/* 🔥 streak — 핵심 metric 아닌 보조 (꾸준함). 맨 아래 반 셀 */}
-            {byMetric.streak && (
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                <MetricCard metric="streak" label="🔥 streak 연속 활성일" data={byMetric.streak} />
-              </div>
-            )}
           </div>
         )}
       </div>
@@ -214,15 +211,6 @@ function MetricCard({
               {fmtValue(metric, data.myRank[metric])}
             </span>
           </div>
-          {/* cost 카드 — Max20 ($200/월) 대비 회수율 보조 표시.
-              "내가 max20 플랜 비용을 얼마나 뽑았나" 의 직관 */}
-          {metric === "cost" && data.myRank.cost > 0 && (
-            <p className="text-[11px] font-mono text-slate-400 mt-1">
-              Max20 (${MAX20_MONTHLY_USD}) 대비 <span className="text-yellow-300 font-bold">
-                {Math.round((data.myRank.cost / MAX20_MONTHLY_USD) * 100)}%
-              </span> 회수
-            </p>
-          )}
         </div>
       ) : (
         <div className="px-4 py-2 bg-slate-800/50 border-b border-slate-800 text-[11px] font-mono text-slate-500">
@@ -230,7 +218,7 @@ function MetricCard({
         </div>
       )}
 
-      {/* Top 10 */}
+      {/* Top 10 — cost 카드만 Max20 회수율 컬럼 추가 */}
       <table className="w-full text-xs font-mono">
         <thead>
           <tr className="text-slate-600 border-b border-slate-800">
@@ -238,6 +226,9 @@ function MetricCard({
             <th className="text-left px-3 py-1.5">이름</th>
             <th className="text-right px-3 py-1.5 w-16 whitespace-nowrap">활성일</th>
             <th className="text-right px-3 py-1.5 w-20 whitespace-nowrap">{label}</th>
+            {metric === "cost" && (
+              <th className="text-right px-3 py-1.5 w-20 whitespace-nowrap">Max20 회수</th>
+            )}
           </tr>
         </thead>
         <tbody>
@@ -248,7 +239,7 @@ function MetricCard({
           {!myInTop && data.myRank && (
             <>
               <tr>
-                <td colSpan={4} className="text-center text-slate-700 text-[10px] py-1">⋯</td>
+                <td colSpan={metric === "cost" ? 5 : 4} className="text-center text-slate-700 text-[10px] py-1">⋯</td>
               </tr>
               <RankRow row={data.myRank} metric={metric} valueColor={valueColor} />
             </>
@@ -303,6 +294,11 @@ function RankRow({
       <td className={`px-3 py-1.5 text-right tabular-nums ${valueColor}`}>
         {fmtValue(metric, row[metric])}
       </td>
+      {metric === "cost" && (
+        <td className="px-3 py-1.5 text-right tabular-nums text-yellow-300/80">
+          {row.cost > 0 ? `${Math.round((row.cost / MAX20_MONTHLY_USD) * 100)}%` : "—"}
+        </td>
+      )}
     </tr>
   );
 }
