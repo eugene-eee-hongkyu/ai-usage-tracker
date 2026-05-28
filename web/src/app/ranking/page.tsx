@@ -99,7 +99,7 @@ export default function RankingPage() {
         <header>
           <h1 className="text-lg font-bold text-slate-100">{m.nav.ranking ?? "랭킹"}</h1>
           <p className="text-xs text-slate-500 mt-1">
-            최근 30일 기준 전체 참여자 순위. 이름은 익명 처리됩니다.
+            최근 30일 (UTC) 기준 전체 참여자 순위. 이름은 익명 처리됩니다. 동점은 같은 순위.
           </p>
         </header>
 

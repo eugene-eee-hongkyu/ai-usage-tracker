@@ -94,17 +94,21 @@ export async function GET(req: NextRequest) {
     let input30 = 0;
     let activeDays = 0;
 
+    // B4 (2026-05-28): 활성일 기준을 totalTokens > 0 으로 통일. 옛 동작은
+    // activeDays 만 cost > 0 으로 카운트하고 tokens/cache 는 무관 합산 → avg
+    // 부풀려짐 + cache-only 활동 (cost=0, hit 100%) 누락. tokens>0 한 row 만
+    // 모든 합산에 포함.
     for (const d of daily) {
       if (!d.date || d.date < thirtyAgoYmd) continue;
+      const tt = d.totalTokens ?? 0;
+      if (tt <= 0) continue;
       const c = (d as Record<string, unknown>).totalCost as number | undefined;
-      if (c && c > 0) {
-        cost30 += c;
-        activeDays++;
-      }
-      tokens30 += d.totalTokens ?? 0;
+      cost30 += c ?? 0;
+      tokens30 += tt;
       cacheRead30 += d.cacheReadTokens ?? 0;
       cacheWrite30 += d.cacheCreationTokens ?? 0;
       input30 += d.inputTokens ?? 0;
+      activeDays++;
     }
 
     const cacheDenom = cacheRead30 + cacheWrite30 + input30;
@@ -123,25 +127,39 @@ export async function GET(req: NextRequest) {
     });
   }
 
-  // metric 기준 정렬 (desc)
-  entries.sort((a, b) => {
-    const va = a[metric];
-    const vb = b[metric];
-    return vb - va;
+  // B5 (2026-05-28): 활동 없는 사용자 (activeDays=0) 는 ranked 에서 제외.
+  // 옛 동작은 0점 사용자가 user_id 순으로 줄줄이 표시되어 게이미피케이션 가치 ↓.
+  const activeEntries = entries.filter((e) => e.activeDays > 0);
+
+  // metric 기준 정렬 (desc) + secondary tiebreak (userId asc) — sort 안정성 명시
+  activeEntries.sort((a, b) => {
+    const diff = b[metric] - a[metric];
+    if (diff !== 0) return diff;
+    return a.userId - b.userId;
   });
 
-  // 순위 부여 + 마스킹
-  const ranked: RankedUser[] = entries.map((e, i) => ({
-    rank: i + 1,
-    userId: e.userId,
-    name: adminView ? e.name : maskName(e.name),
-    cost: Math.round(e.cost * 100) / 100,
-    tokens: e.tokens,
-    powerIndex: Math.round(e.powerIndex * 10) / 10,
-    cacheHit: Math.round(e.cacheHit * 10) / 10,
-    activeDays: e.activeDays,
-    isMe: e.userId === meId,
-  }));
+  // 순위 부여 + 마스킹. 표준 RANK 룰 — 동점은 같은 순위, 다음은 동점 수만큼 skip.
+  const ranked: RankedUser[] = [];
+  let prevValue: number | null = null;
+  let prevRank = 0;
+  for (let i = 0; i < activeEntries.length; i++) {
+    const e = activeEntries[i];
+    const cur = e[metric];
+    const rank = prevValue !== null && cur === prevValue ? prevRank : i + 1;
+    prevValue = cur;
+    prevRank = rank;
+    ranked.push({
+      rank,
+      userId: e.userId,
+      name: adminView ? e.name : maskName(e.name),
+      cost: Math.round(e.cost * 100) / 100,
+      tokens: e.tokens,
+      powerIndex: Math.round(e.powerIndex * 10) / 10,
+      cacheHit: Math.round(e.cacheHit * 10) / 10,
+      activeDays: e.activeDays,
+      isMe: e.userId === meId,
+    });
+  }
 
   // 상위 50명
   const top = ranked.slice(0, 50);

@@ -38,11 +38,20 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "personal_team_not_found" }, { status: 500 });
 
   if (personal) {
-    await db.update(users).set({ personal: true }).where(eq(users.id, userId));
-    await db
-      .insert(teamMembers)
-      .values({ teamId: personalTeamId, userId, role: "member" })
-      .onConflictDoNothing();
+    // B1+B2 (2026-05-28): 트랜잭션화 + onConflictDoUpdate.
+    //   onConflictDoNothing 이었으면 OFF 로 deletedAt 박힌 row 가 ON 재토글 시
+    //   conflict 로 무시 → users.personal=true 인데 team_members 는 dead 상태로
+    //   영속 부정합. onConflictDoUpdate 로 deletedAt=null 복구.
+    await db.transaction(async (tx) => {
+      await tx.update(users).set({ personal: true }).where(eq(users.id, userId));
+      await tx
+        .insert(teamMembers)
+        .values({ teamId: personalTeamId, userId, role: "member" })
+        .onConflictDoUpdate({
+          target: [teamMembers.teamId, teamMembers.userId],
+          set: { deletedAt: null, role: "member" },
+        });
+    });
   } else {
     // personal OFF 시 normal 팀에 속해있는지 확인. 없으면 거부
     // (personal 만 있는 사용자가 OFF 하면 어디에도 속하지 않아 403 상태)
@@ -62,17 +71,19 @@ export async function POST(req: NextRequest) {
     if (!normalTeamMembership[0])
       return NextResponse.json({ error: "no_team", message: "팀에 소속되어야 랭킹 참여를 해제할 수 있습니다." }, { status: 400 });
 
-    await db.update(users).set({ personal: false }).where(eq(users.id, userId));
-    await db
-      .update(teamMembers)
-      .set({ deletedAt: new Date() })
-      .where(
-        and(
-          eq(teamMembers.teamId, personalTeamId),
-          eq(teamMembers.userId, userId),
-          isNull(teamMembers.deletedAt)
-        )
-      );
+    await db.transaction(async (tx) => {
+      await tx.update(users).set({ personal: false }).where(eq(users.id, userId));
+      await tx
+        .update(teamMembers)
+        .set({ deletedAt: new Date() })
+        .where(
+          and(
+            eq(teamMembers.teamId, personalTeamId),
+            eq(teamMembers.userId, userId),
+            isNull(teamMembers.deletedAt)
+          )
+        );
+    });
   }
 
   return NextResponse.json({ ok: true, personal });

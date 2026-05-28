@@ -118,7 +118,15 @@ export const authOptions: NextAuthOptions = {
               )
             )
             .limit(1);
-          if (existingInvite[0] && existingInvite[0].expiresAt >= new Date()) {
+          if (existingInvite[0] && existingInvite[0].expiresAt < new Date()) {
+            // B6 (2026-05-28): 만료 invitation 은 cancelledAt 박아 stale row 정리.
+            // 신규 사용자 분기와 대칭 — 옛 동작은 기존 사용자가 만료 invitation 들고
+            // 로그인해도 row 가 영원히 pending 으로 남던 부정합.
+            await db
+              .update(invTable)
+              .set({ cancelledAt: new Date() })
+              .where(eq(invTable.id, existingInvite[0].id));
+          } else if (existingInvite[0]) {
             const inv = existingInvite[0];
             const alreadyMember = await db
               .select({ id: teamMembers.id })
@@ -127,7 +135,7 @@ export const authOptions: NextAuthOptions = {
               .limit(1);
             if (!alreadyMember[0]) {
               const teamRole = inv.role === "owner" || inv.role === "admin" ? inv.role : "member";
-              await db.insert(teamMembers).values({ teamId: inv.teamId, userId: u.id, role: teamRole });
+              await db.insert(teamMembers).values({ teamId: inv.teamId, userId: u.id, role: teamRole }).onConflictDoNothing();
               await writeAudit({
                 teamId: inv.teamId,
                 actorUserId: u.id,
@@ -169,7 +177,7 @@ export const authOptions: NextAuthOptions = {
                   .from(teamMembers)
                   .where(andOp2(eq(teamMembers.teamId, autoTeam[0].id), isNullOp2(teamMembers.deletedAt)));
                 if ((activeCount[0]?.c ?? 0) < autoTeam[0].maxMembers) {
-                  await db.insert(teamMembers).values({ teamId: autoTeam[0].id, userId: u.id, role: "member" });
+                  await db.insert(teamMembers).values({ teamId: autoTeam[0].id, userId: u.id, role: "member" }).onConflictDoNothing();
                   await writeAudit({
                     teamId: autoTeam[0].id,
                     actorUserId: u.id,
@@ -226,17 +234,26 @@ export const authOptions: NextAuthOptions = {
             return `/login?error=invitation_expired`;
           }
           // 자동 가입 + invitation accept (도메인 우회)
-          const inserted = await db
-            .insert(users)
-            .values({
-              githubId: String((profile as Record<string, unknown>)?.id ?? account?.providerAccountId),
-              email,
-              name: user.name ?? email.split("@")[0],
-              avatarUrl: user.image ?? null,
-              role: invite[0].role,
-              permissions: invite[0].permissions,
-            })
-            .returning({ id: users.id });
+          // B7 (2026-05-28): 동시 OAuth 가입 race — users.email unique violation 시
+          // existing 재조회로 fallback. silent 통과 (이미 다른 동시 요청이 가입 처리).
+          let inserted: { id: number }[];
+          try {
+            inserted = await db
+              .insert(users)
+              .values({
+                githubId: String((profile as Record<string, unknown>)?.id ?? account?.providerAccountId),
+                email,
+                name: user.name ?? email.split("@")[0],
+                avatarUrl: user.image ?? null,
+                role: invite[0].role,
+                permissions: invite[0].permissions,
+              })
+              .returning({ id: users.id });
+          } catch (insertErr) {
+            const refetch = await db.select({ id: users.id }).from(users).where(eq(users.email, email)).limit(1);
+            if (!refetch[0]) throw insertErr;
+            inserted = [{ id: refetch[0].id }];
+          }
           await db
             .update(invitations)
             .set({ acceptedAt: new Date() })
@@ -253,7 +270,7 @@ export const authOptions: NextAuthOptions = {
               teamId: invite[0].teamId,
               userId: newUserId,
               role: teamRole,
-            });
+            }).onConflictDoNothing();
           }
           await writeAudit({
             teamId: invite[0].teamId,
@@ -303,24 +320,32 @@ export const authOptions: NextAuthOptions = {
               .from(teamMembers)
               .where(and(eq(teamMembers.teamId, autoTeamId), isNull(teamMembers.deletedAt)));
             if ((activeCount[0]?.c ?? 0) < cap) {
-              const inserted = await db
-                .insert(users)
-                .values({
-                  githubId: String((profile as Record<string, unknown>)?.id ?? account?.providerAccountId),
-                  email,
-                  name: user.name ?? email.split("@")[0],
-                  avatarUrl: user.image ?? null,
-                  role: "member",
-                  permissions: {},
-                })
-                .returning({ id: users.id });
+              // B7: 동시 가입 race → existing 재조회 fallback
+              let inserted: { id: number }[];
+              try {
+                inserted = await db
+                  .insert(users)
+                  .values({
+                    githubId: String((profile as Record<string, unknown>)?.id ?? account?.providerAccountId),
+                    email,
+                    name: user.name ?? email.split("@")[0],
+                    avatarUrl: user.image ?? null,
+                    role: "member",
+                    permissions: {},
+                  })
+                  .returning({ id: users.id });
+              } catch (insertErr) {
+                const refetch = await db.select({ id: users.id }).from(users).where(eq(users.email, email)).limit(1);
+                if (!refetch[0]) throw insertErr;
+                inserted = [{ id: refetch[0].id }];
+              }
               const newUserId = inserted[0]?.id ?? null;
               if (newUserId) {
                 await db.insert(teamMembers).values({
                   teamId: autoTeamId,
                   userId: newUserId,
                   role: "member",
-                });
+                }).onConflictDoNothing();
                 await writeAudit({
                   teamId: autoTeamId,
                   actorUserId: newUserId,
@@ -349,25 +374,33 @@ export const authOptions: NextAuthOptions = {
           console.error("[auth] personal team not found — migration 0013 not applied?");
           return `/login?error=db`;
         }
-        const inserted = await db
-          .insert(users)
-          .values({
-            githubId: String((profile as Record<string, unknown>)?.id ?? account?.providerAccountId),
-            email,
-            name: user.name ?? email.split("@")[0],
-            avatarUrl: user.image ?? null,
-            role: "member",
-            permissions: {},
-            personal: true,
-          })
-          .returning({ id: users.id });
+        // B7: 동시 가입 race → existing 재조회 fallback
+        let inserted: { id: number }[];
+        try {
+          inserted = await db
+            .insert(users)
+            .values({
+              githubId: String((profile as Record<string, unknown>)?.id ?? account?.providerAccountId),
+              email,
+              name: user.name ?? email.split("@")[0],
+              avatarUrl: user.image ?? null,
+              role: "member",
+              permissions: {},
+              personal: true,
+            })
+            .returning({ id: users.id });
+        } catch (insertErr) {
+          const refetch = await db.select({ id: users.id }).from(users).where(eq(users.email, email)).limit(1);
+          if (!refetch[0]) throw insertErr;
+          inserted = [{ id: refetch[0].id }];
+        }
         const newUserId = inserted[0]?.id ?? null;
         if (newUserId) {
           await db.insert(teamMembers).values({
             teamId: personalTeamId,
             userId: newUserId,
             role: "member",
-          });
+          }).onConflictDoNothing();
           await writeAudit({
             teamId: personalTeamId,
             actorUserId: newUserId,
