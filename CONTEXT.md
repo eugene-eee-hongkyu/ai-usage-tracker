@@ -46,7 +46,7 @@ ai-usage-tracker/
 │   │       ├── ingest/     ← POST (CLI가 세션 종료 시 호출)
 │   │       ├── dashboard/  ← GET 개인 데이터
 │   │       ├── team/       ← GET 팀 랭킹
-│   │       └── feedback/   ← POST 👍/👎 + Done 클릭
+│   │       └── suggest/    ← POST 사용자 제안 (Resend 발송)
 │   └── src/lib/
 │       ├── collectors/     ← ccusage spawn 어댑터
 │       ├── rules/          ← 최적화 룰 (deterministic)
@@ -69,7 +69,7 @@ ai-usage-tracker/
 - `period_snapshots` — daily/weekly/monthly aggregations
 - `user_blocks` — active block tracking
 - `daily_visits` — dwell time
-- `suggestion_feedback` — user_id, suggestion_type, action
+- `suggestions` — user_id, category, context_screen, body, emailed_at
 
 **환경변수** (값은 `.env` 에 — `.env.example` 참조):
 ```

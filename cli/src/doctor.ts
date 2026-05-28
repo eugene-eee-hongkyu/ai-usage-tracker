@@ -54,12 +54,20 @@ function safeExec(cmd: string): string | null {
 
 function detectNodeManager(nodePath: string | null): DoctorReport["node_manager"] {
   if (!nodePath) return null;
+  // Unix / macOS — forward slash 패턴
   if (nodePath.includes("/.nvm/")) return "nvm";
   if (nodePath.includes("/.asdf/")) return "asdf";
   if (nodePath.includes("/.volta/")) return "volta";
   if (nodePath.includes("/.fnm/") || process.env.FNM_DIR) return "fnm";
   if (nodePath === "/usr/local/bin/node") return "pkg_installer";
   if (nodePath.startsWith("/opt/homebrew/") || nodePath.includes("/Cellar/node/")) return "homebrew";
+  // Windows — backslash 패턴. 흔한 설치 경로 매칭.
+  // case-insensitive 비교 (Windows path 는 보통 case-insensitive).
+  const lower = nodePath.toLowerCase();
+  if (lower.includes("\\nvm\\") || lower.includes("\\.nvm\\")) return "nvm";
+  if (lower.includes("\\.volta\\")) return "volta";
+  if (lower.includes("\\fnm\\") || lower.includes("\\.fnm\\")) return "fnm";
+  if (lower.includes("\\program files\\nodejs\\") || lower.includes("\\program files (x86)\\nodejs\\")) return "pkg_installer";
   return "unknown";
 }
 

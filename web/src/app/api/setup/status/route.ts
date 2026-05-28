@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import { db, users, userSnapshots } from "@/lib/db";
-import { eq } from "drizzle-orm";
+import { db, users, userSnapshots, IS_LOCAL_MODE } from "@/lib/db";
+import { getAuthedEmail } from "@/lib/local-user";
+import { eq, desc } from "drizzle-orm";
 
 interface EnvInfo {
   platform: string | null;
@@ -17,22 +18,28 @@ interface EnvInfo {
 }
 
 export async function GET() {
-  const session = await getServerSession(authOptions);
-  if (!session?.user?.email)
+  // LOCAL_MODE 패턴 통일 — dashboard / team / user 라우트와 일관. 옛 동작은
+  // session 만 보고 401 → LOCAL_MODE 사용자 setup-status 페이지 깨짐.
+  const session = IS_LOCAL_MODE ? null : await getServerSession(authOptions);
+  const authedEmail = await getAuthedEmail(session?.user?.email);
+  if (!authedEmail)
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
 
   const user = await db
     .select({ id: users.id, lastSyncedAt: users.lastSyncedAt })
     .from(users)
-    .where(eq(users.email, session.user.email))
+    .where(eq(users.email, authedEmail))
     .limit(1);
 
   if (!user[0]) return NextResponse.json({ ready: false, steps: {} });
 
+  // multi-device user 의 경우 row 가 N개 — 가장 최근 ingest snapshot 사용.
+  // 옛 동작은 임의 첫 row (DB 정렬 무관) 라 sessionsCount/envInfo 부정확.
   const snap = await db
     .select({ sessionsCount: userSnapshots.sessionsCount, rawJson: userSnapshots.rawJson })
     .from(userSnapshots)
     .where(eq(userSnapshots.userId, user[0].id))
+    .orderBy(desc(userSnapshots.updatedAt))
     .limit(1);
 
   const sessionsCount = snap[0]?.sessionsCount ?? 0;

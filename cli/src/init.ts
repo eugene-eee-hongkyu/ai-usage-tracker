@@ -386,6 +386,15 @@ function openBrowser(url: string) {
   }
 }
 
+function escapeHtml(s: string): string {
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 function getApiKeyViaLocalServer(): Promise<string> {
   return new Promise((resolve, reject) => {
     const server = http.createServer((req, res) => {
@@ -398,8 +407,10 @@ function getApiKeyViaLocalServer(): Promise<string> {
 
       res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
       if (apiKey) {
-        const emailLine = email ? `<p style='font-size:0.9em;color:#555'>계정: <b>${email}</b></p>` : "";
-        const deviceLine = device ? `<p style='font-size:0.9em;color:#555'>디바이스: <b>${device}</b></p>` : "";
+        // email/device 는 query string 에서 옴 — 신뢰 서버 (cli-auth) 가 보내지만
+        // 메일 클라이언트 / 외부 phishing URL 안전망으로 HTML escape.
+        const emailLine = email ? `<p style='font-size:0.9em;color:#555'>계정: <b>${escapeHtml(email)}</b></p>` : "";
+        const deviceLine = device ? `<p style='font-size:0.9em;color:#555'>디바이스: <b>${escapeHtml(device)}</b></p>` : "";
         res.end(
           "<html><body style='font-family:sans-serif;padding:2em'>" +
           "<h2>&#x2705; Authentication Complete</h2>" +
@@ -667,6 +678,9 @@ function runBackfill(apiKey: string) {
   const scriptPath = fs.existsSync(syncScript) ? syncScript : fs.existsSync(syncTs) ? syncTs : null;
   if (!scriptPath) return;
 
+  // USAGE_TRACKER_DAYS 는 옛 의도였으나 sync.mjs 가 reader 가 없어 dead env.
+  // 실제 sync 는 PERIODS = ['today','week','month','30days','all'] — 'all' 이
+  // codeburn 의 전체 history 를 가져옴. 90일 의도와 결과적으로 비슷 또는 더 김.
   const child = spawn(process.execPath, [scriptPath], {
     detached: true,
     stdio: "ignore",
@@ -674,11 +688,10 @@ function runBackfill(apiKey: string) {
       ...process.env,
       USAGE_TRACKER_API_KEY: apiKey,
       USAGE_TRACKER_URL: SERVER_URL,
-      USAGE_TRACKER_DAYS: "90",
     },
   });
   child.unref();
-  console.log("📦 과거 데이터 백그라운드 수집 시작 (최대 90일)");
+  console.log("📦 과거 데이터 백그라운드 수집 시작");
 }
 
 function runImmediateSync(apiKey: string) {
