@@ -65,8 +65,9 @@ export async function GET(req: NextRequest) {
     ORDER BY us.user_id, us.updated_at DESC
   `);
 
+  // "최근 30일" = 오늘 포함 30 calendar days. setDate(-30) 은 31일 윈도우라 -29 사용.
   const thirtyAgo = new Date();
-  thirtyAgo.setDate(thirtyAgo.getDate() - 30);
+  thirtyAgo.setDate(thirtyAgo.getDate() - 29);
   const thirtyAgoYmd = thirtyAgo.toISOString().slice(0, 10);
 
   // 30일 집계

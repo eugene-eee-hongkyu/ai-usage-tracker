@@ -206,8 +206,8 @@ function MetricCard({
           <tr className="text-slate-600 border-b border-slate-800">
             <th className="text-left px-3 py-1.5 w-10">#</th>
             <th className="text-left px-3 py-1.5">이름</th>
-            <th className="text-right px-3 py-1.5 w-14">활성일</th>
-            <th className="text-right px-3 py-1.5 w-20">{label}</th>
+            <th className="text-right px-3 py-1.5 w-16 whitespace-nowrap">활성일</th>
+            <th className="text-right px-3 py-1.5 w-20 whitespace-nowrap">{label}</th>
           </tr>
         </thead>
         <tbody>
