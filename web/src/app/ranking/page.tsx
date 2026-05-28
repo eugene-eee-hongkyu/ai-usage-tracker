@@ -12,7 +12,7 @@ import { useRouter } from "next/navigation";
 import { Nav } from "@/components/nav";
 import { useMessages } from "@/lib/use-i18n";
 
-type Metric = "cost" | "tokens" | "powerIndex" | "cacheHit";
+type Metric = "cost" | "tokens" | "cacheHit" | "streak" | "saving";
 
 interface RankedUser {
   rank: number;
@@ -20,8 +20,9 @@ interface RankedUser {
   name: string;
   cost: number;
   tokens: number;
-  powerIndex: number;
   cacheHit: number;
+  streak: number;
+  saving: number;
   activeDays: number;
   isMe: boolean;
 }
@@ -35,12 +36,19 @@ interface RankingResponse {
   period: string;
 }
 
-const METRICS: Array<{ value: Metric; label: string; color: string }> = [
-  { value: "cost", label: "비용", color: "yellow" },
-  { value: "tokens", label: "사용량", color: "cyan" },
-  { value: "powerIndex", label: "활용지수", color: "emerald" },
-  { value: "cacheHit", label: "캐시 히트", color: "violet" },
+// 4 카드 (2x2 grid). streak 는 차원이 달라 hero 로 분리.
+const METRICS: Array<{ value: Metric; label: string }> = [
+  { value: "cost", label: "비용" },
+  { value: "tokens", label: "사용량" },
+  { value: "cacheHit", label: "캐시 히트" },
+  { value: "saving", label: "캐시 절약액" },
 ];
+
+// 모든 metric (streak 포함) — fetch 용
+const ALL_METRICS: Metric[] = ["cost", "tokens", "cacheHit", "saving", "streak"];
+
+// Claude Max20 플랜 월 가격 (회수율 산출 분모)
+const MAX20_MONTHLY_USD = 200;
 
 function fmtValue(metric: Metric, value: number): string {
   switch (metric) {
@@ -51,25 +59,29 @@ function fmtValue(metric: Metric, value: number): string {
       if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(1)}M`;
       if (value >= 1_000) return `${(value / 1_000).toFixed(1)}k`;
       return String(Math.round(value));
-    case "powerIndex":
-      return value.toFixed(1);
     case "cacheHit":
       return `${value.toFixed(1)}%`;
+    case "streak":
+      return `${value}일`;
+    case "saving":
+      return `$${value.toFixed(2)}`;
   }
 }
 
 const VALUE_COLOR_BY_METRIC: Record<Metric, string> = {
   cost: "text-yellow-400",
   tokens: "text-cyan-400",
-  powerIndex: "text-emerald-400",
   cacheHit: "text-violet-400",
+  streak: "text-orange-400",
+  saving: "text-emerald-400",
 };
 
 const ACCENT_BY_METRIC: Record<Metric, { bg: string; border: string; text: string }> = {
   cost: { bg: "bg-yellow-500/10", border: "border-yellow-500/30", text: "text-yellow-300" },
   tokens: { bg: "bg-cyan-500/10", border: "border-cyan-500/30", text: "text-cyan-300" },
-  powerIndex: { bg: "bg-emerald-500/10", border: "border-emerald-500/30", text: "text-emerald-300" },
   cacheHit: { bg: "bg-violet-500/10", border: "border-violet-500/30", text: "text-violet-300" },
+  streak: { bg: "bg-orange-500/10", border: "border-orange-500/30", text: "text-orange-300" },
+  saving: { bg: "bg-emerald-500/10", border: "border-emerald-500/30", text: "text-emerald-300" },
 };
 
 export default function RankingPage() {
@@ -89,13 +101,13 @@ export default function RankingPage() {
     setLoading(true);
     setError(null);
     Promise.all(
-      METRICS.map((mt) =>
-        fetch(`/api/ranking?metric=${mt.value}`)
+      ALL_METRICS.map((mt) =>
+        fetch(`/api/ranking?metric=${mt}`)
           .then((r) => {
             if (!r.ok) throw new Error(String(r.status));
             return r.json();
           })
-          .then((d: RankingResponse) => ({ metric: mt.value, data: d }))
+          .then((d: RankingResponse) => ({ metric: mt, data: d }))
       )
     )
       .then((results) => {
@@ -132,15 +144,22 @@ export default function RankingPage() {
         {loading && <p className="text-sm text-neutral-500 font-mono">loading…</p>}
 
         {!loading && !error && (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            {METRICS.map((mt) => (
-              <MetricCard
-                key={mt.value}
-                metric={mt.value}
-                label={mt.label}
-                data={byMetric[mt.value] ?? null}
-              />
-            ))}
+          <div className="space-y-4">
+            {/* 🔥 Streak — 차원이 다른 게이미피케이션 (꾸준함). hero 로 전체 width */}
+            {byMetric.streak && (
+              <MetricCard metric="streak" label="🔥 streak 연속 활성일" data={byMetric.streak} />
+            )}
+            {/* 4 metric — 2x2 grid */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              {METRICS.map((mt) => (
+                <MetricCard
+                  key={mt.value}
+                  metric={mt.value}
+                  label={mt.label}
+                  data={byMetric[mt.value] ?? null}
+                />
+              ))}
+            </div>
           </div>
         )}
       </div>
@@ -193,6 +212,15 @@ function MetricCard({
               {fmtValue(metric, data.myRank[metric])}
             </span>
           </div>
+          {/* cost 카드 — Max20 ($200/월) 대비 회수율 보조 표시.
+              "내가 max20 플랜 비용을 얼마나 뽑았나" 의 직관 */}
+          {metric === "cost" && data.myRank.cost > 0 && (
+            <p className="text-[11px] font-mono text-slate-400 mt-1">
+              Max20 (${MAX20_MONTHLY_USD}) 대비 <span className="text-yellow-300 font-bold">
+                {Math.round((data.myRank.cost / MAX20_MONTHLY_USD) * 100)}%
+              </span> 회수
+            </p>
+          )}
         </div>
       ) : (
         <div className="px-4 py-2 bg-slate-800/50 border-b border-slate-800 text-[11px] font-mono text-slate-500">

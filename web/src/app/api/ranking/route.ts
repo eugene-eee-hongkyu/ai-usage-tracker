@@ -12,9 +12,34 @@ import { db, users } from "@/lib/db";
 import { eq, sql } from "drizzle-orm";
 import { isAdmin } from "@/lib/admin";
 import { getCcusageDaily } from "@/lib/ccusage-row";
-import { computePowerIndex } from "@/lib/rules";
+type Metric = "cost" | "tokens" | "cacheHit" | "streak" | "saving";
 
-type Metric = "cost" | "tokens" | "powerIndex" | "cacheHit";
+// Cache 절약액 추정: cacheRead × (input 가격 - cache read 가격).
+// Anthropic Claude Sonnet 4.x 기준 input $3/M, cache read $0.30/M → 차이 $2.70/M.
+// 모델 mix 무시한 근사 (Haiku/Opus 가격 다름). v1 단순화.
+const CACHE_SAVING_PER_M_TOKENS = 2.7;
+
+function calcStreak(daily: Array<{ date?: string; totalTokens?: number }>, todayYmd: string): number {
+  // 현재까지 진행 중 streak — 오늘 또는 어제 활동 있으면 거기서부터 거꾸로 count.
+  // 오늘 ingest 가 늦게 들어오는 race 회피 위해 어제까지도 허용.
+  const activeDates = new Set(
+    daily.filter((d) => d.date && (d.totalTokens ?? 0) > 0).map((d) => d.date)
+  );
+  const cur = new Date(todayYmd);
+  let ymd = cur.toISOString().slice(0, 10);
+  if (!activeDates.has(ymd)) {
+    cur.setDate(cur.getDate() - 1);
+    ymd = cur.toISOString().slice(0, 10);
+    if (!activeDates.has(ymd)) return 0;
+  }
+  let streak = 0;
+  while (activeDates.has(ymd) && streak < 30) {
+    streak++;
+    cur.setDate(cur.getDate() - 1);
+    ymd = cur.toISOString().slice(0, 10);
+  }
+  return streak;
+}
 
 function maskName(name: string): string {
   if (name.length <= 2) return name[0] + "*";
@@ -27,8 +52,9 @@ interface RankedUser {
   name: string;
   cost: number;
   tokens: number;
-  powerIndex: number;
   cacheHit: number;
+  streak: number;
+  saving: number;
   activeDays: number;
   isMe: boolean;
 }
@@ -39,7 +65,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
 
   const metric = (req.nextUrl.searchParams.get("metric") ?? "cost") as Metric;
-  if (!["cost", "tokens", "powerIndex", "cacheHit"].includes(metric))
+  if (!["cost", "tokens", "cacheHit", "streak", "saving"].includes(metric))
     return NextResponse.json({ error: "invalid_metric" }, { status: 400 });
 
   const adminView = req.nextUrl.searchParams.get("admin") === "1" && isAdmin(session.user.email);
@@ -70,14 +96,17 @@ export async function GET(req: NextRequest) {
   thirtyAgo.setDate(thirtyAgo.getDate() - 29);
   const thirtyAgoYmd = thirtyAgo.toISOString().slice(0, 10);
 
+  const todayYmd = new Date().toISOString().slice(0, 10);
+
   // 30일 집계
   const entries: Array<{
     userId: number;
     name: string;
     cost: number;
     tokens: number;
-    powerIndex: number;
     cacheHit: number;
+    streak: number;
+    saving: number;
     activeDays: number;
   }> = [];
 
@@ -114,16 +143,18 @@ export async function GET(req: NextRequest) {
 
     const cacheDenom = cacheRead30 + cacheWrite30 + input30;
     const cacheHit = cacheDenom > 0 ? (cacheRead30 / cacheDenom) * 100 : 0;
-    const avgDailyTokens = activeDays > 0 ? (tokens30 / activeDays) : 0;
-    const pi = computePowerIndex(activeDays, avgDailyTokens, 30);
+
+    const streak = calcStreak(daily as Array<{ date?: string; totalTokens?: number }>, todayYmd);
+    const saving = (cacheRead30 / 1_000_000) * CACHE_SAVING_PER_M_TOKENS;
 
     entries.push({
       userId,
       name,
       cost: cost30,
       tokens: tokens30,
-      powerIndex: pi,
       cacheHit,
+      streak,
+      saving,
       activeDays,
     });
   }
@@ -155,8 +186,9 @@ export async function GET(req: NextRequest) {
       name: adminView ? e.name : maskName(e.name),
       cost: Math.round(e.cost * 100) / 100,
       tokens: e.tokens,
-      powerIndex: Math.round(e.powerIndex * 10) / 10,
       cacheHit: Math.round(e.cacheHit * 10) / 10,
+      streak: e.streak,
+      saving: Math.round(e.saving * 100) / 100,
       activeDays: e.activeDays,
       isMe: e.userId === meId,
     });
