@@ -62,6 +62,22 @@ export function Landing() {
           </Link>
           <p className="text-xs text-slate-500">{t.ctaSub}</p>
         </section>
+
+        {/* Team funnel — 팀 도입 검토자는 ai.z21labs.world 의 풀 마케팅으로 분기 */}
+        <section className="text-center">
+          <p className="text-xs text-slate-500">
+            {t.teamFunnel}{" "}
+            <a
+              href={`https://${t.teamFunnelLink}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              data-testid="landing-team-funnel"
+              className="text-slate-300 hover:text-slate-100 underline underline-offset-2 font-medium"
+            >
+              {t.teamFunnelLink} →
+            </a>
+          </p>
+        </section>
       </main>
 
       <footer className="py-6 text-center text-xs text-slate-600">

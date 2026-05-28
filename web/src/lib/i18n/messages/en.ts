@@ -309,6 +309,8 @@ export interface Messages {
     ctaSub: string;
     learnMore: string;
     learnMoreLink: string;
+    teamFunnel: string;
+    teamFunnelLink: string;
   };
   login: {
     tagline: string;
@@ -1005,6 +1007,8 @@ export const en: Messages = {
     ctaSub: "30 seconds with GitHub or Google",
     learnMore: "Learn more at",
     learnMoreLink: "ai.z21labs.world",
+    teamFunnel: "Looking to roll this out for a team?",
+    teamFunnelLink: "ai.z21labs.world",
   },
   login: {
     tagline: "See at a glance how much and how well you're using AI coding tools",

@@ -315,6 +315,8 @@ export const ko: DeepPartial<Messages> = {
     ctaSub: "GitHub 또는 Google 로 30초",
     learnMore: "자세한 소개는",
     learnMoreLink: "ai.z21labs.world",
+    teamFunnel: "팀으로 도입 검토 중이시라면",
+    teamFunnelLink: "ai.z21labs.world",
   },
   login: {
     tagline: "AI 코딩 도구를 얼마나, 어떻게 쓰고 있는지 한눈에",
