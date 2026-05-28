@@ -39,7 +39,13 @@ function rateLimitOk(ip: string): boolean {
 
 // 단일 실패 응답 — 모든 실패 케이스 (missing/invalid/revoked/deleted/suspended)
 // 동일 status + body. enumeration 차단.
-const INVALID_RESPONSE = NextResponse.json({ error: "invalid" }, { status: 401 });
+//
+// 주의: 매 요청마다 새 Response 인스턴스 반환. module-level 상수로 캐싱하면
+// NextResponse 의 body (ReadableStream) 가 첫 요청에서 소비된 후 다음 요청부터
+// content-length: 0 으로 응답되는 회귀 (2026-05-28 e2e 검증 중 발견).
+function invalidResponse() {
+  return NextResponse.json({ error: "invalid" }, { status: 401 });
+}
 
 export async function GET(req: NextRequest) {
   if (IS_LOCAL_MODE) {
@@ -56,7 +62,7 @@ export async function GET(req: NextRequest) {
   }
 
   const apiKey = req.headers.get("x-api-key");
-  if (!apiKey) return INVALID_RESPONSE;
+  if (!apiKey) return invalidResponse();
   const hash = crypto.createHash("sha256").update(apiKey).digest("hex");
 
   // 1차 — api_tokens 매칭 (device-scope 발급 키)
@@ -72,7 +78,7 @@ export async function GET(req: NextRequest) {
     .where(and(eq(apiTokens.hash, hash), isNull(apiTokens.revokedAt)))
     .limit(1);
   if (tokenRow[0]) {
-    if (tokenRow[0].deletedAt || tokenRow[0].suspendedAt) return INVALID_RESPONSE;
+    if (tokenRow[0].deletedAt || tokenRow[0].suspendedAt) return invalidResponse();
     return NextResponse.json({ ok: true, source: "api_token", tokenId: tokenRow[0].tokenId });
   }
 
@@ -83,9 +89,9 @@ export async function GET(req: NextRequest) {
     .where(eq(users.apiKeyHash, hash))
     .limit(1);
   if (userRow[0]) {
-    if (userRow[0].deletedAt || userRow[0].suspendedAt) return INVALID_RESPONSE;
+    if (userRow[0].deletedAt || userRow[0].suspendedAt) return invalidResponse();
     return NextResponse.json({ ok: true, source: "legacy" });
   }
 
-  return INVALID_RESPONSE;
+  return invalidResponse();
 }
