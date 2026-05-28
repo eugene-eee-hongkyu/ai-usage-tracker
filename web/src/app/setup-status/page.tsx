@@ -292,6 +292,9 @@ export default function SetupStatusPage() {
           </div>
         </div>
 
+        {/* 랭킹 참여 토글 */}
+        <RankingToggleCard en={en} />
+
       </main>
       <PageFooter screen="settings" />
     </div>
@@ -391,6 +394,66 @@ function EnvDiagnosticCard({ env, en }: { env: EnvInfo; en: boolean }) {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+function RankingToggleCard({ en }: { en: boolean }) {
+  const { data: session } = useSession();
+  const isPersonal = (session?.user as { personal?: boolean } | undefined)?.personal ?? false;
+  const [value, setValue] = useState(isPersonal);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    setValue(isPersonal);
+  }, [isPersonal]);
+
+  const toggle = async () => {
+    setLoading(true);
+    try {
+      const r = await fetch("/api/personal/toggle", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ personal: !value }),
+      });
+      if (r.ok) {
+        setValue(!value);
+        window.location.reload();
+      } else {
+        const d = await r.json().catch(() => ({}));
+        if (d.message) alert(d.message);
+      }
+    } catch {
+      // ignore
+    }
+    setLoading(false);
+  };
+
+  return (
+    <div className="bg-slate-900 rounded-lg p-4 border border-slate-700">
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <p className="text-sm font-medium text-slate-200">
+            {en ? "Ranking Participation" : "랭킹 참여"}
+          </p>
+          <p className="text-xs text-slate-500 mt-0.5">
+            {en
+              ? "Join the global anonymous ranking (30-day, cost/tokens/utilization/cache hit)"
+              : "전체 익명 랭킹에 참여합니다 (30일 기준, 비용/사용량/활용지수/캐시히트)"}
+          </p>
+        </div>
+        <button
+          onClick={toggle}
+          disabled={loading}
+          className={`shrink-0 px-3 py-1.5 rounded text-sm font-mono transition-colors ${
+            value
+              ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 hover:bg-emerald-500/30"
+              : "bg-slate-800 text-slate-500 border border-slate-700 hover:text-slate-300"
+          }`}
+        >
+          {value ? "ON" : "OFF"}
+        </button>
+      </div>
     </div>
   );
 }
