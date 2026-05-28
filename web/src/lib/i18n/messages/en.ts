@@ -614,6 +614,15 @@ export interface Messages {
     weekdayThu: string;
     weekdayFri: string;
     weekdaySat: string;
+    // TeamPositionCard — 팀 내 내 위치. 옛 한국어 hardcoded 정리 (2026-05-28).
+    teamPositionTitle: string;          // "팀 내 내 위치 · {period} · {n}명 중"
+    teamPositionLabelUsage: string;     // "사용량"
+    teamPositionLabelCost: string;      // "비용"
+    teamPositionLabelCacheHit: string;  // "cache hit"
+    teamPositionLabelPower: string;     // "활용 지수"
+    teamPositionTeamAvg: string;        // "팀 평균 {avg}"
+    teamPositionMeFirst: string;        // "★ 팀 1위 (나)"
+    teamPositionTeamFirst: string;      // "팀 1위 {name} {val}"
   };
   teamUsageHero: {
     powerLabel: string;             // ⚡ 팀 활용 지수
@@ -1349,6 +1358,14 @@ export const en: Messages = {
     weekdayThu: "Thu",
     weekdayFri: "Fri",
     weekdaySat: "Sat",
+    teamPositionTitle: "My team position · {period} · of {n}",
+    teamPositionLabelUsage: "Usage",
+    teamPositionLabelCost: "Cost",
+    teamPositionLabelCacheHit: "Cache hit",
+    teamPositionLabelPower: "Power index",
+    teamPositionTeamAvg: "Team avg {avg}",
+    teamPositionMeFirst: "★ Team #1 (me)",
+    teamPositionTeamFirst: "Team #1 {name} {val}",
   },
   teamUsageHero: {
     powerLabel: "⚡ Team Power Index",

@@ -649,6 +649,7 @@ function tokenLevelToGrade(level: number): GradeLevel {
   return "warning";
 }
 function fmtTokensShort(n: number): string {
+  if (!Number.isFinite(n)) return "—";
   if (n >= 1_000_000_000) return `${(n / 1_000_000_000).toFixed(1)}B`;
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
   if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
@@ -685,6 +686,7 @@ function fmtSyncedAt(ts: string | null, tz: string): string {
 }
 
 function fmtTokens(n: number): string {
+  if (!Number.isFinite(n)) return "—";
   if (n >= 1_000_000_000) return `${(n / 1_000_000_000).toFixed(1)}B`;
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
   if (n >= 1_000) return `${(n / 1_000).toFixed(1)}k`;
@@ -787,11 +789,13 @@ function TeamPositionCard({
   currentUserName: string;
   periodLabel: string;
 }) {
+  const { m } = useMessages();
+  const dv = m.dashboardView;
   const members = team.byEfficiency ?? [];
   const usage = team.memberUsage ?? [];
   if (members.length === 0) return null;
   // 본인 매칭 — name 기반 (동명이인 quirk team-view 와 동일).
-  const me = members.find((m) => m.name === currentUserName);
+  const me = members.find((mb) => mb.name === currentUserName);
   if (!me) return null;
 
   // 각 metric 별 정렬 (desc) + 본인 rank/평균/1위.
@@ -809,12 +813,12 @@ function TeamPositionCard({
       const vb = extract(b).value;
       return isHigherBetter ? vb - va : va - vb;
     });
-    const myIdx = sorted.findIndex((m) => extract(m).name === currentUserName);
+    const myIdx = sorted.findIndex((mb) => extract(mb).name === currentUserName);
     if (myIdx === -1) return null;
     const myVal = extract(sorted[myIdx]).value;
     const total = sorted.length;
     const rank = myIdx + 1;
-    const avg = sorted.reduce((s, m) => s + extract(m).value, 0) / sorted.length;
+    const avg = sorted.reduce((s, mb) => s + extract(mb).value, 0) / sorted.length;
     const first = sorted[0];
     const isMeFirst = extract(first).name === currentUserName;
     const isTop1 = rank === 1;
@@ -822,14 +826,14 @@ function TeamPositionCard({
   }
 
   const rows = [
-    buildRow("사용량", members, (m) => ({ name: m.name, value: m.totalTokens }), true,
+    buildRow(dv.teamPositionLabelUsage, members, (mb) => ({ name: mb.name, value: mb.totalTokens }), true,
       (v) => v >= 1_000_000_000 ? `${(v / 1_000_000_000).toFixed(1)}B` : v >= 1_000_000 ? `${(v / 1_000_000).toFixed(1)}M` : v >= 1_000 ? `${(v / 1_000).toFixed(1)}k` : String(v),
       "text-cyan-300"),
-    buildRow("비용", members, (m) => ({ name: m.name, value: m.totalCost }), true,
+    buildRow(dv.teamPositionLabelCost, members, (mb) => ({ name: mb.name, value: mb.totalCost }), true,
       (v) => `$${v.toFixed(2)}`, "text-yellow-300"),
-    buildRow("cache hit", members, (m) => ({ name: m.name, value: m.cacheHitPct }), true,
+    buildRow(dv.teamPositionLabelCacheHit, members, (mb) => ({ name: mb.name, value: mb.cacheHitPct }), true,
       (v) => `${v.toFixed(1)}%`, "text-emerald-300"),
-    buildRow("활용 지수", usage, (m) => ({ name: m.name, value: m.powerIndex }), true,
+    buildRow(dv.teamPositionLabelPower, usage, (mb) => ({ name: mb.name, value: mb.powerIndex }), true,
       (v) => String(v), "text-cyan-300"),
   ].filter((r): r is NonNullable<typeof r> => r !== null);
 
@@ -839,7 +843,7 @@ function TeamPositionCard({
     <div data-testid="dash-card-team-position" className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-indigo-500 rounded">
       <div className="px-3 py-2 border-b border-neutral-800 flex items-center justify-between">
         <span className="text-xs font-mono font-bold text-indigo-400 uppercase tracking-wider">
-          팀 내 내 위치 · {periodLabel} · {members.length}명 중
+          {tmpl(dv.teamPositionTitle, { period: periodLabel, n: members.length })}
         </span>
       </div>
       <div className="p-3 space-y-1.5">
@@ -854,12 +858,12 @@ function TeamPositionCard({
             </span>
             <span className={`${r.valueColor} tabular-nums font-bold text-right whitespace-nowrap`}>{r.fmt(r.myVal)}</span>
             <span className="text-neutral-500 truncate min-w-0">
-              팀 평균 <span className="text-neutral-400">{r.fmt(r.avg)}</span>
+              {tmpl(dv.teamPositionTeamAvg, { avg: r.fmt(r.avg) })}
               <span className="text-neutral-700 mx-1.5">·</span>
               {r.isMeFirst ? (
-                <span className="text-emerald-400">★ 팀 1위 (나)</span>
+                <span className="text-emerald-400">{dv.teamPositionMeFirst}</span>
               ) : (
-                <>팀 1위 <span className="text-neutral-400">{r.firstName}</span> <span className="text-neutral-500 ml-1">{r.fmt(r.firstVal)}</span></>
+                <>{tmpl(dv.teamPositionTeamFirst, { name: r.firstName, val: r.fmt(r.firstVal) })}</>
               )}
             </span>
             <span className="text-emerald-400 w-3 text-center">
@@ -1095,23 +1099,32 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
     if (data?.user?.timezone) setUserTz(data.user.timezone);
   }, [data?.user?.timezone]);
 
-  // 로컬 모드 + 데이터 아직 없음 → 5초마다 자동 polling. sync 완료되어 overview 가
-  // 채워지면 polling 중단.
+  // overview 가 없는 사용자 (첫 sync 대기 중) 자동 polling. LOCAL_MODE 면 5초,
+  // 서버 모드 면 4초. 옛 동작은 두 useEffect 가 분리되어 isLocalMode=false 사용자
+  // 가 LOCAL_MODE 가드 통과 후 서버 polling 동시에 도는 race 가능 + AbortController
+  // 없어 unmount 후 setData 호출. 통합 + signal 처리.
   useEffect(() => {
-    if (!isLocalMode) return;
+    if (!session && !isLocalMode) return;
     if (data?.overview) return;
+    const intervalMs = isLocalMode ? 5000 : 4000;
+    const ctrl = new AbortController();
     const id = setInterval(() => {
-      fetch(apiUrl(period, weekOffset, monthOffset, dayOffset, deviceId))
+      fetch(apiUrl(period, weekOffset, monthOffset, dayOffset, deviceId), { signal: ctrl.signal })
         .then((r) => r.json())
         .then((d) => {
           if (d?.error) return;
           if (d?.overview) setData(d);
         })
-        .catch(() => {});
-    }, 5000);
-    return () => clearInterval(id);
+        .catch(() => {
+          // AbortError / 네트워크 오류 — 다음 tick 에서 자연 재시도.
+        });
+    }, intervalMs);
+    return () => {
+      clearInterval(id);
+      ctrl.abort();
+    };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isLocalMode, data?.overview, period, weekOffset, monthOffset, dayOffset, deviceId, targetUserId]);
+  }, [session, isLocalMode, data?.overview, period, weekOffset, monthOffset, dayOffset, deviceId, targetUserId]);
 
   const saveTz = async (tz: string) => {
     setUserTz(tz);
@@ -1122,17 +1135,6 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
       body: JSON.stringify({ timezone: tz }),
     });
   };
-
-  useEffect(() => {
-    if (!session || !data || data.overview) return;
-    const timer = setInterval(() => {
-      fetch(apiUrl(period, weekOffset, monthOffset, dayOffset, deviceId))
-        .then((r) => r.json())
-        .then((d) => { if (d.overview) setData(d); });
-    }, 4000);
-    return () => clearInterval(timer);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [session, data, period, weekOffset, monthOffset, dayOffset, deviceId]);
 
   if (status === "loading" || (!data && !fetchError)) return (
     <div className="min-h-screen bg-neutral-950">
@@ -1409,7 +1411,24 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
         4;
       return { date: row.date, count: min, level };
     });
-    const monthKey = new Date().toISOString().slice(0, 7);
+    // monthKey 는 사용자 timezone 기준 — 옛 UTC `.toISOString().slice(0, 7)` 은
+    // KST/SGT 사용자가 매월 1일 자정~9시 사이에 이번 달 visits 0 으로 표시되는
+    // boundary mismatch. daily_visits.date 가 사용자 timezone 으로 저장되므로
+    // client 도 동일 timezone 으로 filter.
+    const monthKey = (() => {
+      try {
+        const parts = new Intl.DateTimeFormat("en-CA", {
+          timeZone: userTz,
+          year: "numeric",
+          month: "2-digit",
+        }).formatToParts(new Date());
+        const y = parts.find((p) => p.type === "year")?.value ?? "0000";
+        const mo = parts.find((p) => p.type === "month")?.value ?? "01";
+        return `${y}-${mo}`;
+      } catch {
+        return new Date().toISOString().slice(0, 7);
+      }
+    })();
     const monthRows = rows.filter((r) => r.date.startsWith(monthKey));
     const monthVisitsTotal = monthRows.reduce((s, r) => s + r.visitCount, 0);
     const monthDwellTotal = monthRows.reduce((s, r) => s + r.dwellSec, 0);
