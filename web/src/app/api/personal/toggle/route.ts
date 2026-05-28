@@ -44,6 +44,24 @@ export async function POST(req: NextRequest) {
       .values({ teamId: personalTeamId, userId, role: "member" })
       .onConflictDoNothing();
   } else {
+    // personal OFF 시 normal 팀에 속해있는지 확인. 없으면 거부
+    // (personal 만 있는 사용자가 OFF 하면 어디에도 속하지 않아 403 상태)
+    const normalTeamMembership = await db
+      .select({ id: teamMembers.id })
+      .from(teamMembers)
+      .innerJoin(teams, eq(teams.id, teamMembers.teamId))
+      .where(
+        and(
+          eq(teamMembers.userId, userId),
+          isNull(teamMembers.deletedAt),
+          isNull(teams.deletedAt),
+          eq(teams.type, "normal")
+        )
+      )
+      .limit(1);
+    if (!normalTeamMembership[0])
+      return NextResponse.json({ error: "no_team", message: "팀에 소속되어야 랭킹 참여를 해제할 수 있습니다." }, { status: 400 });
+
     await db.update(users).set({ personal: false }).where(eq(users.id, userId));
     await db
       .update(teamMembers)

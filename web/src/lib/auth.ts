@@ -70,7 +70,10 @@ export const authOptions: NextAuthOptions = {
           .where(eq(users.email, email))
           .limit(1);
 
-        // 기존 사용자 — 도메인 화이트리스트 무관 통과 (이미 가입한 사람)
+        // 기존 사용자 — deleted/suspended 체크 후, invitation/auto-join 팀 가입도 처리.
+        // Personal 도입 전에는 "기존 사용자 = 이미 팀에 속한 사람" 이라 바로 통과했지만,
+        // personal-only 사용자가 팀 초대 받거나 auto-join 도메인에 해당하면 team_members
+        // INSERT 가 필요. 기존 팀 사용자의 두 번째 팀 가입에도 동일하게 적용.
         if (existing.length > 0) {
           const u = existing[0];
           if (u.deletedAt) {
@@ -95,6 +98,91 @@ export const authOptions: NextAuthOptions = {
             });
             return `/login?error=suspended`;
           }
+
+          // 기존 사용자에 대해 invitation 매칭 → team_members INSERT (users INSERT skip)
+          const { invitations: invTable } = await import("@/lib/db");
+          const { and: andOp, isNull: isNullOp } = await import("drizzle-orm");
+          const existingInvite = await db
+            .select({
+              id: invTable.id,
+              role: invTable.role,
+              expiresAt: invTable.expiresAt,
+              teamId: invTable.teamId,
+            })
+            .from(invTable)
+            .where(
+              andOp(
+                eq(invTable.email, email),
+                isNullOp(invTable.acceptedAt),
+                isNullOp(invTable.cancelledAt)
+              )
+            )
+            .limit(1);
+          if (existingInvite[0] && existingInvite[0].expiresAt >= new Date()) {
+            const inv = existingInvite[0];
+            const alreadyMember = await db
+              .select({ id: teamMembers.id })
+              .from(teamMembers)
+              .where(andOp(eq(teamMembers.userId, u.id), eq(teamMembers.teamId, inv.teamId), isNullOp(teamMembers.deletedAt)))
+              .limit(1);
+            if (!alreadyMember[0]) {
+              const teamRole = inv.role === "owner" || inv.role === "admin" ? inv.role : "member";
+              await db.insert(teamMembers).values({ teamId: inv.teamId, userId: u.id, role: teamRole });
+              await writeAudit({
+                teamId: inv.teamId,
+                actorUserId: u.id,
+                action: "user.team_join.via_invite",
+                targetType: "team",
+                targetId: inv.teamId,
+                metadata: { email, provider, invitationId: inv.id },
+              });
+            }
+            await db.update(invTable).set({ acceptedAt: new Date() }).where(eq(invTable.id, inv.id));
+          }
+
+          // 기존 사용자에 대해 auto-join 도메인 매칭 → team_members INSERT
+          const { and: andOp2, isNull: isNullOp2 } = await import("drizzle-orm");
+          const existingDomain = email.split("@")[1]?.toLowerCase();
+          if (existingDomain && isEmailAllowed(email)) {
+            const autoTeam = await db
+              .select({ id: teams.id, maxMembers: teams.maxMembers })
+              .from(teams)
+              .where(
+                andOp2(
+                  isNullOp2(teams.deletedAt),
+                  eq(teams.namePending, false),
+                  eq(teams.autoJoinEnabled, true),
+                  eq(teams.type, "normal"),
+                  sql`${teams.autoJoinDomains} @> ${JSON.stringify([existingDomain])}::jsonb`
+                )
+              )
+              .limit(1);
+            if (autoTeam[0]) {
+              const alreadyMember = await db
+                .select({ id: teamMembers.id })
+                .from(teamMembers)
+                .where(andOp2(eq(teamMembers.userId, u.id), eq(teamMembers.teamId, autoTeam[0].id), isNullOp2(teamMembers.deletedAt)))
+                .limit(1);
+              if (!alreadyMember[0]) {
+                const activeCount = await db
+                  .select({ c: sql<number>`count(*)::int` })
+                  .from(teamMembers)
+                  .where(andOp2(eq(teamMembers.teamId, autoTeam[0].id), isNullOp2(teamMembers.deletedAt)));
+                if ((activeCount[0]?.c ?? 0) < autoTeam[0].maxMembers) {
+                  await db.insert(teamMembers).values({ teamId: autoTeam[0].id, userId: u.id, role: "member" });
+                  await writeAudit({
+                    teamId: autoTeam[0].id,
+                    actorUserId: u.id,
+                    action: "user.team_join.auto_domain",
+                    targetType: "team",
+                    targetId: autoTeam[0].id,
+                    metadata: { email, provider, domain: existingDomain },
+                  });
+                }
+              }
+            }
+          }
+
           return true;
         }
 
