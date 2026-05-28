@@ -52,9 +52,7 @@ function NavInner() {
     if (userFlags?.personal) {
       tabs.push({ href: "/ranking", label: m.nav.ranking ?? "랭킹" });
     }
-    if (userFlags?.hasNormalTeam !== false) {
-      tabs.push({ href: "/setup-status", label: m.nav.setup });
-    }
+    tabs.push({ href: "/setup-status", label: m.nav.setup });
   }
 
   // dashboard / team 등 내부 링크에 현재 locale 유지.
