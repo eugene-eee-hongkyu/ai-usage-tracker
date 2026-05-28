@@ -73,83 +73,62 @@ for (const file of ["sync.mjs", "index.mjs", "init.mjs", "historical.mjs"]) {
   if (existsSync(src)) cpSync(src, path.join(CLI_OUT, file));
 }
 
-// better-sqlite3 다중 ABI prebuilt binary 자동 fetch.
+// better-sqlite3 ABI 127 prebuilt binary 자동 fetch.
 //
-// Node 버전마다 NODE_MODULE_VERSION (ABI) 가 달라 native binary 호환 안 됨:
-//   Node 20 → 115,  22 → 127,  23 → 131,  24 → 137,  25 → 141
+// `bindings` 라이브러리 (better-sqlite3 가 사용) 는 `build/Release/<name>.node`
+// 를 가장 먼저 시도하고 lib/binding/node-v<ABI>-... 하위 트리는 자동 탐색하지
+// 않는다. 즉 실효 binary 는 build/Release 단일 파일 — 동봉 Node 22 (ABI 127)
+// 와 일치해야 함.
 //
-// 사용자 시스템 Node 가 어느 버전이든 즉시 작동하도록 여러 ABI 의 prebuilt
-// binary 를 .app 안에 동봉. better-sqlite3 의 bindings 모듈이 자동으로 현재
-// 프로세스의 ABI 에 맞는 binary 를 lib/binding/node-v{ABI}-darwin-arm64/ 에서 찾음.
+// 옛 코드는 ABI 115/127/131/137/141 모두 fetch + lib/binding/ 에 배치했지만
+// bindings 가 안 봐서 dead code 였음 (2026-05-28 cleanup). 디스크 + 빌드 시간
+// 절약 위해 ABI 127 만 fetch.
 //
-// 캐시: installer/electron/cache/abi-binaries/ 에 ABI 별 binary 보관. 다음 빌드
-// 부터는 fetch 안 함.
+// 캐시: installer/electron/cache/abi-binaries/ 에 ABI 127 binary 보관. 다음
+// 빌드부터는 fetch 안 함.
 const SQLITE_DIR = path.join(WEB_OUT, "node_modules", "better-sqlite3");
 if (!existsSync(SQLITE_DIR)) {
   console.warn("  ⚠️  staged better-sqlite3 디렉토리 없음 — ABI binary 동봉 skip");
 } else {
-  // better-sqlite3 의 release tag 확인 — staged 의 package.json 사용.
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const sqlitePkg = require(path.join(SQLITE_DIR, "package.json"));
   const sqliteVersion = sqlitePkg.version;
-  console.log(`==> better-sqlite3 v${sqliteVersion} — 다중 ABI prebuilt fetch`);
-
-  const ABI_TARGETS = [
-    { abi: "115", node: "20" },
-    { abi: "127", node: "22" },
-    { abi: "131", node: "23" },
-    { abi: "137", node: "24" },
-    { abi: "141", node: "25" },
-  ];
+  console.log(`==> better-sqlite3 v${sqliteVersion} — ABI 127 prebuilt fetch`);
 
   const CACHE_DIR = path.join(ELECTRON_DIR, "cache", "abi-binaries", `better-sqlite3-${sqliteVersion}`);
+  const cachedBin = path.join(CACHE_DIR, `node-v127-darwin-arm64.node`);
   mkdirSync(CACHE_DIR, { recursive: true });
 
-  for (const t of ABI_TARGETS) {
-    const cachedBin = path.join(CACHE_DIR, `node-v${t.abi}-darwin-arm64.node`);
-    const targetDir = path.join(SQLITE_DIR, "lib", "binding", `node-v${t.abi}-darwin-arm64`);
-    const targetBin = path.join(targetDir, "better_sqlite3.node");
-
-    if (!existsSync(cachedBin)) {
-      const url =
-        `https://github.com/WiseLibs/better-sqlite3/releases/download/` +
-        `v${sqliteVersion}/better-sqlite3-v${sqliteVersion}-node-v${t.abi}-darwin-arm64.tar.gz`;
-      const tmpTar = path.join(CACHE_DIR, `node-v${t.abi}.tar.gz`);
-      const tmpExtract = path.join(CACHE_DIR, `node-v${t.abi}-extract`);
-      try {
-        execSync(`curl -fsSL -o "${tmpTar}" "${url}"`, { stdio: "pipe" });
-        mkdirSync(tmpExtract, { recursive: true });
-        execSync(`tar -xzf "${tmpTar}" -C "${tmpExtract}"`, { stdio: "pipe" });
-        const extracted = path.join(tmpExtract, "build", "Release", "better_sqlite3.node");
-        if (!existsSync(extracted)) {
-          throw new Error(`extracted binary 없음: ${extracted}`);
-        }
-        cpSync(extracted, cachedBin);
-        rmSync(tmpExtract, { recursive: true, force: true });
-        rmSync(tmpTar);
-        console.log(`  ✓ Node ${t.node} (ABI ${t.abi}) prebuilt fetched`);
-      } catch (e) {
-        console.warn(`  ⚠️  Node ${t.node} (ABI ${t.abi}) fetch 실패 — ${(e instanceof Error ? e.message : "unknown").split("\n")[0]}`);
-        continue;
+  if (!existsSync(cachedBin)) {
+    const url =
+      `https://github.com/WiseLibs/better-sqlite3/releases/download/` +
+      `v${sqliteVersion}/better-sqlite3-v${sqliteVersion}-node-v127-darwin-arm64.tar.gz`;
+    const tmpTar = path.join(CACHE_DIR, `node-v127.tar.gz`);
+    const tmpExtract = path.join(CACHE_DIR, `node-v127-extract`);
+    try {
+      execSync(`curl -fsSL -o "${tmpTar}" "${url}"`, { stdio: "pipe" });
+      mkdirSync(tmpExtract, { recursive: true });
+      execSync(`tar -xzf "${tmpTar}" -C "${tmpExtract}"`, { stdio: "pipe" });
+      const extracted = path.join(tmpExtract, "build", "Release", "better_sqlite3.node");
+      if (!existsSync(extracted)) {
+        throw new Error(`extracted binary 없음: ${extracted}`);
       }
+      cpSync(extracted, cachedBin);
+      rmSync(tmpExtract, { recursive: true, force: true });
+      rmSync(tmpTar);
+      console.log(`  ✓ ABI 127 prebuilt fetched`);
+    } catch (e) {
+      console.warn(`  ⚠️  ABI 127 fetch 실패 — ${(e instanceof Error ? e.message : "unknown").split("\n")[0]}`);
     }
-
-    mkdirSync(targetDir, { recursive: true });
-    cpSync(cachedBin, targetBin);
   }
 
-  // `bindings` 라이브러리 (better-sqlite3 가 사용) 는 build/Release/<name>.node
-  // 를 가장 먼저 시도 → lib/binding/node-v<ABI>-... 하위 트리는 자동 탐색되지
-  // 않는다. 즉 실효는 build/Release 단일 binary 이며, 동봉 Node 22 (ABI 127) 와
-  // 일치해야 함. ABI 141 등 다른 binary 를 넣으면 ERR_DLOPEN_FAILED.
-  const fallbackBin = path.join(CACHE_DIR, "node-v127-darwin-arm64.node");
-  if (existsSync(fallbackBin)) {
+  if (existsSync(cachedBin)) {
     const buildReleaseDir = path.join(SQLITE_DIR, "build", "Release");
     mkdirSync(buildReleaseDir, { recursive: true });
-    cpSync(fallbackBin, path.join(buildReleaseDir, "better_sqlite3.node"));
+    cpSync(cachedBin, path.join(buildReleaseDir, "better_sqlite3.node"));
     console.log(`  ✓ build/Release/better_sqlite3.node ← ABI 127 (Node 22, 동봉 Node 와 일치)`);
   } else {
-    console.warn(`  ⚠️  ABI 127 prebuilt cache 없음 (${fallbackBin}) — bundled Node 22 가 load 실패할 것`);
+    console.warn(`  ⚠️  ABI 127 prebuilt cache 없음 (${cachedBin}) — bundled Node 22 가 load 실패할 것`);
   }
 }
 

@@ -290,6 +290,7 @@ function fmtDate(d: string): string {
 }
 
 function fmtTokens(n: number): string {
+  if (!Number.isFinite(n)) return "—";
   if (n >= 1_000_000_000) return `${(n / 1_000_000_000).toFixed(1)}B`;
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
   if (n >= 1_000) return `${(n / 1_000).toFixed(1)}k`;
@@ -311,19 +312,31 @@ function GradeCell({ grade, children, testid, tooltip }: { grade: GradeLevel; ch
 
 interface MemberTooltipPayload {
   dataKey: string;
-  value: number;
+  // recharts API 상 number/string/undefined 가능. number 가드 안 하면
+  // .toFixed 에서 TypeError → tooltip 호버 시 UI 크래시.
+  value: number | string | undefined;
   color: string;
+}
+
+// recharts payload.value 정규화 — number 아니면 0 fallback.
+function toFiniteNum(v: number | string | undefined): number {
+  if (typeof v === "number" && Number.isFinite(v)) return v;
+  if (typeof v === "string") {
+    const n = Number(v);
+    return Number.isFinite(n) ? n : 0;
+  }
+  return 0;
 }
 
 function MemberTooltip({ active, payload, label }: { active?: boolean; payload?: MemberTooltipPayload[]; label?: string }) {
   if (!active || !payload?.length) return null;
-  const sorted = [...payload].sort((a, b) => b.value - a.value);
+  const sorted = [...payload].sort((a, b) => toFiniteNum(b.value) - toFiniteNum(a.value));
   return (
     <div style={{ background: "#171717", border: "1px solid #404040", borderRadius: 6, fontSize: 11, fontFamily: "monospace", padding: "6px 10px" }}>
       <div style={{ color: "#737373", marginBottom: 4 }}>{label}</div>
       {sorted.map((p) => (
         <div key={p.dataKey} style={{ color: p.color }}>
-          {memberLabel(p.dataKey)} : ${p.value.toFixed(2)}
+          {memberLabel(p.dataKey)} : ${toFiniteNum(p.value).toFixed(2)}
         </div>
       ))}
     </div>
@@ -332,13 +345,13 @@ function MemberTooltip({ active, payload, label }: { active?: boolean; payload?:
 
 function MemberTokenTooltip({ active, payload, label }: { active?: boolean; payload?: MemberTooltipPayload[]; label?: string }) {
   if (!active || !payload?.length) return null;
-  const sorted = [...payload].sort((a, b) => b.value - a.value);
+  const sorted = [...payload].sort((a, b) => toFiniteNum(b.value) - toFiniteNum(a.value));
   return (
     <div style={{ background: "#171717", border: "1px solid #404040", borderRadius: 6, fontSize: 11, fontFamily: "monospace", padding: "6px 10px" }}>
       <div style={{ color: "#737373", marginBottom: 4 }}>{label}</div>
       {sorted.map((p) => (
         <div key={p.dataKey} style={{ color: p.color }}>
-          {memberLabel(p.dataKey)} : {fmtTokens(p.value)}
+          {memberLabel(p.dataKey)} : {fmtTokens(toFiniteNum(p.value))}
         </div>
       ))}
     </div>

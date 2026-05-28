@@ -56,12 +56,15 @@ export function patchCcusageDaily(userId: number, date: string, totalCost: numbe
   );
 }
 
-/** daily_visits 의 특정 date 의 dwell 을 변형 (dwell heatmap boundary 검증용). */
+/** daily_visits 의 특정 date 의 dwell 을 변형 (dwell heatmap boundary 검증용).
+ * team_id 는 user 의 첫 active team_members 행에서 가져옴 — Phase 4.2 (M6a)
+ * 부터 daily_visits 가 team-scoped (NOT NULL + uniq (user_id, team_id, date)).
+ * 옛 helper 는 team_id 없이 INSERT 하다 NOT NULL 위반으로 silent throw. */
 export function patchDailyVisit(userId: number, date: string, count: number, dwellSec: number): void {
   const url = process.env.DATABASE_URL;
   if (!url) throw new Error("DATABASE_URL 미설정");
   execSync(
-    `psql "${url}" -c "INSERT INTO daily_visits (user_id, date, count, total_dwell_seconds) VALUES (${userId}, '${date}', ${count}, ${dwellSec}) ON CONFLICT (user_id, date) DO UPDATE SET count = ${count}, total_dwell_seconds = ${dwellSec}"`,
+    `psql "${url}" -c "INSERT INTO daily_visits (user_id, team_id, date, count, total_dwell_seconds) SELECT ${userId}, (SELECT team_id FROM team_members WHERE user_id = ${userId} AND deleted_at IS NULL ORDER BY joined_at LIMIT 1), '${date}', ${count}, ${dwellSec} ON CONFLICT (user_id, team_id, date) DO UPDATE SET count = ${count}, total_dwell_seconds = ${dwellSec}"`,
     { stdio: "pipe" },
   );
 }

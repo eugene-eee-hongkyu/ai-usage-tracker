@@ -37,6 +37,18 @@ async function send(to: string, subject: string, html: string): Promise<SendResu
   }
 }
 
+// HTML 본문에 사용자 입력 (inviterName 등) 을 inject 할 때 escape — 옛 코드는
+// `${p.inviterName}` 같이 직접 inject 해서 OAuth provider 가 검증한 이름이라도
+// 명시 escape 가 안전망. sendSuggestion 의 safe() 와 동일 정책.
+function escapeHtml(s: string): string {
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 // ── 템플릿 ───────────────────────────────────────────────────────────────
 
 type Locale = "ko" | "en" | "ja" | "zh";
@@ -105,10 +117,14 @@ function resolveLocale(l?: Locale): Locale {
 export async function sendInvitation(p: InvitationParams): Promise<SendResult> {
   const url = `${APP_URL}/login?invite=${encodeURIComponent(p.token)}`;
   const t = I18N[resolveLocale(p.locale)];
-  const subject = t.subject(p.inviterName);
+  // inviterName 은 OAuth provider 에서 온 이름이지만 메일 클라이언트의 HTML
+  // 렌더 안전망. subject 는 헤더 — Resend SDK 가 CRLF stripping 한다고 가정,
+  // 추가로 \r\n 제거.
+  const safeInviter = escapeHtml(p.inviterName);
+  const subject = t.subject(p.inviterName).replace(/[\r\n]+/g, " ");
   const html = `<!doctype html><html><body style="font-family: -apple-system, system-ui, sans-serif; max-width: 560px; margin: 40px auto; padding: 24px; color: #0f172a; line-height: 1.6;">
       <h2 style="margin:0 0 16px">${t.title}</h2>
-      <p>${t.inviterLine(p.inviterName)}</p>
+      <p>${t.inviterLine(safeInviter)}</p>
       <p>${t.instruction}</p>
       <p style="margin: 32px 0;">
         <a href="${url}" style="background:#4f46e5; color:#fff; padding:12px 24px; text-decoration:none; border-radius:6px; display:inline-block;">${t.button}</a>
@@ -186,10 +202,11 @@ export async function sendJoinApproved(p: JoinApprovedParams): Promise<SendResul
   const subject = ko
     ? "AI Usage Tracker — 가입 승인됨"
     : "AI Usage Tracker — Join request approved";
+  const safeApprover = escapeHtml(p.approverName);
   const html = ko
     ? `<!doctype html><html><body style="font-family: -apple-system, system-ui, sans-serif; max-width: 560px; margin: 40px auto; padding: 24px; color: #0f172a; line-height: 1.6;">
       <h2 style="margin:0 0 16px">가입 승인됨 ✅</h2>
-      <p><strong>${p.approverName}</strong> 님이 당신의 가입을 승인했습니다.</p>
+      <p><strong>${safeApprover}</strong> 님이 당신의 가입을 승인했습니다.</p>
       <p>이제 install.sh 를 다시 실행해 본인 머신을 연결하세요:</p>
       <pre style="background:#0f172a; color:#e2e8f0; padding:16px; border-radius:6px; overflow-x:auto;">curl -fsSL ${APP_URL}/install.sh | bash</pre>
       <p style="margin: 32px 0;">
@@ -198,7 +215,7 @@ export async function sendJoinApproved(p: JoinApprovedParams): Promise<SendResul
     </body></html>`
     : `<!doctype html><html><body style="font-family: -apple-system, system-ui, sans-serif; max-width: 560px; margin: 40px auto; padding: 24px; color: #0f172a; line-height: 1.6;">
       <h2 style="margin:0 0 16px">Join request approved ✅</h2>
-      <p><strong>${p.approverName}</strong> approved your join request.</p>
+      <p><strong>${safeApprover}</strong> approved your join request.</p>
       <p>Run install.sh on your machine to connect:</p>
       <pre style="background:#0f172a; color:#e2e8f0; padding:16px; border-radius:6px; overflow-x:auto;">curl -fsSL ${APP_URL}/install.sh | bash</pre>
       <p style="margin: 32px 0;">

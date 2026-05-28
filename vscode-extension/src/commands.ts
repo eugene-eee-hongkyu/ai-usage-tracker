@@ -12,14 +12,15 @@ function getConfig() {
 
 // Integrated Terminal 에서 cli 명령 실행. 사용자가 결과를 직접 보고
 // preflight 자동 복구 prompt (Y/n) 같은 인터랙션도 가능.
+//
+// 옛 동작: 10초 후 강제 statusBar.refresh — cli 가 30초+ 걸리는 setup/repair 에서
+// 아직 진행 중인데 'Not setup' 으로 잘못 표시되는 부정확. 제거. extension.ts 의
+// 5분 setInterval 에 맡김 (사용자는 terminal 결과로 즉시 확인 가능).
 function runInTerminal(name: string, command: string, statusBar: StatusBar, label: string): void {
   statusBar.setBusy(label);
   const terminal = vscode.window.createTerminal({ name });
   terminal.show();
   terminal.sendText(command);
-
-  // 명령 자체의 exit 감지는 어려움 (terminal API 제약). 10초 후 상태 재확인.
-  setTimeout(() => statusBar.refresh(isSetupComplete()), 10_000);
 }
 
 export function registerCommands(context: vscode.ExtensionContext, statusBar: StatusBar): void {
