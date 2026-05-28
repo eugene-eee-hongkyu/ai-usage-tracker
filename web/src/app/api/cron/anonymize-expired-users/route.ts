@@ -24,10 +24,21 @@ import {
 } from "@/lib/db";
 import { writeAudit } from "@/lib/audit";
 import { and, isNotNull, lte, eq, notLike } from "drizzle-orm";
+import { timingSafeEqual } from "node:crypto";
 
 export const dynamic = "force-dynamic";
 
 const GRACE_DAYS = 30;
+
+// constant-time Bearer 비교. 길이 다르면 false (timingSafeEqual 가 throw 하므로
+// 사전 길이 체크). cron endpoint 는 30일 grace 만료 user 의 활동 데이터 hard
+// delete 권한 — leak 시 영향이 크므로 timing leak 표면도 정리.
+function bearerEquals(authHeader: string | null, secret: string): boolean {
+  if (!authHeader) return false;
+  const expected = `Bearer ${secret}`;
+  if (authHeader.length !== expected.length) return false;
+  return timingSafeEqual(Buffer.from(authHeader), Buffer.from(expected));
+}
 
 export async function GET(req: NextRequest) {
   const authHeader = req.headers.get("authorization");
@@ -35,7 +46,7 @@ export async function GET(req: NextRequest) {
   if (!expected) {
     return NextResponse.json({ error: "CRON_SECRET not configured" }, { status: 500 });
   }
-  if (authHeader !== `Bearer ${expected}`) {
+  if (!bearerEquals(authHeader, expected)) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
 

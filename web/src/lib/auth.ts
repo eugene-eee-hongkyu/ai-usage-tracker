@@ -9,13 +9,12 @@ import { isAdmin } from "@/lib/admin";
 import { writeAudit } from "@/lib/audit";
 import { PLATFORM_VIEW_AS_COOKIE } from "@/lib/effective-team";
 
-// e2e Credentials provider — NODE_ENV='test' 또는 Z21_E2E_AUTH=1 일 때만 활성
-// (옛 PRIMUS_E2E_AUTH 도 fallback — 마이그레이션 안정 후 제거)
-// 진짜 OAuth (captcha/2FA) 우회용 (C-1 §3 #1 우회 전략)
-const e2eEnabled =
-  process.env.NODE_ENV === "test" ||
-  process.env.Z21_E2E_AUTH === "1" ||
-  process.env.PRIMUS_E2E_AUTH === "1";
+// e2e Credentials provider — NODE_ENV='test' 일 때만 활성.
+// 보안 감사 (2026-05-28): 옛 Z21_E2E_AUTH / PRIMUS_E2E_AUTH env 가드 제거.
+// prod 에 실수로 둘 중 하나라도 설정되면 누구나 임의 email 로 로그인 가능한
+// 단일 실패 모드라 NODE_ENV=test 단독으로 좁힘. e2e runner 는 NODE_ENV=test
+// 로 spawn 하므로 영향 없음. (Vercel prod 는 NODE_ENV=production 강제.)
+const e2eEnabled = process.env.NODE_ENV === "test";
 
 const providers = [
   GithubProvider({
@@ -70,12 +69,30 @@ export const authOptions: NextAuthOptions = {
           .where(eq(users.email, email))
           .limit(1);
 
-        // 기존 사용자 — deleted/suspended 체크 후, invitation/auto-join 팀 가입도 처리.
-        // Personal 도입 전에는 "기존 사용자 = 이미 팀에 속한 사람" 이라 바로 통과했지만,
-        // personal-only 사용자가 팀 초대 받거나 auto-join 도메인에 해당하면 team_members
-        // INSERT 가 필요. 기존 팀 사용자의 두 번째 팀 가입에도 동일하게 적용.
+        // 보안 감사 (2026-05-28, H1 temp A): OAuth provider lock-in.
+        //   - users.provider IS NULL  → legacy 사용자, 현재 provider 로 backfill 후 통과
+        //   - users.provider == 현재 provider → 통과
+        //   - users.provider != 현재 provider → reject (account takeover 차단)
+        // 옛 동작은 email 단독 매칭 — GitHub primary email 미인증 + 옛 Google
+        // 가입자 시나리오에서 다른 provider 의 unverified email 로 행 탈취 가능했음.
+        // 정식 fix (옵션 B: 표준 oauth_accounts 테이블) 도입 전까지 임시 가드.
         if (existing.length > 0) {
           const u = existing[0];
+          if (u.provider && u.provider !== provider) {
+            await writeAudit({
+              actorUserId: u.id,
+              actorType: "user",
+              action: "auth.rejected.provider_mismatch",
+              targetType: "user",
+              targetId: u.id,
+              metadata: { email, attemptedProvider: provider, storedProvider: u.provider },
+            });
+            return `/login?error=provider_mismatch`;
+          }
+          if (u.provider === null) {
+            // legacy backfill — 첫 OAuth 로그인 시점에 영구 lock.
+            await db.update(users).set({ provider }).where(eq(users.id, u.id));
+          }
           if (u.deletedAt) {
             await writeAudit({
               actorUserId: u.id,
@@ -196,18 +213,29 @@ export const authOptions: NextAuthOptions = {
                 .where(andOp2(eq(teamMembers.userId, u.id), eq(teamMembers.teamId, autoTeam[0].id), isNullOp2(teamMembers.deletedAt)))
                 .limit(1);
               if (!alreadyMember[0]) {
-                const activeCount = await db
-                  .select({ c: sql<number>`count(*)::int` })
-                  .from(teamMembers)
-                  .where(andOp2(eq(teamMembers.teamId, autoTeam[0].id), isNullOp2(teamMembers.deletedAt)));
-                if ((activeCount[0]?.c ?? 0) < autoTeam[0].maxMembers) {
-                  await db.insert(teamMembers).values({ teamId: autoTeam[0].id, userId: u.id, role: "member" }).onConflictDoNothing();
-                  // 결정 3 (2026-05-28): auto-join 은 query 자체가 normal 팀
-                  // 으로 제한 (eq(teams.type, "normal")) — personal flag 자동
-                  // 해제. type check 불필요.
-                  if (u.personal) {
-                    await db.update(users).set({ personal: false }).where(eq(users.id, u.id));
+                // 보안 감사 (2026-05-28, M1): cap check + INSERT race fix.
+                // 옛 동작은 SELECT count → INSERT 비원자성 → 같은 도메인 동시 OAuth N명이
+                // cap 검사 통과 후 모두 INSERT → cap 초과. /api/admin/invitations 와
+                // 동일 패턴 (transaction + pg_advisory_xact_lock(teamId)).
+                let didJoin = false;
+                await db.transaction(async (tx) => {
+                  await tx.execute(sql`SELECT pg_advisory_xact_lock(${autoTeam[0].id})`);
+                  const activeCount = await tx
+                    .select({ c: sql<number>`count(*)::int` })
+                    .from(teamMembers)
+                    .where(andOp2(eq(teamMembers.teamId, autoTeam[0].id), isNullOp2(teamMembers.deletedAt)));
+                  if ((activeCount[0]?.c ?? 0) < autoTeam[0].maxMembers) {
+                    await tx.insert(teamMembers).values({ teamId: autoTeam[0].id, userId: u.id, role: "member" }).onConflictDoNothing();
+                    // 결정 3 (2026-05-28): auto-join 은 query 자체가 normal 팀
+                    // 으로 제한 (eq(teams.type, "normal")) — personal flag 자동
+                    // 해제. type check 불필요.
+                    if (u.personal) {
+                      await tx.update(users).set({ personal: false }).where(eq(users.id, u.id));
+                    }
+                    didJoin = true;
                   }
+                });
+                if (didJoin) {
                   await writeAudit({
                     teamId: autoTeam[0].id,
                     actorUserId: u.id,
@@ -277,6 +305,7 @@ export const authOptions: NextAuthOptions = {
                 avatarUrl: user.image ?? null,
                 role: invite[0].role,
                 permissions: invite[0].permissions,
+                provider,
               })
               .returning({ id: users.id });
           } catch (insertErr) {
@@ -345,37 +374,51 @@ export const authOptions: NextAuthOptions = {
           if (autoTeamRows[0]) {
             const autoTeamId = autoTeamRows[0].id;
             const cap = autoTeamRows[0].maxMembers;
-            const activeCount = await db
-              .select({ c: sql<number>`count(*)::int` })
-              .from(teamMembers)
-              .where(and(eq(teamMembers.teamId, autoTeamId), isNull(teamMembers.deletedAt)));
-            if ((activeCount[0]?.c ?? 0) < cap) {
-              // B7: 동시 가입 race → existing 재조회 fallback
-              let inserted: { id: number }[];
-              try {
-                inserted = await db
-                  .insert(users)
-                  .values({
-                    githubId: String((profile as Record<string, unknown>)?.id ?? account?.providerAccountId),
-                    email,
-                    name: user.name ?? email.split("@")[0],
-                    avatarUrl: user.image ?? null,
-                    role: "member",
-                    permissions: {},
-                  })
-                  .returning({ id: users.id });
-              } catch (insertErr) {
-                const refetch = await db.select({ id: users.id }).from(users).where(eq(users.email, email)).limit(1);
-                if (!refetch[0]) throw insertErr;
-                inserted = [{ id: refetch[0].id }];
-              }
-              const newUserId = inserted[0]?.id ?? null;
-              if (newUserId) {
-                await db.insert(teamMembers).values({
-                  teamId: autoTeamId,
-                  userId: newUserId,
+
+            // 보안 감사 (2026-05-28, M1): cap check + INSERT race fix.
+            // 신규 사용자 + auto-join 분기 — 같은 도메인 동시 OAuth 가입 시 cap 초과 차단.
+            // users INSERT 는 unique email 제약으로 자체 race-safe, team_members INSERT
+            // 는 cap 검사와 함께 advisory lock 으로 직렬화.
+            // B7: users INSERT race → existing 재조회 fallback (lock 밖에서 수행 OK,
+            // users.email unique 가 보호).
+            let inserted: { id: number }[];
+            try {
+              inserted = await db
+                .insert(users)
+                .values({
+                  githubId: String((profile as Record<string, unknown>)?.id ?? account?.providerAccountId),
+                  email,
+                  name: user.name ?? email.split("@")[0],
+                  avatarUrl: user.image ?? null,
                   role: "member",
-                }).onConflictDoNothing();
+                  permissions: {},
+                  provider,
+                })
+                .returning({ id: users.id });
+            } catch (insertErr) {
+              const refetch = await db.select({ id: users.id }).from(users).where(eq(users.email, email)).limit(1);
+              if (!refetch[0]) throw insertErr;
+              inserted = [{ id: refetch[0].id }];
+            }
+            const newUserId = inserted[0]?.id ?? null;
+            if (newUserId) {
+              let didJoin = false;
+              await db.transaction(async (tx) => {
+                await tx.execute(sql`SELECT pg_advisory_xact_lock(${autoTeamId})`);
+                const activeCount = await tx
+                  .select({ c: sql<number>`count(*)::int` })
+                  .from(teamMembers)
+                  .where(and(eq(teamMembers.teamId, autoTeamId), isNull(teamMembers.deletedAt)));
+                if ((activeCount[0]?.c ?? 0) < cap) {
+                  await tx.insert(teamMembers).values({
+                    teamId: autoTeamId,
+                    userId: newUserId,
+                    role: "member",
+                  }).onConflictDoNothing();
+                  didJoin = true;
+                }
+              });
+              if (didJoin) {
                 await writeAudit({
                   teamId: autoTeamId,
                   actorUserId: newUserId,
@@ -385,10 +428,13 @@ export const authOptions: NextAuthOptions = {
                   targetId: newUserId,
                   metadata: { email, provider, domain: emailDomain, teamId: autoTeamId },
                 });
+                return true;
               }
-              return true;
+              // cap 초과 — users row 는 이미 INSERT 됐으니 아래 personal fallback 에서
+              // team_members 만 personal 팀에 등록. (옛 동작은 cap 초과 시 personal 로
+              // fallback 했지만 users 가 두 번 INSERT 되었던 잠재 결함은 try/catch + email
+              // unique 가 막아줌.)
             }
-            // cap 초과 — personal fallback 으로 진행 (아래)
           }
         }
 
@@ -417,6 +463,7 @@ export const authOptions: NextAuthOptions = {
               role: "member",
               permissions: {},
               personal: true,
+              provider,
             })
             .returning({ id: users.id });
         } catch (insertErr) {

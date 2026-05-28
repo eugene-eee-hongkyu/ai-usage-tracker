@@ -42,7 +42,12 @@ function LoginContent() {
           {m.login.errorDomain}
         </p>
       )}
-      {error && error !== "domain" && (
+      {error === "provider_mismatch" && (
+        <p data-testid="login-error-provider-mismatch" className="text-red-400 text-sm bg-red-950 px-4 py-2 rounded max-w-md text-center">
+          {m.login.errorProviderMismatch}
+        </p>
+      )}
+      {error && error !== "domain" && error !== "provider_mismatch" && (
         <p data-testid="login-error-other" className="text-red-400 text-sm bg-red-950 px-4 py-2 rounded">
           {m.login.errorOther}
         </p>

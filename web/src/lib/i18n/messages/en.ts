@@ -300,6 +300,7 @@ export interface Messages {
     teamOnly: string;
     errorDomain: string;
     errorOther: string;
+    errorProviderMismatch: string;
     githubStart: string;
     googleStart: string;
     singleOauthHint: string;
@@ -980,6 +981,8 @@ export const en: Messages = {
     teamOnly: "Open to everyone",
     errorDomain: "Email domain not allowed.",
     errorOther: "An error occurred during login.",
+    errorProviderMismatch:
+      "This email is registered with a different sign-in method (GitHub or Google). Please sign in using the same method you originally used. Security policy: each email is bound to one sign-in method.",
     githubStart: "Continue with GitHub",
     googleStart: "Continue with Google",
     singleOauthHint:

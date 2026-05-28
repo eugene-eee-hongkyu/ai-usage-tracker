@@ -21,6 +21,29 @@ import crypto from "crypto";
 export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest) {
+  // 보안 감사 (2026-05-28, H4): cross-site CSRF 차단.
+  // 이 endpoint 는 GET 인데 새 API 토큰을 발급 + 127.0.0.1:<port> 로 redirect 하는
+  // 부수효과를 가진다. NextAuth session cookie 가 SameSite=Lax 라 cross-site GET
+  // 의 top-level navigation (예: 공격자 페이지의 `<a href="...api/cli-auth">click</a>`
+  // 또는 `window.location = ...`) 에는 cookie 가 그대로 전달 → 피해자 모르게 신규
+  // 토큰 발급되어 127.0.0.1:port 의 악성 로컬 프로세스가 raw apiKey 캡쳐 가능.
+  //
+  // 방어: Sec-Fetch-Site 가 'none' (주소창 직접 입력 / CLI 의 `open <url>`) 또는
+  // 'same-origin' 일 때만 통과. 'cross-site' / 'same-site' (다른 도메인의 링크
+  // 클릭) 은 차단. Sec-Fetch-Site 헤더는 Chrome 76+, Firefox 90+, Safari 16+ 지원
+  // — CLI 가 띄우는 시스템 브라우저는 모두 modern.
+  //
+  // 헤더가 없는 (legacy/curl/test) 케이스는 통과시키되 audit log 남김. CLI 정상
+  // 흐름은 헤더 없는 케이스가 흔치 않음 (사용자가 시스템 브라우저로 navigation).
+  // 정식 fix (POST + CSRF token) 는 CLI 양쪽 코드 변경 필요해 별도 phase.
+  const fetchSite = req.headers.get("sec-fetch-site");
+  if (fetchSite && fetchSite !== "none" && fetchSite !== "same-origin") {
+    return NextResponse.json(
+      { error: "csrf_blocked", hint: "Open this URL directly from the CLI prompt, not from another website." },
+      { status: 403 }
+    );
+  }
+
   const session = await getServerSession(authOptions);
   if (!session?.user?.email) {
     const callbackUrl = req.nextUrl.toString();

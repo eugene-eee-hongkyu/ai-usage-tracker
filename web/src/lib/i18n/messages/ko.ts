@@ -306,6 +306,8 @@ export const ko: DeepPartial<Messages> = {
     teamOnly: "누구나 가입 가능",
     errorDomain: "허용되지 않은 이메일 도메인입니다.",
     errorOther: "로그인 중 오류가 발생했습니다.",
+    errorProviderMismatch:
+      "이 이메일은 다른 로그인 방식 (GitHub 또는 Google) 으로 가입된 계정입니다. 처음 가입할 때 사용한 방식으로 로그인해주세요. 보안 정책: 한 이메일은 하나의 로그인 방식에만 묶입니다.",
     githubStart: "GitHub로 시작하기",
     googleStart: "Google로 시작하기",
     singleOauthHint:

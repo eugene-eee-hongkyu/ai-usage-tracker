@@ -20,7 +20,6 @@ import { requireOwner } from "@/lib/auth-guards";
 import { writeAudit } from "@/lib/audit";
 import { sendInvitation } from "@/lib/email";
 import { eq, and, isNull, inArray } from "drizzle-orm";
-import { isPublicEmailDomain } from "@/lib/public-domains";
 import crypto from "crypto";
 
 export const dynamic = "force-dynamic";
@@ -88,10 +87,14 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "invitation_pending", invitationId: pendingInv[0].id }, { status: 409 });
   }
 
-  // M6g: ownerEmail 도메인 자동 등록 (public domain 제외).
-  const ownerDomain = ownerEmail.split("@")[1]?.toLowerCase();
-  const autoJoinDomains =
-    ownerDomain && !isPublicEmailDomain(ownerDomain) ? [ownerDomain] : [];
+  // 보안 감사 (2026-05-28): ownerEmail 도메인 자동 등록 제거.
+  // 옛 동작은 ownerEmail 의 도메인이 public 아니면 autoJoinDomains 에 즉시 등록
+  // → Platform Admin 이 phishing 으로 잘못된 도메인을 입력 시 그 도메인의 *모든*
+  // 신규 가입자가 자동으로 팀에 합류하는 사이드 채널. owner 가 실제로 가입 후
+  // /onboard-team 단계에서 명시 동의할 때만 등록되도록 일원화.
+  // (현재 onboard 흐름: PATCH /api/team/onboard 가 owner 본인 OAuth email 도메인을
+  // autoJoinDomains 에 추가 — single source of truth.)
+  const autoJoinDomains: string[] = [];
 
   // 1) 새 팀 INSERT — owner_id 는 임시로 admin (guard.user.id) 박음. ehongarykr 가 가입 후
   //    별도 액션으로 owner 권한 이양 (M6c). 또는 가입 시 자동 이양 — 후속.

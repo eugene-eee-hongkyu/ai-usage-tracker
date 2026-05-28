@@ -23,6 +23,12 @@ export const users = pgTable("users", {
   avatarUrl: text("avatar_url"),
   apiKeyHash: text("api_key_hash"),
   timezone: text("timezone"),
+  // 보안 감사 (2026-05-28, H1 temp Option A): 최초 가입 OAuth provider 영구 기록.
+  // signIn callback 이 기존 user 매칭 시 provider 가 다르면 reject — GitHub
+  // unverified primary email 로 Google 사용자 행 탈취 차단. 옛 사용자는 NULL
+  // (legacy fallback 1회 backfill 로 채움). Phase 4.2 의 정식 Account 모델 (옵션 B)
+  // 도입 전까지 임시 가드.
+  provider: text("provider"),
   // 사용자가 명시한 Claude Code plan tier. 자동 추정과 별도로 본인 입력 받음.
   // null 이면 추정만 사용. 값: 'pro' | 'max5' | 'max20' | 'team' | 'api'
   planTier: text("plan_tier"),
