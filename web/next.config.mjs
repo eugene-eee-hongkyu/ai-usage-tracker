@@ -7,9 +7,18 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 // 빌드 시점 version = ${package.json major.minor}.${git 누적 commit count}.
 // 매 push 마다 commit count +1 자동. minor 는 의미 있는 변경 시 사람이 의식적으로
-// package.json 의 version 을 0.X.0 형태로 bump (patch 0 은 무시되고 commit count 가 그 자리).
+// package.json 의 version 을 0.X.0 형태로 bump.
+//
+// Vercel 은 shallow clone (depth ~10) 로 빌드 환경 구성 → rev-list --count 가
+// 실제 누적 수의 일부만 셈. 빌드 전 unshallow 시도해 full history 확보.
 let buildVersion = "0.0.dev";
 try {
+  // Vercel 의 shallow clone 대응. 이미 full 이면 fetch 가 에러 — 무시.
+  try {
+    execSync("git fetch --unshallow --quiet", { cwd: __dirname, stdio: "ignore" });
+  } catch {
+    // 이미 unshallow 이거나 fetch 권한 없음. count 가 부분만 나오는 건 받아들임.
+  }
   const pkg = JSON.parse(readFileSync(path.join(__dirname, "package.json"), "utf-8"));
   const [major, minor] = (pkg.version ?? "0.0.0").split(".");
   const count = execSync("git rev-list --count HEAD", { cwd: __dirname }).toString().trim();
