@@ -299,8 +299,8 @@ export default function SetupStatusPage() {
           </p>
           <p className="text-xs text-slate-400 leading-relaxed">
             {en
-              ? "AI Usage Tracker is open source. All data is collected only from your local machine and stored securely. You can review the full source code on GitHub."
-              : "AI Usage Tracker는 오픈소스입니다. 모든 데이터는 본인 머신에서만 수집되며 안전하게 저장됩니다. 전체 소스코드를 GitHub에서 확인할 수 있습니다."}
+              ? "AI Usage Tracker is open source. Only metadata is collected — no personal information or other data — and stored securely. You can review the full source code on GitHub."
+              : "AI Usage Tracker는 오픈소스입니다. 모든 데이터는 개인정보나 다른 정보 없이 메타 데이터만 수집되며 안전하게 저장됩니다. 전체 소스코드를 GitHub에서 확인할 수 있습니다."}
           </p>
           <div className="flex items-center gap-4 pt-1">
             <a
