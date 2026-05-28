@@ -1,6 +1,6 @@
-// /ranking — 전체 개인 랭킹 페이지.
-// 4축 탭 (cost / tokens / 활용지수 / cacheHit). 상위 50명 + 내 위치 중심.
-// 이름은 익명 마스킹 (서버에서 처리). 내 행은 하이라이트.
+// /ranking — 4개 metric 을 한 화면에 grid 로 배치 (대시보드 스타일).
+// 옛 동작: 탭 전환. 새 동작: 2x2 grid (desktop) / 1col (mobile). 각 카드 내부에
+// metric 이름 + 본인 hero + Top 10 + 본인이 top 10 밖이면 마지막 행에 본인.
 
 "use client";
 
@@ -35,11 +35,11 @@ interface RankingResponse {
   period: string;
 }
 
-const METRICS: Array<{ value: Metric; labelKo: string; labelEn: string }> = [
-  { value: "cost", labelKo: "비용", labelEn: "Cost" },
-  { value: "tokens", labelKo: "사용량", labelEn: "Tokens" },
-  { value: "powerIndex", labelKo: "활용지수", labelEn: "Utilization" },
-  { value: "cacheHit", labelKo: "캐시 히트", labelEn: "Cache Hit" },
+const METRICS: Array<{ value: Metric; label: string; color: string }> = [
+  { value: "cost", label: "비용", color: "yellow" },
+  { value: "tokens", label: "사용량", color: "cyan" },
+  { value: "powerIndex", label: "활용지수", color: "emerald" },
+  { value: "cacheHit", label: "캐시 히트", color: "violet" },
 ];
 
 function fmtValue(metric: Metric, value: number): string {
@@ -58,12 +58,25 @@ function fmtValue(metric: Metric, value: number): string {
   }
 }
 
+const VALUE_COLOR_BY_METRIC: Record<Metric, string> = {
+  cost: "text-yellow-400",
+  tokens: "text-cyan-400",
+  powerIndex: "text-emerald-400",
+  cacheHit: "text-violet-400",
+};
+
+const ACCENT_BY_METRIC: Record<Metric, { bg: string; border: string; text: string }> = {
+  cost: { bg: "bg-yellow-500/10", border: "border-yellow-500/30", text: "text-yellow-300" },
+  tokens: { bg: "bg-cyan-500/10", border: "border-cyan-500/30", text: "text-cyan-300" },
+  powerIndex: { bg: "bg-emerald-500/10", border: "border-emerald-500/30", text: "text-emerald-300" },
+  cacheHit: { bg: "bg-violet-500/10", border: "border-violet-500/30", text: "text-violet-300" },
+};
+
 export default function RankingPage() {
   const { status } = useSession();
   const router = useRouter();
   const { m } = useMessages();
-  const [metric, setMetric] = useState<Metric>("cost");
-  const [data, setData] = useState<RankingResponse | null>(null);
+  const [byMetric, setByMetric] = useState<Partial<Record<Metric, RankingResponse>>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -75,107 +88,59 @@ export default function RankingPage() {
     if (status !== "authenticated") return;
     setLoading(true);
     setError(null);
-    fetch(`/api/ranking?metric=${metric}`)
-      .then((r) => {
-        if (!r.ok) throw new Error(String(r.status));
-        return r.json();
-      })
-      .then((d: RankingResponse) => {
-        setData(d);
+    Promise.all(
+      METRICS.map((mt) =>
+        fetch(`/api/ranking?metric=${mt.value}`)
+          .then((r) => {
+            if (!r.ok) throw new Error(String(r.status));
+            return r.json();
+          })
+          .then((d: RankingResponse) => ({ metric: mt.value, data: d }))
+      )
+    )
+      .then((results) => {
+        const next: Partial<Record<Metric, RankingResponse>> = {};
+        for (const { metric, data } of results) next[metric] = data;
+        setByMetric(next);
         setLoading(false);
       })
       .catch((e) => {
         setError(String(e));
         setLoading(false);
       });
-  }, [metric, status]);
+  }, [status]);
 
   if (status === "loading") return null;
+
+  const totalParticipants = byMetric.cost?.totalParticipants ?? 0;
 
   return (
     <div className="min-h-screen bg-neutral-950">
       <Nav />
-      <div className="max-w-4xl mx-auto px-4 py-6 space-y-6">
+      <div className="max-w-6xl mx-auto px-4 py-6 space-y-6">
         <header>
           <h1 className="text-lg font-bold text-slate-100">{m.nav.ranking ?? "랭킹"}</h1>
           <p className="text-xs text-slate-500 mt-1">
             최근 30일 (UTC) 기준 전체 참여자 순위. 이름은 익명 처리됩니다. 동점은 같은 순위.
+            {totalParticipants > 0 && (
+              <span className="text-slate-400 ml-2">전체 {totalParticipants}명 참여</span>
+            )}
           </p>
         </header>
-
-        {/* Metric Tabs */}
-        <div className="flex gap-1">
-          {METRICS.map((mt) => (
-            <button
-              key={mt.value}
-              onClick={() => setMetric(mt.value)}
-              className={`text-xs px-3 py-1.5 rounded font-mono transition-colors ${
-                metric === mt.value
-                  ? "bg-slate-700 text-slate-100"
-                  : "bg-slate-900 text-slate-500 hover:text-slate-300"
-              }`}
-            >
-              {mt.labelKo}
-            </button>
-          ))}
-        </div>
 
         {error && <p className="text-sm text-rose-400 font-mono">로드 실패: {error}</p>}
         {loading && <p className="text-sm text-neutral-500 font-mono">loading…</p>}
 
-        {data && !loading && (
-          <div className="space-y-6">
-            {/* My Rank Summary */}
-            {data.myRank && (
-              <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-lg p-4">
-                <div className="flex items-baseline gap-3 flex-wrap">
-                  <span className="text-3xl font-mono font-bold text-emerald-400">
-                    #{data.myRank.rank}
-                  </span>
-                  <span className="text-sm font-mono text-slate-400">
-                    / {data.totalParticipants}명 중
-                  </span>
-                  <span className="text-lg font-mono font-bold text-slate-100 ml-auto">
-                    {fmtValue(metric, data.myRank[metric])}
-                  </span>
-                </div>
-                <p className="text-xs font-mono text-emerald-300/70 mt-1">
-                  활성일 {data.myRank.activeDays}일 · 최근 30일
-                </p>
-              </div>
-            )}
-
-            {!data.myRank && (
-              <div className="bg-slate-900 border border-slate-800 rounded-lg p-4 text-xs font-mono text-slate-500">
-                랭킹 참여 데이터가 없습니다. 데이터가 수집되면 여기에 내 순위가 표시됩니다.
-              </div>
-            )}
-
-            {/* Top 50 Table */}
-            <div className="bg-slate-900 border border-slate-800 rounded-lg overflow-hidden">
-              <div className="px-4 py-2.5 border-b border-slate-800">
-                <span className="text-xs font-mono font-bold text-slate-400 uppercase tracking-wider">
-                  상위 {Math.min(50, data.totalParticipants)}명
-                </span>
-              </div>
-              <RankTable rows={data.top} metric={metric} />
-            </div>
-
-            {/* Around Me */}
-            {data.around.length > 0 && data.myRank && data.myRank.rank > 50 && (
-              <div className="bg-slate-900 border border-slate-800 rounded-lg overflow-hidden">
-                <div className="px-4 py-2.5 border-b border-slate-800">
-                  <span className="text-xs font-mono font-bold text-slate-400 uppercase tracking-wider">
-                    내 주변 순위
-                  </span>
-                </div>
-                <RankTable rows={data.around} metric={metric} />
-              </div>
-            )}
-
-            <p className="text-[10px] font-mono text-slate-600 text-center">
-              전체 {data.totalParticipants}명 참여 · 최근 30일 · {metric === "cacheHit" ? "높을수록" : metric === "powerIndex" ? "높을수록" : "많을수록"} 상위
-            </p>
+        {!loading && !error && (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            {METRICS.map((mt) => (
+              <MetricCard
+                key={mt.value}
+                metric={mt.value}
+                label={mt.label}
+                data={byMetric[mt.value] ?? null}
+              />
+            ))}
           </div>
         )}
       </div>
@@ -183,58 +148,131 @@ export default function RankingPage() {
   );
 }
 
-function RankTable({ rows, metric }: { rows: RankedUser[]; metric: Metric }) {
+function MetricCard({
+  metric,
+  label,
+  data,
+}: {
+  metric: Metric;
+  label: string;
+  data: RankingResponse | null;
+}) {
+  if (!data) {
+    return (
+      <div className="bg-slate-900 border border-slate-800 rounded-lg p-4">
+        <p className="text-xs font-mono text-slate-500">{label} — 데이터 없음</p>
+      </div>
+    );
+  }
+
+  const accent = ACCENT_BY_METRIC[metric];
+  const valueColor = VALUE_COLOR_BY_METRIC[metric];
+  const top = data.top.slice(0, 10);
+  const myInTop = data.myRank && top.some((r) => r.userId === data.myRank!.userId);
+
   return (
-    <table className="w-full text-xs font-mono">
-      <thead>
-        <tr className="text-slate-600 border-b border-slate-800">
-          <th className="text-left px-4 py-2 w-16">#</th>
-          <th className="text-left px-4 py-2">이름</th>
-          <th className="text-right px-4 py-2 w-20">활성일</th>
-          <th className="text-right px-4 py-2 w-24">
-            {metric === "cost" ? "비용" : metric === "tokens" ? "토큰" : metric === "powerIndex" ? "활용지수" : "캐시히트"}
-          </th>
-        </tr>
-      </thead>
-      <tbody>
-        {rows.map((r) => (
-          <tr
-            key={r.userId}
-            className={`border-b border-slate-800/50 ${
-              r.isMe
-                ? "bg-emerald-500/10 ring-1 ring-inset ring-emerald-500/30"
-                : "hover:bg-slate-800/30"
-            }`}
-          >
-            <td className="px-4 py-2.5 text-slate-500 tabular-nums">
-              {r.rank <= 3 ? (
-                <span className={r.rank === 1 ? "text-yellow-400 font-bold" : r.rank === 2 ? "text-slate-300 font-bold" : "text-amber-600 font-bold"}>
-                  {r.rank}
-                </span>
-              ) : (
-                r.rank
-              )}
-            </td>
-            <td className="px-4 py-2.5">
-              <span className={r.isMe ? "text-emerald-300 font-bold" : "text-slate-300"}>
-                {r.name}
-              </span>
-              {r.isMe && <span className="text-[10px] text-emerald-400 ml-2">← 나</span>}
-            </td>
-            <td className="px-4 py-2.5 text-right text-slate-500 tabular-nums">{r.activeDays}d</td>
-            <td className="px-4 py-2.5 text-right tabular-nums">
-              <span className={
-                metric === "cost" ? "text-yellow-400" :
-                metric === "tokens" ? "text-cyan-400" :
-                metric === "powerIndex" ? "text-emerald-400" :
-                "text-emerald-400"
-              }>
-                {fmtValue(metric, r[metric])}
-              </span>
-            </td>
+    <section className="bg-slate-900 border border-slate-800 rounded-lg overflow-hidden">
+      <div className="px-4 py-2.5 border-b border-slate-800 flex items-center justify-between">
+        <span className="text-xs font-mono font-bold uppercase tracking-wider text-slate-200">
+          {label}
+        </span>
+        <span className="text-[10px] font-mono text-slate-500">Top {top.length}</span>
+      </div>
+
+      {/* 본인 hero — 카드 내부 상단 */}
+      {data.myRank ? (
+        <div className={`px-4 py-3 ${accent.bg} border-b ${accent.border}`}>
+          <div className="flex items-baseline gap-2 flex-wrap">
+            <span className={`text-2xl font-mono font-bold ${accent.text}`}>
+              #{data.myRank.rank}
+            </span>
+            <span className="text-[11px] font-mono text-slate-400">
+              / {data.totalParticipants}명 중
+            </span>
+            <span className={`ml-auto text-base font-mono font-bold ${valueColor}`}>
+              {fmtValue(metric, data.myRank[metric])}
+            </span>
+          </div>
+        </div>
+      ) : (
+        <div className="px-4 py-2 bg-slate-800/50 border-b border-slate-800 text-[11px] font-mono text-slate-500">
+          데이터 없음 — 본인 순위 미표시
+        </div>
+      )}
+
+      {/* Top 10 */}
+      <table className="w-full text-xs font-mono">
+        <thead>
+          <tr className="text-slate-600 border-b border-slate-800">
+            <th className="text-left px-3 py-1.5 w-10">#</th>
+            <th className="text-left px-3 py-1.5">이름</th>
+            <th className="text-right px-3 py-1.5 w-14">활성일</th>
+            <th className="text-right px-3 py-1.5 w-20">{label}</th>
           </tr>
-        ))}
-      </tbody>
-    </table>
+        </thead>
+        <tbody>
+          {top.map((r) => (
+            <RankRow key={r.userId} row={r} metric={metric} valueColor={valueColor} />
+          ))}
+          {/* 본인이 Top 10 밖이면 별도 마지막 행 */}
+          {!myInTop && data.myRank && (
+            <>
+              <tr>
+                <td colSpan={4} className="text-center text-slate-700 text-[10px] py-1">⋯</td>
+              </tr>
+              <RankRow row={data.myRank} metric={metric} valueColor={valueColor} />
+            </>
+          )}
+        </tbody>
+      </table>
+    </section>
+  );
+}
+
+function RankRow({
+  row,
+  metric,
+  valueColor,
+}: {
+  row: RankedUser;
+  metric: Metric;
+  valueColor: string;
+}) {
+  return (
+    <tr
+      className={`border-b border-slate-800/50 ${
+        row.isMe
+          ? "bg-emerald-500/10 ring-1 ring-inset ring-emerald-500/30"
+          : "hover:bg-slate-800/30"
+      }`}
+    >
+      <td className="px-3 py-1.5 text-slate-500 tabular-nums">
+        {row.rank <= 3 ? (
+          <span
+            className={
+              row.rank === 1
+                ? "text-yellow-400 font-bold"
+                : row.rank === 2
+                ? "text-slate-300 font-bold"
+                : "text-amber-600 font-bold"
+            }
+          >
+            {row.rank}
+          </span>
+        ) : (
+          row.rank
+        )}
+      </td>
+      <td className="px-3 py-1.5">
+        <span className={row.isMe ? "text-emerald-300 font-bold" : "text-slate-300"}>
+          {row.name}
+        </span>
+        {row.isMe && <span className="text-[10px] text-emerald-400 ml-1.5">← 나</span>}
+      </td>
+      <td className="px-3 py-1.5 text-right text-slate-500 tabular-nums">{row.activeDays}d</td>
+      <td className={`px-3 py-1.5 text-right tabular-nums ${valueColor}`}>
+        {fmtValue(metric, row[metric])}
+      </td>
+    </tr>
   );
 }

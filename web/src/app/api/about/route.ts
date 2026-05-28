@@ -14,13 +14,18 @@
 import { NextResponse } from "next/server";
 
 import { PINNED } from "@/lib/pinned-versions";
+import pkg from "../../../../package.json";
 
 export async function GET() {
   const isLocal = process.env.LOCAL_MODE === "1" || process.env.NEXT_PUBLIC_LOCAL_MODE === "1";
 
+  // 클라우드 모드: web/package.json 의 version 을 노출 (semver 수동 bump).
+  // 로컬 (.dmg) 모드: installer 의 APP_VERSION env 우선.
+  const appVersion = process.env.APP_VERSION ?? (isLocal ? null : pkg.version);
+
   return NextResponse.json({
     mode: isLocal ? "local" : "cloud",
-    app: process.env.APP_VERSION ?? null,
+    app: appVersion,
     node: process.env.RUNTIME_NODE_VERSION ?? PINNED.NODE_RECOMMENDED,
     codeburn: process.env.RUNTIME_CODEBURN_VERSION ?? PINNED.CODEBURN,
     ccusage: process.env.RUNTIME_CCUSAGE_VERSION ?? PINNED.CCUSAGE,

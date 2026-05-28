@@ -440,15 +440,20 @@ function RankingToggleCard({ en }: { en: boolean }) {
   }, [isPersonal]);
 
   const toggle = async () => {
+    const next = !value;
+    const msg = next
+      ? "전체 익명 랭킹에 참여합니다. 본인 사용량 메타 데이터가 다른 참여자 화면에 익명으로 노출됩니다. 진행할까요?"
+      : "랭킹 참여를 해제합니다. 다시 켜기 전까지 본인 데이터는 랭킹에서 빠집니다. 진행할까요?";
+    if (!window.confirm(msg)) return;
     setLoading(true);
     try {
       const r = await fetch("/api/personal/toggle", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ personal: !value }),
+        body: JSON.stringify({ personal: next }),
       });
       if (r.ok) {
-        setValue(!value);
+        setValue(next);
         window.location.reload();
       } else {
         const d = await r.json().catch(() => ({}));
