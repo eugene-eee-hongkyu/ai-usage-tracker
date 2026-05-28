@@ -295,6 +295,21 @@ export interface Messages {
     topProjects: string;
     sessionsCountUnit: string;
   };
+  landing: {
+    heroTitle: string;
+    heroSubtitle: string;
+    cardUsageTitle: string;
+    cardUsageBody: string;
+    cardGlobalTitle: string;
+    cardGlobalBody: string;
+    cardEfficiencyTitle: string;
+    cardEfficiencyBody: string;
+    trust: string;
+    cta: string;
+    ctaSub: string;
+    learnMore: string;
+    learnMoreLink: string;
+  };
   login: {
     tagline: string;
     teamOnly: string;
@@ -975,6 +990,21 @@ export const en: Messages = {
     activityHeatmap4w: "Activity heatmap (4 weeks, by cost)",
     topProjects: "Top projects",
     sessionsCountUnit: " sessions",
+  },
+  landing: {
+    heroTitle: "Your team's AI usage, on one screen",
+    heroSubtitle: "Claude Code usage, efficiency, and team standing — install once, it accumulates automatically.",
+    cardUsageTitle: "Usage & efficiency at a glance",
+    cardUsageBody: "Tokens, cost, cache hits, one-shot rate on a single page. See exactly where to optimize.",
+    cardGlobalTitle: "Your team's global standing",
+    cardGlobalBody: "Compare efficiency and token cost against other teams. Anonymized rankings for objective benchmarking.",
+    cardEfficiencyTitle: "Who's most productive — and efficient",
+    cardEfficiencyBody: "See which teammates use cache well and have high one-shot rates. For self-coaching, not evaluation.",
+    trust: "No personal data, no external calls, transparent formulas. We collect only metadata — never your code, prompts, or AI responses.",
+    cta: "Get started",
+    ctaSub: "30 seconds with GitHub or Google",
+    learnMore: "Learn more at",
+    learnMoreLink: "ai.z21labs.world",
   },
   login: {
     tagline: "See at a glance how much and how well you're using AI coding tools",
