@@ -119,13 +119,24 @@ export const authOptions: NextAuthOptions = {
             )
             .limit(1);
           if (existingInvite[0] && existingInvite[0].expiresAt < new Date()) {
-            // B6 (2026-05-28): 만료 invitation 은 cancelledAt 박아 stale row 정리.
-            // 신규 사용자 분기와 대칭 — 옛 동작은 기존 사용자가 만료 invitation 들고
-            // 로그인해도 row 가 영원히 pending 으로 남던 부정합.
+            // 만료 invitation: cancelledAt 박고 신규 사용자 분기와 동일하게
+            // invitation_expired 에러로 거부. 옛 비대칭 (기존 사용자는 silent
+            // 통과) 은 사용자 혼동 — "초대 받았는데 가입 안 되네" 가 명시적
+            // 메시지로 표시되어야 함 (2026-05-28 결정).
             await db
               .update(invTable)
               .set({ cancelledAt: new Date() })
               .where(eq(invTable.id, existingInvite[0].id));
+            await writeAudit({
+              teamId: existingInvite[0].teamId,
+              actorUserId: u.id,
+              actorType: "user",
+              action: "invitation.expired",
+              targetType: "invitation",
+              targetId: existingInvite[0].id,
+              metadata: { email, provider, userType: "existing" },
+            });
+            return `/login?error=invitation_expired`;
           } else if (existingInvite[0]) {
             const inv = existingInvite[0];
             const alreadyMember = await db
@@ -136,6 +147,19 @@ export const authOptions: NextAuthOptions = {
             if (!alreadyMember[0]) {
               const teamRole = inv.role === "owner" || inv.role === "admin" ? inv.role : "member";
               await db.insert(teamMembers).values({ teamId: inv.teamId, userId: u.id, role: teamRole }).onConflictDoNothing();
+              // 결정 3 (2026-05-28): personal 사용자가 normal 팀에 가입하면
+              // personal flag 자동 해제. 부정합 상태 (personal=true + normal
+              // 팀 멤버) 방지 — ranking 라우트가 users.personal 만 보기 때문.
+              if (u.personal) {
+                const inviteTeamType = await db
+                  .select({ type: teams.type })
+                  .from(teams)
+                  .where(eq(teams.id, inv.teamId))
+                  .limit(1);
+                if (inviteTeamType[0]?.type === "normal") {
+                  await db.update(users).set({ personal: false }).where(eq(users.id, u.id));
+                }
+              }
               await writeAudit({
                 teamId: inv.teamId,
                 actorUserId: u.id,
@@ -178,6 +202,12 @@ export const authOptions: NextAuthOptions = {
                   .where(andOp2(eq(teamMembers.teamId, autoTeam[0].id), isNullOp2(teamMembers.deletedAt)));
                 if ((activeCount[0]?.c ?? 0) < autoTeam[0].maxMembers) {
                   await db.insert(teamMembers).values({ teamId: autoTeam[0].id, userId: u.id, role: "member" }).onConflictDoNothing();
+                  // 결정 3 (2026-05-28): auto-join 은 query 자체가 normal 팀
+                  // 으로 제한 (eq(teams.type, "normal")) — personal flag 자동
+                  // 해제. type check 불필요.
+                  if (u.personal) {
+                    await db.update(users).set({ personal: false }).where(eq(users.id, u.id));
+                  }
                   await writeAudit({
                     teamId: autoTeam[0].id,
                     actorUserId: u.id,

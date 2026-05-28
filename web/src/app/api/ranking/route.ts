@@ -19,17 +19,37 @@ type Metric = "cost" | "tokens" | "cacheHit" | "streak" | "saving";
 // 모델 mix 무시한 근사 (Haiku/Opus 가격 다름). v1 단순화.
 const CACHE_SAVING_PER_M_TOKENS = 2.7;
 
+// 사용자 timezone 기준 YYYY-MM-DD. ccusage daily.date 가 사용자 로컬 날짜라
+// 비교 키도 같은 timezone 이어야 KST/SGT 사용자 자정~UTC 자정 사이에 streak
+// 가 0 으로 잘못 떨어지지 않음.
+function ymdInTz(date: Date, tz: string): string {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: tz,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(date);
+  const get = (t: string) => parts.find((p) => p.type === t)?.value ?? "00";
+  return `${get("year")}-${get("month")}-${get("day")}`;
+}
+
+// YYYY-MM-DD 산술 (UTC anchor, timezone 무관 + DST 영향 X).
+function shiftYmd(ymd: string, days: number): string {
+  const [y, m, d] = ymd.split("-").map(Number);
+  const utc = new Date(Date.UTC(y, m - 1, d));
+  utc.setUTCDate(utc.getUTCDate() + days);
+  return utc.toISOString().slice(0, 10);
+}
+
 function calcStreak(daily: Array<{ date?: string; totalTokens?: number }>, todayYmd: string): number {
   // 현재까지 진행 중 streak — 오늘 또는 어제 활동 있으면 거기서부터 거꾸로 count.
   // 오늘 ingest 가 늦게 들어오는 race 회피 위해 어제까지도 허용.
   const activeDates = new Set(
     daily.filter((d) => d.date && (d.totalTokens ?? 0) > 0).map((d) => d.date)
   );
-  const cur = new Date(todayYmd);
-  let ymd = cur.toISOString().slice(0, 10);
+  let ymd = todayYmd;
   if (!activeDates.has(ymd)) {
-    cur.setDate(cur.getDate() - 1);
-    ymd = cur.toISOString().slice(0, 10);
+    ymd = shiftYmd(ymd, -1);
     if (!activeDates.has(ymd)) return 0;
   }
   // streak 는 30일 윈도우 무관 — ccusage daily 의 전체 history (대개 ~수년) 에서
@@ -37,8 +57,7 @@ function calcStreak(daily: Array<{ date?: string; totalTokens?: number }>, today
   let streak = 0;
   while (activeDates.has(ymd) && streak < 36500) {
     streak++;
-    cur.setDate(cur.getDate() - 1);
-    ymd = cur.toISOString().slice(0, 10);
+    ymd = shiftYmd(ymd, -1);
   }
   return streak;
 }
@@ -79,10 +98,12 @@ export async function GET(req: NextRequest) {
     .limit(1);
   const meId = meRow[0]?.id ?? -1;
 
-  // personal=true, ranking_hidden=false, active 사용자의 가장 최근 snapshot
+  // personal=true, ranking_hidden=false, active 사용자의 가장 최근 snapshot.
+  // u.timezone 도 함께 — 사용자별 timezone 기준 todayYmd 계산으로 streak
+  // 정확도 ↑ (KST/SGT 자정~UTC 자정 사이 0 으로 떨어지던 버그).
   const rows = await db.execute(sql`
     SELECT DISTINCT ON (us.user_id)
-      us.user_id, u.name, us.raw_json, us.total_cost, us.cache_hit_pct,
+      us.user_id, u.name, u.timezone, us.raw_json, us.total_cost, us.cache_hit_pct,
       us.sessions_count, us.calls_count
     FROM user_snapshots us
     JOIN users u ON u.id = us.user_id
@@ -98,7 +119,7 @@ export async function GET(req: NextRequest) {
   thirtyAgo.setDate(thirtyAgo.getDate() - 29);
   const thirtyAgoYmd = thirtyAgo.toISOString().slice(0, 10);
 
-  const todayYmd = new Date().toISOString().slice(0, 10);
+  const now = new Date();
 
   // 30일 집계
   const entries: Array<{
@@ -115,6 +136,8 @@ export async function GET(req: NextRequest) {
   for (const row of rows.rows as Array<Record<string, unknown>>) {
     const userId = row.user_id as number;
     const name = row.name as string;
+    const userTz = (row.timezone as string | null) ?? "UTC";
+    const todayYmd = ymdInTz(now, userTz);
     const rawJson = row.raw_json as Record<string, unknown>;
 
     const daily = getCcusageDaily(rawJson);

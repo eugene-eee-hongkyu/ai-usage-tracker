@@ -138,9 +138,13 @@ function deriveUserTodayFromBody(body: unknown): string | null {
   const periodMatch = today?.period?.match?.(/(\d{4}-\d{2}-\d{2})/);
   if (periodMatch) candidates.push(periodMatch[1]);
 
-  const cu = b.ccusageDaily as { daily?: Array<{ date?: string }> } | undefined;
+  // ccusage 19.x: row 의 날짜 키가 'date' → 'period'. 양쪽 모두 수용.
+  // 빠뜨리면 KST/SGT 사용자 boundary 직후 newDayStart 가 codeburn UTC today
+  // 만 의존하게 되어 daily snapshot 이 잘못된 날짜로 promote 됨.
+  const cu = b.ccusageDaily as { daily?: Array<{ date?: string; period?: string }> } | undefined;
   for (const row of cu?.daily ?? []) {
-    if (row.date && /^\d{4}-\d{2}-\d{2}$/.test(row.date)) candidates.push(row.date);
+    const d = row.date ?? row.period;
+    if (d && /^\d{4}-\d{2}-\d{2}$/.test(d)) candidates.push(d);
   }
 
   if (!candidates.length) return null;

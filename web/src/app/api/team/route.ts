@@ -141,6 +141,19 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "no_team" }, { status: 403 });
   }
 
+  // 호출자 timezone — teamRecovery 의 monthStart/today 산출에 사용. team 단위라
+  // 단일 timezone 이 없지만 (보는 사람 = 사용자) 기준이 자연. dashboard 의
+  // monthRecovery 와 동일한 사용자 경험 (KST/SGT 매월 1일 boundary 정확).
+  const viewerTimezone = await (async () => {
+    if (IS_LOCAL_MODE) return "UTC";
+    const row = await db
+      .select({ timezone: users.timezone })
+      .from(users)
+      .where(eq(users.email, authedEmail))
+      .limit(1);
+    return row[0]?.timezone ?? "UTC";
+  })();
+
   const period = (req.nextUrl.searchParams.get("period") ?? "all") as Period;
 
   // 팀명 — headline 카드의 "{team} 카드" 라벨용. all-teams 페이지에서 admin
@@ -784,21 +797,32 @@ export async function GET(req: NextRequest) {
   // planTotal = 0 이면 전체 API tier / tier 미입력 → null. UI 가 안내 카드로.
   const teamRecovery = (() => {
     const planTotal = teamPlanHealth.currentMonthlyCostUsd;
-    const now = new Date();
-    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-    const monthStartYmd = monthStart.toISOString().slice(0, 10);
-    const todayYmd = now.toISOString().slice(0, 10);
-    // API tier 멤버 set — memberKey 기준. memberUsage 에서 effectiveTier 'api'.
-    const apiMemberKeys = new Set(
+    // viewerTimezone 기준 monthStart/today — server local (Vercel UTC) 가
+    // 아닌 보는 사람의 달력 기준. dashboard.monthRecovery 와 일관.
+    const todayParts = new Intl.DateTimeFormat("en-CA", {
+      timeZone: viewerTimezone,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).formatToParts(new Date());
+    const getPart = (t: string) => todayParts.find((p) => p.type === t)?.value ?? "00";
+    const todayYmd = `${getPart("year")}-${getPart("month")}-${getPart("day")}`;
+    const monthStartYmd = todayYmd.slice(0, 7) + "-01";
+    // 제외 대상 멤버 set — memberKey 기준.
+    // 1) effectiveTier='api': 종량제라 plan 가격 0 → 본전 회수 framing 무의미.
+    // 2) effectiveTier=null (tier 미입력 + 추정 unknown): plan price 가 분모에
+    //    안 들어가는데 cost 는 분자에 들어가 회수율이 200%+ 부풀려지는 단위
+    //    불일치. Plan 가입자 cost / Plan 가격 정의와 일관 (2026-05-28 결정).
+    const excludedMemberKeys = new Set(
       memberUsage
-        .filter((m) => m.effectiveTier === "api")
+        .filter((m) => m.effectiveTier === "api" || m.effectiveTier === null)
         .map((m) => m.memberKey)
     );
     const memberMonthCost = new Map<string, number>();
     for (const [date, costsByMember] of dailyMemberMap.entries()) {
       if (date < monthStartYmd || date > todayYmd) continue;
       for (const [memberKey, cost] of Object.entries(costsByMember)) {
-        if (apiMemberKeys.has(memberKey)) continue; // API 멤버 cost 제외
+        if (excludedMemberKeys.has(memberKey)) continue;
         memberMonthCost.set(memberKey, (memberMonthCost.get(memberKey) ?? 0) + cost);
       }
     }

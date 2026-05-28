@@ -279,9 +279,10 @@ export const userSnapshots = pgTable(
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
   },
   (t) => ({
-    // 실제 DB 의 unique index 는 (user_id, team_id, COALESCE(token_id, 0)) expression.
-    // Drizzle 의 uniqueIndex 는 expression 표현이 까다로워, 같은 효과를 내는 column-list 로
-    // 선언 (런타임 동작은 DB 의 expression index 가 책임). drizzle migrate 는 미사용.
+    // 실제 DB unique index = (user_id, team_id, token_id) NULLS NOT DISTINCT
+    // (PG 15+). NULL token_id 끼리도 같은 값으로 취급해 legacy fallback row
+    // 중복 차단. drizzle ON CONFLICT (column-list) 와 호환. drizzle migrate
+    // 는 미사용 — 마이그 파일 (drizzle/*.sql) 을 수동으로 Supabase 에 적용.
     userTeamTokenUniq: uniqueIndex("user_snapshots_user_team_token_uniq").on(t.userId, t.teamId, t.tokenId),
     teamIdx: index("user_snapshots_team_idx").on(t.teamId),
   })
@@ -306,7 +307,7 @@ export const periodSnapshots = pgTable(
     rawJson: jsonb("raw_json").notNull(),
   },
   (t) => ({
-    // 실제 DB index 는 (user_id, team_id, period_type, period_start, COALESCE(token_id, 0)).
+    // 실제 DB index = (user_id, team_id, period_type, period_start, token_id) NULLS NOT DISTINCT.
     uniq: uniqueIndex("period_snapshots_uniq").on(t.userId, t.teamId, t.periodType, t.periodStart, t.tokenId),
     teamIdx: index("period_snapshots_team_idx").on(t.teamId),
   })

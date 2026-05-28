@@ -1140,15 +1140,26 @@ export async function GET(req: NextRequest) {
       monthRecovery: (() => {
         const price = effectiveLimits?.monthlyPriceUsd ?? null;
         if (!price || price <= 0) return null;
-        const now = new Date();
-        const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-        const monthStartYmd = monthStart.toISOString().slice(0, 10);
-        const todayYmd = now.toISOString().slice(0, 10);
+        // 사용자 timezone 기준 — Vercel UTC 서버 local Date 를 그대로 쓰면
+        // KST/SGT 사용자 매월 1일 자정~9시 사이에 한 달치 잘못 계산됨.
+        const tz = user[0].timezone ?? "UTC";
+        const todayParts = new Intl.DateTimeFormat("en-CA", {
+          timeZone: tz,
+          year: "numeric",
+          month: "2-digit",
+          day: "2-digit",
+        }).formatToParts(new Date());
+        const getPart = (t: string) => todayParts.find((p) => p.type === t)?.value ?? "00";
+        const todayYmd = `${getPart("year")}-${getPart("month")}-${getPart("day")}`;
+        const monthStartYmd = todayYmd.slice(0, 7) + "-01";
         const monthRows = ccusageRows
           .filter((r) => r.date && r.date >= monthStartYmd && r.date <= todayYmd)
           .sort((a, b) => (a.date ?? "").localeCompare(b.date ?? ""));
-        const daysElapsed = now.getDate();
-        const daysTotal = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+        const daysElapsed = parseInt(getPart("day"), 10);
+        // 해당 월의 총 일수 — UTC anchor 로 계산 (next month day 0 = current month last day).
+        const yr = parseInt(getPart("year"), 10);
+        const mo = parseInt(getPart("month"), 10);
+        const daysTotal = new Date(Date.UTC(yr, mo, 0)).getUTCDate();
         if (monthRows.length === 0) {
           return {
             monthlyPriceUsd: price,
