@@ -9,6 +9,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { isAdmin } from "@/lib/admin";
 import { db, users } from "@/lib/db";
+import { writeAudit } from "@/lib/audit";
 import { eq, and, isNull, sql } from "drizzle-orm";
 import { getCcusageDaily } from "@/lib/ccusage-row";
 import { computePowerIndex } from "@/lib/rules";
@@ -98,14 +99,34 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ error: "forbidden" }, { status: 403 });
 
   const body = await req.json().catch(() => ({}));
-  const { userId, rankingHidden } = body as { userId?: number; rankingHidden?: boolean };
-  if (!userId || typeof rankingHidden !== "boolean")
+  const { userId, rankingHidden } = body as { userId?: unknown; rankingHidden?: unknown };
+  // userId 정수 검증 — string/NaN 통과 차단 (drizzle 의 implicit cast 회피).
+  if (!Number.isInteger(userId) || (userId as number) <= 0 || typeof rankingHidden !== "boolean") {
     return NextResponse.json({ error: "invalid" }, { status: 400 });
+  }
+  const uid = userId as number;
 
   await db
     .update(users)
     .set({ rankingHidden })
-    .where(and(eq(users.id, userId), isNull(users.deletedAt)));
+    .where(and(eq(users.id, uid), isNull(users.deletedAt)));
+
+  // admin 이 ranking_hidden 토글하는 액션 — 다른 admin PATCH 와 일관성 위해 audit.
+  const actorRow = await db
+    .select({ id: users.id })
+    .from(users)
+    .where(eq(users.email, session.user.email))
+    .limit(1);
+  await writeAudit({
+    actorUserId: actorRow[0]?.id ?? null,
+    actorType: "user",
+    action: "user.ranking_hidden.toggle",
+    targetType: "user",
+    targetId: uid,
+    metadata: { rankingHidden },
+    ip: req.headers.get("x-forwarded-for") ?? null,
+    actorIsPlatformOwner: true,
+  });
 
   return NextResponse.json({ ok: true });
 }

@@ -66,6 +66,7 @@ function tierOptions(m: Messages): Array<{ value: string; label: string }> {
 }
 
 function fmtTokens(n: number): string {
+  if (!Number.isFinite(n)) return "—";
   if (n >= 1_000_000_000) return `${(n / 1_000_000_000).toFixed(1)}B`;
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
   if (n >= 1_000) return `${(n / 1_000).toFixed(1)}k`;
@@ -73,6 +74,7 @@ function fmtTokens(n: number): string {
 }
 
 function fmtCostPerMTok(usdPerMTok: number): string {
+  if (!Number.isFinite(usdPerMTok)) return "—";
   if (usdPerMTok >= 10) return `$${usdPerMTok.toFixed(1)}`;
   if (usdPerMTok >= 1) return `$${usdPerMTok.toFixed(2)}`;
   if (usdPerMTok >= 0.01) return `$${usdPerMTok.toFixed(3)}`;
@@ -80,6 +82,7 @@ function fmtCostPerMTok(usdPerMTok: number): string {
 }
 
 function fmtPrice(n: number): string {
+  if (!Number.isFinite(n)) return "—";
   if (Number.isInteger(n)) return `$${n}`;
   return `$${n.toFixed(2)}`;
 }

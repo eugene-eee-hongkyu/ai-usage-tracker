@@ -18,10 +18,22 @@ interface SaveBody {
   destinations: Destination[];
 }
 
+function isValidUrl(s: string): boolean {
+  try {
+    const u = new URL(s);
+    // http/https 만 허용 — file://, javascript: 등 차단. CLI sync 가 다음에
+    // 이 URL 로 POST 하므로 SSRF/임의 fetch 방어.
+    return u.protocol === "http:" || u.protocol === "https:";
+  } catch {
+    return false;
+  }
+}
+
 function isValidDestination(d: unknown): d is Destination {
   if (typeof d !== "object" || d === null) return false;
   const x = d as Record<string, unknown>;
-  return typeof x.name === "string" && typeof x.url === "string";
+  if (typeof x.name !== "string" || typeof x.url !== "string") return false;
+  return isValidUrl(x.url);
 }
 
 export async function POST(req: NextRequest) {

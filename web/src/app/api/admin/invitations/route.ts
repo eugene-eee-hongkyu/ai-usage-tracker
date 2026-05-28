@@ -93,58 +93,77 @@ export async function POST(req: NextRequest) {
   }
 
   // 2026-05-22: 회사별 멤버 cap 가드. 활성 멤버 + 미만료/미수락 pending 합산이
-  // cap 이상이면 거부. 이미 같은 이메일 pending 은 위 분기에서 차단.
+  // cap 이상이면 거부.
+  //
+  // cap race — 옛 동작은 cap check → INSERT 비원자성으로 동시 두 admin 이 같은
+  // 시각에 invite 하면 cap 5 인데 6 row 가 들어가는 사고. transaction + advisory
+  // lock (teamId 단위) 으로 같은 팀의 cap 검사·INSERT 를 직렬화. 다른 팀은 영향 X.
   const teamRow = await db
     .select({ maxMembers: teams.maxMembers, name: teams.name })
     .from(teams)
     .where(eq(teams.id, effectiveTeamId))
     .limit(1);
-  if (teamRow[0]) {
-    const cap = teamRow[0].maxMembers;
-    const activeCount = await db
-      .select({ c: sql<number>`count(*)::int` })
-      .from(teamMembers)
-      .where(and(eq(teamMembers.teamId, effectiveTeamId), isNull(teamMembers.deletedAt)));
-    const pendingCount = await db
-      .select({ c: sql<number>`count(*)::int` })
-      .from(invitations)
-      .where(
-        and(
-          eq(invitations.teamId, effectiveTeamId),
-          isNull(invitations.acceptedAt),
-          isNull(invitations.cancelledAt),
-          gt(invitations.expiresAt, new Date())
-        )
-      );
-    const used = (activeCount[0]?.c ?? 0) + (pendingCount[0]?.c ?? 0);
-    if (used >= cap) {
-      return NextResponse.json(
-        {
-          error: "team_cap_reached",
-          cap,
-          activeMembers: activeCount[0]?.c ?? 0,
-          pendingInvites: pendingCount[0]?.c ?? 0,
-        },
-        { status: 409 }
-      );
-    }
-  }
 
   const token = crypto.randomBytes(32).toString("hex");
   const expiresAt = new Date(Date.now() + EXPIRES_DAYS * 24 * 60 * 60 * 1000);
 
-  const inserted = await db
-    .insert(invitations)
-    .values({
-      teamId: effectiveTeamId,
-      email,
-      invitedBy: guard.user.id,
-      token,
-      role,
-      permissions,
-      expiresAt,
-    })
-    .returning({ id: invitations.id });
+  let inserted: { id: number }[] = [];
+  let capError: { error: string; cap: number; activeMembers: number; pendingInvites: number } | null = null;
+  try {
+    await db.transaction(async (tx) => {
+      // advisory lock — 같은 팀의 cap 검사·INSERT 직렬화. xact_lock 이라 commit/rollback
+      // 시 자동 해제. 키 collision 회피 위해 teamId 만 사용 (같은 팀 안에서만 직렬).
+      await tx.execute(sql`SELECT pg_advisory_xact_lock(${effectiveTeamId})`);
+
+      if (teamRow[0]) {
+        const cap = teamRow[0].maxMembers;
+        const activeCount = await tx
+          .select({ c: sql<number>`count(*)::int` })
+          .from(teamMembers)
+          .where(and(eq(teamMembers.teamId, effectiveTeamId), isNull(teamMembers.deletedAt)));
+        const pendingCount = await tx
+          .select({ c: sql<number>`count(*)::int` })
+          .from(invitations)
+          .where(
+            and(
+              eq(invitations.teamId, effectiveTeamId),
+              isNull(invitations.acceptedAt),
+              isNull(invitations.cancelledAt),
+              gt(invitations.expiresAt, new Date())
+            )
+          );
+        const used = (activeCount[0]?.c ?? 0) + (pendingCount[0]?.c ?? 0);
+        if (used >= cap) {
+          capError = {
+            error: "team_cap_reached",
+            cap,
+            activeMembers: activeCount[0]?.c ?? 0,
+            pendingInvites: pendingCount[0]?.c ?? 0,
+          };
+          // transaction 안에서 throw 하면 rollback. capError 는 closure 로 밖에 전달.
+          throw new Error("CAP_REACHED");
+        }
+      }
+
+      inserted = await tx
+        .insert(invitations)
+        .values({
+          teamId: effectiveTeamId,
+          email,
+          invitedBy: guard.user.id,
+          token,
+          role,
+          permissions,
+          expiresAt,
+        })
+        .returning({ id: invitations.id });
+    });
+  } catch (e) {
+    if (capError) {
+      return NextResponse.json(capError, { status: 409 });
+    }
+    throw e;
+  }
 
   await writeAudit({
     teamId: effectiveTeamId,

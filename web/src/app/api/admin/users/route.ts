@@ -183,13 +183,21 @@ export async function PATCH(req: NextRequest) {
     // role/permissions 변경은 Owner only
     const ownerGuard = await requireOwner();
     if (ownerGuard.error) return ownerGuard.error;
-    await db
-      .update(users)
-      .set({
-        role: role ?? "member",
-        permissions: permissions ?? {},
-      })
-      .where(eq(users.id, id));
+    // role 화이트리스트 — users.role 은 'member' | 'admin' 만 정상값.
+    // 임의 문자열 INSERT 차단 (session.user.role 에 noise + audit 노이즈 방어).
+    const VALID_USER_ROLES = new Set(["member", "admin"]);
+    if (role !== undefined && (typeof role !== "string" || !VALID_USER_ROLES.has(role))) {
+      return NextResponse.json({ error: "invalid_role" }, { status: 400 });
+    }
+    // permissions partial — 호출자가 role 만 보내고 permissions 생략하면
+    // 옛 동작은 빈 객체로 reset 했으나, 두 필드 독립 변경 가능하도록 분리.
+    const updateSet: Record<string, unknown> = {};
+    if (role !== undefined) updateSet.role = role;
+    if (permissions !== undefined) updateSet.permissions = permissions;
+    if (Object.keys(updateSet).length === 0) {
+      return NextResponse.json({ error: "no_changes" }, { status: 400 });
+    }
+    await db.update(users).set(updateSet).where(eq(users.id, id));
   } else {
     return NextResponse.json({ error: "invalid_action" }, { status: 400 });
   }

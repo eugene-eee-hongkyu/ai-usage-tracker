@@ -871,6 +871,21 @@ async function main() {
   mainWindow.webContents.on("did-navigate", onNav);
 }
 
+// Single-instance lock — 사용자가 .app 두 번 더블클릭 (또는 Dock + Spotlight) 했을
+// 때 두 인스턴스가 같은 SQLite + runtime 디렉토리를 동시 만지면서 ensureRuntimeDeps
+// rmSync/cp 가 race 되거나 마이그 .migrations-applied 파일 write 가 충돌하는 사고
+// 방어. lock 못 잡으면 즉시 종료 — 두 번째 클릭은 기존 윈도우를 focus 시켜줌.
+if (!app.requestSingleInstanceLock()) {
+  app.quit();
+} else {
+  app.on("second-instance", () => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      if (mainWindow.isMinimized()) mainWindow.restore();
+      mainWindow.focus();
+    }
+  });
+}
+
 app.whenReady().then(() => {
   main().catch((err) => {
     log(`치명적 오류: ${err.message}\n${err.stack}`);

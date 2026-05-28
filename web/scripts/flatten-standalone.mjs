@@ -17,7 +17,7 @@
 //   .next/standalone/web/* 를 .next/standalone/ 으로 이동 후 빈 web/ 디렉토리 삭제.
 //   node_modules 와 package.json 은 그대로 두면 node 의 require 가 자연 해석.
 
-import { existsSync, rmSync, renameSync, readdirSync, statSync, cpSync, mkdirSync } from "node:fs";
+import { existsSync, rmSync, renameSync, readdirSync, statSync, cpSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -74,6 +74,25 @@ if (existsSync(PUBLIC_SRC)) {
   console.log(`[flatten-standalone] public → ${PUBLIC_DST}`);
 } else {
   console.log("[flatten-standalone] public 없음 — skip");
+}
+
+// 3) server.js HOSTNAME default '0.0.0.0' → '127.0.0.1' 패치.
+//    next.js standalone 의 server.js 가 매 빌드마다 0.0.0.0 default 로 생성됨.
+//    Electron 이 띄울 때는 HOSTNAME=127.0.0.1 명시하지만, 사용자가 standalone
+//    을 다른 방식으로 직접 띄울 때 LAN 노출 방어. LOCAL_MODE 의도 일관.
+const SERVER_JS = path.join(STANDALONE, "server.js");
+if (existsSync(SERVER_JS)) {
+  const src = readFileSync(SERVER_JS, "utf8");
+  const patched = src.replace(
+    /const hostname = process\.env\.HOSTNAME \|\| '0\.0\.0\.0'/,
+    "const hostname = process.env.HOSTNAME || '127.0.0.1'  // LOCAL_MODE 안전망 (flatten-standalone 패치)"
+  );
+  if (patched !== src) {
+    writeFileSync(SERVER_JS, patched);
+    console.log("[flatten-standalone] server.js HOSTNAME default 0.0.0.0 → 127.0.0.1 패치");
+  } else {
+    console.log("[flatten-standalone] server.js HOSTNAME default 패치 대상 패턴 없음 — 이미 패치됐거나 next 버전 변경, 확인 필요");
+  }
 }
 
 console.log("[flatten-standalone] 완료 — server.js + node_modules + .next/static + public 모두 standalone 직속");

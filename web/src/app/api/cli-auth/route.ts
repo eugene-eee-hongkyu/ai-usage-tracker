@@ -15,7 +15,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { db, users, teamMembers, apiTokens } from "@/lib/db";
-import { eq, and, isNull, asc } from "drizzle-orm";
+import { eq, and, isNull, asc, sql } from "drizzle-orm";
 import crypto from "crypto";
 
 export const dynamic = "force-dynamic";
@@ -29,7 +29,14 @@ export async function GET(req: NextRequest) {
     );
   }
 
-  const port = req.nextUrl.searchParams.get("port") ?? "9988";
+  // port 검증 — 정수 + valid 범위만 허용. `?port=9988@evil.com` 같은 URL
+  // user-info injection 으로 raw apiKey 가 외부 도메인에 leak 되는 걸 차단
+  // (브라우저가 `http://127.0.0.1:<port>` 의 port 자리를 user-info 로 해석).
+  const portRaw = req.nextUrl.searchParams.get("port") ?? "9988";
+  const port = parseInt(portRaw, 10);
+  if (!Number.isInteger(port) || port < 1024 || port > 65535 || String(port) !== portRaw) {
+    return NextResponse.json({ error: "invalid_port" }, { status: 400 });
+  }
   // CLI 가 init 시 ?device=<hostname> 전달. 비어있으면 자동 라벨.
   const deviceQuery = req.nextUrl.searchParams.get("device")?.trim();
 
@@ -70,31 +77,39 @@ export async function GET(req: NextRequest) {
   // 같은 노트북에서 install.sh 다시 돌려도 device 행 1개 유지 (옛 hash 무효화 + 새 hash).
   // 다른 노트북 (다른 hostname) 이면 새 행. 사용자가 의도적으로 같은 label 로 등록하려면
   // ?device=<custom> 으로 명시 가능.
-  const existingDevice = await db
-    .select({ id: apiTokens.id })
-    .from(apiTokens)
-    .where(
-      and(
-        eq(apiTokens.userId, userId),
-        eq(apiTokens.name, deviceName),
-        isNull(apiTokens.revokedAt)
+  //
+  // 동시 init race — 동일 device 에서 install.sh 두 번 빠르게 트리거 시 SELECT
+  // → UPDATE/INSERT 사이에 다른 요청이 INSERT 해버려 같은 (user_id, name) 의
+  // active 토큰이 2개 만들어지던 부정합. transaction + advisory lock (user_id 단위)
+  // 으로 직렬화 — read-committed 라도 같은 user 의 cli-auth 호출은 1개씩 처리.
+  await db.transaction(async (tx) => {
+    await tx.execute(sql`SELECT pg_advisory_xact_lock(${userId})`);
+    const existingDevice = await tx
+      .select({ id: apiTokens.id })
+      .from(apiTokens)
+      .where(
+        and(
+          eq(apiTokens.userId, userId),
+          eq(apiTokens.name, deviceName),
+          isNull(apiTokens.revokedAt)
+        )
       )
-    )
-    .limit(1);
-  if (existingDevice[0]) {
-    await db
-      .update(apiTokens)
-      .set({ hash: apiKeyHash, scopes: ["ingest"] })
-      .where(eq(apiTokens.id, existingDevice[0].id));
-  } else {
-    await db.insert(apiTokens).values({
-      teamId,
-      userId,
-      name: deviceName,
-      hash: apiKeyHash,
-      scopes: ["ingest"],
-    });
-  }
+      .limit(1);
+    if (existingDevice[0]) {
+      await tx
+        .update(apiTokens)
+        .set({ hash: apiKeyHash, scopes: ["ingest"] })
+        .where(eq(apiTokens.id, existingDevice[0].id));
+    } else {
+      await tx.insert(apiTokens).values({
+        teamId,
+        userId,
+        name: deviceName,
+        hash: apiKeyHash,
+        scopes: ["ingest"],
+      });
+    }
+  });
 
   // Redirect to CLI's local server with the raw key (HTTP loopback, no plaintext over wire).
   // email 도 같이 — 사용자가 "어떤 OAuth 계정으로 로그인했는지" 콘솔/브라우저 페이지에서

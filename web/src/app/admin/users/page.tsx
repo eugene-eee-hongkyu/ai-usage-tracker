@@ -1,6 +1,8 @@
 // /admin/users — 사용자 관리.
-// 리스트 + search/pagination/filter + invite + approve join requests + suspend/delete
+// 리스트 + search/pagination/filter + invite + suspend/delete
 // + 30일 grace banner (deletedAt 마킹된 사용자) + type-to-confirm delete.
+// 가입 신청 (join-request) 시스템은 dead code 라 2026-05-28 제거됨 — 신규 사용자는
+// invitation / auto-join 도메인 / personal 팀 fallback 으로 자동 가입.
 
 "use client";
 
@@ -43,15 +45,6 @@ interface InvitationRow {
   createdAt: string;
 }
 
-interface JoinRequestRow {
-  id: number;
-  email: string;
-  teamNameHint: string | null;
-  message: string | null;
-  status: string;
-  createdAt: string;
-}
-
 const STATUSES = ["active", "suspended", "deleted", "all"] as const;
 type Status = (typeof STATUSES)[number];
 
@@ -60,7 +53,6 @@ export default function AdminUsersPage() {
   const selfId = session?.user?.id;
   const [users, setUsers] = useState<UserListResp | null>(null);
   const [invitations, setInvitations] = useState<InvitationRow[]>([]);
-  const [joinRequests, setJoinRequests] = useState<JoinRequestRow[]>([]);
   const [q, setQ] = useState("");
   const [status, setStatus] = useState<Status>("active");
   const [page, setPage] = useState(1);
@@ -74,18 +66,14 @@ export default function AdminUsersPage() {
     setError(null);
     try {
       const usersUrl = `/api/admin/users?q=${encodeURIComponent(q)}&status=${status}&page=${page}`;
-      const [u, i, j] = await Promise.all([
+      const [u, i] = await Promise.all([
         fetch(usersUrl).then((r) => (r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`)))),
         fetch("/api/admin/invitations?status=pending").then((r) =>
-          r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`))
-        ),
-        fetch("/api/admin/join-requests?status=pending").then((r) =>
           r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`))
         ),
       ]);
       setUsers(u as UserListResp);
       setInvitations((i as { invitations: InvitationRow[] }).invitations);
-      setJoinRequests((j as { joinRequests: JoinRequestRow[] }).joinRequests);
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -127,22 +115,6 @@ export default function AdminUsersPage() {
     return true;
   }
 
-  async function patchJoinRequest(id: number, decision: "approved" | "rejected") {
-    if (!confirmViewAsAction(`join_request #${id}`, decision)) return;
-
-    const r = await fetch(`/api/admin/join-requests?id=${id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ decision }),
-    });
-    if (!r.ok) {
-      const data = (await r.json().catch(() => ({}))) as { error?: string };
-      alert(`실패: ${data.error ?? r.status}`);
-      return;
-    }
-    await fetchAll();
-  }
-
   async function cancelInvitation(id: number) {
     if (!confirm("초대를 취소하시겠습니까?")) return;
     const r = await fetch(`/api/admin/invitations?id=${id}`, { method: "DELETE" });
@@ -153,47 +125,6 @@ export default function AdminUsersPage() {
   return (
     <div className="space-y-8">
       {error && <div className="bg-red-950 border border-red-800 rounded p-3 text-sm">{error}</div>}
-
-      {/* Pending join requests */}
-      {joinRequests.length > 0 && (
-        <section className="bg-slate-900 border border-amber-700/40 rounded-lg p-4 space-y-3">
-          <h2 className="text-sm font-semibold text-amber-400">
-            가입 신청 대기 ({joinRequests.length})
-          </h2>
-          <div className="space-y-2">
-            {joinRequests.map((jr) => (
-              <div
-                key={jr.id}
-                className="flex items-center justify-between gap-3 bg-slate-950 border border-slate-800 rounded px-3 py-2"
-              >
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm text-slate-200 truncate">{jr.email}</p>
-                  {jr.teamNameHint && (
-                    <p className="text-xs text-slate-500">팀: {jr.teamNameHint}</p>
-                  )}
-                  {jr.message && (
-                    <p className="text-xs text-slate-400 mt-1 line-clamp-2">{jr.message}</p>
-                  )}
-                </div>
-                <div className="flex gap-1 shrink-0">
-                  <button
-                    onClick={() => patchJoinRequest(jr.id, "approved")}
-                    className="px-3 py-1 bg-emerald-700 hover:bg-emerald-600 text-emerald-100 text-xs rounded"
-                  >
-                    승인
-                  </button>
-                  <button
-                    onClick={() => patchJoinRequest(jr.id, "rejected")}
-                    className="px-3 py-1 bg-slate-700 hover:bg-slate-600 text-slate-200 text-xs rounded"
-                  >
-                    거절
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        </section>
-      )}
 
       {/* Pending invitations */}
       {invitations.length > 0 && (
