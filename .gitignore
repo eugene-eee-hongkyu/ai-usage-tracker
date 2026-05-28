@@ -93,3 +93,6 @@ test-results/
 
 # ── VS Code multi-root workspace 파일 ─────────────
 *.code-workspace
+
+# build artifact (생성: web/scripts/fetch-build-version.mjs)
+web/.build-version
