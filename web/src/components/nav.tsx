@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useSession, signOut } from "next-auth/react";
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useEffect, useState, useCallback } from "react";
 import { useLocalModeInfo } from "@/lib/use-local-mode";
 import { useMessages } from "@/lib/use-i18n";
 import { LocaleSwitcher } from "@/components/locale-switcher";
@@ -34,16 +34,27 @@ function NavInner() {
   }, [isLocalMode]);
 
   // 메뉴 구성 — 모드별 분기:
-  //   서버 (Vercel)        : 개인 / 팀 / 셋업
+  //   서버 (Vercel)        : 개인 / 팀 / 셋업 / 랭킹 (personal=Y)
   //   로컬 + 회사 destination : 개인 / 팀 (외부 ↗). 셋업 숨김
   //   로컬 단독              : 개인 만
+  const userFlags = session?.user as {
+    personal?: boolean;
+    hasNormalTeam?: boolean;
+  } | undefined;
   type Tab = { href: string; label: string; external?: boolean };
   const tabs: Tab[] = [{ href: "/dashboard", label: m.nav.personal }];
   if (isLocalMode) {
     if (companyUrl) tabs.push({ href: `${companyUrl}/team`, label: m.nav.team, external: true });
   } else {
-    tabs.push({ href: "/team", label: m.nav.team });
-    tabs.push({ href: "/setup-status", label: m.nav.setup });
+    if (userFlags?.hasNormalTeam !== false) {
+      tabs.push({ href: "/team", label: m.nav.team });
+    }
+    if (userFlags?.personal) {
+      tabs.push({ href: "/ranking", label: m.nav.ranking ?? "랭킹" });
+    }
+    if (userFlags?.hasNormalTeam !== false) {
+      tabs.push({ href: "/setup-status", label: m.nav.setup });
+    }
   }
 
   // dashboard / team 등 내부 링크에 현재 locale 유지.
@@ -151,10 +162,59 @@ function NavInner() {
                 {m.nav.platformAdmin}
               </Link>
             )}
+            {!isLocalMode && (
+              <PersonalToggle
+                isPersonal={userFlags?.personal ?? false}
+                onClose={() => setOpen(false)}
+              />
+            )}
           </div>
         )}
       </div>
     </header>
+  );
+}
+
+function PersonalToggle({ isPersonal, onClose }: { isPersonal: boolean; onClose: () => void }) {
+  const [loading, setLoading] = useState(false);
+  const [value, setValue] = useState(isPersonal);
+
+  const toggle = useCallback(async () => {
+    setLoading(true);
+    try {
+      const r = await fetch("/api/personal/toggle", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ personal: !value }),
+      });
+      if (r.ok) {
+        setValue(!value);
+        window.location.reload();
+      }
+    } catch {
+      // ignore
+    }
+    setLoading(false);
+    onClose();
+  }, [value, onClose]);
+
+  return (
+    <button
+      onClick={toggle}
+      disabled={loading}
+      className="flex items-center justify-between gap-3 px-4 py-2 text-sm hover:bg-slate-700 border-t border-slate-700 w-full text-left"
+    >
+      <span className={value ? "text-emerald-300" : "text-slate-400"}>
+        랭킹 참여
+      </span>
+      <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded ${
+        value
+          ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/40"
+          : "bg-slate-700 text-slate-500"
+      }`}>
+        {value ? "ON" : "OFF"}
+      </span>
+    </button>
   );
 }
 

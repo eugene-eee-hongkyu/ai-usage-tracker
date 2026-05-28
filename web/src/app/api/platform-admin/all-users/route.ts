@@ -89,7 +89,11 @@ export async function GET() {
     .innerJoin(teamMembers, and(eq(teamMembers.userId, users.id), isNull(teamMembers.deletedAt)))
     .innerJoin(teams, and(eq(teams.id, teamMembers.teamId), isNull(teams.deletedAt)))
     .leftJoin(userSnapshots, and(eq(userSnapshots.userId, users.id), eq(userSnapshots.teamId, teams.id)))
-    .where(and(isNull(users.deletedAt), isNull(users.suspendedAt)));
+    .where(and(
+      isNull(users.deletedAt),
+      isNull(users.suspendedAt),
+      sql`${teams.type} = 'normal'`,
+    ));
 
   // 사용자별 device count + 가장 최근 사용 api_token 의 metadata (envInfo).
   // 별도 query 로 가져와 in-memory join — 사용자 수가 적어 N+1 비용 무시.

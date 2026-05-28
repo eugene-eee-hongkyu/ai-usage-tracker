@@ -5,6 +5,7 @@ export interface Messages {
   nav: {
     personal: string;
     team: string;
+    ranking: string;
     setup: string;
     logout: string;
     admin: string;
@@ -667,6 +668,7 @@ export const en: Messages = {
   nav: {
     personal: "Personal",
     team: "Team",
+    ranking: "Ranking",
     setup: "Setup",
     logout: "Logout",
     admin: "Admin",
@@ -966,7 +968,7 @@ export const en: Messages = {
   },
   login: {
     tagline: "See at a glance how much and how well you're using AI coding tools",
-    teamOnly: "Team members only",
+    teamOnly: "Open to everyone",
     errorDomain: "Email domain not allowed.",
     errorOther: "An error occurred during login.",
     githubStart: "Continue with GitHub",

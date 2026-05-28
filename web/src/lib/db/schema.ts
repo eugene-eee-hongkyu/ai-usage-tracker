@@ -35,6 +35,11 @@ export const users = pgTable("users", {
   permissions: jsonb("permissions").notNull().default(sql`'{}'::jsonb`),
   suspendedAt: timestamp("suspended_at"),
   deletedAt: timestamp("deleted_at"),
+  // Personal 기능 (2026-05-28): true 면 전체 랭킹 참여 (opt-in).
+  // 신규 personal-only 가입자 = true. 기존 팀 사용자 = false (opt-in 전까지).
+  personal: boolean("personal").notNull().default(false),
+  // 어드민이 랭킹에서 숨기는 플래그 (abuse 방어).
+  rankingHidden: boolean("ranking_hidden").notNull().default(false),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   lastSyncedAt: timestamp("last_synced_at"),
 });
@@ -74,6 +79,8 @@ export const teams = pgTable(
     // 2026-05-22: 회사별 활성 멤버 수 cap. auth.ts auto-join + invitations POST
     // 에서 가드. Platform Admin 만 변경 (PATCH /api/admin/teams/[id]).
     maxMembers: integer("max_members").notNull().default(5),
+    // Personal 기능 (2026-05-28): 'normal' (기존 회사팀) | 'personal' (글로벌 personal 팀).
+    type: text("type").notNull().default("normal"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     deletedAt: timestamp("deleted_at"),
   },

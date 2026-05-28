@@ -17,6 +17,7 @@ interface TeamListItem {
   id: number;
   name: string;
   slug: string;
+  type: string;
   deletedAt: string | null;
 }
 
@@ -79,7 +80,7 @@ export default function PlatformAdminAllTeamsPage() {
         return;
       }
       const listJson = (await listRes.json()) as { teams: TeamListItem[] };
-      const active = listJson.teams.filter((t) => !t.deletedAt);
+      const active = listJson.teams.filter((t) => !t.deletedAt && t.type !== "personal");
 
       const fetched: TeamFetched[] = await Promise.all(
         active.map(async (t) => {

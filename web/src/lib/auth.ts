@@ -188,25 +188,12 @@ export const authOptions: NextAuthOptions = {
           return true;
         }
 
-        // invitation 없는 신규 사용자만 도메인 화이트리스트 적용
-        if (!isEmailAllowed(email)) {
-          await writeAudit({
-            actorUserId: null,
-            actorType: "system",
-            action: "auth.rejected.domain",
-            targetType: null,
-            targetId: null,
-            metadata: { email, provider },
-          });
-          return `/login?error=domain`;
-        }
-
         // M6f (2026-05-21): email 도메인이 어떤 팀의 auto_join_domains 에 포함되면
         // 그 팀 member 로 즉시 자동 가입. invitation 없어도 OAuth ownership 으로 충분.
+        // 도메인 화이트리스트 (isEmailAllowed) 는 auto-join 팀 매칭에만 영향 —
+        // Personal 기능 도입으로 "매칭 안 되면 personal 팀 가입" 으로 fallback.
         const emailDomain = email.split("@")[1]?.toLowerCase();
-        if (emailDomain) {
-          // jsonb @> '["domain"]' — 배열 contains 매칭 + auto_join_enabled=true.
-          // team 1개 매칭 가정 (첫 번째 사용).
+        if (emailDomain && isEmailAllowed(email)) {
           const autoTeamRows = await db
             .select({ id: teams.id, maxMembers: teams.maxMembers })
             .from(teams)
@@ -215,6 +202,7 @@ export const authOptions: NextAuthOptions = {
                 isNull(teams.deletedAt),
                 eq(teams.namePending, false),
                 eq(teams.autoJoinEnabled, true),
+                eq(teams.type, "normal"),
                 sql`${teams.autoJoinDomains} @> ${JSON.stringify([emailDomain])}::jsonb`
               )
             )
@@ -222,66 +210,87 @@ export const authOptions: NextAuthOptions = {
           if (autoTeamRows[0]) {
             const autoTeamId = autoTeamRows[0].id;
             const cap = autoTeamRows[0].maxMembers;
-            // 2026-05-22: 회사별 멤버 cap 가드. cap 초과면 auto-join 거부 +
-            // /join 으로 폴백 (사람 판단 경로 — 어드민이 cap 늘리거나 별도 안내).
             const activeCount = await db
               .select({ c: sql<number>`count(*)::int` })
               .from(teamMembers)
               .where(and(eq(teamMembers.teamId, autoTeamId), isNull(teamMembers.deletedAt)));
-            if ((activeCount[0]?.c ?? 0) >= cap) {
-              await writeAudit({
-                teamId: autoTeamId,
-                actorUserId: null,
-                actorType: "system",
-                action: "auth.signup.auto_join_blocked_cap",
-                targetType: null,
-                targetId: null,
-                metadata: { email, provider, domain: emailDomain, cap, activeCount: activeCount[0]?.c ?? 0 },
-              });
-              return `/join?email=${encodeURIComponent(email)}&name=${encodeURIComponent(user.name ?? "")}&reason=cap`;
+            if ((activeCount[0]?.c ?? 0) < cap) {
+              const inserted = await db
+                .insert(users)
+                .values({
+                  githubId: String((profile as Record<string, unknown>)?.id ?? account?.providerAccountId),
+                  email,
+                  name: user.name ?? email.split("@")[0],
+                  avatarUrl: user.image ?? null,
+                  role: "member",
+                  permissions: {},
+                })
+                .returning({ id: users.id });
+              const newUserId = inserted[0]?.id ?? null;
+              if (newUserId) {
+                await db.insert(teamMembers).values({
+                  teamId: autoTeamId,
+                  userId: newUserId,
+                  role: "member",
+                });
+                await writeAudit({
+                  teamId: autoTeamId,
+                  actorUserId: newUserId,
+                  actorType: "system",
+                  action: "user.create.auto_join_domain",
+                  targetType: "user",
+                  targetId: newUserId,
+                  metadata: { email, provider, domain: emailDomain, teamId: autoTeamId },
+                });
+              }
+              return true;
             }
-            const inserted = await db
-              .insert(users)
-              .values({
-                githubId: String((profile as Record<string, unknown>)?.id ?? account?.providerAccountId),
-                email,
-                name: user.name ?? email.split("@")[0],
-                avatarUrl: user.image ?? null,
-                role: "member",
-                permissions: {},
-              })
-              .returning({ id: users.id });
-            const newUserId = inserted[0]?.id ?? null;
-            if (newUserId) {
-              await db.insert(teamMembers).values({
-                teamId: autoTeamId,
-                userId: newUserId,
-                role: "member",
-              });
-              await writeAudit({
-                teamId: autoTeamId,
-                actorUserId: newUserId,
-                actorType: "system",
-                action: "user.create.auto_join_domain",
-                targetType: "user",
-                targetId: newUserId,
-                metadata: { email, provider, domain: emailDomain, teamId: autoTeamId },
-              });
-            }
-            return true;
+            // cap 초과 — personal fallback 으로 진행 (아래)
           }
         }
 
-        // 어디에도 매칭 안 됨 — /join 으로 redirect (신규 회사 등록 or 멤버 초대 요청 안내).
-        await writeAudit({
-          actorUserId: null,
-          actorType: "system",
-          action: "auth.signup.redirect_join",
-          targetType: null,
-          targetId: null,
-          metadata: { email, provider, name: user.name ?? null },
-        });
-        return `/join?email=${encodeURIComponent(email)}&name=${encodeURIComponent(user.name ?? "")}`;
+        // Personal 팀 자동 가입 — invitation / auto-join 모두 매칭 안 된 신규 사용자.
+        // 아무 도메인이나 가입 가능. personal=true → 전체 랭킹 참여.
+        const personalTeamRow = await db
+          .select({ id: teams.id })
+          .from(teams)
+          .where(eq(teams.type, "personal"))
+          .limit(1);
+        const personalTeamId = personalTeamRow[0]?.id;
+        if (!personalTeamId) {
+          console.error("[auth] personal team not found — migration 0013 not applied?");
+          return `/login?error=db`;
+        }
+        const inserted = await db
+          .insert(users)
+          .values({
+            githubId: String((profile as Record<string, unknown>)?.id ?? account?.providerAccountId),
+            email,
+            name: user.name ?? email.split("@")[0],
+            avatarUrl: user.image ?? null,
+            role: "member",
+            permissions: {},
+            personal: true,
+          })
+          .returning({ id: users.id });
+        const newUserId = inserted[0]?.id ?? null;
+        if (newUserId) {
+          await db.insert(teamMembers).values({
+            teamId: personalTeamId,
+            userId: newUserId,
+            role: "member",
+          });
+          await writeAudit({
+            teamId: personalTeamId,
+            actorUserId: newUserId,
+            actorType: "system",
+            action: "user.create.personal",
+            targetType: "user",
+            targetId: newUserId,
+            metadata: { email, provider },
+          });
+        }
+        return true;
       } catch (err) {
         console.error("[auth] signIn DB error:", err);
         return "/login?error=db";
@@ -298,6 +307,7 @@ export const authOptions: NextAuthOptions = {
             permissions: users.permissions,
             suspendedAt: users.suspendedAt,
             deletedAt: users.deletedAt,
+            personal: users.personal,
           })
           .from(users)
           .where(eq(users.email, session.user.email))
@@ -306,12 +316,15 @@ export const authOptions: NextAuthOptions = {
           // Phase 4.2 (M6a): currentTeamId 결정 — team_members 의 첫 행 (가입 순).
           // M6b 에서 N팀 가입 + cookie/URL 기반 전환 도입 예정. M6a 에선 first team.
           // M6d: teams.name_pending 도 함께 가져와 /onboard-team 가드용으로 노출.
-          const memberRow = await db
+          // Personal 기능: normal 팀 우선, 없으면 personal 팀 fallback.
+          // teams.type 을 같이 가져와서 normal 팀이 있는지 판별.
+          const memberRows = await db
             .select({
               teamId: teamMembers.teamId,
               teamRole: teamMembers.role,
               teamName: teams.name,
               namePending: teams.namePending,
+              teamType: teams.type,
             })
             .from(teamMembers)
             .leftJoin(teams, eq(teams.id, teamMembers.teamId))
@@ -322,12 +335,14 @@ export const authOptions: NextAuthOptions = {
                 isNull(teams.deletedAt)
               )
             )
-            .orderBy(asc(teamMembers.joinedAt))
-            .limit(1);
-          const currentTeamId = memberRow[0]?.teamId ?? null;
-          const currentTeamRole = memberRow[0]?.teamRole ?? null;
-          const currentTeamName = memberRow[0]?.teamName ?? null;
-          const currentTeamNamePending = memberRow[0]?.namePending ?? false;
+            .orderBy(asc(teamMembers.joinedAt));
+          const normalTeam = memberRows.find((r) => r.teamType === "normal");
+          const primaryTeam = normalTeam ?? memberRows[0] ?? null;
+          const hasNormalTeam = !!normalTeam;
+          const currentTeamId = primaryTeam?.teamId ?? null;
+          const currentTeamRole = primaryTeam?.teamRole ?? null;
+          const currentTeamName = primaryTeam?.teamName ?? null;
+          const currentTeamNamePending = primaryTeam?.namePending ?? false;
 
           const u = session.user as typeof session.user & {
             id: number;
@@ -343,6 +358,8 @@ export const authOptions: NextAuthOptions = {
             currentTeamNamePending: boolean;
             viewAsTeamId: number | null;
             viewAsTeamName: string | null;
+            personal: boolean;
+            hasNormalTeam: boolean;
           };
           u.id = row[0].id;
           u.role = row[0].role;
@@ -355,6 +372,8 @@ export const authOptions: NextAuthOptions = {
           u.currentTeamNamePending = currentTeamNamePending;
           // Platform Admin = ADMIN_EMAIL env 화이트리스트 (= eugene). 모든 팀 조회·view-as·
           // 새 팀 생성 권한. Team owner (team_members.role='owner') 와 별개.
+          u.personal = row[0].personal;
+          u.hasNormalTeam = hasNormalTeam;
           u.isPlatformAdmin = isAdmin(session.user.email);
           // isAdmin = Platform Admin OR team owner OR (membership_admin OR billing_admin 권한 보유).
           // nav 의 어드민 메뉴 노출 조건. team owner 는 별도 permissions 없어도 자기 팀

@@ -48,6 +48,8 @@ export const users = sqliteTable("users", {
   permissions: text("permissions", { mode: "json" }).notNull().default(sql`'{}'`),
   suspendedAt: integer("suspended_at", { mode: "timestamp_ms" }),
   deletedAt: integer("deleted_at", { mode: "timestamp_ms" }),
+  personal: integer("personal", { mode: "boolean" }).notNull().default(false),
+  rankingHidden: integer("ranking_hidden", { mode: "boolean" }).notNull().default(false),
   createdAt: integer("created_at", { mode: "timestamp_ms" })
     .notNull()
     .default(sql`(unixepoch() * 1000)`),
@@ -68,6 +70,7 @@ export const teams = sqliteTable(
     autoJoinEnabled: integer("auto_join_enabled", { mode: "boolean" }).notNull().default(true),
     // LOCAL_MODE 는 single-team 이라 사실상 안 쓰지만 schema 일관성.
     maxMembers: integer("max_members", { mode: "number" }).notNull().default(5),
+    type: text("type").notNull().default("normal"),
     createdAt: integer("created_at", { mode: "timestamp_ms" })
       .notNull()
       .default(sql`(unixepoch() * 1000)`),

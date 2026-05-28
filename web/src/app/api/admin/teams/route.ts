@@ -205,6 +205,7 @@ export async function GET(req: NextRequest) {
       ownerId: teams.ownerId,
       namePending: teams.namePending,
       maxMembers: teams.maxMembers,
+      type: teams.type,
       createdAt: teams.createdAt,
       deletedAt: teams.deletedAt,
     })

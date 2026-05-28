@@ -7,6 +7,7 @@ export const ko: DeepPartial<Messages> = {
   nav: {
     personal: "개인",
     team: "팀",
+    ranking: "랭킹",
     setup: "세팅",
     logout: "로그아웃",
     admin: "어드민",
@@ -302,7 +303,7 @@ export const ko: DeepPartial<Messages> = {
   },
   login: {
     tagline: "AI 코딩 도구를 얼마나, 어떻게 쓰고 있는지 한눈에",
-    teamOnly: "팀 멤버 전용",
+    teamOnly: "누구나 가입 가능",
     errorDomain: "허용되지 않은 이메일 도메인입니다.",
     errorOther: "로그인 중 오류가 발생했습니다.",
     githubStart: "GitHub로 시작하기",
