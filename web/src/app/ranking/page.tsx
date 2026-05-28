@@ -145,11 +145,7 @@ export default function RankingPage() {
 
         {!loading && !error && (
           <div className="space-y-4">
-            {/* 🔥 Streak — 차원이 다른 게이미피케이션 (꾸준함). hero 로 전체 width */}
-            {byMetric.streak && (
-              <MetricCard metric="streak" label="🔥 streak 연속 활성일" data={byMetric.streak} />
-            )}
-            {/* 4 metric — 2x2 grid */}
+            {/* 4 metric — 2x2 grid (cost/tokens/cacheHit/saving) */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
               {METRICS.map((mt) => (
                 <MetricCard
@@ -160,6 +156,12 @@ export default function RankingPage() {
                 />
               ))}
             </div>
+            {/* 🔥 streak — 핵심 metric 아닌 보조 (꾸준함). 맨 아래 반 셀 */}
+            {byMetric.streak && (
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <MetricCard metric="streak" label="🔥 streak 연속 활성일" data={byMetric.streak} />
+              </div>
+            )}
           </div>
         )}
       </div>

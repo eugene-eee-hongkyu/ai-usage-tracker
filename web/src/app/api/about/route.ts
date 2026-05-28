@@ -19,9 +19,12 @@ import pkg from "../../../../package.json";
 export async function GET() {
   const isLocal = process.env.LOCAL_MODE === "1" || process.env.NEXT_PUBLIC_LOCAL_MODE === "1";
 
-  // 클라우드 모드: web/package.json 의 version 을 노출 (semver 수동 bump).
-  // 로컬 (.dmg) 모드: installer 의 APP_VERSION env 우선.
-  const appVersion = process.env.APP_VERSION ?? (isLocal ? null : pkg.version);
+  // 클라우드: NEXT_PUBLIC_BUILD_VERSION (= "major.minor.commit-count", next.config.mjs
+  // 에서 빌드 시 박힘) 우선. 매 push 마다 patch 자동 +1. 로컬 (.dmg): installer 의
+  // APP_VERSION env 우선. fallback: package.json static version.
+  const appVersion =
+    process.env.APP_VERSION ??
+    (isLocal ? null : process.env.NEXT_PUBLIC_BUILD_VERSION ?? pkg.version);
 
   return NextResponse.json({
     mode: isLocal ? "local" : "cloud",

@@ -32,8 +32,10 @@ function calcStreak(daily: Array<{ date?: string; totalTokens?: number }>, today
     ymd = cur.toISOString().slice(0, 10);
     if (!activeDates.has(ymd)) return 0;
   }
+  // streak 는 30일 윈도우 무관 — ccusage daily 의 전체 history (대개 ~수년) 에서
+  // 거꾸로 연속 카운트. 안전 cap 36500 (100년) 으로 무한 루프만 방어.
   let streak = 0;
-  while (activeDates.has(ymd) && streak < 30) {
+  while (activeDates.has(ymd) && streak < 36500) {
     streak++;
     cur.setDate(cur.getDate() - 1);
     ymd = cur.toISOString().slice(0, 10);

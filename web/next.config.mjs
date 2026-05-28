@@ -1,7 +1,22 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { execSync } from "node:child_process";
+import { readFileSync } from "node:fs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+// 빌드 시점 version = ${package.json major.minor}.${git 누적 commit count}.
+// 매 push 마다 commit count +1 자동. minor 는 의미 있는 변경 시 사람이 의식적으로
+// package.json 의 version 을 0.X.0 형태로 bump (patch 0 은 무시되고 commit count 가 그 자리).
+let buildVersion = "0.0.dev";
+try {
+  const pkg = JSON.parse(readFileSync(path.join(__dirname, "package.json"), "utf-8"));
+  const [major, minor] = (pkg.version ?? "0.0.0").split(".");
+  const count = execSync("git rev-list --count HEAD", { cwd: __dirname }).toString().trim();
+  buildVersion = `${major}.${minor}.${count}`;
+} catch (e) {
+  console.warn("[next.config] build version derivation failed, falling back:", e);
+}
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
@@ -11,6 +26,7 @@ const nextConfig = {
   env: {
     NEXT_PUBLIC_BUILD_SHA: process.env.VERCEL_GIT_COMMIT_SHA ?? "dev",
     NEXT_PUBLIC_BUILD_REF: process.env.VERCEL_GIT_COMMIT_REF ?? "local",
+    NEXT_PUBLIC_BUILD_VERSION: buildVersion,
   },
 
   // .pkg/.msi 인스톨러용 standalone 빌드 — node embedded 형태로 패키징 가능.
