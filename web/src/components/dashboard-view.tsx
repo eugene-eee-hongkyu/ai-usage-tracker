@@ -27,7 +27,6 @@ import type { DrilldownPeriod } from "@/components/score-drilldown";
 import { UsageHero } from "@/components/usage-hero";
 import { PrivacyBanner } from "@/components/privacy-banner";
 import { StaleSyncBanner } from "@/components/stale-sync-banner";
-import { track, EVENTS } from "@/lib/analytics/mixpanel";
 
 const ScoreDrilldown = dynamic(
   () => import("@/components/score-drilldown").then((m) => m.ScoreDrilldown),
