@@ -101,6 +101,9 @@ export async function GET(req: NextRequest) {
   // personal=true, ranking_hidden=false, active 사용자의 가장 최근 snapshot.
   // u.timezone 도 함께 — 사용자별 timezone 기준 todayYmd 계산으로 streak
   // 정확도 ↑ (KST/SGT 자정~UTC 자정 사이 0 으로 떨어지던 버그).
+  // Multi-provider Phase 1 baseline: us.provider='claude' 가드. 사용자 1명당 row 2개
+  // (claude+codex) 인데 DISTINCT ON (user_id) + ORDER BY updated_at 으로는 어느 row 잡힐지
+  // 불확정 → 순위 / streak / cost 가 provider 섞여 부정확. Phase 2 에서 provider 분리.
   const rows = await db.execute(sql`
     SELECT DISTINCT ON (us.user_id)
       us.user_id, u.name, u.timezone, us.raw_json, us.total_cost, us.cache_hit_pct,
@@ -111,6 +114,7 @@ export async function GET(req: NextRequest) {
       AND u.ranking_hidden = false
       AND u.deleted_at IS NULL
       AND u.suspended_at IS NULL
+      AND us.provider = 'claude'
     ORDER BY us.user_id, us.updated_at DESC
   `);
 

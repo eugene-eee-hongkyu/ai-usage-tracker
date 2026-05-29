@@ -88,7 +88,9 @@ export async function GET() {
     .from(users)
     .innerJoin(teamMembers, and(eq(teamMembers.userId, users.id), isNull(teamMembers.deletedAt)))
     .innerJoin(teams, and(eq(teams.id, teamMembers.teamId), isNull(teams.deletedAt)))
-    .leftJoin(userSnapshots, and(eq(userSnapshots.userId, users.id), eq(userSnapshots.teamId, teams.id)))
+    // Multi-provider Phase 1 baseline: claude row 만. Phase 2 에서 provider 별 분리.
+    // 가드 없으면 사용자 1명당 row 2개 (claude+codex) 곱집합 → 카드 중복.
+    .leftJoin(userSnapshots, and(eq(userSnapshots.userId, users.id), eq(userSnapshots.teamId, teams.id), eq(userSnapshots.provider, "claude")))
     .where(and(
       isNull(users.deletedAt),
       isNull(users.suspendedAt),

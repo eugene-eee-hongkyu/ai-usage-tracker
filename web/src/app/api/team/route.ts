@@ -188,6 +188,8 @@ export async function GET(req: NextRequest) {
   // M6f (2026-05-26): multi-device 사용자는 token 별 row 가 N개. team 화면도 device
   // 별 row 로 분리 표시 — 가중평균 위험 회피 + 개인 dashboard 의 device chip 모델과 일관.
   // api_tokens leftJoin 으로 device label (api_tokens.name) 같이.
+  // Multi-provider Phase 1 baseline: claude row 만. Phase 2 에서 provider 별 분리.
+  // 가드 없으면 사용자 1명당 claude+codex 2 row → 합산 / leftJoin 곱집합으로 데이터 부정확.
   const allSnapsWithToken = IS_LOCAL_MODE
     ? await db
         .select({
@@ -197,6 +199,7 @@ export async function GET(req: NextRequest) {
         })
         .from(userSnapshots)
         .leftJoin(apiTokens, eq(apiTokens.id, userSnapshots.tokenId))
+        .where(eq(userSnapshots.provider, "claude"))
     : teamMemberIds.length > 0
       ? await db
           .select({
@@ -206,7 +209,7 @@ export async function GET(req: NextRequest) {
           })
           .from(userSnapshots)
           .leftJoin(apiTokens, eq(apiTokens.id, userSnapshots.tokenId))
-          .where(and(inArray(userSnapshots.userId, teamMemberIds), userSnapTeamScope))
+          .where(and(inArray(userSnapshots.userId, teamMemberIds), userSnapTeamScope, eq(userSnapshots.provider, "claude")))
       : [];
 
   // user_id → 그 user 의 모든 device snap (배열). multi-device 사용자는 len>=2.

@@ -78,10 +78,11 @@ export async function GET(
   const user = await db.select().from(users).where(eq(users.id, userId)).limit(1);
   if (!user[0]) return NextResponse.json({ error: "not found" }, { status: 404 });
 
+  // Multi-provider Phase 1 baseline: claude row 만. Phase 2 에서 provider 별 분리.
   const snap = await db
     .select()
     .from(userSnapshots)
-    .where(eq(userSnapshots.userId, userId))
+    .where(and(eq(userSnapshots.userId, userId), eq(userSnapshots.provider, "claude")))
     .limit(1);
 
   if (!snap[0]) {

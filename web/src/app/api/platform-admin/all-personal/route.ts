@@ -21,12 +21,14 @@ export async function GET(req: NextRequest) {
 
   const q = req.nextUrl.searchParams.get("q")?.trim().toLowerCase() ?? "";
 
+  // Multi-provider Phase 1 baseline: us.provider='claude' 가드 (LEFT JOIN ON 조건).
+  // 가드 없으면 사용자 1명당 row 2개 곱집합 → DISTINCT ON 으로 어느 provider 잡힐지 불확정.
   const rows = await db.execute(sql`
     SELECT DISTINCT ON (us.user_id)
       us.user_id, u.name, u.email, u.personal, u.ranking_hidden,
       u.created_at, u.last_synced_at, us.raw_json
     FROM users u
-    LEFT JOIN user_snapshots us ON us.user_id = u.id
+    LEFT JOIN user_snapshots us ON us.user_id = u.id AND us.provider = 'claude'
     WHERE u.personal = true
       AND u.deleted_at IS NULL
       AND u.suspended_at IS NULL
