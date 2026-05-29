@@ -5,7 +5,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { db, users, teamMembers, apiTokens, IS_LOCAL_MODE } from "@/lib/db";
 import { ensureLocalUser } from "@/lib/local-user";
 import { runIngest } from "@/lib/sync/run-ingest";
-import { eq, and, isNull, asc, desc } from "drizzle-orm";
+import { trackServer, EVENTS_SERVER } from "@/lib/analytics/mixpanel-server";
+import { eq, and, isNull, asc, desc, sql } from "drizzle-orm";
 import crypto from "crypto";
 
 export async function POST(req: NextRequest) {
@@ -15,11 +16,12 @@ export async function POST(req: NextRequest) {
     timezone: string | null;
     suspendedAt: Date | null;
     deletedAt: Date | null;
+    lastSyncedAt: Date | null;
   }>;
   let matchedTokenId: number | null = null;
   if (IS_LOCAL_MODE) {
     const u = await ensureLocalUser();
-    userRow = [{ id: u.id, timezone: u.timezone, suspendedAt: null, deletedAt: null }];
+    userRow = [{ id: u.id, timezone: u.timezone, suspendedAt: null, deletedAt: null, lastSyncedAt: null }];
   } else {
     const apiKey = req.headers.get("x-api-key");
     if (!apiKey) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
@@ -32,6 +34,7 @@ export async function POST(req: NextRequest) {
         timezone: users.timezone,
         suspendedAt: users.suspendedAt,
         deletedAt: users.deletedAt,
+        lastSyncedAt: users.lastSyncedAt,
       })
       .from(apiTokens)
       .innerJoin(users, eq(users.id, apiTokens.userId))
@@ -45,6 +48,7 @@ export async function POST(req: NextRequest) {
           timezone: tokenRow[0].timezone,
           suspendedAt: tokenRow[0].suspendedAt,
           deletedAt: tokenRow[0].deletedAt,
+          lastSyncedAt: tokenRow[0].lastSyncedAt,
         },
       ];
     } else {
@@ -56,6 +60,7 @@ export async function POST(req: NextRequest) {
           timezone: users.timezone,
           suspendedAt: users.suspendedAt,
           deletedAt: users.deletedAt,
+          lastSyncedAt: users.lastSyncedAt,
         })
         .from(users)
         .where(eq(users.apiKeyHash, hash))
@@ -95,18 +100,43 @@ export async function POST(req: NextRequest) {
     teamId = memberRow[0].teamId;
   }
 
+  // 첫 ingest 감지 — runIngest 는 끝에 users.last_synced_at 을 set 하므로,
+  // 그 전에 캡처한 값으로 판정. LOCAL_MODE 는 Mixpanel 비활성 (token 미세팅) 이고
+  // 단일 사용자라 funnel 개념 없음 — gate 로 server-side fire 건너뜀.
+  const wasFirstIngest = !IS_LOCAL_MODE && userRow[0].lastSyncedAt === null;
+
   const body = await req.json();
   await runIngest(userRow[0].id, teamId, matchedTokenId, userRow[0].timezone, body);
 
   // M6e: 매칭된 token 의 last_used_at + metadata 갱신. fallback (users 단일 hash)
   // 경로면 matchedTokenId=null 이라 skip — 옛 CLI 가 metadata 안 보내도 안전.
+  const envInfo = (body as { envInfo?: unknown })?.envInfo;
   if (matchedTokenId !== null) {
-    const envInfo = (body as { envInfo?: unknown })?.envInfo;
     const metadataUpdate: { lastUsedAt: Date; metadata?: unknown } = { lastUsedAt: new Date() };
     if (envInfo && typeof envInfo === "object") {
       metadataUpdate.metadata = envInfo;
     }
     await db.update(apiTokens).set(metadataUpdate).where(eq(apiTokens.id, matchedTokenId));
+  }
+
+  // 가입 → 실제 사용 funnel 의 마지막 노드. distinct_id 는 user.id (client 측
+  // identifyUser 와 동일) — 같은 사용자의 client/server event 가 Mixpanel 에서
+  // 같은 row 로 통합. fire-and-forget, response 안 막음.
+  if (wasFirstIngest) {
+    const env = envInfo as Record<string, unknown> | undefined;
+    // 디바이스 수 — multi-device 사용자 분석용.
+    const deviceCountRow = await db
+      .select({ c: sql<number>`count(*)::int` })
+      .from(apiTokens)
+      .where(and(eq(apiTokens.userId, userRow[0].id), isNull(apiTokens.revokedAt)));
+    trackServer(EVENTS_SERVER.SETUP_COMPLETE, userRow[0].id, {
+      cli_version: env?.cliVersion ?? null,
+      claude_code_version: env?.claudeCodeVersion ?? null,
+      platform: env?.platform ?? null,
+      node_version: env?.nodeVersion ?? null,
+      install_method: env?.installMethod ?? null,
+      device_count: deviceCountRow[0]?.c ?? 1,
+    });
   }
 
   return NextResponse.json({ ok: true });

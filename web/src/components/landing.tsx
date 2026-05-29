@@ -3,6 +3,13 @@
 // 미인증 첫 방문자용 랜딩 — hero / 3 가치 카드 / 신뢰 한 줄 / CTA / footer 링크.
 // ai.z21labs.world 의 풀 마케팅 페이지에서 핵심 5섹션만 추출 — "30초 이해 후 try" 흐름.
 // 인증된 사용자는 page.tsx 에서 /dashboard 로 redirect 처리되어 여기 안 도달.
+//
+// landing_view 의미 (2026-05-29 결정):
+//   "anonymous 사용자가 마케팅 컨텐츠를 실제로 봤다" 이벤트로 정의. 인증된 사용자가
+//   / 로 들어와도 /dashboard 직행이라 landing_view 안 fire — 의도된 동작이고
+//   funnel 의 첫 노드 의미가 깨끗하게 유지됨. 인증된 사용자의 root visit 은
+//   dashboard_view 로 이미 잡힘. 별도 root_visit 이벤트는 funnel 신호 dilute
+//   되어 추가 안 함.
 
 import Link from "next/link";
 import { useEffect } from "react";
