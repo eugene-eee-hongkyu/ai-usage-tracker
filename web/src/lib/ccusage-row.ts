@@ -9,16 +9,30 @@ export interface CcusageDailyRow {
   date?: string;
   period?: string;
   totalCost?: number;
+  // Multi-provider (2026-05-30 M): Codex ccusage daily 의 schema 가 Claude 와 다르다.
+  //   Claude: totalCost / cacheReadTokens / modelsUsed[]
+  //   Codex:  costUSD / cachedInputTokens / models{} (key=model 명)
+  // normalize 가 양쪽 동의어를 통일된 키 (totalCost / cacheReadTokens / modelsUsed) 로 변환.
+  costUSD?: number;
   inputTokens?: number;
   outputTokens?: number;
   cacheCreationTokens?: number;
   cacheReadTokens?: number;
+  cachedInputTokens?: number;
   totalTokens?: number;
+  reasoningOutputTokens?: number;
   modelsUsed?: string[];
+  models?: Record<string, unknown>;
 }
 
 export function normalizeCcusageRow(row: CcusageDailyRow): CcusageDailyRow {
-  return { ...row, date: row.date ?? row.period };
+  return {
+    ...row,
+    date: row.date ?? row.period,
+    totalCost: row.totalCost ?? row.costUSD,
+    cacheReadTokens: row.cacheReadTokens ?? row.cachedInputTokens,
+    modelsUsed: row.modelsUsed ?? (row.models ? Object.keys(row.models) : undefined),
+  };
 }
 
 export function getCcusageDaily(raw: unknown): CcusageDailyRow[] {
