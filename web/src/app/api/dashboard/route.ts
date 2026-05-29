@@ -174,6 +174,10 @@ export async function GET(req: NextRequest) {
       and(
         eq(userSnapshots.tokenId, apiTokens.id),
         eq(userSnapshots.userId, user[0].id),
+        // Multi-provider (2026-05-29 M): device chip 은 Claude row 기준 1개.
+        // 가드 없으면 같은 token 의 (claude, codex) row 2개로 leftJoin 곱집합 → device chip 2개 노출.
+        // Codex 만 있는 사용자는 향후 Phase 2 에서 별도 처리.
+        eq(userSnapshots.provider, "claude"),
         IS_LOCAL_MODE ? undefined : eq(userSnapshots.teamId, effectiveTeamId!),
       )
     )
