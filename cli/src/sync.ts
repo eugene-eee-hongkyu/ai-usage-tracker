@@ -2,35 +2,41 @@ import { spawn } from "child_process";
 import { loadDestinations, type Destination } from "./destinations.js";
 
 const PERIODS = ["today", "week", "month", "30days", "all"] as const;
+const PROVIDERS = ["claude", "codex"] as const;
+type Provider = (typeof PROVIDERS)[number];
 
 // launchd가 Node에 TZ env를 안 넘겨주면 codeburn이 UTC로 today 계산. 명시 주입.
 const SYSTEM_TZ = Intl.DateTimeFormat().resolvedOptions().timeZone;
 const childEnv = { ...process.env, TZ: SYSTEM_TZ, CODEBURN_TZ: SYSTEM_TZ };
 
-function spawnCodeburn(period: string): Promise<unknown> {
+// Multi-provider (2026-05-29): provider 인자로 Claude / Codex 분리 호출.
+// codeburn 은 `--provider <name>`, ccusage 는 sub-command (`ccusage claude/codex daily|blocks`).
+// 빈 환경 (e.g. ~/.codex/sessions/ 없음) 도 안전 — overview 0 + 빈 배열 응답.
+
+function spawnCodeburn(provider: Provider, period: string): Promise<unknown> {
   return new Promise((resolve, reject) => {
     const chunks: Buffer[] = [];
-    const proc = spawn("codeburn", ["report", "--format", "json", "--provider", "claude", "--period", period], {
+    const proc = spawn("codeburn", ["report", "--format", "json", "--provider", provider, "--period", period], {
       stdio: ["ignore", "pipe", "pipe"],
       shell: true,
       env: childEnv,
     });
     proc.stdout.on("data", (d: Buffer) => chunks.push(d));
     proc.on("close", (code: number) => {
-      if (code !== 0) return reject(new Error(`codeburn exited ${code} (period=${period})`));
+      if (code !== 0) return reject(new Error(`codeburn exited ${code} (${provider}/${period})`));
       try {
         resolve(JSON.parse(Buffer.concat(chunks).toString("utf8").trim()));
       } catch (e) { reject(e); }
     });
     proc.on("error", reject);
-    setTimeout(() => { proc.kill(); reject(new Error(`codeburn timeout (period=${period})`)); }, 600_000);
+    setTimeout(() => { proc.kill(); reject(new Error(`codeburn timeout (${provider}/${period})`)); }, 600_000);
   });
 }
 
-function spawnCcusageDaily(): Promise<unknown> {
+function spawnCcusageDaily(provider: Provider): Promise<unknown> {
   return new Promise((resolve) => {
     const chunks: Buffer[] = [];
-    const proc = spawn("ccusage", ["daily", "--json"], {
+    const proc = spawn("ccusage", [provider, "daily", "--json"], {
       stdio: ["ignore", "pipe", "pipe"],
       shell: true,
       env: childEnv,
@@ -47,10 +53,10 @@ function spawnCcusageDaily(): Promise<unknown> {
   });
 }
 
-function spawnCcusageBlocks(): Promise<unknown> {
+function spawnCcusageBlocks(provider: Provider): Promise<unknown> {
   return new Promise((resolve) => {
     const chunks: Buffer[] = [];
-    const proc = spawn("ccusage", ["blocks", "--json"], {
+    const proc = spawn("ccusage", [provider, "blocks", "--json"], {
       stdio: ["ignore", "pipe", "pipe"],
       shell: true,
       env: childEnv,
@@ -65,6 +71,21 @@ function spawnCcusageBlocks(): Promise<unknown> {
     proc.on("error", () => resolve(null));
     setTimeout(() => { proc.kill(); resolve(null); }, 600_000);
   });
+}
+
+// provider 1개 분량 — codeburn × PERIODS + ccusage daily + ccusage blocks.
+async function collectForProvider(provider: Provider): Promise<Record<string, unknown>> {
+  const [results, ccusageDaily, ccusageBlocks] = await Promise.all([
+    Promise.all(PERIODS.map((p) => spawnCodeburn(provider, p))),
+    spawnCcusageDaily(provider),
+    spawnCcusageBlocks(provider),
+  ]);
+  const providerReport: Record<string, unknown> = Object.fromEntries(
+    PERIODS.map((p, i) => [p, results[i]])
+  );
+  if (ccusageDaily) providerReport.ccusageDaily = ccusageDaily;
+  if (ccusageBlocks) providerReport.ccusageBlocks = ccusageBlocks;
+  return providerReport;
 }
 
 interface PostOutcome { ok: boolean; status?: number; error?: string; }
@@ -97,18 +118,15 @@ export async function runSync(_days?: number) {
   }
 
   const summary = destinations.map((d) => d.name).join(", ");
-  console.log(`codeburn + ccusage 데이터 수집 중... (destinations: ${summary})`);
+  console.log(`codeburn + ccusage 데이터 수집 중 (claude + codex)... (destinations: ${summary})`);
 
+  // body schema (신): { claude: {...}, codex: {...} }
   let report: Record<string, unknown>;
   try {
-    const [results, ccusageDaily, ccusageBlocks] = await Promise.all([
-      Promise.all(PERIODS.map((p) => spawnCodeburn(p))),
-      spawnCcusageDaily(),
-      spawnCcusageBlocks(),
-    ]);
-    report = Object.fromEntries(PERIODS.map((p, i) => [p, results[i]]));
-    if (ccusageDaily) report.ccusageDaily = ccusageDaily;
-    if (ccusageBlocks) report.ccusageBlocks = ccusageBlocks;
+    const [claudeReport, codexReport] = await Promise.all(
+      PROVIDERS.map((p) => collectForProvider(p))
+    );
+    report = { claude: claudeReport, codex: codexReport };
   } catch (err) {
     console.error("codeburn 실행 실패:", (err as Error).message);
     process.exit(1);

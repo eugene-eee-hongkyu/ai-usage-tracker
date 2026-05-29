@@ -158,12 +158,44 @@ function deriveUserTodayFromBody(body: unknown): string | null {
  * tokenId: M6f (2026-05-25) device-scope 도입. (user, team, token) 단위로 row 분리 → 같은
  * user 의 노트북 N대 데이터가 서로 덮어쓰지 않음. dashboard 가 device 별로 보거나 합산 선택.
  * fallback (옛 users.api_key_hash 경로) 면 null — (user, team, null) 단일 legacy row.
+ *
+ * Multi-provider (2026-05-29 M): body 의 형태에 따라 분기.
+ *   - 신 형태: body = { claude: {...}, codex: {...}, envInfo?, ccusageMissing? } — provider 별 별도 row.
+ *   - 옛 형태: body = { today, week, ..., ccusageDaily, ccusageBlocks } — 전체 claude 처리 (backward compat).
+ * (user, team, token, provider) 단위 row 분리. claude / codex 각자 prev snapshot 기준 boundary promotion.
  */
 export async function runIngest(
   userId: number,
   teamId: number,
   tokenId: number | null,
   userTimezone: string | null,
+  body: unknown
+): Promise<void> {
+  const b = (body && typeof body === "object" ? body : {}) as Record<string, unknown>;
+  const hasProviderSplit = b.claude !== undefined || b.codex !== undefined;
+
+  if (hasProviderSplit) {
+    const PROVIDERS: Array<"claude" | "codex"> = ["claude", "codex"];
+    for (const provider of PROVIDERS) {
+      const providerBody = b[provider];
+      if (providerBody && typeof providerBody === "object") {
+        await runIngestForProvider(userId, teamId, tokenId, userTimezone, provider, providerBody);
+      }
+    }
+  } else {
+    // 옛 형태 — 전체 claude 로 처리 (backward compat — 옛 CLI 가 아직 deployed 일 가능성).
+    await runIngestForProvider(userId, teamId, tokenId, userTimezone, "claude", body);
+  }
+
+  await db.update(users).set({ lastSyncedAt: new Date() }).where(eq(users.id, userId));
+}
+
+async function runIngestForProvider(
+  userId: number,
+  teamId: number,
+  tokenId: number | null,
+  userTimezone: string | null,
+  provider: string,
   body: unknown
 ): Promise<void> {
   const base = getBaseReport(body);
@@ -207,6 +239,7 @@ export async function runIngest(
         tokenId === null
           ? sql`${userSnapshots.tokenId} IS NULL`
           : eq(userSnapshots.tokenId, tokenId),
+        eq(userSnapshots.provider, provider),
       )
     )
     .limit(1);
@@ -263,6 +296,7 @@ export async function runIngest(
         userId,
         teamId,
         tokenId,
+        provider,
         periodType: "weekly",
         periodStart: prev.currentWeekStart,
         capturedAt: prev.updatedAt ?? now,
@@ -279,6 +313,7 @@ export async function runIngest(
         userId,
         teamId,
         tokenId,
+        provider,
         periodType: "monthly",
         periodStart: prev.currentMonthStart,
         capturedAt: prev.updatedAt ?? now,
@@ -295,6 +330,7 @@ export async function runIngest(
         userId,
         teamId,
         tokenId,
+        provider,
         periodType: "daily",
         periodStart: prev.currentDayStart,
         capturedAt: prev.updatedAt ?? now,
@@ -309,6 +345,7 @@ export async function runIngest(
       userId,
       teamId,
       tokenId,
+      provider,
       rawJson: body,
       totalCost,
       sessionsCount,
@@ -324,7 +361,7 @@ export async function runIngest(
       updatedAt: now,
     })
     .onConflictDoUpdate({
-      target: [userSnapshots.userId, userSnapshots.teamId, userSnapshots.tokenId],
+      target: [userSnapshots.userId, userSnapshots.teamId, userSnapshots.tokenId, userSnapshots.provider],
       set: {
         rawJson: sql`excluded.raw_json`,
         totalCost: sql`excluded.total_cost`,
@@ -395,6 +432,7 @@ export async function runIngest(
         userId,
         teamId,
         blockId: blk.id,
+        provider,
         startedAt,
         endedAt,
         minutes,
@@ -405,7 +443,7 @@ export async function runIngest(
         updatedAt: now,
       })
       .onConflictDoUpdate({
-        target: [userBlocks.userId, userBlocks.teamId, userBlocks.blockId],
+        target: [userBlocks.userId, userBlocks.teamId, userBlocks.blockId, userBlocks.provider],
         set: {
           endedAt: sql`excluded.ended_at`,
           minutes: sql`excluded.minutes`,
@@ -429,5 +467,5 @@ export async function runIngest(
       )
     );
 
-  await db.update(users).set({ lastSyncedAt: now }).where(eq(users.id, userId));
+  // last_synced_at 갱신은 wrapper runIngest 가 양쪽 provider 호출 후 1회만 처리.
 }

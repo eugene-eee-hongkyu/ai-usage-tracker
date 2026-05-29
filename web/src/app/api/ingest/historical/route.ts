@@ -12,6 +12,9 @@ import crypto from "crypto";
 interface HistoricalPayload {
   type: "weekly" | "monthly";
   periodStart: string;     // "YYYY-MM-DD" (월요일 또는 1일)
+  // Multi-provider (2026-05-29 M): 'claude' | 'codex'. 옛 historical.mjs 가 provider
+  // 안 보내면 'claude' default (backward compat).
+  provider?: string;
   rawJson: unknown;
 }
 
@@ -105,6 +108,8 @@ export async function POST(req: NextRequest) {
     const calls = Number(ov?.calls ?? 0);
     if (cost === 0 && calls === 0) { skipped++; continue; }
 
+    const provider = it.provider === "codex" ? "codex" : "claude";
+
     try {
       const result = await db
         .insert(periodSnapshots)
@@ -112,6 +117,7 @@ export async function POST(req: NextRequest) {
           userId: userRow[0].id,
           teamId,
           tokenId: matchedTokenId,
+          provider,
           periodType: it.type,
           periodStart: it.periodStart,
           capturedAt: new Date(),

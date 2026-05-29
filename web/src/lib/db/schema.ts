@@ -270,6 +270,11 @@ export const userSnapshots = pgTable(
     // nullable: fallback (users.api_key_hash 매칭) 경로에서 token 결정 못 했을 때만.
     // 안정화 (1-2주) 후 NOT NULL 강제 + COALESCE 인덱스 → 정상 인덱스 재구성 예정.
     tokenId: integer("token_id").references(() => apiTokens.id),
+    // Multi-provider (2026-05-29 M): Claude / Codex (/ Phase 2 Gemini 등) 분리.
+    // ccusage / codeburn 양쪽이 단일 binary 로 모든 provider 지원 → provider 별
+    // 분리 호출 + (user, team, token, provider) 단위 row. 기존 row 는 default
+    // 'claude' 로 자동 마킹 (마이그 0016).
+    provider: text("provider").notNull().default("claude"),
     rawJson: jsonb("raw_json").notNull(),
     totalCost: real("total_cost").notNull().default(0),
     sessionsCount: integer("sessions_count").notNull().default(0),
@@ -285,12 +290,13 @@ export const userSnapshots = pgTable(
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
   },
   (t) => ({
-    // 실제 DB unique index = (user_id, team_id, token_id) NULLS NOT DISTINCT
-    // (PG 15+). NULL token_id 끼리도 같은 값으로 취급해 legacy fallback row
-    // 중복 차단. drizzle ON CONFLICT (column-list) 와 호환. drizzle migrate
+    // 실제 DB unique index = (user_id, team_id, token_id, provider) NULLS NOT
+    // DISTINCT (PG 15+). NULL token_id 끼리도 같은 값으로 취급해 legacy fallback
+    // row 중복 차단. drizzle ON CONFLICT (column-list) 와 호환. drizzle migrate
     // 는 미사용 — 마이그 파일 (drizzle/*.sql) 을 수동으로 Supabase 에 적용.
-    userTeamTokenUniq: uniqueIndex("user_snapshots_user_team_token_uniq").on(t.userId, t.teamId, t.tokenId),
+    userTeamTokenProviderUniq: uniqueIndex("user_snapshots_user_team_token_provider_uniq").on(t.userId, t.teamId, t.tokenId, t.provider),
     teamIdx: index("user_snapshots_team_idx").on(t.teamId),
+    providerIdx: index("user_snapshots_provider_idx").on(t.provider),
   })
 );
 
@@ -307,15 +313,19 @@ export const periodSnapshots = pgTable(
       .references(() => users.id),
     // M6f (2026-05-25): device-scope snapshot. user_snapshots 와 동일 의도.
     tokenId: integer("token_id").references(() => apiTokens.id),
+    // Multi-provider (2026-05-29 M): user_snapshots 와 동일 정책. 기존 row
+    // default 'claude' 마킹. 마이그 0016.
+    provider: text("provider").notNull().default("claude"),
     periodType: text("period_type").notNull(),
     periodStart: date("period_start").notNull(),
     capturedAt: timestamp("captured_at").defaultNow().notNull(),
     rawJson: jsonb("raw_json").notNull(),
   },
   (t) => ({
-    // 실제 DB index = (user_id, team_id, period_type, period_start, token_id) NULLS NOT DISTINCT.
-    uniq: uniqueIndex("period_snapshots_uniq").on(t.userId, t.teamId, t.periodType, t.periodStart, t.tokenId),
+    // 실제 DB index = (user_id, team_id, period_type, period_start, token_id, provider) NULLS NOT DISTINCT.
+    uniq: uniqueIndex("period_snapshots_uniq").on(t.userId, t.teamId, t.periodType, t.periodStart, t.tokenId, t.provider),
     teamIdx: index("period_snapshots_team_idx").on(t.teamId),
+    providerIdx: index("period_snapshots_provider_idx").on(t.provider),
   })
 );
 
@@ -335,6 +345,9 @@ export const userBlocks = pgTable(
       .notNull()
       .references(() => users.id),
     blockId: text("block_id").notNull(),
+    // Multi-provider (2026-05-29 M): ccusage blocks 의 provider 분기 저장.
+    // 기존 row default 'claude' 마킹. 마이그 0016.
+    provider: text("provider").notNull().default("claude"),
     startedAt: timestamp("started_at", { withTimezone: true }).notNull(),
     endedAt: timestamp("ended_at", { withTimezone: true }).notNull(),
     minutes: integer("minutes").notNull(),
@@ -345,9 +358,10 @@ export const userBlocks = pgTable(
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
   },
   (t) => ({
-    userBlockUniq: uniqueIndex("user_blocks_user_team_block_uniq").on(t.userId, t.teamId, t.blockId),
+    userBlockProviderUniq: uniqueIndex("user_blocks_user_team_block_provider_uniq").on(t.userId, t.teamId, t.blockId, t.provider),
     userStartedIdx: index("user_blocks_user_started_idx").on(t.userId, t.startedAt),
     teamIdx: index("user_blocks_team_idx").on(t.teamId),
+    providerIdx: index("user_blocks_provider_idx").on(t.provider),
   })
 );
 

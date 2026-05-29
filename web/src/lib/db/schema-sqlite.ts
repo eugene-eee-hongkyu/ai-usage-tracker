@@ -120,6 +120,9 @@ export const userSnapshots = sqliteTable(
     // M6f (2026-05-25): PG 와 schema sync. LOCAL_MODE 는 api_tokens 자체가 없어
     // 항상 NULL — 단일 user/단일 머신 환경이라 device 분리 의미 없음. FK 없음.
     tokenId: integer("token_id", { mode: "number" }),
+    // Multi-provider (2026-05-29 M): PG 와 schema sync. 단일 사용자 환경이라도
+    // Claude / Codex 분리 표시는 same dashboard 코드 공유.
+    provider: text("provider").notNull().default("claude"),
     rawJson: text("raw_json", { mode: "json" }).notNull(),
     totalCost: real("total_cost").notNull().default(0),
     sessionsCount: integer("sessions_count", { mode: "number" }).notNull().default(0),
@@ -137,8 +140,9 @@ export const userSnapshots = sqliteTable(
       .default(sql`(unixepoch() * 1000)`),
   },
   (t) => ({
-    userTeamUniq: uniqueIndex("user_snapshots_user_team_uniq").on(t.userId, t.teamId),
+    userTeamProviderUniq: uniqueIndex("user_snapshots_user_team_provider_uniq").on(t.userId, t.teamId, t.provider),
     teamIdx: index("user_snapshots_team_idx").on(t.teamId),
+    providerIdx: index("user_snapshots_provider_idx").on(t.provider),
   })
 );
 
@@ -154,6 +158,8 @@ export const periodSnapshots = sqliteTable(
       .references(() => teams.id),
     // M6f: schema sync. LOCAL_MODE 에선 항상 NULL.
     tokenId: integer("token_id", { mode: "number" }),
+    // Multi-provider (2026-05-29 M): PG 와 schema sync.
+    provider: text("provider").notNull().default("claude"),
     periodType: text("period_type").notNull(),
     periodStart: text("period_start").notNull(),
     capturedAt: integer("captured_at", { mode: "timestamp_ms" })
@@ -162,8 +168,9 @@ export const periodSnapshots = sqliteTable(
     rawJson: text("raw_json", { mode: "json" }).notNull(),
   },
   (t) => ({
-    uniq: uniqueIndex("period_snapshots_uniq").on(t.userId, t.teamId, t.periodType, t.periodStart),
+    uniq: uniqueIndex("period_snapshots_uniq").on(t.userId, t.teamId, t.periodType, t.periodStart, t.provider),
     teamIdx: index("period_snapshots_team_idx").on(t.teamId),
+    providerIdx: index("period_snapshots_provider_idx").on(t.provider),
   })
 );
 
@@ -178,6 +185,8 @@ export const userBlocks = sqliteTable(
       .notNull()
       .references(() => teams.id),
     blockId: text("block_id").notNull(),
+    // Multi-provider (2026-05-29 M): PG 와 schema sync.
+    provider: text("provider").notNull().default("claude"),
     startedAt: integer("started_at", { mode: "timestamp_ms" }).notNull(),
     endedAt: integer("ended_at", { mode: "timestamp_ms" }).notNull(),
     minutes: integer("minutes", { mode: "number" }).notNull(),
@@ -190,9 +199,10 @@ export const userBlocks = sqliteTable(
       .default(sql`(unixepoch() * 1000)`),
   },
   (t) => ({
-    userTeamBlockUniq: uniqueIndex("user_blocks_user_team_block_uniq").on(t.userId, t.teamId, t.blockId),
+    userTeamBlockProviderUniq: uniqueIndex("user_blocks_user_team_block_provider_uniq").on(t.userId, t.teamId, t.blockId, t.provider),
     userStartedIdx: index("user_blocks_user_started_idx").on(t.userId, t.startedAt),
     teamIdx: index("user_blocks_team_idx").on(t.teamId),
+    providerIdx: index("user_blocks_provider_idx").on(t.provider),
   })
 );
 

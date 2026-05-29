@@ -109,6 +109,9 @@ export async function GET(req: NextRequest) {
   const weekOffset = parseInt(req.nextUrl.searchParams.get("weekOffset") ?? "0") || 0;
   const monthOffset = parseInt(req.nextUrl.searchParams.get("monthOffset") ?? "0") || 0;
   const dayOffset = parseInt(req.nextUrl.searchParams.get("dayOffset") ?? "0") || 0;
+  // Multi-provider (2026-05-29 M): provider tab filter. default = claude (대다수 사용자).
+  // 'codex' 외 값은 무시 → claude. Phase 2 (Gemini 등) 진입 시 enum 확장.
+  const provider = req.nextUrl.searchParams.get("provider") === "codex" ? "codex" : "claude";
 
   // team 격리 결정. LOCAL_MODE 는 single-tenant 라 team 무의미 → null 허용.
   // platform owner 가 viewAs cookie 박은 경우 그 team, 일반 user 는 currentTeamId.
@@ -211,13 +214,18 @@ export async function GET(req: NextRequest) {
   const tokenScopeForSnap = selectedTokenId !== null ? eq(userSnapshots.tokenId, selectedTokenId) : undefined;
   const tokenScopeForPeriod = selectedTokenId !== null ? eq(periodSnapshots.tokenId, selectedTokenId) : undefined;
 
+  // Multi-provider scope — 모든 user_snapshots / period_snapshots / user_blocks query 에 적용.
+  const providerScopeForSnap = eq(userSnapshots.provider, provider);
+  const providerScopeForPeriod = eq(periodSnapshots.provider, provider);
+  const providerScopeForBlocks = eq(userBlocks.provider, provider);
+
   const snap = await db
     .select()
     .from(userSnapshots)
     .where(
       IS_LOCAL_MODE
-        ? and(eq(userSnapshots.userId, user[0].id), tokenScopeForSnap)
-        : and(eq(userSnapshots.userId, user[0].id), eq(userSnapshots.teamId, effectiveTeamId!), tokenScopeForSnap)
+        ? and(eq(userSnapshots.userId, user[0].id), tokenScopeForSnap, providerScopeForSnap)
+        : and(eq(userSnapshots.userId, user[0].id), eq(userSnapshots.teamId, effectiveTeamId!), tokenScopeForSnap, providerScopeForSnap)
     )
     .limit(1);
 
@@ -231,17 +239,17 @@ export async function GET(req: NextRequest) {
   const availableWeeklyRows = await db
     .select({ periodStart: periodSnapshots.periodStart, capturedAt: periodSnapshots.capturedAt })
     .from(periodSnapshots)
-    .where(and(eq(periodSnapshots.userId, user[0].id), eq(periodSnapshots.periodType, "weekly"), teamScope, tokenScopeForPeriod))
+    .where(and(eq(periodSnapshots.userId, user[0].id), eq(periodSnapshots.periodType, "weekly"), teamScope, tokenScopeForPeriod, providerScopeForPeriod))
     .orderBy(desc(periodSnapshots.periodStart));
   const availableMonthlyRows = await db
     .select({ periodStart: periodSnapshots.periodStart, capturedAt: periodSnapshots.capturedAt })
     .from(periodSnapshots)
-    .where(and(eq(periodSnapshots.userId, user[0].id), eq(periodSnapshots.periodType, "monthly"), teamScope, tokenScopeForPeriod))
+    .where(and(eq(periodSnapshots.userId, user[0].id), eq(periodSnapshots.periodType, "monthly"), teamScope, tokenScopeForPeriod, providerScopeForPeriod))
     .orderBy(desc(periodSnapshots.periodStart));
   const availableDailyRows = await db
     .select({ periodStart: periodSnapshots.periodStart, capturedAt: periodSnapshots.capturedAt })
     .from(periodSnapshots)
-    .where(and(eq(periodSnapshots.userId, user[0].id), eq(periodSnapshots.periodType, "daily"), teamScope, tokenScopeForPeriod))
+    .where(and(eq(periodSnapshots.userId, user[0].id), eq(periodSnapshots.periodType, "daily"), teamScope, tokenScopeForPeriod, providerScopeForPeriod))
     .orderBy(desc(periodSnapshots.periodStart));
 
   const availableSnapshots = {
@@ -256,7 +264,7 @@ export async function GET(req: NextRequest) {
     const rows = await db
       .select()
       .from(periodSnapshots)
-      .where(and(eq(periodSnapshots.userId, user[0].id), eq(periodSnapshots.periodType, "weekly"), teamScope, tokenScopeForPeriod))
+      .where(and(eq(periodSnapshots.userId, user[0].id), eq(periodSnapshots.periodType, "weekly"), teamScope, tokenScopeForPeriod, providerScopeForPeriod))
       .orderBy(desc(periodSnapshots.periodStart))
       .limit(1)
       .offset(weekOffset - 1);
@@ -265,7 +273,7 @@ export async function GET(req: NextRequest) {
     const rows = await db
       .select()
       .from(periodSnapshots)
-      .where(and(eq(periodSnapshots.userId, user[0].id), eq(periodSnapshots.periodType, "monthly"), teamScope, tokenScopeForPeriod))
+      .where(and(eq(periodSnapshots.userId, user[0].id), eq(periodSnapshots.periodType, "monthly"), teamScope, tokenScopeForPeriod, providerScopeForPeriod))
       .orderBy(desc(periodSnapshots.periodStart))
       .limit(1)
       .offset(monthOffset - 1);
@@ -274,7 +282,7 @@ export async function GET(req: NextRequest) {
     const rows = await db
       .select()
       .from(periodSnapshots)
-      .where(and(eq(periodSnapshots.userId, user[0].id), eq(periodSnapshots.periodType, "daily"), teamScope, tokenScopeForPeriod))
+      .where(and(eq(periodSnapshots.userId, user[0].id), eq(periodSnapshots.periodType, "daily"), teamScope, tokenScopeForPeriod, providerScopeForPeriod))
       .orderBy(desc(periodSnapshots.periodStart))
       .limit(1)
       .offset(dayOffset - 1);
@@ -691,12 +699,12 @@ export async function GET(req: NextRequest) {
       ? await db.select().from(users).where(inArray(users.id, rankMemberIds))
       : [];
   const allSnapsForRank = IS_LOCAL_MODE
-    ? await db.select().from(userSnapshots)
+    ? await db.select().from(userSnapshots).where(providerScopeForSnap)
     : rankMemberIds.length > 0
       ? await db
           .select()
           .from(userSnapshots)
-          .where(and(inArray(userSnapshots.userId, rankMemberIds), userSnapTeamScope))
+          .where(and(inArray(userSnapshots.userId, rankMemberIds), userSnapTeamScope, providerScopeForSnap))
       : [];
   const snapMapAll = new Map(allSnapsForRank.map((s2) => [s2.userId, s2]));
   const memberCacheHits: Array<{ userId: number; cacheHitPct: number }> = [];
@@ -788,6 +796,7 @@ export async function GET(req: NextRequest) {
           eq(userBlocks.userId, user[0].id),
           gte(userBlocks.startedAt, blocksWindowStart),
           userBlocksTeamScope,
+          providerScopeForBlocks,
         ))
         .orderBy(asc(userBlocks.startedAt))
     : [];
@@ -842,6 +851,7 @@ export async function GET(req: NextRequest) {
         gte(userBlocks.startedAt, prevStart),
         lt(userBlocks.startedAt, prevEnd),
         userBlocksTeamScope,
+        providerScopeForBlocks,
       ));
     const prevCount = prevRows.length;
     const prevTotalMin = prevRows.reduce((s, r) => s + r.minutes, 0);

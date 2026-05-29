@@ -353,6 +353,9 @@ function openBrowser(url) {
       execSync(`xdg-open "${url}"`);
   } catch {}
 }
+function escapeHtml(s) {
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+}
 function getApiKeyViaLocalServer() {
   return new Promise((resolve, reject) => {
     const server = http.createServer((req, res) => {
@@ -362,8 +365,8 @@ function getApiKeyViaLocalServer() {
       const device = url.searchParams.get("device") ?? "";
       res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
       if (apiKey) {
-        const emailLine = email ? `<p style='font-size:0.9em;color:#555'>계정: <b>${email}</b></p>` : "";
-        const deviceLine = device ? `<p style='font-size:0.9em;color:#555'>디바이스: <b>${device}</b></p>` : "";
+        const emailLine = email ? `<p style='font-size:0.9em;color:#555'>계정: <b>${escapeHtml(email)}</b></p>` : "";
+        const deviceLine = device ? `<p style='font-size:0.9em;color:#555'>디바이스: <b>${escapeHtml(device)}</b></p>` : "";
         res.end("<html><body style='font-family:sans-serif;padding:2em'><h2>&#x2705; Authentication Complete</h2>" + emailLine + deviceLine + "<p>이 창을 닫고 터미널로 돌아가세요. 터미널에 <code>✨ 설치 완료</code> 메시지가 떠야 정상입니다.</p>" + "</body></html>");
         if (email)
           console.log(`
@@ -599,12 +602,11 @@ function runBackfill(apiKey) {
     env: {
       ...process.env,
       USAGE_TRACKER_API_KEY: apiKey,
-      USAGE_TRACKER_URL: SERVER_URL,
-      USAGE_TRACKER_DAYS: "90"
+      USAGE_TRACKER_URL: SERVER_URL
     }
   });
   child.unref();
-  console.log("\uD83D\uDCE6 과거 데이터 백그라운드 수집 시작 (최대 90일)");
+  console.log("\uD83D\uDCE6 과거 데이터 백그라운드 수집 시작");
 }
 function runImmediateSync(apiKey) {
   if (!fs.existsSync(STABLE_SUBMIT))

@@ -103,38 +103,42 @@ function releaseLock() {
   try { unlinkSync(LOCK_FILE); } catch {}
 }
 
-function spawnCodeburn(period) {
+// Multi-provider (2026-05-29): provider 인자로 Claude / Codex 분리 호출.
+// codeburn 은 `--provider <name>` 옵션, ccusage 는 sub-command (`ccusage claude daily` / `codex daily`).
+// 빈 환경 (e.g. ~/.codex/sessions/ 없음) 도 안전 — overview 0 + 빈 배열 응답.
+
+function spawnCodeburn(provider, period) {
   return new Promise((resolve, reject) => {
     const chunks = [];
     // shell: true — Claude Code hook 환경에서 PATH가 제한될 수 있어 shell 경유
-    const proc = spawn("codeburn", ["report", "--format", "json", "--provider", "claude", "--period", period], {
+    const proc = spawn("codeburn", ["report", "--format", "json", "--provider", provider, "--period", period], {
       stdio: ["ignore", "pipe", "pipe"],
       shell: true,
       env: childEnv,
     });
     proc.stdout.on("data", (d) => chunks.push(d));
     proc.on("close", (code) => {
-      if (code !== 0) return reject(new Error(`codeburn exited ${code} (period=${period})`));
+      if (code !== 0) return reject(new Error(`codeburn exited ${code} (${provider}/${period})`));
       try {
         resolve(JSON.parse(Buffer.concat(chunks).toString("utf8").trim()));
       } catch (e) {
-        reject(new Error(`codeburn JSON parse error: ${e.message}`));
+        reject(new Error(`codeburn JSON parse error (${provider}/${period}): ${e.message}`));
       }
     });
     proc.on("error", reject);
-    setTimeout(() => { proc.kill(); reject(new Error(`codeburn timeout (period=${period})`)); }, 600_000);
+    setTimeout(() => { proc.kill(); reject(new Error(`codeburn timeout (${provider}/${period})`)); }, 600_000);
   });
 }
 
-// ccusage 결과 + 실패 사유. main()에서 ingest payload에 ccusageMissing 플래그를 붙이고
-// submit.log에 명확한 진단 라인을 남긴다.
-let ccusageStatus = "unknown"; // "ok" | "missing" | "error" | "timeout" | "parse"
+// ccusage 결과 + 실패 사유. provider 별로 분리 추적. main()에서 ingest payload의
+// ccusageMissing 플래그는 양쪽 모두 missing 일 때만 true.
+const ccusageStatus = { claude: "unknown", codex: "unknown" };
 
-function spawnCcusageDaily() {
+function spawnCcusageDaily(provider) {
   return new Promise((resolve) => {
     const stdoutChunks = [];
     const stderrChunks = [];
-    const proc = spawn("ccusage", ["daily", "--json"], {
+    const proc = spawn("ccusage", [provider, "daily", "--json"], {
       stdio: ["ignore", "pipe", "pipe"],
       shell: true,
       env: childEnv,
@@ -146,38 +150,38 @@ function spawnCcusageDaily() {
         // shell: true → ENOENT는 exit 127 + stderr "command not found"로 나타남
         const stderr = Buffer.concat(stderrChunks).toString("utf8");
         if (code === 127 || /not found|not recognized|cannot find/i.test(stderr)) {
-          ccusageStatus = "missing";
-          log("ccusage NOT INSTALLED — token graphs will be empty. Run: npm install -g ccusage");
+          ccusageStatus[provider] = "missing";
+          log(`ccusage NOT INSTALLED (${provider}) — token graphs will be empty. Run: npm install -g ccusage`);
         } else {
-          ccusageStatus = "error";
-          log(`ccusage exited ${code} — ${stderr.trim().slice(0, 200)}`);
+          ccusageStatus[provider] = "error";
+          log(`ccusage ${provider} exited ${code} — ${stderr.trim().slice(0, 200)}`);
         }
         return resolve(null);
       }
       try {
         const data = JSON.parse(Buffer.concat(stdoutChunks).toString("utf8").trim());
-        ccusageStatus = "ok";
+        ccusageStatus[provider] = "ok";
         resolve(data);
       } catch (e) {
-        ccusageStatus = "parse";
-        log(`ccusage JSON parse error: ${e?.message ?? e}`);
+        ccusageStatus[provider] = "parse";
+        log(`ccusage ${provider} JSON parse error: ${e?.message ?? e}`);
         resolve(null);
       }
     });
     proc.on("error", (err) => {
       if (err && err.code === "ENOENT") {
-        ccusageStatus = "missing";
-        log("ccusage NOT INSTALLED — token graphs will be empty. Run: npm install -g ccusage");
+        ccusageStatus[provider] = "missing";
+        log(`ccusage NOT INSTALLED (${provider}) — token graphs will be empty. Run: npm install -g ccusage`);
       } else {
-        ccusageStatus = "error";
-        log(`ccusage spawn error: ${err?.message ?? err}`);
+        ccusageStatus[provider] = "error";
+        log(`ccusage ${provider} spawn error: ${err?.message ?? err}`);
       }
       resolve(null);
     });
     setTimeout(() => {
       proc.kill();
-      ccusageStatus = "timeout";
-      log("ccusage timeout (600s)");
+      ccusageStatus[provider] = "timeout";
+      log(`ccusage ${provider} timeout (600s)`);
       resolve(null);
     }, 600_000);
   });
@@ -272,10 +276,10 @@ function collectEnvInfo() {
   };
 }
 
-function spawnCcusageBlocks() {
+function spawnCcusageBlocks(provider) {
   return new Promise((resolve) => {
     const stdoutChunks = [];
-    const proc = spawn("ccusage", ["blocks", "--json"], {
+    const proc = spawn("ccusage", [provider, "blocks", "--json"], {
       stdio: ["ignore", "pipe", "pipe"],
       shell: true,
       env: childEnv,
@@ -290,6 +294,41 @@ function spawnCcusageBlocks() {
     proc.on("error", () => resolve(null));
     setTimeout(() => { proc.kill(); resolve(null); }, 600_000);
   });
+}
+
+// provider 1개 분량 — codeburn × PERIODS + ccusage daily + ccusage blocks.
+// 빈 환경 (~/.codex/sessions/ 없는 사용자) 도 안전 — overview 0 + 빈 배열 응답이라 그대로 박아 보냄.
+async function collectForProvider(provider) {
+  const settled = await Promise.allSettled([
+    ...PERIODS.map((p) => spawnCodeburn(provider, p)),
+    spawnCcusageDaily(provider),
+    spawnCcusageBlocks(provider),
+  ]);
+  const cbResults = settled.slice(0, PERIODS.length);
+  const ccResult = settled[PERIODS.length];
+  const blocksResult = settled[PERIODS.length + 1];
+
+  const okPeriods = [];
+  const failPeriods = [];
+  const providerReport = {};
+  for (let i = 0; i < PERIODS.length; i++) {
+    const r = cbResults[i];
+    if (r.status === "fulfilled" && r.value) {
+      providerReport[PERIODS[i]] = r.value;
+      okPeriods.push(PERIODS[i]);
+    } else {
+      failPeriods.push(`${provider}/${PERIODS[i]}:${r.status === "rejected" ? r.reason?.message ?? r.reason : "empty"}`);
+    }
+  }
+  const ccusageDaily = ccResult.status === "fulfilled" ? ccResult.value : null;
+  if (ccusageDaily) providerReport.ccusageDaily = ccusageDaily;
+  const ccusageBlocks = blocksResult.status === "fulfilled" ? blocksResult.value : null;
+  if (ccusageBlocks) {
+    providerReport.ccusageBlocks = ccusageBlocks;
+    const cnt = Array.isArray(ccusageBlocks?.blocks) ? ccusageBlocks.blocks.length : 0;
+    log(`${provider}: ccusage blocks ok — ${cnt} blocks`);
+  }
+  return { providerReport, okPeriods, failPeriods };
 }
 
 async function main() {
@@ -309,42 +348,38 @@ async function main() {
 
     let report = {};
     try {
-      log(`spawning codeburn x${PERIODS.length} + ccusage daily + ccusage blocks...`);
-      const settled = await Promise.allSettled([
-        ...PERIODS.map((p) => spawnCodeburn(p)),
-        spawnCcusageDaily(),
-        spawnCcusageBlocks(),
-      ]);
-      const cbResults = settled.slice(0, PERIODS.length);
-      const ccResult = settled[PERIODS.length];
-      const blocksResult = settled[PERIODS.length + 1];
+      const PROVIDERS = ["claude", "codex"];
+      log(`spawning ${PROVIDERS.length} providers × (codeburn x${PERIODS.length} + ccusage daily + ccusage blocks)...`);
+      const providerResults = await Promise.all(PROVIDERS.map((p) => collectForProvider(p)));
+      const claudeResult = providerResults[0];
+      const codexResult = providerResults[1];
 
-      const okPeriods = [];
-      const failPeriods = [];
-      for (let i = 0; i < PERIODS.length; i++) {
-        const r = cbResults[i];
-        if (r.status === "fulfilled" && r.value) {
-          report[PERIODS[i]] = r.value;
-          okPeriods.push(PERIODS[i]);
-        } else {
-          failPeriods.push(`${PERIODS[i]}:${r.status === "rejected" ? r.reason?.message ?? r.reason : "empty"}`);
-        }
-      }
-      const ccusageDaily = ccResult.status === "fulfilled" ? ccResult.value : null;
-      if (ccusageDaily) report.ccusageDaily = ccusageDaily;
-      if (ccusageStatus === "missing") report.ccusageMissing = true;
-      const ccusageBlocks = blocksResult.status === "fulfilled" ? blocksResult.value : null;
-      if (ccusageBlocks) {
-        report.ccusageBlocks = ccusageBlocks;
-        const cnt = Array.isArray(ccusageBlocks?.blocks) ? ccusageBlocks.blocks.length : 0;
-        log(`ccusage blocks ok — ${cnt} blocks`);
-      }
+      const allOk = [
+        ...claudeResult.okPeriods.map((p) => `claude/${p}`),
+        ...codexResult.okPeriods.map((p) => `codex/${p}`),
+      ];
+      const allFail = [...claudeResult.failPeriods, ...codexResult.failPeriods];
 
-      if (okPeriods.length === 0 && !ccusageDaily) {
-        log(`ERROR: all spawns failed — ${failPeriods.join(", ")}`);
+      // 양쪽 다 빈 결과면 진짜 실패 — 그 외엔 (Codex 빈 환경 정상) 정상 진행.
+      const hasAnyClaude = claudeResult.okPeriods.length > 0 || claudeResult.providerReport.ccusageDaily;
+      const hasAnyCodex = codexResult.okPeriods.length > 0 || codexResult.providerReport.ccusageDaily;
+      if (!hasAnyClaude && !hasAnyCodex) {
+        log(`ERROR: all spawns failed — ${allFail.join(", ")}`);
         return;
       }
-      log(`spawn done — codeburn ok=[${okPeriods.join(",")}]${failPeriods.length ? ` fail=[${failPeriods.join(",")}]` : ""}, ccusage=${ccusageStatus}`);
+      log(`spawn done — ok=[${allOk.join(",")}]${allFail.length ? ` fail=[${allFail.join(",")}]` : ""}, ccusage claude=${ccusageStatus.claude} codex=${ccusageStatus.codex}`);
+
+      // body schema (신): { claude: { today, week, month, 30days, all, ccusageDaily, ccusageBlocks },
+      //                    codex: { ... }, envInfo, ccusageMissing? }
+      // 서버 run-ingest 가 양쪽 분기 처리. 옛 형태 (provider key 없음) 도 backward compat 으로 claude 처리.
+      report = {
+        claude: claudeResult.providerReport,
+        codex: codexResult.providerReport,
+      };
+      // 양쪽 모두 missing 일 때만 ccusageMissing 플래그 — 한쪽만 missing 은 정상 (Codex 안 쓰는 사용자).
+      if (ccusageStatus.claude === "missing" && ccusageStatus.codex === "missing") {
+        report.ccusageMissing = true;
+      }
 
       try {
         report.envInfo = collectEnvInfo();

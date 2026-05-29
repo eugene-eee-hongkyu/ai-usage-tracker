@@ -19,6 +19,10 @@ import { homedir } from "os";
 const SYSTEM_TZ = Intl.DateTimeFormat().resolvedOptions().timeZone;
 const childEnv = { ...process.env, TZ: SYSTEM_TZ, CODEBURN_TZ: SYSTEM_TZ };
 
+// Multi-provider (2026-05-29): Claude + Codex 분리 backfill.
+// 각 (period, provider) 가 별도 snapshot row. 빈 데이터는 drop (isEmpty 판정 그대로).
+const PROVIDERS = ["claude", "codex"];
+
 // destinations 로더 — sync.mjs / destinations.ts 와 동일 패턴.
 // 우선순위:
 //   1. ~/.usage-tracker/config.json 의 destinations[] (위저드가 만든 .dmg 환경)
@@ -116,12 +120,12 @@ function lastDayOfMonth(firstOfMonth) {
   return shiftDays(next, -1);
 }
 
-function spawnCodeburnRange(fromYmd, toYmd) {
+function spawnCodeburnRange(provider, fromYmd, toYmd) {
   return new Promise((resolve) => {
     const chunks = [];
     const proc = spawn(
       "codeburn",
-      ["report", "--from", fromYmd, "--to", toYmd, "--format", "json", "--provider", "claude"],
+      ["report", "--from", fromYmd, "--to", toYmd, "--format", "json", "--provider", provider],
       { stdio: ["ignore", "pipe", "pipe"], shell: true, env: childEnv }
     );
     proc.stdout.on("data", (d) => chunks.push(d));
@@ -138,14 +142,15 @@ function spawnCodeburnRange(fromYmd, toYmd) {
 
 // ccusage daily 일별 토큰 분해 (--since / --until 은 YYYYMMDD 형식).
 // historical snapshot 의 DAILY ACTIVITY 토큰 차트가 비지 않게 임베드.
-function spawnCcusageRange(fromYmd, toYmd) {
+// Multi-provider: ccusage claude/codex sub-command.
+function spawnCcusageRange(provider, fromYmd, toYmd) {
   return new Promise((resolve) => {
     const since = fromYmd.replace(/-/g, "");
     const until = toYmd.replace(/-/g, "");
     const chunks = [];
     const proc = spawn(
       "ccusage",
-      ["daily", "--since", since, "--until", until, "--json"],
+      [provider, "daily", "--since", since, "--until", until, "--json"],
       { stdio: ["ignore", "pipe", "pipe"], shell: true, env: childEnv }
     );
     proc.stdout.on("data", (d) => chunks.push(d));
@@ -167,24 +172,29 @@ function isEmpty(json) {
   return cost === 0 && calls === 0;
 }
 
+// Multi-provider: 양쪽 provider 각각 codeburn + ccusage 호출. 빈 결과 (Codex 안 쓰는
+// 사용자) 는 isEmpty 로 drop. 결과는 provider 별 entry 배열로 반환.
 async function fetchOnePeriod(start, end, label) {
-  const json = await spawnCodeburnRange(start, end);
-  if (!json || !json.overview) {
-    log(`${label}: codeburn fetch failed`);
-    return null;
+  const results = [];
+  for (const provider of PROVIDERS) {
+    const json = await spawnCodeburnRange(provider, start, end);
+    if (!json || !json.overview) {
+      log(`${label} ${provider}: codeburn fetch failed`);
+      continue;
+    }
+    if (isEmpty(json)) {
+      log(`${label} ${provider}: empty period (cost=0/calls=0) — skip`);
+      continue;
+    }
+    const ccu = await spawnCcusageRange(provider, start, end);
+    if (ccu) {
+      json.ccusageDaily = ccu;
+    } else {
+      log(`${label} ${provider}: ccusage fetch failed (codeburn 만 임베드)`);
+    }
+    results.push({ provider, rawJson: json });
   }
-  if (isEmpty(json)) {
-    log(`${label}: empty period (cost=0/calls=0) — skip`);
-    return null;
-  }
-  // ccusage 일별 토큰 분해 동시 추출, rawJson 에 임베드.
-  const ccu = await spawnCcusageRange(start, end);
-  if (ccu) {
-    json.ccusageDaily = ccu;
-  } else {
-    log(`${label}: ccusage fetch failed (codeburn 만 임베드)`);
-  }
-  return json;
+  return results;
 }
 
 async function generateSnapshots() {
@@ -200,8 +210,10 @@ async function generateSnapshots() {
     const end = shiftDays(start, 6);
     const label = `weekly ${start}~${end}`;
     log(label);
-    const json = await fetchOnePeriod(start, end, label);
-    if (json) snapshots.push({ type: "weekly", periodStart: start, rawJson: json });
+    const results = await fetchOnePeriod(start, end, label);
+    for (const { provider, rawJson } of results) {
+      snapshots.push({ type: "weekly", periodStart: start, provider, rawJson });
+    }
   }
 
   // 지난 12개월 (이번 달 제외)
@@ -210,8 +222,10 @@ async function generateSnapshots() {
     const end = lastDayOfMonth(start);
     const label = `monthly ${start}~${end}`;
     log(label);
-    const json = await fetchOnePeriod(start, end, label);
-    if (json) snapshots.push({ type: "monthly", periodStart: start, rawJson: json });
+    const results = await fetchOnePeriod(start, end, label);
+    for (const { provider, rawJson } of results) {
+      snapshots.push({ type: "monthly", periodStart: start, provider, rawJson });
+    }
   }
 
   return snapshots;

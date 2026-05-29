@@ -983,14 +983,17 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
   const [dayOffset, setDayOffset] = useState(0);
   // M6f: 사용자가 노트북 N대 쓰면 device chip 으로 선택. null = server 가 가장 최근 device 자동 결정.
   const [deviceId, setDeviceId] = useState<number | null>(null);
+  // Multi-provider (2026-05-29 M): Claude / Codex 분리 탭. default = claude (대다수).
+  const [provider, setProvider] = useState<"claude" | "codex">("claude");
 
-  const apiUrl = (p: Period, wOff: number, mOff: number, dOff: number, devId: number | null) => {
+  const apiUrl = (p: Period, wOff: number, mOff: number, dOff: number, devId: number | null, prov: "claude" | "codex") => {
     const params = new URLSearchParams({ period: p });
     if (targetUserId) params.set("userId", targetUserId);
     if (p === "8days" && wOff > 0) params.set("weekOffset", String(wOff));
     if (p === "month" && mOff > 0) params.set("monthOffset", String(mOff));
     if (p === "today" && dOff > 0) params.set("dayOffset", String(dOff));
     if (devId !== null) params.set("deviceId", String(devId));
+    if (prov === "codex") params.set("provider", "codex");
     return `/api/dashboard?${params.toString()}`;
   };
 
@@ -1092,7 +1095,7 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
     if (!periodReady) return;
     const ctrl = new AbortController();
     setLoading(true);
-    fetch(apiUrl(period, weekOffset, monthOffset, dayOffset, deviceId), { signal: ctrl.signal })
+    fetch(apiUrl(period, weekOffset, monthOffset, dayOffset, deviceId, provider), { signal: ctrl.signal })
       .then((r) => r.json())
       .then((d) => {
         if (d?.error) { setFetchError(true); setLoading(false); return; }
@@ -1107,7 +1110,7 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
       });
     return () => ctrl.abort();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [session, period, weekOffset, monthOffset, dayOffset, deviceId, targetUserId, periodReady]);
+  }, [session, period, weekOffset, monthOffset, dayOffset, deviceId, provider, targetUserId, periodReady]);
 
   useEffect(() => {
     if (data?.user?.timezone) setUserTz(data.user.timezone);
@@ -1123,7 +1126,7 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
     const intervalMs = isLocalMode ? 5000 : 4000;
     const ctrl = new AbortController();
     const id = setInterval(() => {
-      fetch(apiUrl(period, weekOffset, monthOffset, dayOffset, deviceId), { signal: ctrl.signal })
+      fetch(apiUrl(period, weekOffset, monthOffset, dayOffset, deviceId, provider), { signal: ctrl.signal })
         .then((r) => r.json())
         .then((d) => {
           if (d?.error) return;
@@ -1138,7 +1141,7 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
       ctrl.abort();
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [session, isLocalMode, data?.overview, period, weekOffset, monthOffset, dayOffset, deviceId, targetUserId]);
+  }, [session, isLocalMode, data?.overview, period, weekOffset, monthOffset, dayOffset, deviceId, provider, targetUserId]);
 
   const saveTz = async (tz: string) => {
     setUserTz(tz);
@@ -1168,7 +1171,7 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
           data-testid="dash-retry"
           onClick={() => {
             setFetchError(false); setLoading(true);
-            fetch(apiUrl(period, weekOffset, monthOffset, dayOffset, deviceId)).then((r) => r.json()).then((d) => {
+            fetch(apiUrl(period, weekOffset, monthOffset, dayOffset, deviceId, provider)).then((r) => r.json()).then((d) => {
               if (!d?.error) { setData(d); setLoading(false); }
             });
           }}
@@ -2259,6 +2262,23 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
               ))}
             </select>
           )}
+        </div>
+        {/* Multi-provider (2026-05-29 M): Claude / Codex 탭. Phase 1. device chip 패턴 follow.
+            Codex 데이터 없는 사용자가 클릭하면 빈 dashboard 표시 (자연 empty state). */}
+        <div className="max-w-6xl mx-auto px-4 pb-2 flex gap-1.5 items-center">
+          <span className="text-[10px] font-mono text-neutral-600 uppercase tracking-wider mr-1">provider:</span>
+          {(["claude", "codex"] as const).map((prov) => (
+            <button
+              key={prov}
+              data-testid={`dash-provider-${prov}`}
+              onClick={() => setProvider(prov)}
+              className={`text-xs font-mono border rounded px-3 py-1 transition-colors ${
+                provider === prov
+                  ? "bg-indigo-600 text-white border-indigo-500"
+                  : "bg-neutral-800 text-neutral-300 border-neutral-700 hover:border-neutral-500"
+              }`}
+            >{prov === "claude" ? "Claude Code" : "Codex"}</button>
+          ))}
         </div>
         {/* M6f: device chip row — user 가 노트북 N대 사용 시 표시. 1개면 숨김.
             클릭하면 그 device 의 데이터로 dashboard 갱신. server 가 selectedDeviceId 결정 → 동기화. */}
