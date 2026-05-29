@@ -195,6 +195,8 @@ interface TeamData {
     dates: string[];
     byUser: Record<string, { name: string; counts: number[] }>;
   };
+  // Multi-provider Phase 2: 팀 멤버 중 의미 있는 Codex 사용 1+ → Provider Tabs 표시.
+  hasCodexData?: boolean;
 }
 
 function AdminBadge() {
@@ -367,6 +369,8 @@ export function TeamView({ adminMode = false }: { adminMode?: boolean }) {
   const { data: session, status } = useSession();
   const router = useRouter();
   const [period, setPeriod] = useState<Period>("month");
+  // Multi-provider Phase 2 (2026-05-30 M): Provider Tabs. default = claude.
+  const [provider, setProvider] = useState<"claude" | "codex">("claude");
 
   // team_view 진입 시 1회. adminMode (admin view-as) 와 분리.
   useEffect(() => {
@@ -443,7 +447,7 @@ export function TeamView({ adminMode = false }: { adminMode?: boolean }) {
     const ctrl = new AbortController();
     setLoading(true);
     setFetchError(false);
-    fetch(`/api/team?period=${period}`, { signal: ctrl.signal })
+    fetch(`/api/team?period=${period}${provider === "codex" ? "&provider=codex" : ""}`, { signal: ctrl.signal })
       .then((r) => {
         if (!r.ok) throw new Error(String(r.status));
         return r.json();
@@ -459,7 +463,7 @@ export function TeamView({ adminMode = false }: { adminMode?: boolean }) {
         setLoading(false);
       });
     return () => ctrl.abort();
-  }, [session, period, reloadKey, periodReady]);
+  }, [session, period, provider, reloadKey, periodReady]);
 
   if (fetchError) return (
     <div className="min-h-screen bg-neutral-950">
@@ -1599,7 +1603,7 @@ export function TeamView({ adminMode = false }: { adminMode?: boolean }) {
     <div className="min-h-screen bg-neutral-950 text-neutral-100">
       <NavComponent />
 
-      {/* Period Tabs */}
+      {/* Period Tabs + Provider Tabs (Multi-provider Phase 2) */}
       <div className="border-b border-neutral-800">
         <div className="max-w-6xl mx-auto px-4 pt-3 pb-2 flex gap-1">
           {(["today", "8days", "month", "30days", "all"] as Period[]).map((p) => (
@@ -1614,6 +1618,23 @@ export function TeamView({ adminMode = false }: { adminMode?: boolean }) {
             >{periodLabel(p as Period, t)}</button>
           ))}
         </div>
+        {data.hasCodexData && (
+          <div className="max-w-6xl mx-auto px-4 pb-2 flex gap-1.5 items-center">
+            <span className="text-[10px] font-mono text-neutral-600 uppercase tracking-wider mr-1">provider:</span>
+            {(["claude", "codex"] as const).map((prov) => (
+              <button
+                key={prov}
+                data-testid={`team-provider-${prov}`}
+                onClick={() => setProvider(prov)}
+                className={`text-xs font-mono border rounded px-3 py-1 transition-colors ${
+                  provider === prov
+                    ? "bg-indigo-600 text-white border-indigo-500"
+                    : "bg-neutral-800 text-neutral-300 border-neutral-700 hover:border-neutral-500"
+                }`}
+              >{prov === "claude" ? "Claude Code" : "Codex"}</button>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Team Summary Bar 는 기본 토글 안 첫 child 로 이동 — 사용자 피드백:

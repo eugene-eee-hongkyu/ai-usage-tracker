@@ -108,19 +108,23 @@ export default function PlatformAdminAllUsersPage() {
   const [users, setUsers] = useState<CardData[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [switchingTeamId, setSwitchingTeamId] = useState<number | null>(null);
+  // Multi-provider Phase 2: Provider Tabs.
+  const [provider, setProvider] = useState<"claude" | "codex">("claude");
+  const [hasCodexData, setHasCodexData] = useState(false);
 
   useEffect(() => {
-    fetch("/api/platform-admin/all-users")
+    fetch(`/api/platform-admin/all-users${provider === "codex" ? "?provider=codex" : ""}`)
       .then((r) => {
         if (!r.ok) throw new Error(String(r.status));
         return r.json();
       })
-      .then((d: { users?: CardData[]; error?: string }) => {
+      .then((d: { users?: CardData[]; error?: string; hasCodexData?: boolean }) => {
         if (d.error) { setError(d.error); return; }
         setUsers(d.users ?? []);
+        if (d.hasCodexData) setHasCodexData(true);
       })
       .catch((e) => setError(String(e)));
-  }, []);
+  }, [provider]);
 
   async function handleCardClick(card: CardData) {
     if (switchingTeamId !== null) return;
@@ -178,6 +182,25 @@ export default function PlatformAdminAllUsersPage() {
           전체 {users.length}명 · 오늘 활동 {activeCount}명
         </p>
       </header>
+
+      {/* Multi-provider Phase 2: Provider Tabs (전체 사용자 중 의미 있는 Codex 1+ 일 때만) */}
+      {hasCodexData && (
+        <div className="flex gap-1.5 items-center">
+          <span className="text-[10px] font-mono text-neutral-600 uppercase tracking-wider mr-1">provider:</span>
+          {(["claude", "codex"] as const).map((prov) => (
+            <button
+              key={prov}
+              data-testid={`all-users-provider-${prov}`}
+              onClick={() => setProvider(prov)}
+              className={`text-xs font-mono border rounded px-3 py-1 transition-colors ${
+                provider === prov
+                  ? "bg-indigo-600 text-white border-indigo-500"
+                  : "bg-neutral-800 text-neutral-300 border-neutral-700 hover:border-neutral-500"
+              }`}
+            >{prov === "claude" ? "Claude Code" : "Codex"}</button>
+          ))}
+        </div>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {users.map((u) => (

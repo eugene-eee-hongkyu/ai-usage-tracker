@@ -10,12 +10,12 @@
 //
 // 정렬: 팀명 → 사용자명. 비활동 (today.tokens=0 or 없음) 사용자는 같은 팀 안에서 맨 뒤.
 
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { isAdmin } from "@/lib/admin";
 import { db, users, teamMembers, teams, userSnapshots, apiTokens, IS_LOCAL_MODE } from "@/lib/db";
-import { eq, and, isNull, sql } from "drizzle-orm";
+import { eq, and, gt, isNull, or, sql } from "drizzle-orm";
 import { getPlanLimits, type PlanTier } from "@/lib/plan-health";
 import { PINNED } from "@/lib/pinned-versions";
 import { getCcusageDaily } from "@/lib/ccusage-row";
@@ -62,7 +62,7 @@ function syncColor(lastSyncedAt: Date | null): "green" | "yellow" | "red" | "non
   return "red";
 }
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   if (IS_LOCAL_MODE) {
     return NextResponse.json({ error: "not_available_local" }, { status: 501 });
   }
@@ -70,6 +70,8 @@ export async function GET() {
   if (!session?.user?.email || !isAdmin(session.user.email)) {
     return NextResponse.json({ error: "forbidden" }, { status: 403 });
   }
+  // Multi-provider Phase 2: provider Tabs.
+  const provider = req.nextUrl.searchParams.get("provider") === "codex" ? "codex" : "claude";
 
   // 모든 (deleted/suspended 제외) 사용자 + 팀 + snapshot + 가장 최근 사용 api_token.
   // 멀티팀 사용자는 team_members 행 수만큼 등장 (현재 코드베이스 의도 — 각 (user, team) 쌍 별도 카드).
@@ -88,9 +90,8 @@ export async function GET() {
     .from(users)
     .innerJoin(teamMembers, and(eq(teamMembers.userId, users.id), isNull(teamMembers.deletedAt)))
     .innerJoin(teams, and(eq(teams.id, teamMembers.teamId), isNull(teams.deletedAt)))
-    // Multi-provider Phase 1 baseline: claude row 만. Phase 2 에서 provider 별 분리.
-    // 가드 없으면 사용자 1명당 row 2개 (claude+codex) 곱집합 → 카드 중복.
-    .leftJoin(userSnapshots, and(eq(userSnapshots.userId, users.id), eq(userSnapshots.teamId, teams.id), eq(userSnapshots.provider, "claude")))
+    // Multi-provider Phase 2: provider param 으로 분기.
+    .leftJoin(userSnapshots, and(eq(userSnapshots.userId, users.id), eq(userSnapshots.teamId, teams.id), eq(userSnapshots.provider, provider)))
     .where(and(
       isNull(users.deletedAt),
       isNull(users.suspendedAt),
@@ -266,5 +267,16 @@ export async function GET() {
     return collator.compare(a.name, b.name);
   });
 
-  return NextResponse.json({ users: cards });
+  // hasCodexData = 전체 사용자 중 의미 있는 Codex 사용량 1+. UI Tabs 분기.
+  const codexCheck = await db
+    .select({ id: userSnapshots.id })
+    .from(userSnapshots)
+    .where(and(
+      eq(userSnapshots.provider, "codex"),
+      or(gt(userSnapshots.totalCost, 0), gt(userSnapshots.sessionsCount, 0)),
+    ))
+    .limit(1);
+  const hasCodexData = codexCheck.length > 0;
+
+  return NextResponse.json({ users: cards, hasCodexData });
 }

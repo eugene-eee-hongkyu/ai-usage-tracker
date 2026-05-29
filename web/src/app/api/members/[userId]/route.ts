@@ -6,7 +6,7 @@ import { authOptions } from "@/lib/auth";
 import { db, userSnapshots, users, teamMembers, IS_LOCAL_MODE } from "@/lib/db";
 import { getAuthedEmail } from "@/lib/local-user";
 import { getEffectiveTeamId } from "@/lib/effective-team";
-import { and, eq, isNull } from "drizzle-orm";
+import { and, eq, gt, isNull, or } from "drizzle-orm";
 import { isAdmin } from "@/lib/admin";
 
 interface DailyRow { date: string; cost: number; sessions: number }
@@ -78,12 +78,26 @@ export async function GET(
   const user = await db.select().from(users).where(eq(users.id, userId)).limit(1);
   if (!user[0]) return NextResponse.json({ error: "not found" }, { status: 404 });
 
-  // Multi-provider Phase 1 baseline: claude row 만. Phase 2 에서 provider 별 분리.
+  // Multi-provider Phase 2: provider query param 으로 분기.
+  const provider = req.nextUrl.searchParams.get("provider") === "codex" ? "codex" : "claude";
+
   const snap = await db
     .select()
     .from(userSnapshots)
-    .where(and(eq(userSnapshots.userId, userId), eq(userSnapshots.provider, "claude")))
+    .where(and(eq(userSnapshots.userId, userId), eq(userSnapshots.provider, provider)))
     .limit(1);
+
+  // hasCodexData = 이 멤버의 의미 있는 Codex 사용량 1+. UI Tabs 분기.
+  const codexCheck = await db
+    .select({ id: userSnapshots.id })
+    .from(userSnapshots)
+    .where(and(
+      eq(userSnapshots.userId, userId),
+      eq(userSnapshots.provider, "codex"),
+      or(gt(userSnapshots.totalCost, 0), gt(userSnapshots.sessionsCount, 0)),
+    ))
+    .limit(1);
+  const hasCodexData = codexCheck.length > 0;
 
   if (!snap[0]) {
     return NextResponse.json({
@@ -92,6 +106,7 @@ export async function GET(
       daily: [],
       streak: 0,
       projects: [],
+      hasCodexData,
     });
   }
 
@@ -162,5 +177,6 @@ export async function GET(
     streak,
     projects: projects.sort((a, b) => b.cost - a.cost).slice(0, 10),
     canViewFullDashboard: IS_LOCAL_MODE ? true : isAdmin(authedEmail),
+    hasCodexData,
   });
 }

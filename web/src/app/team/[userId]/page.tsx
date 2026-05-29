@@ -17,6 +17,7 @@ interface MemberData {
   daily: Array<{ date: string; cost: number; sessions: number }>;
   streak: number;
   projects: Array<{ name: string; cost: number; sessions: number; avgCost: number }>;
+  hasCodexData?: boolean;
 }
 
 interface NotFoundResp { error: string }
@@ -30,6 +31,8 @@ export default function MemberProfilePage() {
   const { m: t } = useMessages();
   const [data, setData] = useState<MemberData | null>(null);
   const [notFound, setNotFound] = useState(false);
+  // Multi-provider Phase 2 (2026-05-30 M): Provider Tabs.
+  const [provider, setProvider] = useState<"claude" | "codex">("claude");
 
   useEffect(() => {
     if (isLocalMode === null || isLocalMode) return;
@@ -38,7 +41,7 @@ export default function MemberProfilePage() {
 
   useEffect(() => {
     if (!session) return;
-    fetch(`/api/members/${userId}`)
+    fetch(`/api/members/${userId}${provider === "codex" ? "?provider=codex" : ""}`)
       .then((r) => r.json())
       .then((j: MemberData | NotFoundResp) => {
         if ("error" in j) {
@@ -47,7 +50,7 @@ export default function MemberProfilePage() {
           setData(j);
         }
       });
-  }, [session, userId]);
+  }, [session, userId, provider]);
 
   if (notFound) return (
     <div className="min-h-screen">
@@ -114,6 +117,25 @@ export default function MemberProfilePage() {
           <Link href="/team" className="text-slate-400 hover:text-slate-200 text-sm">{t.memberProfile.teamRanking}</Link>
           <h1 className="font-semibold text-slate-200">{data.user.name}{t.memberProfile.profileSuffix}</h1>
         </div>
+
+        {/* Multi-provider Phase 2: Provider Tabs (이 멤버의 의미 있는 Codex 사용 1+ 일 때만) */}
+        {data.hasCodexData && (
+          <div className="flex gap-1.5 items-center">
+            <span className="text-[10px] font-mono text-neutral-600 uppercase tracking-wider mr-1">provider:</span>
+            {(["claude", "codex"] as const).map((prov) => (
+              <button
+                key={prov}
+                data-testid={`member-provider-${prov}`}
+                onClick={() => setProvider(prov)}
+                className={`text-xs font-mono border rounded px-3 py-1 transition-colors ${
+                  provider === prov
+                    ? "bg-indigo-600 text-white border-indigo-500"
+                    : "bg-neutral-800 text-neutral-300 border-neutral-700 hover:border-neutral-500"
+                }`}
+              >{prov === "claude" ? "Claude Code" : "Codex"}</button>
+            ))}
+          </div>
+        )}
 
         {/* Summary */}
         <div className="bg-slate-900 rounded-lg p-4">

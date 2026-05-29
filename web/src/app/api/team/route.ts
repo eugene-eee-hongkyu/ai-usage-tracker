@@ -16,7 +16,7 @@ import {
 import { computeEfficiencyScore, computeDailyEfficiencyScore, computePowerIndex } from "@/lib/rules";
 import { isAdmin } from "@/lib/admin";
 import { getCcusageDaily } from "@/lib/ccusage-row";
-import { and, eq, gte, isNull, inArray } from "drizzle-orm";
+import { and, eq, gt, gte, isNull, inArray, or } from "drizzle-orm";
 
 type Period = "today" | "month" | "8days" | "30days" | "all";
 
@@ -155,6 +155,8 @@ export async function GET(req: NextRequest) {
   })();
 
   const period = (req.nextUrl.searchParams.get("period") ?? "all") as Period;
+  // Multi-provider Phase 2 (2026-05-29 M): Claude / Codex Tabs.
+  const provider = req.nextUrl.searchParams.get("provider") === "codex" ? "codex" : "claude";
 
   // 팀명 — headline 카드의 "{team} 카드" 라벨용. all-teams 페이지에서 admin
   // 이 다른 팀을 fetch 할 때 session.viewAsTeamName 이 안 맞아 빈 값이 됨.
@@ -188,8 +190,7 @@ export async function GET(req: NextRequest) {
   // M6f (2026-05-26): multi-device 사용자는 token 별 row 가 N개. team 화면도 device
   // 별 row 로 분리 표시 — 가중평균 위험 회피 + 개인 dashboard 의 device chip 모델과 일관.
   // api_tokens leftJoin 으로 device label (api_tokens.name) 같이.
-  // Multi-provider Phase 1 baseline: claude row 만. Phase 2 에서 provider 별 분리.
-  // 가드 없으면 사용자 1명당 claude+codex 2 row → 합산 / leftJoin 곱집합으로 데이터 부정확.
+  // Multi-provider Phase 2: provider query param 으로 분기. Phase 1 hardcode 'claude' 에서 전환.
   const allSnapsWithToken = IS_LOCAL_MODE
     ? await db
         .select({
@@ -199,7 +200,7 @@ export async function GET(req: NextRequest) {
         })
         .from(userSnapshots)
         .leftJoin(apiTokens, eq(apiTokens.id, userSnapshots.tokenId))
-        .where(eq(userSnapshots.provider, "claude"))
+        .where(eq(userSnapshots.provider, provider))
     : teamMemberIds.length > 0
       ? await db
           .select({
@@ -209,8 +210,32 @@ export async function GET(req: NextRequest) {
           })
           .from(userSnapshots)
           .leftJoin(apiTokens, eq(apiTokens.id, userSnapshots.tokenId))
-          .where(and(inArray(userSnapshots.userId, teamMemberIds), userSnapTeamScope, eq(userSnapshots.provider, "claude")))
+          .where(and(inArray(userSnapshots.userId, teamMemberIds), userSnapTeamScope, eq(userSnapshots.provider, provider)))
       : [];
+
+  // hasCodexData = 팀 멤버 중 의미 있는 Codex 사용량 (cost/sessions > 0) 1+. UI Tabs 표시 조건.
+  const teamCodexCheck = IS_LOCAL_MODE
+    ? await db
+        .select({ id: userSnapshots.id })
+        .from(userSnapshots)
+        .where(and(
+          eq(userSnapshots.provider, "codex"),
+          or(gt(userSnapshots.totalCost, 0), gt(userSnapshots.sessionsCount, 0)),
+        ))
+        .limit(1)
+    : teamMemberIds.length > 0
+      ? await db
+          .select({ id: userSnapshots.id })
+          .from(userSnapshots)
+          .where(and(
+            inArray(userSnapshots.userId, teamMemberIds),
+            userSnapTeamScope,
+            eq(userSnapshots.provider, "codex"),
+            or(gt(userSnapshots.totalCost, 0), gt(userSnapshots.sessionsCount, 0)),
+          ))
+          .limit(1)
+      : [];
+  const hasCodexData = teamCodexCheck.length > 0;
 
   // user_id → 그 user 의 모든 device snap (배열). multi-device 사용자는 len>=2.
   const snapsByUser = new Map<number, Array<{ snap: typeof userSnapshots.$inferSelect; tokenName: string | null; tokenPlatform: unknown }>>();
@@ -1107,6 +1132,7 @@ export async function GET(req: NextRequest) {
     teamUsage,
     memberUsage,
     dailyUnitCostByMember,
+    hasCodexData,
     // 30일 일별 방문 매트릭스 — ENGAGEMENT 카드용
     dailyVisits30d: {
       dates: visit30Dates,

@@ -36,6 +36,7 @@ interface RankingResponse {
   around: RankedUser[];
   myRank: RankedUser | null;
   period: string;
+  hasCodexData?: boolean;
 }
 
 // 비용은 wide (전체 width) 강조. 그 아래 2x2 grid 에 나머지 4개.
@@ -92,6 +93,8 @@ export default function RankingPage() {
   const [byMetric, setByMetric] = useState<Partial<Record<Metric, RankingResponse>>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // Multi-provider Phase 2 (2026-05-30 M): Provider Tabs. default = claude.
+  const [provider, setProvider] = useState<"claude" | "codex">("claude");
 
   useEffect(() => {
     if (status === "unauthenticated") router.push("/login");
@@ -111,7 +114,7 @@ export default function RankingPage() {
     setError(null);
     Promise.all(
       ALL_METRICS.map((mt) =>
-        fetch(`/api/ranking?metric=${mt}`)
+        fetch(`/api/ranking?metric=${mt}${provider === "codex" ? "&provider=codex" : ""}`)
           .then((r) => {
             if (!r.ok) throw new Error(String(r.status));
             return r.json();
@@ -129,7 +132,7 @@ export default function RankingPage() {
         setError(String(e));
         setLoading(false);
       });
-  }, [status]);
+  }, [status, provider]);
 
   if (status === "loading") return null;
 
@@ -148,6 +151,25 @@ export default function RankingPage() {
             )}
           </p>
         </header>
+
+        {/* Multi-provider Phase 2: Provider Tabs. 전체 랭킹 scope 안에 의미 있는 Codex 사용자 1+ 일 때만. */}
+        {byMetric.cost?.hasCodexData && (
+          <div className="flex gap-1.5 items-center">
+            <span className="text-[10px] font-mono text-neutral-600 uppercase tracking-wider mr-1">provider:</span>
+            {(["claude", "codex"] as const).map((prov) => (
+              <button
+                key={prov}
+                data-testid={`ranking-provider-${prov}`}
+                onClick={() => setProvider(prov)}
+                className={`text-xs font-mono border rounded px-3 py-1 transition-colors ${
+                  provider === prov
+                    ? "bg-indigo-600 text-white border-indigo-500"
+                    : "bg-neutral-800 text-neutral-300 border-neutral-700 hover:border-neutral-500"
+                }`}
+              >{prov === "claude" ? "Claude Code" : "Codex"}</button>
+            ))}
+          </div>
+        )}
 
         {error && <p className="text-sm text-rose-400 font-mono">로드 실패: {error}</p>}
         {loading && <p className="text-sm text-neutral-500 font-mono">loading…</p>}

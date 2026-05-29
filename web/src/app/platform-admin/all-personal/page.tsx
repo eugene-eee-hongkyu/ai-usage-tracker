@@ -32,21 +32,30 @@ export default function AllPersonalPage() {
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [toggling, setToggling] = useState<number | null>(null);
+  // Multi-provider Phase 2: Provider Tabs.
+  const [provider, setProvider] = useState<"claude" | "codex">("claude");
+  const [hasCodexData, setHasCodexData] = useState(false);
 
-  function load(q: string) {
-    const url = q ? `/api/platform-admin/all-personal?q=${encodeURIComponent(q)}` : "/api/platform-admin/all-personal";
+  function load(q: string, prov: "claude" | "codex") {
+    const params = new URLSearchParams();
+    if (q) params.set("q", q);
+    if (prov === "codex") params.set("provider", "codex");
+    const url = params.toString() ? `/api/platform-admin/all-personal?${params}` : "/api/platform-admin/all-personal";
     fetch(url)
       .then((r) => {
         if (!r.ok) throw new Error(String(r.status));
         return r.json();
       })
-      .then((d: { users: PersonalUser[] }) => setUsers(d.users))
+      .then((d: { users: PersonalUser[]; hasCodexData?: boolean }) => {
+        setUsers(d.users);
+        if (d.hasCodexData) setHasCodexData(true);
+      })
       .catch((e) => setError(String(e)));
   }
 
   useEffect(() => {
-    load("");
-  }, []);
+    load("", provider);
+  }, [provider]);
 
   async function handleHideToggle(userId: number, rankingHidden: boolean) {
     setToggling(userId);
@@ -69,7 +78,7 @@ export default function AllPersonalPage() {
   function handleSearch() {
     setUsers(null);
     setError(null);
-    load(search);
+    load(search, provider);
   }
 
   return (
@@ -80,6 +89,25 @@ export default function AllPersonalPage() {
           Personal 랭킹 참여자 목록. 실명 + 30일 지표. hide 토글로 랭킹에서 숨기기.
         </p>
       </header>
+
+      {/* Multi-provider Phase 2: Provider Tabs (personal 사용자 중 의미 있는 Codex 1+ 일 때만) */}
+      {hasCodexData && (
+        <div className="flex gap-1.5 items-center">
+          <span className="text-[10px] font-mono text-neutral-600 uppercase tracking-wider mr-1">provider:</span>
+          {(["claude", "codex"] as const).map((prov) => (
+            <button
+              key={prov}
+              data-testid={`all-personal-provider-${prov}`}
+              onClick={() => setProvider(prov)}
+              className={`text-xs font-mono border rounded px-3 py-1 transition-colors ${
+                provider === prov
+                  ? "bg-indigo-600 text-white border-indigo-500"
+                  : "bg-neutral-800 text-neutral-300 border-neutral-700 hover:border-neutral-500"
+              }`}
+            >{prov === "claude" ? "Claude Code" : "Codex"}</button>
+          ))}
+        </div>
+      )}
 
       {/* Search */}
       <div className="flex gap-2">

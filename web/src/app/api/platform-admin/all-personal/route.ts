@@ -20,20 +20,34 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "forbidden" }, { status: 403 });
 
   const q = req.nextUrl.searchParams.get("q")?.trim().toLowerCase() ?? "";
+  // Multi-provider Phase 2: provider Tabs.
+  const provider = req.nextUrl.searchParams.get("provider") === "codex" ? "codex" : "claude";
 
-  // Multi-provider Phase 1 baseline: us.provider='claude' 가드 (LEFT JOIN ON 조건).
-  // 가드 없으면 사용자 1명당 row 2개 곱집합 → DISTINCT ON 으로 어느 provider 잡힐지 불확정.
   const rows = await db.execute(sql`
     SELECT DISTINCT ON (us.user_id)
       us.user_id, u.name, u.email, u.personal, u.ranking_hidden,
       u.created_at, u.last_synced_at, us.raw_json
     FROM users u
-    LEFT JOIN user_snapshots us ON us.user_id = u.id AND us.provider = 'claude'
+    LEFT JOIN user_snapshots us ON us.user_id = u.id AND us.provider = ${provider}
     WHERE u.personal = true
       AND u.deleted_at IS NULL
       AND u.suspended_at IS NULL
     ORDER BY us.user_id, us.updated_at DESC NULLS LAST
   `);
+
+  // hasCodexData = personal 사용자 중 의미 있는 Codex 1+. UI Tabs 분기.
+  const codexCheck = await db.execute(sql`
+    SELECT 1
+    FROM user_snapshots us
+    JOIN users u ON u.id = us.user_id
+    WHERE u.personal = true
+      AND u.deleted_at IS NULL
+      AND u.suspended_at IS NULL
+      AND us.provider = 'codex'
+      AND (us.total_cost > 0 OR us.sessions_count > 0)
+    LIMIT 1
+  `);
+  const hasCodexData = ((codexCheck.rows as unknown[] | undefined)?.length ?? 0) > 0;
 
   const thirtyAgo = new Date();
   thirtyAgo.setDate(thirtyAgo.getDate() - 30);
@@ -92,7 +106,7 @@ export async function GET(req: NextRequest) {
 
   result.sort((a, b) => b.cost30 - a.cost30);
 
-  return NextResponse.json({ users: result });
+  return NextResponse.json({ users: result, hasCodexData });
 }
 
 export async function PATCH(req: NextRequest) {
