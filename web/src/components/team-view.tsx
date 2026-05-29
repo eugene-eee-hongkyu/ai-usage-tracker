@@ -17,6 +17,7 @@ import { scoreLabel } from "@/components/score-gauge";
 import { computeTokenLevel, computeDailyEfficiencyScore } from "@/lib/rules";
 import { useMessages } from "@/lib/use-i18n";
 import type { Messages } from "@/lib/i18n";
+import { track, EVENTS } from "@/lib/analytics/mixpanel";
 
 type Period = "today" | "8days" | "month" | "30days" | "all";
 type GradeLevel = "exemplary" | "good" | "moderate" | "insufficient" | "warning";
@@ -364,6 +365,11 @@ export function TeamView({ adminMode = false }: { adminMode?: boolean }) {
   const { data: session, status } = useSession();
   const router = useRouter();
   const [period, setPeriod] = useState<Period>("month");
+
+  // team_view 진입 시 1회. adminMode (admin view-as) 와 분리.
+  useEffect(() => {
+    if (!adminMode) track(EVENTS.TEAM_VIEW);
+  }, [adminMode]);
   // localStorage 읽기 전 첫 fetch 가 stale period 로 발사 + race 로 늦은 응답이
   // 덮어쓰는 버그 방지. 읽기 완료 후에만 fetch 허용.
   const [periodReady, setPeriodReady] = useState(false);

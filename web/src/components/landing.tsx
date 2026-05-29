@@ -5,12 +5,18 @@
 // 인증된 사용자는 page.tsx 에서 /dashboard 로 redirect 처리되어 여기 안 도달.
 
 import Link from "next/link";
+import { useEffect } from "react";
 import { useMessages } from "@/lib/use-i18n";
 import { LocaleSwitcher } from "@/components/locale-switcher";
+import { track, EVENTS } from "@/lib/analytics/mixpanel";
 
 export function Landing() {
   const { m } = useMessages();
   const t = m.landing;
+
+  useEffect(() => {
+    track(EVENTS.LANDING_VIEW);
+  }, []);
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -56,6 +62,7 @@ export function Landing() {
           <Link
             href="/login"
             data-testid="landing-cta"
+            onClick={() => track(EVENTS.LANDING_CTA_CLICK)}
             className="px-8 py-3 bg-slate-100 text-slate-900 rounded-lg font-semibold hover:bg-white transition-colors"
           >
             {t.cta}
@@ -72,6 +79,7 @@ export function Landing() {
               target="_blank"
               rel="noopener noreferrer"
               data-testid="landing-team-funnel"
+              onClick={() => track(EVENTS.LANDING_TEAM_FUNNEL_CLICK)}
               className="text-slate-300 hover:text-slate-100 underline underline-offset-2 font-medium"
             >
               {t.teamFunnelLink} →

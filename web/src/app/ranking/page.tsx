@@ -11,6 +11,7 @@ import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { Nav } from "@/components/nav";
 import { useMessages } from "@/lib/use-i18n";
+import { track, EVENTS } from "@/lib/analytics/mixpanel";
 
 type Metric = "cost" | "tokens" | "cacheHit" | "streak" | "saving";
 
@@ -94,6 +95,11 @@ export default function RankingPage() {
   useEffect(() => {
     if (status === "unauthenticated") router.push("/login");
   }, [status, router]);
+
+  // ranking_view — 인증된 사용자 진입 시 1회.
+  useEffect(() => {
+    if (status === "authenticated") track(EVENTS.RANKING_VIEW);
+  }, [status]);
 
   useEffect(() => {
     if (status !== "authenticated") return;

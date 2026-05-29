@@ -27,6 +27,7 @@ import type { DrilldownPeriod } from "@/components/score-drilldown";
 import { UsageHero } from "@/components/usage-hero";
 import { PrivacyBanner } from "@/components/privacy-banner";
 import { StaleSyncBanner } from "@/components/stale-sync-banner";
+import { track, EVENTS } from "@/lib/analytics/mixpanel";
 
 const ScoreDrilldown = dynamic(
   () => import("@/components/score-drilldown").then((m) => m.ScoreDrilldown),
@@ -909,6 +910,14 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
   // 로컬 모드 (.pkg/.app 설치 환경) 면 NextAuth session 없이도 작동.
   const isLocalMode = useLocalMode();
   const { m: t } = useMessages();
+
+  // dashboard_view — 본인 dashboard 진입 시 1회. adminMode (어드민이 view-as 로
+  // 들어온 케이스) 는 funnel 의도와 달라 분리.
+  useEffect(() => {
+    if (!viewOnly && !adminMode) {
+      track(EVENTS.DASHBOARD_VIEW);
+    }
+  }, [viewOnly, adminMode]);
 
   useEffect(() => {
     const saved = localStorage.getItem(storageKey);

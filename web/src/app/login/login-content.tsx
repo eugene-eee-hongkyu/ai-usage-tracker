@@ -9,6 +9,7 @@ import { Suspense, useEffect } from "react";
 import { useLocalMode } from "@/lib/use-local-mode";
 import { useMessages } from "@/lib/use-i18n";
 import { LocaleSwitcher } from "@/components/locale-switcher";
+import { track, EVENTS } from "@/lib/analytics/mixpanel";
 
 function LoginInner() {
   const params = useSearchParams();
@@ -22,6 +23,14 @@ function LoginInner() {
   useEffect(() => {
     if (isLocalMode) router.replace("/dashboard");
   }, [isLocalMode, router]);
+
+  // login_view — LOCAL_MODE 아닌 사용자가 실제로 로그인 화면 본 시점.
+  // error 가 있으면 props 로 첨부 (provider_mismatch 등의 빈도 추적).
+  useEffect(() => {
+    if (isLocalMode === false) {
+      track(EVENTS.LOGIN_VIEW, { error: error ?? null });
+    }
+  }, [isLocalMode, error]);
 
   // 로컬 모드 확인 중이거나 확정된 경우 login UI 렌더 안 함 (깜빡임 방지)
   if (isLocalMode === null || isLocalMode) return null;
@@ -70,7 +79,10 @@ function LoginInner() {
       <div className="flex flex-col gap-3 w-full max-w-xs">
         <button
           data-testid="login-btn-github"
-          onClick={() => signIn("github", { callbackUrl: "/dashboard" })}
+          onClick={() => {
+            track(EVENTS.OAUTH_START, { provider: "github" });
+            signIn("github", { callbackUrl: "/dashboard" });
+          }}
           className="flex items-center justify-center gap-3 px-6 py-3 bg-slate-100 text-slate-900 rounded-lg font-semibold hover:bg-white transition-colors"
         >
           <svg viewBox="0 0 24 24" className="w-5 h-5 fill-current">
@@ -81,7 +93,10 @@ function LoginInner() {
 
         <button
           data-testid="login-btn-google"
-          onClick={() => signIn("google", { callbackUrl: "/dashboard" })}
+          onClick={() => {
+            track(EVENTS.OAUTH_START, { provider: "google" });
+            signIn("google", { callbackUrl: "/dashboard" });
+          }}
           className="flex items-center justify-center gap-3 px-6 py-3 bg-white text-slate-800 rounded-lg font-semibold hover:bg-slate-50 transition-colors border border-slate-200"
         >
           <svg viewBox="0 0 24 24" className="w-5 h-5">

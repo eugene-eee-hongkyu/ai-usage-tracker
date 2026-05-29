@@ -4,6 +4,7 @@ import { SessionProvider } from "next-auth/react";
 import type { Session } from "next-auth";
 import { SessionGuard } from "@/components/session-guard";
 import { OnboardTeamGuard } from "@/components/onboard-team-guard";
+import { AnalyticsBridge } from "@/components/analytics-bridge";
 
 // 로컬 단독 모드 (.pkg/.app 인스톨러) 에서는 NextAuth 의 OAuth flow 가 작동 안 함
 // (외부 callback URL 불가). server 측 API route 는 IS_LOCAL_MODE 로 우회하지만,
@@ -31,6 +32,9 @@ export function Providers({ children }: { children: React.ReactNode }) {
     <SessionProvider session={IS_LOCAL_BUILD ? LOCAL_SESSION : undefined}>
       {!IS_LOCAL_BUILD && <SessionGuard />}
       {!IS_LOCAL_BUILD && <OnboardTeamGuard />}
+      {/* Mixpanel init + 로그인 시 identifyUser. LOCAL_MODE 는 NEXT_PUBLIC_MIXPANEL_TOKEN
+          미설정이면 no-op (다른 사용자의 토큰 새지 않음). */}
+      {!IS_LOCAL_BUILD && <AnalyticsBridge />}
       {children}
     </SessionProvider>
   );
