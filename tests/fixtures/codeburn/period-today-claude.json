@@ -1,0 +1,35 @@
+{
+  "period": "2026-05-29",
+  "overview": {
+    "cost": 5.745,
+    "sessions": 2,
+    "calls": 45,
+    "tokens": {
+      "input": 20000,
+      "output": 12000,
+      "cacheRead": 80000,
+      "cacheWrite": 4000
+    }
+  },
+  "activities": [
+    {
+      "name": "코드 작성",
+      "category": "coding",
+      "sessions": 1,
+      "turns": 20,
+      "cost": 4.0,
+      "oneShotRate": 75.0
+    },
+    {
+      "name": "디버깅",
+      "category": "debug",
+      "sessions": 1,
+      "turns": 15,
+      "cost": 1.745,
+      "oneShotRate": 45.0
+    }
+  ],
+  "daily": [
+    {"date": "2026-05-29", "cost": 5.745, "calls": 45, "oneShotRate": 65.0}
+  ]
+}

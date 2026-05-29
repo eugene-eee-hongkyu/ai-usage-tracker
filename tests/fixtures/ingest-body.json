@@ -1,0 +1,88 @@
+{
+  "_comment": "client (cli/src/submit.mjs) 가 server /api/ingest 에 POST 하는 body 의 통합 fixture. 5 period codeburn report + ccusage daily + ccusage blocks 모두 묶임. run-ingest.ts 의 모든 의존 경로 (getBaseReport, runIngest, extractBlocks, deriveUserTodayFromBody) 를 단일 입력으로 커버.",
+  "today": {
+    "period": "2026-05-29",
+    "daily": [{"date": "2026-05-29", "cost": 5.745, "calls": 45, "oneShotRate": 65.0}],
+    "overview": {
+      "cost": 5.745,
+      "sessions": 2,
+      "calls": 45,
+      "tokens": {"input": 20000, "output": 12000, "cacheRead": 80000, "cacheWrite": 4000}
+    },
+    "activities": [
+      {"name": "코드 작성", "category": "coding", "sessions": 1, "turns": 20, "cost": 4.0, "oneShotRate": 75.0},
+      {"name": "디버깅", "category": "debug", "sessions": 1, "turns": 15, "cost": 1.745, "oneShotRate": 45.0}
+    ]
+  },
+  "week": {
+    "period": "2026-05-25..2026-05-31",
+    "overview": {"cost": 12.345, "sessions": 5, "calls": 100, "tokens": {"input": 50000, "output": 30000, "cacheRead": 200000, "cacheWrite": 10000}},
+    "activities": [
+      {"name": "코드 작성", "category": "coding", "sessions": 3, "turns": 50, "cost": 8.5, "oneShotRate": 75.5},
+      {"name": "디버깅", "category": "debug", "sessions": 2, "turns": 30, "cost": 3.0, "oneShotRate": 40.0}
+    ],
+    "daily": [
+      {"date": "2026-05-27", "cost": 2.1, "calls": 15, "oneShotRate": 60.0},
+      {"date": "2026-05-28", "cost": 4.5, "calls": 40, "oneShotRate": 70.0},
+      {"date": "2026-05-29", "cost": 5.745, "calls": 45, "oneShotRate": 65.0}
+    ]
+  },
+  "month": {
+    "period": "2026-05",
+    "overview": {"cost": 48.0, "sessions": 18, "calls": 380, "tokens": {"input": 180000, "output": 110000, "cacheRead": 750000, "cacheWrite": 38000}},
+    "activities": [
+      {"name": "코드 작성", "category": "coding", "sessions": 12, "turns": 180, "cost": 32.0, "oneShotRate": 72.0},
+      {"name": "디버깅", "category": "debug", "sessions": 6, "turns": 110, "cost": 16.0, "oneShotRate": 42.0}
+    ]
+  },
+  "30days": {
+    "period": "2026-04-30..2026-05-29",
+    "overview": {"cost": 52.0, "sessions": 20, "calls": 400, "tokens": {"input": 195000, "output": 119000, "cacheRead": 800000, "cacheWrite": 40000}},
+    "activities": []
+  },
+  "all": {
+    "overview": {
+      "cost": 245.0,
+      "sessions": 95,
+      "calls": 1900,
+      "totalCost": 245.0,
+      "totalSessions": 95,
+      "callsCount": 1900,
+      "tokens": {"input": 920000, "output": 560000, "cacheRead": 3800000, "cacheWrite": 190000}
+    },
+    "activities": [
+      {"name": "코드 작성", "category": "coding", "sessions": 60, "turns": 850, "cost": 168.0, "oneShotRate": 72.5},
+      {"name": "디버깅", "category": "debug", "sessions": 25, "turns": 480, "cost": 60.0, "oneShotRate": 42.0},
+      {"name": "리뷰", "category": "review", "sessions": 10, "turns": 90, "cost": 17.0, "oneShotRate": null}
+    ],
+    "projects": [
+      {"name": "ai-usage-tracker", "path": "/Users/test/repo/ai-usage-tracker", "cost": 200.0, "sessions": 70, "calls": 1500, "avgCost": 2.857},
+      {"name": "another-project", "path": "/Users/test/repo/another-project", "cost": 45.0, "sessions": 25, "calls": 400, "avgCost": 1.8}
+    ],
+    "topSessions": [
+      {"id": "sess-001", "date": "2026-05-29", "project": "ai-usage-tracker", "cost": 5.0},
+      {"id": "sess-002", "date": "2026-05-28", "project": "ai-usage-tracker", "cost": 4.2}
+    ],
+    "daily": [
+      {"date": "2026-05-15", "cost": 5.0, "calls": 50, "oneShotRate": 68.0},
+      {"date": "2026-05-20", "cost": 8.5, "calls": 85, "oneShotRate": 72.0},
+      {"date": "2026-05-27", "cost": 2.1, "calls": 15, "oneShotRate": 60.0},
+      {"date": "2026-05-28", "cost": 4.5, "calls": 40, "oneShotRate": 70.0},
+      {"date": "2026-05-29", "cost": 5.745, "calls": 45, "oneShotRate": 65.0}
+    ]
+  },
+  "ccusageDaily": {
+    "daily": [
+      {"period": "2026-05-27", "totalCost": 2.1, "inputTokens": 8000, "outputTokens": 5000, "cacheReadTokens": 30000, "cacheCreationTokens": 1500, "totalTokens": 44500, "modelsUsed": ["claude-sonnet-4-6"]},
+      {"period": "2026-05-28", "totalCost": 4.5, "inputTokens": 18000, "outputTokens": 11000, "cacheReadTokens": 80000, "cacheCreationTokens": 4000, "totalTokens": 113000, "modelsUsed": ["claude-sonnet-4-6", "claude-opus-4-7"]},
+      {"period": "2026-05-29", "totalCost": 5.745, "inputTokens": 20000, "outputTokens": 12000, "cacheReadTokens": 80000, "cacheCreationTokens": 4000, "totalTokens": 116000, "modelsUsed": ["claude-opus-4-7"]}
+    ]
+  },
+  "ccusageBlocks": {
+    "blocks": [
+      {"id": "block-2026-05-29-10", "startTime": "2026-05-29T01:00:00.000Z", "endTime": "2026-05-29T06:00:00.000Z", "actualEndTime": "2026-05-29T05:30:00.000Z", "isActive": false, "isGap": false, "entries": 25, "totalTokens": 60000, "costUSD": 3.2, "models": ["claude-sonnet-4-6"]},
+      {"id": "block-2026-05-29-15", "startTime": "2026-05-29T06:30:00.000Z", "endTime": "2026-05-29T11:30:00.000Z", "actualEndTime": "2026-05-29T10:45:00.000Z", "isActive": false, "isGap": false, "entries": 20, "totalTokens": 56000, "costUSD": 2.545, "models": ["claude-opus-4-7"]},
+      {"id": "block-active-001", "startTime": "2026-05-29T13:00:00.000Z", "endTime": "2026-05-29T18:00:00.000Z", "actualEndTime": null, "isActive": true, "isGap": false, "entries": 5, "totalTokens": 12000, "costUSD": 0.5, "models": ["claude-opus-4-7"]}
+    ]
+  }
+}

@@ -196,6 +196,28 @@ export async function sendSuggestion(p: SuggestionParams): Promise<SendResult> {
   }
 }
 
+interface CompatReportParams {
+  pkg: string;
+  from: string;
+  to: string;
+  verdictLabel: string;
+  markdown: string;
+}
+
+const COMPAT_TO = process.env.COMPAT_REPORT_TO_EMAIL ?? "info@z21lab.xyz";
+
+export async function sendCompatReport(p: CompatReportParams): Promise<SendResult> {
+  const subject = `[AI Usage Tracker · CLI 호환성] ${p.pkg} ${p.from} → ${p.to} — ${p.verdictLabel}`.replace(/[\r\n]+/g, " ");
+  const safeMd = escapeHtml(p.markdown);
+  const html = `<!doctype html><html><body style="font-family: -apple-system, system-ui, sans-serif; max-width: 720px; margin: 40px auto; padding: 24px; color: #0f172a; line-height: 1.55;">
+      <h2 style="margin:0 0 12px">${escapeHtml(p.pkg)} 호환성 리포트</h2>
+      <p style="font-size:13px; color:#475569; margin:0 0 16px;"><strong>${escapeHtml(p.from)} → ${escapeHtml(p.to)}</strong> · 판정 <strong>${escapeHtml(p.verdictLabel)}</strong></p>
+      <pre style="background:#0f172a; color:#e2e8f0; padding:16px; border-radius:6px; overflow-x:auto; font-size:12px; line-height:1.5; white-space:pre-wrap; word-break:break-word;">${safeMd}</pre>
+      <p style="font-size:11px; color:#94a3b8; margin-top:24px;">자동 생성: /api/cron/cli-compat-check · 매트릭스: docs/external-cli-compat.md</p>
+    </body></html>`;
+  return send(COMPAT_TO, subject, html);
+}
+
 export async function sendJoinApproved(p: JoinApprovedParams): Promise<SendResult> {
   const url = `${APP_URL}/dashboard`;
   const ko = p.locale !== "en";

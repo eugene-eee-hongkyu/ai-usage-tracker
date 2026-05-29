@@ -1,0 +1,25 @@
+{
+  "_comment": "ccusage 18.x 옛 schema — 'date' 키. normalizeCcusageRow 가 양쪽 모두 수용하는지 회귀 테스트 fixture. period 키 회귀 (NEXA 0.42 → 43.62) 가 정확히 이 형태에서 19.x 신 schema 로 변경되며 발생.",
+  "daily": [
+    {
+      "date": "2026-05-28",
+      "totalCost": 4.5,
+      "inputTokens": 18000,
+      "outputTokens": 11000,
+      "cacheReadTokens": 80000,
+      "cacheCreationTokens": 4000,
+      "totalTokens": 113000,
+      "modelsUsed": ["claude-sonnet-4-6"]
+    },
+    {
+      "date": "2026-05-29",
+      "totalCost": 5.745,
+      "inputTokens": 20000,
+      "outputTokens": 12000,
+      "cacheReadTokens": 80000,
+      "cacheCreationTokens": 4000,
+      "totalTokens": 116000,
+      "modelsUsed": ["claude-opus-4-7"]
+    }
+  ]
+}

@@ -1,0 +1,54 @@
+{
+  "blocks": [
+    {
+      "id": "block-2026-05-29-10",
+      "startTime": "2026-05-29T01:00:00.000Z",
+      "endTime": "2026-05-29T06:00:00.000Z",
+      "actualEndTime": "2026-05-29T05:30:00.000Z",
+      "isActive": false,
+      "isGap": false,
+      "entries": 25,
+      "totalTokens": 60000,
+      "costUSD": 3.2,
+      "models": ["claude-sonnet-4-6"]
+    },
+    {
+      "id": "block-2026-05-29-15",
+      "startTime": "2026-05-29T06:30:00.000Z",
+      "endTime": "2026-05-29T11:30:00.000Z",
+      "actualEndTime": "2026-05-29T10:45:00.000Z",
+      "isActive": false,
+      "isGap": false,
+      "entries": 20,
+      "totalTokens": 56000,
+      "costUSD": 2.545,
+      "models": ["claude-opus-4-7"]
+    },
+    {
+      "_comment": "gap 블록 — run-ingest 가 스킵",
+      "id": "block-gap-001",
+      "startTime": "2026-05-29T11:30:00.000Z",
+      "endTime": "2026-05-29T12:00:00.000Z",
+      "actualEndTime": "2026-05-29T11:45:00.000Z",
+      "isActive": false,
+      "isGap": true,
+      "entries": 0,
+      "totalTokens": 0,
+      "costUSD": 0,
+      "models": []
+    },
+    {
+      "_comment": "active 블록 — actualEndTime null. run-ingest 가 스킵.",
+      "id": "block-active-001",
+      "startTime": "2026-05-29T13:00:00.000Z",
+      "endTime": "2026-05-29T18:00:00.000Z",
+      "actualEndTime": null,
+      "isActive": true,
+      "isGap": false,
+      "entries": 5,
+      "totalTokens": 12000,
+      "costUSD": 0.5,
+      "models": ["claude-opus-4-7"]
+    }
+  ]
+}

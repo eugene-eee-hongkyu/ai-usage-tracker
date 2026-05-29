@@ -1,0 +1,79 @@
+{
+  "overview": {
+    "cost": 12.345,
+    "sessions": 5,
+    "calls": 100,
+    "totalCost": 12.345,
+    "totalSessions": 5,
+    "callsCount": 100,
+    "tokens": {
+      "input": 50000,
+      "output": 30000,
+      "cacheRead": 200000,
+      "cacheWrite": 10000
+    }
+  },
+  "activities": [
+    {
+      "name": "코드 작성",
+      "category": "coding",
+      "sessions": 3,
+      "turns": 50,
+      "cost": 8.5,
+      "oneShotRate": 75.5
+    },
+    {
+      "name": "디버깅",
+      "category": "debug",
+      "sessions": 2,
+      "turns": 30,
+      "cost": 3.0,
+      "oneShotRate": 40.0
+    },
+    {
+      "name": "리뷰",
+      "category": "review",
+      "sessions": 1,
+      "turns": 10,
+      "cost": 0.845,
+      "oneShotRate": null
+    }
+  ],
+  "projects": [
+    {
+      "name": "ai-usage-tracker",
+      "path": "/Users/test/repo/ai-usage-tracker",
+      "cost": 10.5,
+      "sessions": 4,
+      "calls": 80,
+      "avgCost": 2.625
+    },
+    {
+      "name": "another-project",
+      "path": "/Users/test/repo/another-project",
+      "cost": 1.845,
+      "sessions": 1,
+      "calls": 20,
+      "avgCost": 1.845
+    }
+  ],
+  "topSessions": [
+    {
+      "id": "sess-001",
+      "date": "2026-05-29",
+      "project": "ai-usage-tracker",
+      "cost": 5.0
+    },
+    {
+      "id": "sess-002",
+      "date": "2026-05-28",
+      "project": "ai-usage-tracker",
+      "cost": 3.2
+    }
+  ],
+  "daily": [
+    {"date": "2026-05-27", "cost": 2.1, "calls": 15, "oneShotRate": 60.0},
+    {"date": "2026-05-28", "cost": 4.5, "calls": 40, "oneShotRate": 70.0},
+    {"date": "2026-05-29", "cost": 5.745, "calls": 45, "oneShotRate": 65.0}
+  ]
+}

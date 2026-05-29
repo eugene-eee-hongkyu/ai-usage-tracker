@@ -1,0 +1,34 @@
+{
+  "daily": [
+    {
+      "period": "2026-05-27",
+      "totalCost": 2.1,
+      "inputTokens": 8000,
+      "outputTokens": 5000,
+      "cacheReadTokens": 30000,
+      "cacheCreationTokens": 1500,
+      "totalTokens": 44500,
+      "modelsUsed": ["claude-sonnet-4-6"]
+    },
+    {
+      "period": "2026-05-28",
+      "totalCost": 4.5,
+      "inputTokens": 18000,
+      "outputTokens": 11000,
+      "cacheReadTokens": 80000,
+      "cacheCreationTokens": 4000,
+      "totalTokens": 113000,
+      "modelsUsed": ["claude-sonnet-4-6", "claude-opus-4-7"]
+    },
+    {
+      "period": "2026-05-29",
+      "totalCost": 5.745,
+      "inputTokens": 20000,
+      "outputTokens": 12000,
+      "cacheReadTokens": 80000,
+      "cacheCreationTokens": 4000,
+      "totalTokens": 116000,
+      "modelsUsed": ["claude-opus-4-7"]
+    }
+  ]
+}
