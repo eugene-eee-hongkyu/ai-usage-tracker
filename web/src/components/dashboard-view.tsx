@@ -27,6 +27,8 @@ import type { DrilldownPeriod } from "@/components/score-drilldown";
 import { UsageHero } from "@/components/usage-hero";
 import { PrivacyBanner } from "@/components/privacy-banner";
 import { StaleSyncBanner } from "@/components/stale-sync-banner";
+import { track, EVENTS } from "@/lib/analytics/mixpanel";
+import { useTrackScrollDepth } from "@/lib/analytics/use-track-scroll-depth";
 
 const ScoreDrilldown = dynamic(
   () => import("@/components/score-drilldown").then((m) => m.ScoreDrilldown),
@@ -909,6 +911,9 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
   // 로컬 모드 (.pkg/.app 설치 환경) 면 NextAuth session 없이도 작동.
   const isLocalMode = useLocalMode();
   const { m: t } = useMessages();
+
+  // 스크롤 깊이 25/50/75/100 마일스톤 자동 추적 (본인 모드 / view-as 모드 통합)
+  useTrackScrollDepth(viewOnly ? "dashboard_view_as" : "dashboard");
 
   // dashboard_view — funnel 추적은 page.tsx 의 DashboardPage 에서 처리.
   // 옛 이 위치 fire 는 DashboardRouter 의 status 분기 구조 (status !== authenticated
@@ -2172,6 +2177,7 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
               key={p}
               data-testid={`dash-period-${p}`}
               onClick={() => {
+                track(EVENTS.PERIOD_CLICK, { screen: "dashboard", period: p });
                 setPeriod(p);
                 // 어떤 period 버튼을 누르든 모든 offset 초기화 → 항상 라이브로 복귀
                 setWeekOffset(0);
@@ -2185,7 +2191,11 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
             <select
               data-testid="dash-day-offset"
               value={dayOffset}
-              onChange={(e) => setDayOffset(Number(e.target.value))}
+              onChange={(e) => {
+                const v = Number(e.target.value);
+                if (v > 0) track(EVENTS.HISTORICAL_PERIOD_CLICK, { screen: "dashboard", kind: "day", offset: v });
+                setDayOffset(v);
+              }}
               className={`text-xs font-mono border rounded px-2 py-1 cursor-pointer focus:outline-none ${dayOffset > 0 ? "bg-indigo-600 text-white border-indigo-500" : "bg-neutral-800 text-neutral-400 border-neutral-700 hover:text-neutral-200"}`}
             >
               <option value={0}>{t.dashboardView.previous}</option>
@@ -2200,7 +2210,11 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
             <select
               data-testid="dash-week-offset"
               value={weekOffset}
-              onChange={(e) => setWeekOffset(Number(e.target.value))}
+              onChange={(e) => {
+                const v = Number(e.target.value);
+                if (v > 0) track(EVENTS.HISTORICAL_PERIOD_CLICK, { screen: "dashboard", kind: "week", offset: v });
+                setWeekOffset(v);
+              }}
               className={`text-xs font-mono border rounded px-2 py-1 cursor-pointer focus:outline-none ${weekOffset > 0 ? "bg-indigo-600 text-white border-indigo-500" : "bg-neutral-800 text-neutral-400 border-neutral-700 hover:text-neutral-200"}`}
             >
               <option value={0}>{t.dashboardView.previous}</option>
@@ -2215,7 +2229,11 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
             <select
               data-testid="dash-month-offset"
               value={monthOffset}
-              onChange={(e) => setMonthOffset(Number(e.target.value))}
+              onChange={(e) => {
+                const v = Number(e.target.value);
+                if (v > 0) track(EVENTS.HISTORICAL_PERIOD_CLICK, { screen: "dashboard", kind: "month", offset: v });
+                setMonthOffset(v);
+              }}
               className={`text-xs font-mono border rounded px-2 py-1 cursor-pointer focus:outline-none ${monthOffset > 0 ? "bg-indigo-600 text-white border-indigo-500" : "bg-neutral-800 text-neutral-400 border-neutral-700 hover:text-neutral-200"}`}
             >
               <option value={0}>{t.dashboardView.previous}</option>

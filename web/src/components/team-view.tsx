@@ -18,6 +18,7 @@ import { computeTokenLevel, computeDailyEfficiencyScore } from "@/lib/rules";
 import { useMessages } from "@/lib/use-i18n";
 import type { Messages } from "@/lib/i18n";
 import { track, EVENTS } from "@/lib/analytics/mixpanel";
+import { useTrackScrollDepth } from "@/lib/analytics/use-track-scroll-depth";
 
 type Period = "today" | "8days" | "month" | "30days" | "all";
 type GradeLevel = "exemplary" | "good" | "moderate" | "insufficient" | "warning";
@@ -370,6 +371,9 @@ export function TeamView({ adminMode = false }: { adminMode?: boolean }) {
   useEffect(() => {
     if (!adminMode) track(EVENTS.TEAM_VIEW);
   }, [adminMode]);
+
+  // 스크롤 깊이 마일스톤 자동 추적
+  useTrackScrollDepth(adminMode ? "team_admin_view" : "team");
   // localStorage 읽기 전 첫 fetch 가 stale period 로 발사 + race 로 늦은 응답이
   // 덮어쓰는 버그 방지. 읽기 완료 후에만 fetch 허용.
   const [periodReady, setPeriodReady] = useState(false);
@@ -1599,7 +1603,10 @@ export function TeamView({ adminMode = false }: { adminMode?: boolean }) {
             <button
               key={p}
               data-testid={`team-period-${p}`}
-              onClick={() => setPeriod(p)}
+              onClick={() => {
+                track(EVENTS.PERIOD_CLICK, { screen: "team", period: p });
+                setPeriod(p);
+              }}
               className={`w-16 text-center py-1 rounded text-xs font-mono transition-colors ${period === p ? "bg-indigo-600 text-white" : "bg-neutral-800 text-neutral-400 hover:text-neutral-200"}`}
             >{periodLabel(p as Period, t)}</button>
           ))}

@@ -7,6 +7,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useMessages } from "@/lib/use-i18n";
+import { track, EVENTS } from "@/lib/analytics/mixpanel";
 
 interface AboutData {
   mode: "local" | "cloud";
@@ -52,7 +53,11 @@ export function AboutPopover() {
     <div className="relative" ref={ref}>
       <button
         data-testid="nav-about-toggle"
-        onClick={() => setOpen(!open)}
+        onClick={() => {
+          // open 으로 토글되는 시점만 (close 는 무시) — 첫 열림 신호가 더 가치 있음.
+          if (!open) track(EVENTS.INFO_CLICK, { target: "version" });
+          setOpen(!open);
+        }}
         aria-label={m.about.title}
         title={m.about.title}
         className="w-6 h-6 rounded-full border border-slate-700 text-slate-400 hover:text-slate-200 hover:border-slate-500 text-xs flex items-center justify-center transition-colors"

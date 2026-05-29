@@ -12,6 +12,7 @@ import { useRouter } from "next/navigation";
 import { Nav } from "@/components/nav";
 import { useMessages } from "@/lib/use-i18n";
 import { track, EVENTS } from "@/lib/analytics/mixpanel";
+import { useTrackScrollDepth } from "@/lib/analytics/use-track-scroll-depth";
 
 type Metric = "cost" | "tokens" | "cacheHit" | "streak" | "saving";
 
@@ -100,6 +101,9 @@ export default function RankingPage() {
   useEffect(() => {
     if (status === "authenticated") track(EVENTS.RANKING_VIEW);
   }, [status]);
+
+  // 스크롤 깊이 마일스톤
+  useTrackScrollDepth("ranking");
 
   useEffect(() => {
     if (status !== "authenticated") return;

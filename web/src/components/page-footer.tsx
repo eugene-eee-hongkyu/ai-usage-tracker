@@ -6,6 +6,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useLocalMode } from "@/lib/use-local-mode";
+import { track, EVENTS } from "@/lib/analytics/mixpanel";
 
 export function PageFooter({ screen }: { screen?: "dashboard" | "team" | "settings" }) {
   const isLocalMode = useLocalMode();
@@ -34,13 +35,18 @@ export function PageFooter({ screen }: { screen?: "dashboard" | "team" | "settin
       <div className="max-w-6xl mx-auto flex justify-end items-center gap-4 text-xs text-neutral-500">
         <Link
           href="/changelog"
+          onClick={() => track(EVENTS.FOOTER_LINK_CLICK, { screen: screen ?? null, target: "changelog", has_new: hasNewChangelog })}
           className="hover:text-neutral-300 inline-flex items-center gap-1.5"
         >
           <span>릴리즈 노트</span>
           {hasNewChangelog && <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />}
         </Link>
         <span className="text-neutral-700">·</span>
-        <Link href={suggestHref} className="hover:text-neutral-300">
+        <Link
+          href={suggestHref}
+          onClick={() => track(EVENTS.FOOTER_LINK_CLICK, { screen: screen ?? null, target: "suggest" })}
+          className="hover:text-neutral-300"
+        >
           제안하기 💡
         </Link>
       </div>

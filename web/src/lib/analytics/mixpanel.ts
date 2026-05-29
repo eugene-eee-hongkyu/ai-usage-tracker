@@ -95,4 +95,11 @@ export const EVENTS = {
   DASHBOARD_VIEW: "dashboard_view",
   TEAM_VIEW: "team_view",
   RANKING_VIEW: "ranking_view",
+  // 인터랙션 (2026-05-29 추가)
+  PERIOD_CLICK: "period_click",                     // props: { screen, period }
+  HISTORICAL_PERIOD_CLICK: "historical_period_click", // props: { screen, kind: 'day'|'week'|'month', offset }
+  INFO_CLICK: "info_click",                         // props: { screen, target } — e.g., target: 'version'
+  FOOTER_LINK_CLICK: "footer_link_click",           // props: { screen, target: 'changelog'|'suggest' }
+  // 스크롤 깊이 (25/50/75/100 마일스톤, 페이지당 each once)
+  SCROLL_DEPTH: "scroll_depth",                     // props: { screen, milestone: 25|50|75|100 }
 } as const;
