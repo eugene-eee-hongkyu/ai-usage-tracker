@@ -911,13 +911,11 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
   const isLocalMode = useLocalMode();
   const { m: t } = useMessages();
 
-  // dashboard_view — 본인 dashboard 진입 시 1회. adminMode (어드민이 view-as 로
-  // 들어온 케이스) 는 funnel 의도와 달라 분리.
-  useEffect(() => {
-    if (!viewOnly && !adminMode) {
-      track(EVENTS.DASHBOARD_VIEW);
-    }
-  }, [viewOnly, adminMode]);
+  // dashboard_view — funnel 추적은 page.tsx 의 DashboardPage 에서 처리.
+  // 옛 이 위치 fire 는 DashboardRouter 의 status 분기 구조 (status !== authenticated
+  // vs authenticated 가 Fragment 다른 위치) 때문에 session 전환 시 DashboardView 가
+  // unmount + remount 되어 useEffect 가 2회 발사되는 버그 (Mixpanel 2026-05-29 e2e
+  // 검증에서 발견). 추적을 outer page component 로 옮겨 1회만 보장.
 
   useEffect(() => {
     const saved = localStorage.getItem(storageKey);

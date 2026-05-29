@@ -2,12 +2,13 @@
 
 export const dynamic = "force-dynamic";
 
-import { Suspense, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
 import { DashboardView } from "@/components/dashboard-view";
 import { PolicyBanner } from "@/components/policy-banner";
 import { TransparencyCard } from "@/components/transparency-card";
 import { PageFooter } from "@/components/page-footer";
+import { track, EVENTS } from "@/lib/analytics/mixpanel";
 
 // /dashboard = "본인" 화면. Platform Admin 이 다른 팀 view-as 상태로 여기
 // 들어오면 본인 데이터가 view-as 팀 scope 라 빈 화면 + 옛 admin 배너가
@@ -81,6 +82,12 @@ function DashboardRouter() {
 }
 
 export default function DashboardPage() {
+  // dashboard_view — mount 시 1회. DashboardRouter 안에서 session 전환에 따라
+  // DashboardView 가 unmount/remount 되어도 outer page 는 그대로 → 중복 회피.
+  useEffect(() => {
+    track(EVENTS.DASHBOARD_VIEW);
+  }, []);
+
   return (
     <Suspense fallback={null}>
       <DashboardRouter />
