@@ -1,6 +1,6 @@
 {
   "name": "@z21labs/usage-tracker",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Claude Code usage tracker CLI",
   "type": "module",
   "bin": {

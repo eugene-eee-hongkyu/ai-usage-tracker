@@ -1,7 +1,7 @@
 {
   "name": "z21-ai-tracker",
   "displayName": "AI Usage Tracker",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Claude Code usage tracker for teams",
   "type": "module",
   "bin": {
