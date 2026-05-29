@@ -247,7 +247,18 @@ echo ""
 
 # 옛 primus 경로 마이그 — 새 사용자에겐 noop 이라 출력 없음 (migrate.ts 가 silent
 # 처리). 실제 옛 경로 발견 시에만 마이그 메시지 표시.
-npx --yes --ignore-cache "$REPO" migrate 2>/dev/null || true
+# npx 가 GitHub tarball 다운로드 + 의존성 install (30초~1분) 하는 동안
+# 무음이라 사용자에게 멈춘 듯 보임 → background 점 spinner 로 진행 표시.
+npx --yes --ignore-cache "$REPO" migrate >/dev/null 2>&1 &
+MIGRATE_PID=$!
+printf "📦 패키지 받는 중"
+while kill -0 "$MIGRATE_PID" 2>/dev/null; do
+  printf "."
+  sleep 1
+done
+printf " ✓\n"
+wait "$MIGRATE_PID" 2>/dev/null || true
+echo ""
 
 # 기존 키 있음 = 업데이트 흐름 / 없음 = 신규 설치.
 # AIUSAGE_FROM_INSTALL_SH=1 — preflight 무한 루프 안전장치.
