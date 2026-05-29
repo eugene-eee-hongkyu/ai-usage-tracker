@@ -6,7 +6,7 @@ import { authOptions } from "@/lib/auth";
 import { db, userSnapshots, users, periodSnapshots, dailyVisits, userBlocks, teamMembers, apiTokens, IS_LOCAL_MODE } from "@/lib/db";
 import { getAuthedEmail } from "@/lib/local-user";
 import { getEffectiveTeamId } from "@/lib/effective-team";
-import { and, asc, desc, eq, gte, isNull, lt, inArray } from "drizzle-orm";
+import { and, asc, desc, eq, gt, gte, isNull, lt, inArray, or } from "drizzle-orm";
 import { isAdmin } from "@/lib/admin";
 import { computeDailyEfficiencyScore, computePowerIndex } from "@/lib/rules";
 import {
@@ -237,6 +237,9 @@ export async function GET(req: NextRequest) {
     const [major, minor] = v.split(".").map((n) => parseInt(n, 10) || 0);
     return major > 0 || (major === 0 && minor >= 3);
   })();
+  // hasCodexData = "의미 있는 Codex 사용 데이터 존재" — 단순 row 존재가 아니라
+  // 실제 사용 (cost > 0 또는 sessions > 0) 가드. 새 CLI 가 Codex 안 쓰는 사용자에도
+  // 빈 응답 (cost=0, sessions=0) 을 매번 row 로 저장하므로 가드 없으면 false positive.
   const codexSnaps = await db
     .select({ id: userSnapshots.id })
     .from(userSnapshots)
@@ -244,6 +247,7 @@ export async function GET(req: NextRequest) {
       eq(userSnapshots.userId, user[0].id),
       eq(userSnapshots.provider, "codex"),
       IS_LOCAL_MODE ? undefined : eq(userSnapshots.teamId, effectiveTeamId!),
+      or(gt(userSnapshots.totalCost, 0), gt(userSnapshots.sessionsCount, 0)),
     ))
     .limit(1);
   const hasCodexData = codexSnaps.length > 0;
