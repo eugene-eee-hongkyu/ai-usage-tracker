@@ -29,6 +29,7 @@ import { PrivacyBanner } from "@/components/privacy-banner";
 import { StaleSyncBanner } from "@/components/stale-sync-banner";
 import { track, EVENTS } from "@/lib/analytics/mixpanel";
 import { useTrackScrollDepth } from "@/lib/analytics/use-track-scroll-depth";
+import { useTrackSectionDwell } from "@/lib/analytics/use-track-section-dwell";
 
 const ScoreDrilldown = dynamic(
   () => import("@/components/score-drilldown").then((m) => m.ScoreDrilldown),
@@ -842,7 +843,7 @@ function TeamPositionCard({
   if (rows.length === 0) return null;
 
   return (
-    <div data-testid="dash-card-team-position" className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-indigo-500 rounded">
+    <div data-testid="dash-card-team-position" data-track-dwell="team_position" className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-indigo-500 rounded">
       <div className="px-3 py-2 border-b border-neutral-800 flex items-center justify-between">
         <span className="text-xs font-mono font-bold text-indigo-400 uppercase tracking-wider">
           {tmpl(dv.teamPositionTitle, { period: periodLabel, n: members.length })}
@@ -914,6 +915,8 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
 
   // 스크롤 깊이 25/50/75/100 마일스톤 자동 추적 (본인 모드 / view-as 모드 통합)
   useTrackScrollDepth(viewOnly ? "dashboard_view_as" : "dashboard");
+  // 섹션 dwell 자동 추적 — 카드 div 의 data-track-dwell attribute 로 매칭.
+  useTrackSectionDwell(viewOnly ? "dashboard_view_as" : "dashboard");
 
   // dashboard_view — funnel 추적은 page.tsx 의 DashboardPage 에서 처리.
   // 옛 이 위치 fire 는 DashboardRouter 의 status 분기 구조 (status !== authenticated
@@ -1372,7 +1375,7 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
   // MCP Servers 카드 — today period 면 Active Blocks 가 미표시라 빈 슬롯이
   // 생김. 그 자리에 MCP 를 올려 한 줄 절약. 그 외 period 는 Row 7 에 표시.
   const mcpServersBlock = (
-    <div data-testid="dash-card-mcp" className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-cyan-500 rounded">
+    <div data-testid="dash-card-mcp" data-track-dwell="mcp" className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-cyan-500 rounded">
       <div className="px-3 py-2 border-b border-neutral-800 flex items-center justify-between">
         <span className="text-xs font-mono font-bold text-cyan-400 uppercase tracking-wider">MCP Servers</span>
         {(data.mcpServers ?? []).length > 15 && (
@@ -1446,7 +1449,7 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
     const avgDwellSec = monthVisitsTotal > 0 ? Math.round(monthDwellTotal / monthVisitsTotal) : 0;
     const avgMinSec = `${Math.floor(avgDwellSec / 60)}:${String(avgDwellSec % 60).padStart(2, "0")}`;
     return (
-      <div data-testid="dash-card-dwell-heatmap" className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-amber-500 rounded">
+      <div data-testid="dash-card-dwell-heatmap" data-track-dwell="dwell_heatmap" className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-amber-500 rounded">
         <div className="px-3 py-2 border-b border-neutral-800">
           <span data-testid="dash-heatmap-dwell" className="text-xs font-mono font-bold text-amber-400 uppercase tracking-wider">
             {tmpl(t.dashboardView.dwellHeatmapLabel, { weeks: Math.round(rows.length / 7) })}
@@ -1472,7 +1475,7 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
   // 일별 토큰 단가 (plan amortized) — (monthlyPrice/30) / 일별 토큰 × 1M.
   // 팀 화면의 BY MEMBER 카드와 동일 공식. emerald = plan 활용 효율 컨셉.
   const unitCostBlock = (
-    <div data-testid="dash-card-unit-cost" className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-emerald-500 rounded">
+    <div data-testid="dash-card-unit-cost" data-track-dwell="unit_cost" className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-emerald-500 rounded">
       <div className="px-3 py-2 border-b border-neutral-800">
         <span className="text-xs font-mono font-bold text-emerald-400 uppercase tracking-wider">
           {t.dashboard.cards.unitCost}
@@ -1620,7 +1623,7 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
   // Plan Savings KPI — fintech stat card pattern: 빅 넘버 (절약 금액) + 트렌드
   // 화살표 + 비교 막대. team 카드와 동일 디자인.
   const planSavingsBlock = (
-    <div data-testid="dash-card-plan-savings" className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-emerald-500 rounded">
+    <div data-testid="dash-card-plan-savings" data-track-dwell="plan_savings" className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-emerald-500 rounded">
       <div className="px-3 py-2 border-b border-neutral-800">
         <span className="text-xs font-mono font-bold text-emerald-400 uppercase tracking-wider">
           {t.dashboard.cards.planSavings}
@@ -1812,7 +1815,7 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
 
   // Efficiency Metrics
   const efficiencyBlock = (
-    <div data-testid="dash-card-efficiency" className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-fuchsia-500 rounded">
+    <div data-testid="dash-card-efficiency" data-track-dwell="efficiency" className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-fuchsia-500 rounded">
       <div className="px-3 py-2 border-b border-neutral-800 flex items-center justify-between">
         <span className="text-xs font-mono font-bold text-fuchsia-400 uppercase tracking-wider">Efficiency</span>
         {(() => {
@@ -1983,7 +1986,7 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
     if (topModel) rows.push({ label: "Model", name: topModel.name, cost: topModel.cost, color: "text-pink-300" });
     if (topActivity) rows.push({ label: "Activity", name: topActivity.name, cost: topActivity.cost, color: "text-violet-300" });
     return (
-      <div data-testid="dash-card-cost-top3" className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-amber-500 rounded">
+      <div data-testid="dash-card-cost-top3" data-track-dwell="cost_top3" className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-amber-500 rounded">
         <div className="px-3 py-2 border-b border-neutral-800">
           <span className="text-xs font-mono font-bold text-amber-400 uppercase tracking-wider">
             비용 원인 Top 3 · {periodLabel(period, t)}
@@ -2021,7 +2024,7 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
     const s = data.efficiencyScore;
     if (!s) return null;
     return (
-      <div data-testid="dash-card-cache-streak" className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-orange-500 rounded">
+      <div data-testid="dash-card-cache-streak" data-track-dwell="cache_streak" className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-orange-500 rounded">
         <div className="px-3 py-2 border-b border-neutral-800">
           <span className="text-xs font-mono font-bold text-orange-400 uppercase tracking-wider">
             Cache Hit Streak
@@ -2073,7 +2076,7 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
   // Daily Cost block — main Row 1 (Daily Activity 옆) + 자세히 보기 안
   // Efficiency 옆 두 곳에서 재사용 (사용자 피드백: 진단성 차트로도 옆에).
   const dailyCostBlock = (
-    <div data-testid="dash-card-daily-cost" className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-yellow-500 rounded">
+    <div data-testid="dash-card-daily-cost" data-track-dwell="daily_cost" className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-yellow-500 rounded">
       <div className="px-3 py-2 border-b border-neutral-800 flex items-center justify-between">
         <span className="text-xs font-mono font-bold text-yellow-400 uppercase tracking-wider">Daily Cost</span>
         {chartData.length > 45 && (
@@ -2128,7 +2131,7 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
       return { date: row.date, count: Math.round(cost * 100), level };
     });
     return (
-      <div data-testid="dash-card-activity-heatmap" className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-indigo-500 rounded">
+      <div data-testid="dash-card-activity-heatmap" data-track-dwell="activity_heatmap" className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-indigo-500 rounded">
         <div className="px-3 py-2 border-b border-neutral-800">
           <span data-testid="dash-heatmap-activity" className="text-xs font-mono font-bold text-indigo-400 uppercase tracking-wider">{tmpl(t.dashboardView.activityHeatmapLabel, { weeks: Math.round((data.heatmapDaily ?? []).length / 7) })}</span>
         </div>

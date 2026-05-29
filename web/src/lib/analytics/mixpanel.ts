@@ -102,4 +102,8 @@ export const EVENTS = {
   FOOTER_LINK_CLICK: "footer_link_click",           // props: { screen, target: 'changelog'|'suggest' }
   // 스크롤 깊이 (25/50/75/100 마일스톤, 페이지당 each once)
   SCROLL_DEPTH: "scroll_depth",                     // props: { screen, milestone: 25|50|75|100 }
+  // 섹션 dwell (어느 카드에서 오래 머물렀는지). 페이지 visibility 숨김 또는 unmount 시 flush.
+  SECTION_DWELL: "section_dwell",                   // props: { screen, section, dwell_ms, view_count }
+  // 배너 dismiss
+  BANNER_DISMISS: "banner_dismiss",                 // props: { screen, banner: 'policy'|'privacy' }
 } as const;

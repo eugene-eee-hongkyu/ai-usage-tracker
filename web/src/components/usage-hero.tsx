@@ -10,6 +10,7 @@ import {
 } from "@/lib/rules";
 import { useMessages } from "@/lib/use-i18n";
 import type { Messages } from "@/lib/i18n";
+import { track, EVENTS } from "@/lib/analytics/mixpanel";
 
 // 사용량 zone hero — Power Index + 토큰 단가 동등 크기 2-card.
 // period 비례 정규화 — 30일 anchor 를 기준으로 8days/today/all 어느 윈도우에서도
@@ -302,7 +303,7 @@ export function UsageHero({
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
 
           {/* Power Index */}
-          <div data-testid="usage-hero-power" className="bg-neutral-900 border-l-2 border-l-cyan-500 border border-neutral-800 rounded p-4">
+          <div data-testid="usage-hero-power" data-track-dwell="power_index" className="bg-neutral-900 border-l-2 border-l-cyan-500 border border-neutral-800 rounded p-4">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-2">
               <div className="flex items-center gap-2 flex-wrap">
                 <span className="text-xs font-mono font-bold text-cyan-400 uppercase tracking-wider">{m.usageHero.powerLabel}</span>
@@ -311,7 +312,10 @@ export function UsageHero({
               <button
                 type="button"
                 data-testid="usage-hero-power-info"
-                onClick={() => setBreakdownOpen((v) => !v)}
+                onClick={() => {
+                  if (!breakdownOpen) track(EVENTS.INFO_CLICK, { screen: "dashboard", target: "power_index_score" });
+                  setBreakdownOpen((v) => !v);
+                }}
                 className="text-[11px] font-mono text-neutral-500 hover:text-cyan-300 border border-neutral-700 hover:border-cyan-500/60 rounded px-1.5 py-0.5 transition-colors"
                 title={m.usageHero.powerInfoTooltip}
               >
@@ -436,7 +440,10 @@ export function UsageHero({
                 <button
                   type="button"
                   data-testid="usage-hero-unit-info"
-                  onClick={() => setBreakdownOpen((v) => !v)}
+                  onClick={() => {
+                    if (!breakdownOpen) track(EVENTS.INFO_CLICK, { screen: "dashboard", target: "unit_cost_score" });
+                    setBreakdownOpen((v) => !v);
+                  }}
                   className="text-[11px] font-mono text-neutral-500 hover:text-yellow-300 border border-neutral-700 hover:border-yellow-500/60 rounded px-1.5 py-0.5 transition-colors"
                   title={m.usageHero.powerInfoTooltip}
                 >
@@ -450,7 +457,10 @@ export function UsageHero({
                 <button
                   type="button"
                   data-testid="usage-hero-tier-hint"
-                  onClick={() => setTierHintOpen((v) => !v)}
+                  onClick={() => {
+                    if (!tierHintOpen) track(EVENTS.INFO_CLICK, { screen: "dashboard", target: "find_my_tier" });
+                    setTierHintOpen((v) => !v);
+                  }}
                   className="text-neutral-500 hover:text-yellow-300 transition-colors"
                 >
                   {tierHintOpen ? m.usageHero.tierHintCloseLabel : m.usageHero.tierHintOpenLabel}

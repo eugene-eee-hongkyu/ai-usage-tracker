@@ -5,6 +5,7 @@
 
 import { useEffect, useState } from "react";
 import { useMessages } from "@/lib/use-i18n";
+import { track, EVENTS } from "@/lib/analytics/mixpanel";
 
 const DISMISS_KEY = "policy_banner_dismissed_until";
 
@@ -30,6 +31,7 @@ export function PolicyBanner() {
     const sevenDays = 7 * 24 * 60 * 60 * 1000;
     localStorage.setItem(DISMISS_KEY, String(Date.now() + sevenDays));
     setShow(false);
+    track(EVENTS.BANNER_DISMISS, { banner: "policy" });
   }
 
   const text =

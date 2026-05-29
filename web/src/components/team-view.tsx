@@ -19,6 +19,7 @@ import { useMessages } from "@/lib/use-i18n";
 import type { Messages } from "@/lib/i18n";
 import { track, EVENTS } from "@/lib/analytics/mixpanel";
 import { useTrackScrollDepth } from "@/lib/analytics/use-track-scroll-depth";
+import { useTrackSectionDwell } from "@/lib/analytics/use-track-section-dwell";
 
 type Period = "today" | "8days" | "month" | "30days" | "all";
 type GradeLevel = "exemplary" | "good" | "moderate" | "insufficient" | "warning";
@@ -374,6 +375,8 @@ export function TeamView({ adminMode = false }: { adminMode?: boolean }) {
 
   // 스크롤 깊이 마일스톤 자동 추적
   useTrackScrollDepth(adminMode ? "team_admin_view" : "team");
+  // 섹션 dwell 자동 추적 — 카드 div 의 data-track-dwell attribute 로 매칭.
+  useTrackSectionDwell(adminMode ? "team_admin_view" : "team");
   // localStorage 읽기 전 첫 fetch 가 stale period 로 발사 + race 로 늦은 응답이
   // 덮어쓰는 버그 방지. 읽기 완료 후에만 fetch 허용.
   const [periodReady, setPeriodReady] = useState(false);
@@ -724,7 +727,7 @@ export function TeamView({ adminMode = false }: { adminMode?: boolean }) {
 
   // Activity (tokens)
   const activityBlock = (
-    <div data-testid="team-card-activity" className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-cyan-500 rounded">
+    <div data-testid="team-card-activity" data-track-dwell="activity" className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-cyan-500 rounded">
       <div className="px-3 py-2 border-b border-neutral-800">
         <span className="text-xs font-mono font-bold text-cyan-400 uppercase tracking-wider">Activity</span>
       </div>
@@ -768,7 +771,7 @@ export function TeamView({ adminMode = false }: { adminMode?: boolean }) {
 
   // Cost
   const costBlock = (
-    <div data-testid="team-card-cost" className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-yellow-500 rounded">
+    <div data-testid="team-card-cost" data-track-dwell="cost" className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-yellow-500 rounded">
       <div className="px-3 py-2 border-b border-neutral-800">
         <span className="text-xs font-mono font-bold text-yellow-400 uppercase tracking-wider">Cost</span>
       </div>
@@ -813,7 +816,7 @@ export function TeamView({ adminMode = false }: { adminMode?: boolean }) {
 
   // 활용지수 순위 — period 분모가 멤버 동일 → 직접 비교 정확
   const powerRankBlock = (
-    <div data-testid="team-card-power-rank" className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-cyan-500 rounded">
+    <div data-testid="team-card-power-rank" data-track-dwell="power_rank" className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-cyan-500 rounded">
       <div className="px-3 py-2 border-b border-neutral-800">
         <span className="text-xs font-mono font-bold text-cyan-400 uppercase tracking-wider">{t.teamView.powerRankCard}</span>
       </div>
@@ -859,7 +862,7 @@ export function TeamView({ adminMode = false }: { adminMode?: boolean }) {
 
   // 일별 토큰 단가 (멤버별) — 멤버별 plan 가치 / 일별 토큰 × 1M
   const dailyUnitCostBlock = (
-    <div data-testid="team-card-daily-unit-cost" className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-yellow-500 rounded">
+    <div data-testid="team-card-daily-unit-cost" data-track-dwell="daily_unit_cost" className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-yellow-500 rounded">
       <div className="px-3 py-2 border-b border-neutral-800 flex items-center justify-between flex-wrap gap-y-1">
         <span className="text-xs font-mono font-bold text-yellow-400 uppercase tracking-wider">
           {t.teamView.unitCostCardLabel}
@@ -951,7 +954,7 @@ export function TeamView({ adminMode = false }: { adminMode?: boolean }) {
       { label: tmpl(t.teamView.teamLabel, { team: teamDisplayName }), value: ic.activeDayAvg, star: true },
     ];
     return (
-      <div data-testid="team-card-headline" className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-emerald-500 rounded">
+      <div data-testid="team-card-headline" data-track-dwell="headline" className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-emerald-500 rounded">
         <div className="px-3 py-2 border-b border-neutral-800">
           <span className="text-xs font-mono font-bold text-emerald-400 uppercase tracking-wider">
             {tmpl(t.teamView.headlineTitle, { team: teamDisplayName })}
@@ -1024,7 +1027,7 @@ export function TeamView({ adminMode = false }: { adminMode?: boolean }) {
     const apiPct = (apiCost / barMax) * 100;
     const planPct = (planCost / barMax) * 100;
     return (
-      <div data-testid="team-card-plan-savings" className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-emerald-500 rounded">
+      <div data-testid="team-card-plan-savings" data-track-dwell="plan_savings" className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-emerald-500 rounded">
         <div className="px-3 py-2 border-b border-neutral-800">
           <span className="text-xs font-mono font-bold text-emerald-400 uppercase tracking-wider">
             {t.dashboard.cards.planSavings} · {tmpl(t.teamView.teamAvgN, { n: memberCount })}
@@ -1141,7 +1144,7 @@ export function TeamView({ adminMode = false }: { adminMode?: boolean }) {
   // 옛 headlineBlock 의 효율 점수 gauge 를 header 옆으로 흡수 (사용자 피드백:
   // 헤드라인은 업계 비교만, 효율 점수는 efficiency 쪽에).
   const efficiencyBlock = (
-    <div data-testid="team-card-efficiency" className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-fuchsia-500 rounded">
+    <div data-testid="team-card-efficiency" data-track-dwell="efficiency" className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-fuchsia-500 rounded">
       <div className="px-3 py-2 border-b border-neutral-800 flex items-center justify-between gap-2 flex-wrap">
         <span className="text-xs font-mono font-bold text-fuchsia-400 uppercase tracking-wider">Efficiency</span>
         <div className="flex items-center gap-3">
@@ -1745,7 +1748,7 @@ export function TeamView({ adminMode = false }: { adminMode?: boolean }) {
                   v >= 1 ? `$${v.toFixed(0)}` : `$${v.toFixed(2)}`;
                 const recovered = r!.recoveryPct >= 100;
                 return (
-                  <div data-testid="team-card-recovery" className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-emerald-500 rounded">
+                  <div data-testid="team-card-recovery" data-track-dwell="recovery" className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-emerald-500 rounded">
                     <div className="px-3 py-2 border-b border-neutral-800">
                       <span className="text-xs font-mono font-bold text-emerald-400 uppercase tracking-wider">
                         팀 본전 회수 (이번 달)

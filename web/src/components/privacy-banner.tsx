@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useMessages } from "@/lib/use-i18n";
+import { track, EVENTS } from "@/lib/analytics/mixpanel";
 
 // 첫 진입 시 한 번 dismiss 가능 banner. dismiss 후엔 footer 작은 form 으로 항상 노출.
 // "수집 안 함" 명시 (negative claim 이 trust 강함).
@@ -35,6 +36,7 @@ export function PrivacyBanner() {
             onClick={() => {
               try { localStorage.setItem(DISMISS_KEY, "1"); } catch {}
               setDismissed(true);
+              track(EVENTS.BANNER_DISMISS, { banner: "privacy" });
             }}
             className="text-slate-500 hover:text-slate-200 text-sm shrink-0"
             aria-label={m.privacy.dismissAria}
