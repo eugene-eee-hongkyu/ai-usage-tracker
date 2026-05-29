@@ -9,7 +9,9 @@ import { fileURLToPath } from "url";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const SERVER_URL = process.env.USAGE_TRACKER_URL ?? "https://aiusage.z21labs.world";
-export const CLI_VERSION = "0.2.0";
+// Multi-provider (2026-05-29 M): 0.3.x 부터 Claude + Codex 분리 호출.
+// dashboard 가 envInfo.cliVersion >= 0.3.0 으로 Codex 탭 활성 분기.
+export const CLI_VERSION = "0.3.0";
 
 // === 새 (z21labs) ===
 const KEYTAR_SERVICE = "z21labs-usage-tracker";

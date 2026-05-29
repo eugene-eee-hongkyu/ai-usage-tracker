@@ -178,6 +178,12 @@ interface DashboardData {
   // M6f (2026-05-25): device-scope. user 가 노트북 N대 쓰면 N entries.
   devices?: DeviceMeta[];
   selectedDeviceId?: number | null;
+  // Multi-provider (2026-05-29 M): Codex 탭 분기.
+  //   supportsMultiProvider — selectedDeviceId 의 CLI 가 Codex 분리 호출 지원 (>= 0.3.0)
+  //   hasCodexData          — user_snapshots 에 provider='codex' row 1+ 존재
+  // Tabs 표시 = !supportsMultiProvider || hasCodexData (옛 CLI 업데이트 유도 || Codex 사용자)
+  supportsMultiProvider?: boolean;
+  hasCodexData?: boolean;
 }
 
 interface DeviceMeta {
@@ -186,6 +192,7 @@ interface DeviceMeta {
   platform: string | null;
   osVersion: string | null;
   hostname: string | null;
+  cliVersion: string | null;
   lastUsedAt: string | null;
   snapshotUpdatedAt: string | null;
   hasData: boolean;
@@ -1202,6 +1209,39 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
   }
 
   if (!data.overview) {
+    // Multi-provider (2026-05-29 M): Codex 탭 선택 + 현재 CLI 가 옛 버전 (< 0.3.0) →
+    // Codex 데이터 미수집 안내. admin / isLocalMode / sync 안내 분기보다 우선 — 본인이
+    // admin 이라도 Codex 미수집 안내가 더 정확. viewOnly 는 그대로 noDataYet 표시.
+    if (!viewOnly && provider === "codex" && data.supportsMultiProvider === false) {
+      const selectedDev = data.devices?.find((d) => d.tokenId === data.selectedDeviceId);
+      const verLabel = selectedDev?.cliVersion ?? "0.2.x";
+      const installCmd = "curl -fsSL https://aiusage.z21labs.world/install.sh | bash";
+      return (
+        <div className="min-h-screen bg-neutral-950">
+          <NavComponent />
+          <main className="max-w-md mx-auto px-4 py-20 text-center space-y-6">
+            <h1 className="text-2xl font-bold text-neutral-100">Codex 데이터 미수집</h1>
+            <p className="text-neutral-400 text-sm">
+              현재 CLI 버전 (<code className="text-cyan-400 font-mono">v{verLabel}</code>) 은 Codex 사용량을 수집하지 않습니다.<br />
+              최신 버전으로 업데이트하면 Codex 사용량도 자동으로 표시됩니다.
+            </p>
+            <div className="flex items-center gap-2 bg-neutral-900 border border-neutral-800 rounded px-4 py-3 text-left">
+              <code className="flex-1 text-sm text-cyan-400 font-mono break-all">{installCmd}</code>
+              <button
+                onClick={() => { navigator.clipboard.writeText(installCmd); setSyncCopied(true); setTimeout(() => setSyncCopied(false), 2000); }}
+                className="shrink-0 px-3 py-1 bg-indigo-600 hover:bg-indigo-500 text-white text-xs rounded font-mono"
+              >{syncCopied ? "✓" : "복사"}</button>
+            </div>
+            <p className="text-xs text-neutral-600 font-mono">업데이트 후 5-10분 안에 Codex 데이터가 차오릅니다.</p>
+            <button
+              onClick={() => setProvider("claude")}
+              className="text-xs text-neutral-500 hover:text-neutral-300 font-mono"
+            >← Claude Code 탭으로 돌아가기</button>
+          </main>
+        </div>
+      );
+    }
+
     if (viewOnly) return (
       <div className="min-h-screen bg-neutral-950">
         <NavComponent />
@@ -2263,23 +2303,26 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
             </select>
           )}
         </div>
-        {/* Multi-provider (2026-05-29 M): Claude / Codex 탭. Phase 1. device chip 패턴 follow.
-            Codex 데이터 없는 사용자가 클릭하면 빈 dashboard 표시 (자연 empty state). */}
-        <div className="max-w-6xl mx-auto px-4 pb-2 flex gap-1.5 items-center">
-          <span className="text-[10px] font-mono text-neutral-600 uppercase tracking-wider mr-1">provider:</span>
-          {(["claude", "codex"] as const).map((prov) => (
-            <button
-              key={prov}
-              data-testid={`dash-provider-${prov}`}
-              onClick={() => setProvider(prov)}
-              className={`text-xs font-mono border rounded px-3 py-1 transition-colors ${
-                provider === prov
-                  ? "bg-indigo-600 text-white border-indigo-500"
-                  : "bg-neutral-800 text-neutral-300 border-neutral-700 hover:border-neutral-500"
-              }`}
-            >{prov === "claude" ? "Claude Code" : "Codex"}</button>
-          ))}
-        </div>
+        {/* Multi-provider (2026-05-29 M): Claude / Codex 탭.
+            표시 조건 = !supportsMultiProvider (옛 CLI — 업데이트 유도) || hasCodexData (새 CLI + Codex 사용자).
+            둘 다 아니면 (새 CLI + Codex 안 씀) 탭 라인 자체 숨김 — 사용자 선택지 없는데 노출 = 노이즈. */}
+        {(!data.supportsMultiProvider || data.hasCodexData) && (
+          <div className="max-w-6xl mx-auto px-4 pb-2 flex gap-1.5 items-center">
+            <span className="text-[10px] font-mono text-neutral-600 uppercase tracking-wider mr-1">provider:</span>
+            {(["claude", "codex"] as const).map((prov) => (
+              <button
+                key={prov}
+                data-testid={`dash-provider-${prov}`}
+                onClick={() => setProvider(prov)}
+                className={`text-xs font-mono border rounded px-3 py-1 transition-colors ${
+                  provider === prov
+                    ? "bg-indigo-600 text-white border-indigo-500"
+                    : "bg-neutral-800 text-neutral-300 border-neutral-700 hover:border-neutral-500"
+                }`}
+              >{prov === "claude" ? "Claude Code" : "Codex"}</button>
+            ))}
+          </div>
+        )}
         {/* M6f: device chip row — user 가 노트북 N대 사용 시 표시. 1개면 숨김.
             클릭하면 그 device 의 데이터로 dashboard 갱신. server 가 selectedDeviceId 결정 → 동기화. */}
         {(data.devices?.length ?? 0) >= 2 && (

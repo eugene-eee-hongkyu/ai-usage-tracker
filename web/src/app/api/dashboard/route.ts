@@ -181,13 +181,14 @@ export async function GET(req: NextRequest) {
     .orderBy(desc(apiTokens.lastUsedAt));
 
   const devices = devicesRaw.map((d) => {
-    const meta = (d.metadata ?? {}) as { platform?: string; osVersion?: string; hostname?: string };
+    const meta = (d.metadata ?? {}) as { platform?: string; osVersion?: string; hostname?: string; cliVersion?: string };
     return {
       tokenId: d.tokenId,
       name: d.name,
       platform: meta.platform ?? null,
       osVersion: meta.osVersion ?? null,
       hostname: meta.hostname ?? null,
+      cliVersion: meta.cliVersion ?? null,
       lastUsedAt: d.tokenLastUsedAt,
       snapshotUpdatedAt: d.snapshotUpdatedAt,
       hasData: !!d.snapshotUpdatedAt,
@@ -218,6 +219,30 @@ export async function GET(req: NextRequest) {
   const providerScopeForSnap = eq(userSnapshots.provider, provider);
   const providerScopeForPeriod = eq(periodSnapshots.provider, provider);
   const providerScopeForBlocks = eq(userBlocks.provider, provider);
+
+  // Multi-provider 분기 (2026-05-29 M):
+  //   supportsMultiProvider = selectedDeviceId 의 CLI 가 Codex 분리 호출 지원 (>= 0.3.0)
+  //   hasCodexData          = user_snapshots 에 provider='codex' row 1+ 존재
+  // dashboard-view 의 Provider Tabs 표시 조건:
+  //   !supportsMultiProvider || hasCodexData
+  // = 옛 CLI (업데이트 유도) || 새 CLI + Codex 사용. 둘 다 아니면 탭 숨김.
+  const selectedDevice = devices.find((d) => d.tokenId === selectedTokenId);
+  const supportsMultiProvider = (() => {
+    const v = selectedDevice?.cliVersion ?? null;
+    if (!v) return false;
+    const [major, minor] = v.split(".").map((n) => parseInt(n, 10) || 0);
+    return major > 0 || (major === 0 && minor >= 3);
+  })();
+  const codexSnaps = await db
+    .select({ id: userSnapshots.id })
+    .from(userSnapshots)
+    .where(and(
+      eq(userSnapshots.userId, user[0].id),
+      eq(userSnapshots.provider, "codex"),
+      IS_LOCAL_MODE ? undefined : eq(userSnapshots.teamId, effectiveTeamId!),
+    ))
+    .limit(1);
+  const hasCodexData = codexSnaps.length > 0;
 
   const snap = await db
     .select()
@@ -303,6 +328,8 @@ export async function GET(req: NextRequest) {
       availableSnapshots,
       devices,
       selectedDeviceId: selectedTokenId,
+      supportsMultiProvider,
+      hasCodexData,
     });
   }
 
@@ -1227,5 +1254,7 @@ export async function GET(req: NextRequest) {
     efficiencyScore,
     devices,
     selectedDeviceId: selectedTokenId,
+    supportsMultiProvider,
+    hasCodexData,
   });
 }

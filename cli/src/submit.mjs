@@ -10,9 +10,10 @@ import { existsSync, readFileSync, writeFileSync, unlinkSync, appendFileSync, st
 import { join } from "path";
 import { homedir, arch as osArch, release as osRelease } from "os";
 
-// M6e: CLI 자체 버전. init.ts 의 CLI_VERSION 과 동기화 — 양쪽 다 0.2.0.
+// M6e: CLI 자체 버전. init.ts 의 CLI_VERSION 과 동기화.
 // 새 릴리즈 시 두 파일 같이 bump.
-const CLI_VERSION = "0.2.0";
+// Multi-provider (2026-05-29 M): 0.3.x 부터 Claude + Codex 분리 호출.
+const CLI_VERSION = "0.3.0";
 
 // 직전 sync 실패 정보를 다음 sync 가 함께 보내기 위한 marker.
 // 실패 시 catch 블록에서 write, 성공 시 다음 envInfo 수집에서 read + 삭제.
