@@ -1215,7 +1215,10 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
     if (!viewOnly && provider === "codex" && data.supportsMultiProvider === false) {
       const selectedDev = data.devices?.find((d) => d.tokenId === data.selectedDeviceId);
       const verLabel = selectedDev?.cliVersion ?? "0.2.x";
-      const installCmd = "curl -fsSL https://aiusage.z21labs.world/install.sh | bash";
+      // Windows 사용자에겐 PowerShell 명령. selectedDevice.platform 없으면 macOS/Linux 기본.
+      const installCmd = selectedDev?.platform === "win32"
+        ? "irm https://aiusage.z21labs.world/install.ps1 | iex"
+        : "curl -fsSL https://aiusage.z21labs.world/install.sh | bash";
       return (
         <div className="min-h-screen bg-neutral-950">
           <NavComponent />
