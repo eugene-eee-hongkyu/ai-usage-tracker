@@ -34,6 +34,21 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     }
   }, [status, isAnyAdmin, isLocalMode, loading, router]);
 
+  // 마지막으로 머문 탭을 기록. /admin (redirect 페이지) 진입 시 이 값으로 복귀.
+  // ALLOWED 화이트리스트로만 저장 — dynamic sub-path 가 생겨도 5 탭 외엔 무시.
+  useEffect(() => {
+    const ALLOWED = [
+      "/admin/members",
+      "/admin/team",
+      "/admin/team/ranking",
+      "/admin/users",
+      "/admin/settings",
+    ];
+    if (ALLOWED.includes(path)) {
+      try { localStorage.setItem("admin_last_tab", path); } catch { /* ignore */ }
+    }
+  }, [path]);
+
   if (isLocalMode) return <>{children}</>;
   if (status === "loading" || isLocalMode === null || loading) return null;
   if (status === "authenticated" && !isAnyAdmin) return null;
