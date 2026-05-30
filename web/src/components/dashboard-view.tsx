@@ -1004,7 +1004,10 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
   const [monthOffset, setMonthOffset] = useState(0);
   const [dayOffset, setDayOffset] = useState(0);
   // M6f: 사용자가 노트북 N대 쓰면 device chip 으로 선택. null = server 가 가장 최근 device 자동 결정.
+  // -1 (MERGED) = 모든 device 합산 (영진님 시범 기능, 2026-05-30). server 가 raw_json
+  // 키 별 group sum + cache hit / oneShot 재계산. multi-device 사용자만 의미 있음.
   const [deviceId, setDeviceId] = useState<number | null>(null);
+  const MERGED_DEVICE_ID = -1;
   // Multi-provider — 마지막 선택 localStorage 기억 (화면 간 공유). lazy init 이라 race 없음.
   const [provider, setProvider] = useProviderPreference();
 
@@ -1014,7 +1017,7 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
     if (p === "8days" && wOff > 0) params.set("weekOffset", String(wOff));
     if (p === "month" && mOff > 0) params.set("monthOffset", String(mOff));
     if (p === "today" && dOff > 0) params.set("dayOffset", String(dOff));
-    if (devId !== null) params.set("deviceId", String(devId));
+    if (devId !== null) params.set("deviceId", devId === MERGED_DEVICE_ID ? "merged" : String(devId));
     if (prov === "codex") params.set("provider", "codex");
     return `/api/dashboard?${params.toString()}`;
   };
@@ -2271,7 +2274,9 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
           <div className="max-w-6xl mx-auto px-4 pb-2 flex flex-wrap gap-1.5 items-center">
             <span className="text-[10px] font-mono text-neutral-600 uppercase tracking-wider mr-1">device:</span>
             {data.devices!.map((dev) => {
-              const isSelected = (deviceId ?? data.selectedDeviceId) === dev.tokenId;
+              const isSelected = deviceId === MERGED_DEVICE_ID
+                ? false
+                : (deviceId ?? data.selectedDeviceId) === dev.tokenId;
               const sinceMs = dev.snapshotUpdatedAt ? Date.now() - new Date(dev.snapshotUpdatedAt).getTime() : null;
               const ageLabel = sinceMs === null
                 ? "no data"
@@ -2299,6 +2304,20 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
                 </button>
               );
             })}
+            {/* 합산 버튼 — multi-device 사용자만. 모든 device 의 raw_json 합산해서 1 view. */}
+            <button
+              data-testid="dash-device-merged"
+              onClick={() => setDeviceId(MERGED_DEVICE_ID)}
+              className={`text-xs font-mono border rounded px-2 py-1 transition-colors flex items-center gap-1.5 ${
+                deviceId === MERGED_DEVICE_ID
+                  ? "bg-indigo-600 text-white border-indigo-500"
+                  : "bg-neutral-800 text-neutral-300 border-neutral-700 hover:border-neutral-500"
+              }`}
+              title="모든 device 의 데이터 합산"
+            >
+              <span>🔀</span>
+              <span>합산</span>
+            </button>
           </div>
         )}
         {/* Period main tabs — 위계는 하위지만 클릭 빈도가 가장 높아 visual weight 유지 */}

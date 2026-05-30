@@ -17,6 +17,7 @@ import {
 import { getCodexPlanLimits, type CodexPlanTier, VALID_CODEX_TIERS } from "@/lib/codex-plans";
 import { getCcusageDaily } from "@/lib/ccusage-row";
 import { PINNED } from "@/lib/pinned-versions";
+import { mergeUserSnapshots, type UserSnapshotLike } from "@/lib/merge-snapshots";
 
 // device.metadata.cliVersion vs PINNED.USAGE_TRACKER_RECOMMENDED 비교.
 // 둘 다 "major.minor.patch" 형태 가정. parse 실패 시 0 으로 fallback (보수적 — 가장 낮은 버전 취급).
@@ -221,24 +222,37 @@ export async function GET(req: NextRequest) {
     };
   });
 
+  // mergeDevices (2026-05-30 영진님 시범 기능): device chip 의 "🔀 합산" 버튼.
+  // requestedDeviceId === "merged" 이면 모든 device 의 user_snapshots row 를 in-memory
+  // merge 한 virtual snap 으로 처리. tokenScope 모두 해제 (= 모든 device row).
+  // 단일 device 사용자는 효과 0 (snap 1 row 그대로). multi-device 만 의미 있음.
+  const mergeDevices = requestedDeviceId === "merged";
+
   // selectedTokenId 결정: query param 우선, 없으면 가장 최근 ingest 한 device.
+  // mergeDevices 면 null (virtual merged row).
   let selectedTokenId: number | null = null;
-  if (requestedDeviceId) {
-    const reqId = parseInt(requestedDeviceId);
-    if (!Number.isNaN(reqId) && devices.find((d) => d.tokenId === reqId)) {
-      selectedTokenId = reqId;
+  if (!mergeDevices) {
+    if (requestedDeviceId) {
+      const reqId = parseInt(requestedDeviceId);
+      if (!Number.isNaN(reqId) && devices.find((d) => d.tokenId === reqId)) {
+        selectedTokenId = reqId;
+      }
+    }
+    if (selectedTokenId === null) {
+      // hasData 인 것 중 가장 최근 snapshotUpdatedAt 우선, 없으면 첫 active token.
+      const withData = devicesRaw
+        .filter((d) => d.snapshotUpdatedAt)
+        .sort((a, b) => (b.snapshotUpdatedAt!.getTime() - a.snapshotUpdatedAt!.getTime()));
+      selectedTokenId = withData[0]?.tokenId ?? devicesRaw[0]?.tokenId ?? null;
     }
   }
-  if (selectedTokenId === null) {
-    // hasData 인 것 중 가장 최근 snapshotUpdatedAt 우선, 없으면 첫 active token.
-    const withData = devicesRaw
-      .filter((d) => d.snapshotUpdatedAt)
-      .sort((a, b) => (b.snapshotUpdatedAt!.getTime() - a.snapshotUpdatedAt!.getTime()));
-    selectedTokenId = withData[0]?.tokenId ?? devicesRaw[0]?.tokenId ?? null;
-  }
 
-  const tokenScopeForSnap = selectedTokenId !== null ? eq(userSnapshots.tokenId, selectedTokenId) : undefined;
-  const tokenScopeForPeriod = selectedTokenId !== null ? eq(periodSnapshots.tokenId, selectedTokenId) : undefined;
+  const tokenScopeForSnap = mergeDevices
+    ? undefined
+    : (selectedTokenId !== null ? eq(userSnapshots.tokenId, selectedTokenId) : undefined);
+  const tokenScopeForPeriod = mergeDevices
+    ? undefined
+    : (selectedTokenId !== null ? eq(periodSnapshots.tokenId, selectedTokenId) : undefined);
 
   // Multi-provider scope — 모든 user_snapshots / period_snapshots / user_blocks query 에 적용.
   const providerScopeForSnap = eq(userSnapshots.provider, provider);
@@ -317,7 +331,8 @@ export async function GET(req: NextRequest) {
     .limit(1);
   const hasClaudeData = claudeSnaps.length > 0 || claudePeriods.length > 0;
 
-  const snap = await db
+  // mergeDevices 면 모든 device row 가져와 in-memory merge — virtual snap 1 row 로 압축.
+  const snapRaw = await db
     .select()
     .from(userSnapshots)
     .where(
@@ -325,7 +340,10 @@ export async function GET(req: NextRequest) {
         ? and(eq(userSnapshots.userId, user[0].id), tokenScopeForSnap, providerScopeForSnap)
         : and(eq(userSnapshots.userId, user[0].id), eq(userSnapshots.teamId, effectiveTeamId!), tokenScopeForSnap, providerScopeForSnap)
     )
-    .limit(1);
+    .limit(mergeDevices ? 20 : 1);
+  const snap: typeof snapRaw = mergeDevices && snapRaw.length > 1
+    ? [mergeUserSnapshots(snapRaw as unknown as UserSnapshotLike[]) as unknown as typeof snapRaw[0]]
+    : snapRaw;
 
   // team_id scope helper (LOCAL_MODE 면 undefined → and() 가 무시).
   const teamScope = IS_LOCAL_MODE ? undefined : eq(periodSnapshots.teamId, effectiveTeamId!);
