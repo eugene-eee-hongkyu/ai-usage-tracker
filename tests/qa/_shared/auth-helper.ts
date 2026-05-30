@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const SEED_ROOT = resolve(__dirname, "../../../db/seed");
 
-export type PersonaId = "P1" | "P2" | "P3" | "P4" | "P5" | "P6" | "P7" | "P8" | "team-mixed";
+export type PersonaId = "P1" | "P2" | "P3" | "P4" | "P5" | "P6" | "P7" | "P8" | "P9" | "team-mixed" | "team-codex" | "team-codex-oreo" | "team-codex-bob";
 
 const EMAIL_BY_PERSONA: Record<PersonaId, string | null> = {
   P1: null,
@@ -17,7 +17,12 @@ const EMAIL_BY_PERSONA: Record<PersonaId, string | null> = {
   P6: "dave@iskra.world",
   P7: "bob@iskra.world",
   P8: "eugene.eee@iskra.world", // admin 본인
+  P9: "p9@iskra.world",          // Codex 사용 personal user (codex_plan_tier=NULL 시작)
   "team-mixed": "eugene.eee@iskra.world", // P3 admin 으로 진입
+  // team-codex fixture 의 세 멤버 시점별 로그인
+  "team-codex":      "eugene.eee@iskra.world", // admin / platform admin
+  "team-codex-oreo": "oreo@iskra.world",       // Codex 사용 멤버
+  "team-codex-bob":  "bob@iskra.world",        // Claude only 멤버
 };
 
 export function seed(persona: PersonaId): void {
@@ -110,6 +115,17 @@ export async function signInAs(page: Page, persona: PersonaId): Promise<void> {
 
 export async function clearSession(page: Page): Promise<void> {
   await page.context().clearCookies();
+}
+
+/** psql 로 임의 SELECT 1행 1컬럼 값 반환 (codex spec 의 plan tier 저장 검증용). */
+export function queryScalar(sql: string): string {
+  const url = process.env.DATABASE_URL;
+  if (!url) throw new Error("DATABASE_URL 미설정");
+  const out = execSync(
+    `psql "${url}" -t -A -c "${sql.replace(/"/g, '\\"')}"`,
+    { stdio: ["pipe", "pipe", "pipe"] },
+  ).toString().trim();
+  return out;
 }
 
 /** page.route stub — /api/dashboard 응답 overview 필드 변형 (efficiency 5단계 검증용). */
