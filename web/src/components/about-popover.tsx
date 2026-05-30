@@ -32,13 +32,32 @@ export function AboutPopover() {
   const ref = useRef<HTMLDivElement>(null);
   const { m } = useMessages();
 
+  // 자동 버전 체크 — mount 시 1회 + 5분 polling + 탭 active 복귀 시 즉시 refetch.
+  // 옛 동작은 popover 열어야만 fetch — 사용자가 (i) 안 누르면 새 빌드 인지 못함.
+  // 이제는 buildSha 가 다르면 (i) 우상단 빨간 점 → popover 안에 새로고침 버튼.
+  // polling 5분 = SHA 갱신 인지 지연 상한. 트래픽 미미 (응답 작음).
   useEffect(() => {
-    if (!open || data) return;
-    fetch("/api/about")
-      .then((r) => (r.ok ? r.json() : null))
-      .then((d) => setData(d))
-      .catch(() => setData(null));
-  }, [open, data]);
+    let cancelled = false;
+    const fetchAbout = () => {
+      fetch("/api/about")
+        .then((r) => (r.ok ? r.json() : null))
+        .then((d) => { if (!cancelled) setData(d); })
+        .catch(() => { /* network 에러는 침묵 — 다음 poll 에서 자동 재시도 */ });
+    };
+    fetchAbout();
+    const id = setInterval(fetchAbout, 5 * 60_000);
+    const onVis = () => { if (document.visibilityState === "visible") fetchAbout(); };
+    document.addEventListener("visibilitychange", onVis);
+    return () => {
+      cancelled = true;
+      clearInterval(id);
+      document.removeEventListener("visibilitychange", onVis);
+    };
+  }, []);
+
+  // hasUpdate — client 번들 SHA 와 server 응답 SHA 가 다르면 true. dev / local
+  // 빌드는 비교 무의미 (SHA = "dev") 라 제외.
+  const hasUpdate = !!data && data.buildSha !== CLIENT_BUILD_SHA && CLIENT_BUILD_SHA !== "dev";
 
   useEffect(() => {
     if (!open) return;
@@ -59,10 +78,17 @@ export function AboutPopover() {
           setOpen(!open);
         }}
         aria-label={m.about.title}
-        title={m.about.title}
-        className="w-6 h-6 rounded-full border border-slate-700 text-slate-400 hover:text-slate-200 hover:border-slate-500 text-xs flex items-center justify-center transition-colors"
+        title={hasUpdate ? `${m.about.title} (새 버전 있음)` : m.about.title}
+        className="relative w-6 h-6 rounded-full border border-slate-700 text-slate-400 hover:text-slate-200 hover:border-slate-500 text-xs flex items-center justify-center transition-colors"
       >
         i
+        {hasUpdate && (
+          <span
+            data-testid="nav-about-update-dot"
+            className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-red-500 ring-2 ring-slate-950"
+            aria-hidden="true"
+          />
+        )}
       </button>
       {open && (
         <div
@@ -99,7 +125,7 @@ export function AboutPopover() {
                   {shortSha(data.buildSha)}
                 </dd>
               </dl>
-              {CLIENT_BUILD_SHA !== data.buildSha && CLIENT_BUILD_SHA !== "dev" && (
+              {hasUpdate && (
                 <div className="mt-3 pt-2 border-t border-slate-700">
                   <p className="text-amber-400 text-[11px] mb-2">
                     이전 버전을 보고 있어요. 새로고침하면 최신 화면으로 갱신됩니다.

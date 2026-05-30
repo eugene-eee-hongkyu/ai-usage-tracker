@@ -28,6 +28,7 @@ import type { DrilldownPeriod } from "@/components/score-drilldown";
 import { UsageHero } from "@/components/usage-hero";
 import { PrivacyBanner } from "@/components/privacy-banner";
 import { StaleSyncBanner } from "@/components/stale-sync-banner";
+import { CliUpdateBanner } from "@/components/cli-update-banner";
 import { track, EVENTS } from "@/lib/analytics/mixpanel";
 import { useTrackScrollDepth } from "@/lib/analytics/use-track-scroll-depth";
 import { useTrackSectionDwell } from "@/lib/analytics/use-track-section-dwell";
@@ -187,6 +188,11 @@ interface DashboardData {
   supportsMultiProvider?: boolean;
   hasCodexData?: boolean;
   hasClaudeData?: boolean;
+  // 2026-05-30: CLI 업데이트 권장 — selectedDevice 의 cliVersion 이 PINNED 미만.
+  // 본인 dashboard 상단에 CliUpdateBanner 로 표시. viewOnly/isLocalMode 면 표시 X.
+  cliOutdated?: boolean;
+  cliCurrentVersion?: string | null;
+  cliRecommendedVersion?: string;
   // Phase 3a — Codex 추론 비중 (reasoningOutputTokens ÷ outputTokens × 100). Claude 면 null.
   reasoningRatio?: number | null;
   // Phase 3a-2 — Codex 모델 fallback (isFallback=true) 발생 카운트. Claude 면 0.
@@ -2225,6 +2231,13 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
       <NavComponent />
       <StaleSyncBanner
         lastSyncedAt={data.user.lastSyncedAt}
+        hidden={viewOnly || isLocalMode === true}
+      />
+      <CliUpdateBanner
+        outdated={data.cliOutdated ?? false}
+        currentVersion={data.cliCurrentVersion ?? null}
+        recommendedVersion={data.cliRecommendedVersion ?? ""}
+        platform={data.devices?.find((d) => d.tokenId === data.selectedDeviceId)?.platform ?? null}
         hidden={viewOnly || isLocalMode === true}
       />
 

@@ -16,6 +16,20 @@ import {
   type PlanTier,
 } from "@/lib/plan-health";
 import { getCcusageDaily } from "@/lib/ccusage-row";
+import { PINNED } from "@/lib/pinned-versions";
+
+// device.metadata.cliVersion vs PINNED.USAGE_TRACKER_RECOMMENDED 비교.
+// 둘 다 "major.minor.patch" 형태 가정. parse 실패 시 0 으로 fallback (보수적 — 가장 낮은 버전 취급).
+// 동일 / 미만 / 초과 → -1 / 0 / +1.
+function compareSemver(a: string, b: string): number {
+  const pa = a.split(".").map((n) => parseInt(n, 10) || 0);
+  const pb = b.split(".").map((n) => parseInt(n, 10) || 0);
+  for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+    const diff = (pa[i] ?? 0) - (pb[i] ?? 0);
+    if (diff !== 0) return diff > 0 ? 1 : -1;
+  }
+  return 0;
+}
 
 type Period = "today" | "month" | "8days" | "30days" | "all";
 
@@ -237,6 +251,14 @@ export async function GET(req: NextRequest) {
     const [major, minor] = v.split(".").map((n) => parseInt(n, 10) || 0);
     return major > 0 || (major === 0 && minor >= 3);
   })();
+  // CLI 업데이트 권장 — selectedDevice 의 cliVersion 이 PINNED 미만이면 true.
+  // cliVersion 모르면 (null) false — 옛 CLI 가 metadata 안 보낼 수 있고, 이 경우
+  // 배너로 채근하기보다 침묵이 안전 (다른 신호 — Codex 미수집 안내 등 — 이 안내함).
+  const cliRecommendedVersion = PINNED.USAGE_TRACKER_RECOMMENDED;
+  const cliCurrentVersion = selectedDevice?.cliVersion ?? null;
+  const cliOutdated = cliCurrentVersion
+    ? compareSemver(cliCurrentVersion, cliRecommendedVersion) < 0
+    : false;
   // hasCodexData / hasClaudeData = "의미 있는 provider 별 사용 데이터 존재" —
   // 단순 row 존재가 아니라 실제 사용 (cost > 0 또는 sessions > 0) 가드.
   // 새 CLI 가 안 쓰는 provider 에도 빈 응답 (cost=0, sessions=0) 을 row 로 저장하므로
@@ -351,6 +373,9 @@ export async function GET(req: NextRequest) {
       supportsMultiProvider,
       hasCodexData,
       hasClaudeData,
+      cliOutdated,
+      cliCurrentVersion,
+      cliRecommendedVersion,
     });
   }
 
@@ -1314,6 +1339,9 @@ export async function GET(req: NextRequest) {
     supportsMultiProvider,
     hasCodexData,
     hasClaudeData,
+    cliOutdated,
+    cliCurrentVersion,
+    cliRecommendedVersion,
     reasoningRatio,
     codexFallbackCount,
   });
