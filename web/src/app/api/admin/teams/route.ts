@@ -15,11 +15,11 @@
 // LOCAL_MODE 차단 (.dmg 는 single-tenant single-user).
 
 import { NextRequest, NextResponse } from "next/server";
-import { db, teams, teamMembers, invitations, users, IS_LOCAL_MODE } from "@/lib/db";
+import { db, teams, teamMembers, invitations, users, userSnapshots, IS_LOCAL_MODE } from "@/lib/db";
 import { requireOwner } from "@/lib/auth-guards";
 import { writeAudit } from "@/lib/audit";
 import { sendInvitation } from "@/lib/email";
-import { eq, and, isNull, inArray } from "drizzle-orm";
+import { eq, and, isNull, inArray, or, gt } from "drizzle-orm";
 import crypto from "crypto";
 
 export const dynamic = "force-dynamic";
@@ -215,8 +215,24 @@ export async function GET(req: NextRequest) {
     .from(teams)
     .orderBy(teams.id);
 
+  // 시스템 전체에서 provider 별 의미 있는 사용 1+ 존재 여부. all-teams 페이지의
+  // provider segmented control 의 disabled chip 분기에 사용.
+  async function checkProviderUsage(prov: "claude" | "codex"): Promise<boolean> {
+    const r = await db
+      .select({ id: userSnapshots.id })
+      .from(userSnapshots)
+      .where(and(
+        eq(userSnapshots.provider, prov),
+        or(gt(userSnapshots.totalCost, 0), gt(userSnapshots.sessionsCount, 0)),
+      ))
+      .limit(1);
+    return r.length > 0;
+  }
+  const hasCodexData = await checkProviderUsage("codex");
+  const hasClaudeData = await checkProviderUsage("claude");
+
   if (!includeMembers) {
-    return NextResponse.json({ teams: rows });
+    return NextResponse.json({ teams: rows, hasCodexData, hasClaudeData });
   }
 
   // 멤버 + 멤버 수 포함. team_members JOIN users.
@@ -255,5 +271,5 @@ export async function GET(req: NextRequest) {
     };
   });
 
-  return NextResponse.json({ teams: teamsWithMembers });
+  return NextResponse.json({ teams: teamsWithMembers, hasCodexData, hasClaudeData });
 }

@@ -267,16 +267,21 @@ export async function GET(req: NextRequest) {
     return collator.compare(a.name, b.name);
   });
 
-  // hasCodexData = 전체 사용자 중 의미 있는 Codex 사용량 1+. UI Tabs 분기.
-  const codexCheck = await db
-    .select({ id: userSnapshots.id })
-    .from(userSnapshots)
-    .where(and(
-      eq(userSnapshots.provider, "codex"),
-      or(gt(userSnapshots.totalCost, 0), gt(userSnapshots.sessionsCount, 0)),
-    ))
-    .limit(1);
-  const hasCodexData = codexCheck.length > 0;
+  // hasCodexData / hasClaudeData = 전체 사용자 중 provider 별 의미 있는 사용 1+.
+  // provider segmented control 의 disabled chip 분기에 사용.
+  async function checkProviderUsage(prov: "claude" | "codex"): Promise<boolean> {
+    const rows = await db
+      .select({ id: userSnapshots.id })
+      .from(userSnapshots)
+      .where(and(
+        eq(userSnapshots.provider, prov),
+        or(gt(userSnapshots.totalCost, 0), gt(userSnapshots.sessionsCount, 0)),
+      ))
+      .limit(1);
+    return rows.length > 0;
+  }
+  const hasCodexData = await checkProviderUsage("codex");
+  const hasClaudeData = await checkProviderUsage("claude");
 
-  return NextResponse.json({ users: cards, hasCodexData });
+  return NextResponse.json({ users: cards, hasCodexData, hasClaudeData });
 }

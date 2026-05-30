@@ -7,6 +7,8 @@ export const dynamic = "force-dynamic";
 
 import { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
+import { ProviderSegmentedControl } from "@/components/provider-segmented-control";
+import { useProviderPreference } from "@/lib/use-provider-preference";
 
 interface CardData {
   userId: number;
@@ -108,9 +110,10 @@ export default function PlatformAdminAllUsersPage() {
   const [users, setUsers] = useState<CardData[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [switchingTeamId, setSwitchingTeamId] = useState<number | null>(null);
-  // Multi-provider Phase 2: Provider Tabs.
-  const [provider, setProvider] = useState<"claude" | "codex">("claude");
+  // Multi-provider — 마지막 선택 localStorage 기억 (dashboard / team / ranking 과 공유).
+  const [provider, setProvider] = useProviderPreference();
   const [hasCodexData, setHasCodexData] = useState(false);
+  const [hasClaudeData, setHasClaudeData] = useState(true);
 
   useEffect(() => {
     fetch(`/api/platform-admin/all-users${provider === "codex" ? "?provider=codex" : ""}`)
@@ -118,10 +121,12 @@ export default function PlatformAdminAllUsersPage() {
         if (!r.ok) throw new Error(String(r.status));
         return r.json();
       })
-      .then((d: { users?: CardData[]; error?: string; hasCodexData?: boolean }) => {
+      .then((d: { users?: CardData[]; error?: string; hasCodexData?: boolean; hasClaudeData?: boolean }) => {
         if (d.error) { setError(d.error); return; }
         setUsers(d.users ?? []);
-        if (d.hasCodexData) setHasCodexData(true);
+        // 토글 후엔 새 응답의 값으로 갱신 — 시스템 전체 scope 이므로 매 fetch 갱신해도 안정적.
+        setHasCodexData(d.hasCodexData ?? false);
+        setHasClaudeData(d.hasClaudeData ?? true);
       })
       .catch((e) => setError(String(e)));
   }, [provider]);
@@ -164,7 +169,23 @@ export default function PlatformAdminAllUsersPage() {
     );
   }
   if (users === null) {
-    return <div className="text-sm text-neutral-500 font-mono">loading…</div>;
+    // loading 중에도 provider control 은 유지 — 토글 즉시 setUsers(null) 분기로 들어와도
+    // 사용자가 다시 토글 가능. 시스템 전체 scope 라 hasFlags 는 직전 응답 값 그대로 사용.
+    return (
+      <div className="space-y-4">
+        <ProviderSegmentedControl
+          value={provider}
+          onChange={(p) => {
+            if (p !== provider) setUsers(null);
+            setProvider(p);
+          }}
+          hasClaudeData={hasClaudeData}
+          hasCodexData={hasCodexData}
+          testIdPrefix="all-users-provider"
+        />
+        <div className="text-sm text-neutral-500 font-mono">loading…</div>
+      </div>
+    );
   }
 
   const activeCount = users.filter((u) => (u.today?.tokens ?? 0) > 0).length;
@@ -183,24 +204,17 @@ export default function PlatformAdminAllUsersPage() {
         </p>
       </header>
 
-      {/* Multi-provider Phase 2: Provider Tabs (전체 사용자 중 의미 있는 Codex 1+ 일 때만) */}
-      {hasCodexData && (
-        <div className="flex gap-1.5 items-center">
-          <span className="text-[10px] font-mono text-neutral-600 uppercase tracking-wider mr-1">provider:</span>
-          {(["claude", "codex"] as const).map((prov) => (
-            <button
-              key={prov}
-              data-testid={`all-users-provider-${prov}`}
-              onClick={() => setProvider(prov)}
-              className={`text-xs font-mono border rounded px-3 py-1 transition-colors ${
-                provider === prov
-                  ? "bg-indigo-600 text-white border-indigo-500"
-                  : "bg-neutral-800 text-neutral-300 border-neutral-700 hover:border-neutral-500"
-              }`}
-            >{prov === "claude" ? "Claude Code" : "Codex"}</button>
-          ))}
-        </div>
-      )}
+      {/* Provider segmented control — 항상 표시. 토글 시 setUsers(null) 로 옛 응답 폐기 (잔상 방지). */}
+      <ProviderSegmentedControl
+        value={provider}
+        onChange={(p) => {
+          if (p !== provider) setUsers(null);
+          setProvider(p);
+        }}
+        hasClaudeData={hasClaudeData}
+        hasCodexData={hasCodexData}
+        testIdPrefix="all-users-provider"
+      />
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {users.map((u) => (

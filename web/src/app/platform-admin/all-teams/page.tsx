@@ -10,6 +10,8 @@ export const dynamic = "force-dynamic";
 import { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
 import { TeamComparisonRow, type TeamRowData } from "@/components/team-comparison-row";
+import { ProviderSegmentedControl } from "@/components/provider-segmented-control";
+import { useProviderPreference } from "@/lib/use-provider-preference";
 
 type Period = "today" | "8days" | "month" | "30days" | "all";
 
@@ -37,9 +39,14 @@ export default function PlatformAdminAllTeamsPage() {
   const myViewAsTeamId =
     (session?.user as { viewAsTeamId?: number | null } | undefined)?.viewAsTeamId ?? null;
   const [period, setPeriod] = useState<Period>(DEFAULT_PERIOD);
+  // Multi-provider — 마지막 선택 localStorage 기억 (전 화면 공유).
+  const [provider, setProvider] = useProviderPreference();
   const [teams, setTeams] = useState<TeamFetched[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [navigatingTeamId, setNavigatingTeamId] = useState<number | null>(null);
+  // 시스템 전체 has 플래그 — /api/admin/teams GET 응답에서 받음.
+  const [hasCodexData, setHasCodexData] = useState(false);
+  const [hasClaudeData, setHasClaudeData] = useState(true);
 
   // 팀명 클릭 → 해당 팀 view-as 진입 (본인 팀이면 view-as exit) → /team 으로 full nav.
   // /platform-admin/all-users 의 handleCardClick 패턴 동일 (route 만 /team).
@@ -79,13 +86,19 @@ export default function PlatformAdminAllTeamsPage() {
         if (!cancelled) setLoadError(`팀 목록 로드 실패 (${listRes?.status ?? "network"})`);
         return;
       }
-      const listJson = (await listRes.json()) as { teams: TeamListItem[] };
+      const listJson = (await listRes.json()) as { teams: TeamListItem[]; hasCodexData?: boolean; hasClaudeData?: boolean };
       const active = listJson.teams.filter((t) => !t.deletedAt && t.type !== "personal");
+      if (!cancelled) {
+        setHasCodexData(listJson.hasCodexData ?? false);
+        setHasClaudeData(listJson.hasClaudeData ?? true);
+      }
 
       const fetched: TeamFetched[] = await Promise.all(
         active.map(async (t) => {
           try {
-            const r = await fetch(`/api/team?teamId=${t.id}&period=${period}`);
+            // provider query 추가 — 옛 코드는 항상 claude scope 만 fetch 했음. Codex 사용 팀이
+            // 있어도 이 화면에서 안 보이던 버그 수정.
+            const r = await fetch(`/api/team?teamId=${t.id}&period=${period}${provider === "codex" ? "&provider=codex" : ""}`);
             if (!r.ok) return { teamId: t.id, teamName: t.name, data: null, error: String(r.status) };
             const d = (await r.json()) as TeamRowData & { error?: string; teamName?: string };
             if (d.error) return { teamId: t.id, teamName: t.name, data: null, error: d.error };
@@ -116,7 +129,7 @@ export default function PlatformAdminAllTeamsPage() {
     return () => {
       cancelled = true;
     };
-  }, [period]);
+  }, [period, provider]);
 
   return (
     <div className="space-y-6">
@@ -129,6 +142,18 @@ export default function PlatformAdminAllTeamsPage() {
         </div>
         <PeriodSwitcher period={period} onChange={setPeriod} />
       </header>
+      {/* Provider segmented control — 항상 표시. 옛 코드는 provider 자체가 없어 항상 claude scope.
+          Codex 사용 팀 health check 누락 버그 수정. 토글 시 setTeams(null) 로 옛 응답 폐기. */}
+      <ProviderSegmentedControl
+        value={provider}
+        onChange={(p) => {
+          if (p !== provider) setTeams(null);
+          setProvider(p);
+        }}
+        hasClaudeData={hasClaudeData}
+        hasCodexData={hasCodexData}
+        testIdPrefix="all-teams-provider"
+      />
 
       {loadError && (
         <div className="text-sm text-rose-400 font-mono">Failed to load: {loadError}</div>

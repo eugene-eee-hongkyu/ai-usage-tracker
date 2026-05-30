@@ -35,19 +35,24 @@ export async function GET(req: NextRequest) {
     ORDER BY us.user_id, us.updated_at DESC NULLS LAST
   `);
 
-  // hasCodexData = personal 사용자 중 의미 있는 Codex 1+. UI Tabs 분기.
-  const codexCheck = await db.execute(sql`
-    SELECT 1
-    FROM user_snapshots us
-    JOIN users u ON u.id = us.user_id
-    WHERE u.personal = true
-      AND u.deleted_at IS NULL
-      AND u.suspended_at IS NULL
-      AND us.provider = 'codex'
-      AND (us.total_cost > 0 OR us.sessions_count > 0)
-    LIMIT 1
-  `);
-  const hasCodexData = ((codexCheck.rows as unknown[] | undefined)?.length ?? 0) > 0;
+  // hasCodexData / hasClaudeData = personal 사용자 중 provider 별 의미 있는 사용 1+.
+  // provider segmented control 의 disabled chip 분기에 사용.
+  async function checkProviderUsage(prov: "claude" | "codex"): Promise<boolean> {
+    const rows = await db.execute(sql`
+      SELECT 1
+      FROM user_snapshots us
+      JOIN users u ON u.id = us.user_id
+      WHERE u.personal = true
+        AND u.deleted_at IS NULL
+        AND u.suspended_at IS NULL
+        AND us.provider = ${prov}
+        AND (us.total_cost > 0 OR us.sessions_count > 0)
+      LIMIT 1
+    `);
+    return ((rows.rows as unknown[] | undefined)?.length ?? 0) > 0;
+  }
+  const hasCodexData = await checkProviderUsage("codex");
+  const hasClaudeData = await checkProviderUsage("claude");
 
   const thirtyAgo = new Date();
   thirtyAgo.setDate(thirtyAgo.getDate() - 30);
@@ -106,7 +111,7 @@ export async function GET(req: NextRequest) {
 
   result.sort((a, b) => b.cost30 - a.cost30);
 
-  return NextResponse.json({ users: result, hasCodexData });
+  return NextResponse.json({ users: result, hasCodexData, hasClaudeData });
 }
 
 export async function PATCH(req: NextRequest) {

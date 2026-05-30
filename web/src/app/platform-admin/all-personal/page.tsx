@@ -5,6 +5,8 @@
 export const dynamic = "force-dynamic";
 
 import { useEffect, useState } from "react";
+import { ProviderSegmentedControl } from "@/components/provider-segmented-control";
+import { useProviderPreference } from "@/lib/use-provider-preference";
 
 interface PersonalUser {
   userId: number;
@@ -32,9 +34,10 @@ export default function AllPersonalPage() {
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [toggling, setToggling] = useState<number | null>(null);
-  // Multi-provider Phase 2: Provider Tabs.
-  const [provider, setProvider] = useState<"claude" | "codex">("claude");
+  // Multi-provider — 마지막 선택 localStorage 기억 (전 화면 공유).
+  const [provider, setProvider] = useProviderPreference();
   const [hasCodexData, setHasCodexData] = useState(false);
+  const [hasClaudeData, setHasClaudeData] = useState(true);
 
   function load(q: string, prov: "claude" | "codex") {
     const params = new URLSearchParams();
@@ -46,9 +49,10 @@ export default function AllPersonalPage() {
         if (!r.ok) throw new Error(String(r.status));
         return r.json();
       })
-      .then((d: { users: PersonalUser[]; hasCodexData?: boolean }) => {
+      .then((d: { users: PersonalUser[]; hasCodexData?: boolean; hasClaudeData?: boolean }) => {
         setUsers(d.users);
-        if (d.hasCodexData) setHasCodexData(true);
+        setHasCodexData(d.hasCodexData ?? false);
+        setHasClaudeData(d.hasClaudeData ?? true);
       })
       .catch((e) => setError(String(e)));
   }
@@ -90,24 +94,17 @@ export default function AllPersonalPage() {
         </p>
       </header>
 
-      {/* Multi-provider Phase 2: Provider Tabs (personal 사용자 중 의미 있는 Codex 1+ 일 때만) */}
-      {hasCodexData && (
-        <div className="flex gap-1.5 items-center">
-          <span className="text-[10px] font-mono text-neutral-600 uppercase tracking-wider mr-1">provider:</span>
-          {(["claude", "codex"] as const).map((prov) => (
-            <button
-              key={prov}
-              data-testid={`all-personal-provider-${prov}`}
-              onClick={() => setProvider(prov)}
-              className={`text-xs font-mono border rounded px-3 py-1 transition-colors ${
-                provider === prov
-                  ? "bg-indigo-600 text-white border-indigo-500"
-                  : "bg-neutral-800 text-neutral-300 border-neutral-700 hover:border-neutral-500"
-              }`}
-            >{prov === "claude" ? "Claude Code" : "Codex"}</button>
-          ))}
-        </div>
-      )}
+      {/* Provider segmented control — 항상 표시. 토글 시 setUsers(null) 로 옛 응답 폐기. */}
+      <ProviderSegmentedControl
+        value={provider}
+        onChange={(p) => {
+          if (p !== provider) setUsers(null);
+          setProvider(p);
+        }}
+        hasClaudeData={hasClaudeData}
+        hasCodexData={hasCodexData}
+        testIdPrefix="all-personal-provider"
+      />
 
       {/* Search */}
       <div className="flex gap-2">
