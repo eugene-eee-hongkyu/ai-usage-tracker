@@ -101,11 +101,18 @@ function getPeriodData(raw: unknown, period: string): RawPeriodData {
   if (typeof raw !== "object" || raw === null) return {};
   const r = raw as Record<string, unknown>;
   // 8days uses codeburn's rolling-week storage key (rawJson.week).
+  // CLI partial submit 케이스 (oreo 2026-05-30: claude/month·30days·all
+  // codeburn 호출 실패 → 그 키들이 raw_json 에서 누락된 채 overwrite) 방어:
+  // 요청 period 키 없으면 단계적 fallback (all → week → today). 정확값은 아니지만
+  // 비어 보이는 것보다 일부라도 노출. partial ingest 자체는 CLI/codeburn 측 진단 별도.
   if (period === "8days") {
-    return ((r.week as RawPeriodData | undefined) ?? {}) as RawPeriodData;
+    return ((r.week as RawPeriodData | undefined)
+      ?? (r.all as RawPeriodData | undefined)
+      ?? (r.today as RawPeriodData | undefined)
+      ?? {}) as RawPeriodData;
   }
-  if ("all" in r || "today" in r) {
-    return (r[period] ?? r.all ?? {}) as RawPeriodData;
+  if ("all" in r || "today" in r || "week" in r) {
+    return (r[period] ?? r.all ?? r.week ?? r.today ?? {}) as RawPeriodData;
   }
   return r as RawPeriodData;
 }
