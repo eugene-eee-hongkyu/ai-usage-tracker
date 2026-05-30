@@ -373,10 +373,26 @@ async function main() {
       // body schema (신): { claude: { today, week, month, 30days, all, ccusageDaily, ccusageBlocks },
       //                    codex: { ... }, envInfo, ccusageMissing? }
       // 서버 run-ingest 가 양쪽 분기 처리. 옛 형태 (provider key 없음) 도 backward compat 으로 claude 처리.
-      report = {
-        claude: claudeResult.providerReport,
-        codex: codexResult.providerReport,
-      };
+      //
+      // 2026-05-30 (oreo 회귀 대응, C): codeburn PERIODS 5 개 중 1+ 실패한 provider 는
+      // body 에서 통째로 제외 (key 자체 생략). 서버는 그 provider 의 raw_json 을 안 받아
+      // 기존 풀데이터 유지 (다음 풀 ingest 까지 partial overwrite 차단). 양쪽 모두
+      // partial fail 면 ingest 자체 skip (위 hasAnyClaude/hasAnyCodex 가드 외 추가 가드).
+      report = {};
+      if (claudeResult.failPeriods.length === 0) {
+        report.claude = claudeResult.providerReport;
+      } else {
+        log(`SKIP claude submit — partial codeburn fail: ${claudeResult.failPeriods.join(", ")}`);
+      }
+      if (codexResult.failPeriods.length === 0) {
+        report.codex = codexResult.providerReport;
+      } else {
+        log(`SKIP codex submit — partial codeburn fail: ${codexResult.failPeriods.join(", ")}`);
+      }
+      if (!report.claude && !report.codex) {
+        log(`ERROR: both providers partial fail — nothing to submit`);
+        return;
+      }
       // 양쪽 모두 missing 일 때만 ccusageMissing 플래그 — 한쪽만 missing 은 정상 (Codex 안 쓰는 사용자).
       if (ccusageStatus.claude === "missing" && ccusageStatus.codex === "missing") {
         report.ccusageMissing = true;

@@ -108,7 +108,7 @@ provider 토글은 dashboard / team / ranking 간 공유 (useProviderPreference,
 | 증상 | 1차 의심 |
 |---|---|
 | 멤버가 어제까지 사용했는데 provider chip disabled + "사용 기록 없음" modal | hasClaudeData / hasCodexData 가 user_snapshots 만 보고 period_snapshots 누적 가드 누락 (2026-05-30 fix 회귀) |
-| 특정 멤버의 이번달 / 30일 / 전체 차트가 0 (8일은 정상) | CLI partial ingest — `codeburn --provider X --period {month,30days,all}` 호출 실패 → 그 키들이 raw_json 에서 누락. 서버는 raw_json 전체 overwrite 하므로 다음 풀 ingest 까지 partial 만 남음. 2026-05-30 fix 로 fallback (r[period] → r.all → r.week → r.today) 추가 |
+| 특정 멤버의 이번달 / 30일 / 전체 차트가 0 (8일은 정상) | CLI partial ingest — `codeburn --provider X --period {month,30days,all}` 호출 실패 → 그 키들이 raw_json 에서 누락. 서버는 raw_json 전체 overwrite 하므로 다음 풀 ingest 까지 partial 만 남음. 2026-05-30 fix: A (UI fallback) + C (CLI submit.mjs v0.3.1 — partial codeburn 실패 시 그 provider key 자체 안 보냄, 서버 raw_json 보존). 사용자가 CLI 업데이트 후 효과 |
 | 영진님 device line 1 개로 합침 | M6f token_id 분기 (user_snapshots.token_id 컬럼 사용 회귀) |
 | 영진님 team badge "iskra" 가 아닌 z21labs | auto-join 도메인 매핑 회귀 (teams.auto_join_domains) |
 | oreo Codex 경고 사라짐 | efficiencyBlock 의 경고 트리거 조건 변경 또는 oreo 데이터 분포 변화 |
