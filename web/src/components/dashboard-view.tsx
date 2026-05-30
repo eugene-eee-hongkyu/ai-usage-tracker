@@ -2642,7 +2642,11 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
             둘 다. 팀 데이터 없거나 매칭 row 없으면 히트맵만 full-width
             fallback. Efficiency 카드는 자세히 보기로 이동 (사용자 안 본다). */}
         {(() => {
-          const targetName = viewOnly ? data.user.name : session?.user?.name;
+          // 양쪽 viewOnly / 자기 화면 모두 DB users.name 사용 — /api/team 의
+          // byEfficiency[].name 도 DB 라 동일 source. session.user.name 은 OAuth
+          // provider name 이 JWT 에 박혀 DB 와 drift 가능 (NextAuth session callback
+          // 이 user.name 미갱신) → me 매칭 실패로 카드가 null 반환되는 회귀 방지.
+          const targetName = data.user.name;
           if (teamRankData && targetName) {
             return (
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
