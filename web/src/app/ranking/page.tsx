@@ -10,9 +10,9 @@ import { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { Nav } from "@/components/nav";
-import { useMessages } from "@/lib/use-i18n";
 import { track, EVENTS } from "@/lib/analytics/mixpanel";
 import { useTrackScrollDepth } from "@/lib/analytics/use-track-scroll-depth";
+import { ProviderSegmentedControl } from "@/components/provider-segmented-control";
 
 type Metric = "cost" | "tokens" | "cacheHit" | "streak" | "saving";
 
@@ -37,6 +37,7 @@ interface RankingResponse {
   myRank: RankedUser | null;
   period: string;
   hasCodexData?: boolean;
+  hasClaudeData?: boolean;
 }
 
 // 비용은 wide (전체 width) 강조. 그 아래 2x2 grid 에 나머지 4개.
@@ -89,7 +90,6 @@ const ACCENT_BY_METRIC: Record<Metric, { bg: string; border: string; text: strin
 export default function RankingPage() {
   const { status } = useSession();
   const router = useRouter();
-  const { m } = useMessages();
   const [byMetric, setByMetric] = useState<Partial<Record<Metric, RankingResponse>>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -141,35 +141,22 @@ export default function RankingPage() {
   return (
     <div className="min-h-screen bg-neutral-950">
       <Nav />
-      <div className="max-w-6xl mx-auto px-4 py-6 space-y-6">
-        <header>
-          <h1 className="text-lg font-bold text-slate-100">{m.nav.ranking ?? "랭킹"}</h1>
-          <p className="text-xs text-slate-500 mt-1">
-            최근 30일 (UTC) 기준 전체 참여자 순위. 이름은 익명 처리됩니다. 동점은 같은 순위.
-            {totalParticipants > 0 && (
-              <span className="text-slate-400 ml-2">전체 {totalParticipants}명 참여</span>
-            )}
-          </p>
-        </header>
-
-        {/* Multi-provider Phase 2: Provider Tabs. 전체 랭킹 scope 안에 의미 있는 Codex 사용자 1+ 일 때만. */}
-        {byMetric.cost?.hasCodexData && (
-          <div className="flex gap-1.5 items-center">
-            <span className="text-[10px] font-mono text-neutral-600 uppercase tracking-wider mr-1">provider:</span>
-            {(["claude", "codex"] as const).map((prov) => (
-              <button
-                key={prov}
-                data-testid={`ranking-provider-${prov}`}
-                onClick={() => setProvider(prov)}
-                className={`text-xs font-mono border rounded px-3 py-1 transition-colors ${
-                  provider === prov
-                    ? "bg-indigo-600 text-white border-indigo-500"
-                    : "bg-neutral-800 text-neutral-300 border-neutral-700 hover:border-neutral-500"
-                }`}
-              >{prov === "claude" ? "Claude Code" : "Codex"}</button>
-            ))}
-          </div>
-        )}
+      <div className="max-w-6xl mx-auto px-4 py-6 space-y-4">
+        {/* 2026-05-30 reorder: dashboard / team 과 동일 — provider segmented control 이 최상단.
+            "랭킹" h1 제거 (사용자 피드백: nav 가 이미 [랭킹] 활성). 부제는 컨텍스트 (30일 / 익명 / 참여자 수) 라 유지. */}
+        <ProviderSegmentedControl
+          value={provider}
+          onChange={setProvider}
+          hasClaudeData={byMetric.cost?.hasClaudeData ?? true}
+          hasCodexData={byMetric.cost?.hasCodexData ?? false}
+          testIdPrefix="ranking-provider"
+        />
+        <p className="text-xs text-slate-500">
+          최근 30일 (UTC) 기준 전체 참여자 순위. 이름은 익명 처리됩니다. 동점은 같은 순위.
+          {totalParticipants > 0 && (
+            <span className="text-slate-400 ml-2">전체 {totalParticipants}명 참여</span>
+          )}
+        </p>
 
         {error && <p className="text-sm text-rose-400 font-mono">로드 실패: {error}</p>}
         {loading && <p className="text-sm text-neutral-500 font-mono">loading…</p>}

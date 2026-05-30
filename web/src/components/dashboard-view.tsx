@@ -29,6 +29,7 @@ import { UsageHero } from "@/components/usage-hero";
 import { PrivacyBanner } from "@/components/privacy-banner";
 import { StaleSyncBanner } from "@/components/stale-sync-banner";
 import { CliUpdateBanner } from "@/components/cli-update-banner";
+import { ProviderSegmentedControl } from "@/components/provider-segmented-control";
 import { track, EVENTS } from "@/lib/analytics/mixpanel";
 import { useTrackScrollDepth } from "@/lib/analytics/use-track-scroll-depth";
 import { useTrackSectionDwell } from "@/lib/analytics/use-track-section-dwell";
@@ -1006,8 +1007,6 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
   const [deviceId, setDeviceId] = useState<number | null>(null);
   // Multi-provider (2026-05-29 M): Claude / Codex 분리 탭. default = claude (대다수).
   const [provider, setProvider] = useState<"claude" | "codex">("claude");
-  // 2026-05-30 reorder: 데이터 없는 provider 클릭 시 안내 dialog. null = 닫힘.
-  const [disabledProviderDialog, setDisabledProviderDialog] = useState<"claude" | "codex" | null>(null);
 
   const apiUrl = (p: Period, wOff: number, mOff: number, dOff: number, devId: number | null, prov: "claude" | "codex") => {
     const params = new URLSearchParams({ period: p });
@@ -2246,47 +2245,18 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
           데이터 없는 쪽은 disabled chip + 클릭 시 dialog 안내. device 는 2대+ 일 때만.
           period 는 가장 자주 쓰는 컨트롤이라 메인 강조 (큰 탭) 유지. */}
       <div className="border-b border-neutral-800">
-        {/* Provider segmented control — 항상 표시 */}
-        {(() => {
-          const hasClaude = data.hasClaudeData ?? true; // 옛 CLI (필드 없음) 는 모두 claude provider 라 true
-          const hasCodex = data.hasCodexData ?? false;
-          const supportsMP = data.supportsMultiProvider ?? false;
-          const providers: Array<{ key: "claude" | "codex"; label: string; hasData: boolean }> = [
-            { key: "claude", label: "Claude Code", hasData: hasClaude },
-            { key: "codex", label: "Codex", hasData: hasCodex && supportsMP },
-          ];
-          return (
-            <div className="max-w-6xl mx-auto px-4 pt-3 pb-2 flex gap-2 items-center">
-              <span className="text-[10px] font-mono text-neutral-600 uppercase tracking-wider">provider</span>
-              <div className="inline-flex rounded-md border border-neutral-700 bg-neutral-900 p-0.5">
-                {providers.map((prov) => {
-                  const selected = provider === prov.key;
-                  const disabled = !prov.hasData;
-                  return (
-                    <button
-                      key={prov.key}
-                      data-testid={`dash-provider-${prov.key}`}
-                      onClick={() => {
-                        if (disabled) {
-                          setDisabledProviderDialog(prov.key);
-                        } else {
-                          setProvider(prov.key);
-                        }
-                      }}
-                      className={`text-xs font-mono rounded px-3 py-1 transition-colors ${
-                        selected && !disabled
-                          ? "bg-indigo-600 text-white"
-                          : disabled
-                            ? "text-neutral-600 hover:text-neutral-400 cursor-help"
-                            : "text-neutral-300 hover:text-neutral-100"
-                      }`}
-                    >{prov.label}</button>
-                  );
-                })}
-              </div>
-            </div>
-          );
-        })()}
+        {/* Provider segmented control — 항상 표시. supportsMultiProvider=false 면
+            Codex 데이터가 있어도 disabled (옛 CLI 라 분리 집계 X) → dialog 에서 CLI 업데이트 안내. */}
+        <div className="max-w-6xl mx-auto px-4 pt-3 pb-2">
+          <ProviderSegmentedControl
+            value={provider}
+            onChange={setProvider}
+            hasClaudeData={data.hasClaudeData ?? true}
+            hasCodexData={(data.hasCodexData ?? false) && (data.supportsMultiProvider ?? false)}
+            codexNeedsCliUpdate={!(data.supportsMultiProvider ?? false)}
+            testIdPrefix="dash-provider"
+          />
+        </div>
         {/* Device chips — 2대+ 일 때만 표시. selectedDeviceId 와 동기화. */}
         {(data.devices?.length ?? 0) >= 2 && (
           <div className="max-w-6xl mx-auto px-4 pb-2 flex flex-wrap gap-1.5 items-center">
@@ -3047,86 +3017,6 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
           onClose={() => setShowTokenModal(false)}
         />
       )}
-      {disabledProviderDialog && (
-        <ProviderDisabledDialog
-          provider={disabledProviderDialog}
-          supportsMultiProvider={data.supportsMultiProvider ?? false}
-          onClose={() => setDisabledProviderDialog(null)}
-        />
-      )}
-    </div>
-  );
-}
-
-// 2026-05-30: provider segmented control 에서 disabled chip 클릭 시 표시.
-// "Claude Code 쓰면 자동으로 잡힙니다" 같은 짧은 안내. 작은 dialog 라 ModalShell 대신 inline.
-function ProviderDisabledDialog({
-  provider,
-  supportsMultiProvider,
-  onClose,
-}: {
-  provider: "claude" | "codex";
-  supportsMultiProvider: boolean;
-  onClose: () => void;
-}) {
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
-    window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
-  }, [onClose]);
-
-  const isClaude = provider === "claude";
-  const title = isClaude ? "Claude Code 사용 기록 없음" : "Codex 사용 기록 없음";
-  const needsCliUpdate = provider === "codex" && !supportsMultiProvider;
-
-  return (
-    <div
-      className="fixed inset-0 bg-black/70 z-50 flex items-start justify-center overflow-y-auto p-4"
-      onClick={onClose}
-      data-testid={`provider-disabled-dialog-${provider}`}
-    >
-      <div
-        className="bg-slate-900 border border-slate-700 rounded-xl w-full max-w-md my-16 shadow-2xl"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-800">
-          <h2 className="text-sm font-semibold text-slate-200">{title}</h2>
-          <button
-            onClick={onClose}
-            className="text-slate-500 hover:text-slate-300 text-xl leading-none w-7 h-7 flex items-center justify-center rounded hover:bg-slate-800 transition-colors"
-          >×</button>
-        </div>
-        <div className="px-5 py-5 space-y-3 text-sm text-slate-300 leading-relaxed">
-          {isClaude ? (
-            <>
-              <p>이 계정에는 아직 <span className="text-cyan-400 font-mono">Claude Code</span> 사용 기록이 없습니다.</p>
-              <p className="text-slate-400">
-                평소처럼 Claude Code 를 쓰시면 세션 종료마다 자동으로 사용량이 수집되어 여기에 표시됩니다.
-              </p>
-            </>
-          ) : needsCliUpdate ? (
-            <>
-              <p>이 계정에는 아직 <span className="text-cyan-400 font-mono">Codex</span> 사용 기록이 없습니다.</p>
-              <p className="text-slate-400">
-                현재 설치된 ai-usage-tracker CLI 버전은 Codex 사용량을 분리 집계하지 않습니다. CLI 를 최신 버전 (<span className="font-mono text-cyan-400">0.3.0+</span>) 으로 업데이트하면 Codex 사용량도 자동으로 잡힙니다.
-              </p>
-            </>
-          ) : (
-            <>
-              <p>이 계정에는 아직 <span className="text-cyan-400 font-mono">Codex</span> 사용 기록이 없습니다.</p>
-              <p className="text-slate-400">
-                Codex CLI 를 쓰시면 세션 종료마다 자동으로 사용량이 수집되어 여기에 표시됩니다. 별도 설정은 필요 없습니다.
-              </p>
-            </>
-          )}
-        </div>
-        <div className="px-5 py-3 border-t border-slate-800 flex justify-end">
-          <button
-            onClick={onClose}
-            className="text-xs font-mono bg-indigo-600 hover:bg-indigo-500 text-white rounded px-4 py-1.5 transition-colors"
-          >확인</button>
-        </div>
-      </div>
     </div>
   );
 }

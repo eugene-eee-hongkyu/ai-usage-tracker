@@ -22,6 +22,7 @@ import type { Messages } from "@/lib/i18n";
 import { track, EVENTS } from "@/lib/analytics/mixpanel";
 import { useTrackScrollDepth } from "@/lib/analytics/use-track-scroll-depth";
 import { useTrackSectionDwell } from "@/lib/analytics/use-track-section-dwell";
+import { ProviderSegmentedControl } from "@/components/provider-segmented-control";
 
 type Period = "today" | "8days" | "month" | "30days" | "all";
 type GradeLevel = "exemplary" | "good" | "moderate" | "insufficient" | "warning";
@@ -197,8 +198,10 @@ interface TeamData {
     dates: string[];
     byUser: Record<string, { name: string; counts: number[] }>;
   };
-  // Multi-provider Phase 2: 팀 멤버 중 의미 있는 Codex 사용 1+ → Provider Tabs 표시.
+  // Multi-provider Phase 2 (2026-05-30 reorder): 팀 멤버 중 provider 별 의미 있는 사용 1+.
+  // dashboard 와 동일 — provider segmented control 의 disabled chip 분기.
   hasCodexData?: boolean;
+  hasClaudeData?: boolean;
 }
 
 function AdminBadge() {
@@ -1606,9 +1609,19 @@ export function TeamView({ adminMode = false }: { adminMode?: boolean }) {
     <div className="min-h-screen bg-neutral-950 text-neutral-100">
       <NavComponent />
 
-      {/* Period Tabs + Provider Tabs (Multi-provider Phase 2) */}
+      {/* 2026-05-30 reorder: provider → period 위계 (dashboard 와 동일).
+          provider 는 항상 표시, 데이터 없는 쪽 disabled chip + dialog. */}
       <div className="border-b border-neutral-800">
-        <div className="max-w-6xl mx-auto px-4 pt-3 pb-2 flex gap-1">
+        <div className="max-w-6xl mx-auto px-4 pt-3 pb-2">
+          <ProviderSegmentedControl
+            value={provider}
+            onChange={setProvider}
+            hasClaudeData={data.hasClaudeData ?? true}
+            hasCodexData={data.hasCodexData ?? false}
+            testIdPrefix="team-provider"
+          />
+        </div>
+        <div className="max-w-6xl mx-auto px-4 pt-1 pb-2 flex gap-1">
           {(["today", "8days", "month", "30days", "all"] as Period[]).map((p) => (
             <button
               key={p}
@@ -1621,23 +1634,6 @@ export function TeamView({ adminMode = false }: { adminMode?: boolean }) {
             >{periodLabel(p as Period, t)}</button>
           ))}
         </div>
-        {data.hasCodexData && (
-          <div className="max-w-6xl mx-auto px-4 pb-2 flex gap-1.5 items-center">
-            <span className="text-[10px] font-mono text-neutral-600 uppercase tracking-wider mr-1">provider:</span>
-            {(["claude", "codex"] as const).map((prov) => (
-              <button
-                key={prov}
-                data-testid={`team-provider-${prov}`}
-                onClick={() => setProvider(prov)}
-                className={`text-xs font-mono border rounded px-3 py-1 transition-colors ${
-                  provider === prov
-                    ? "bg-indigo-600 text-white border-indigo-500"
-                    : "bg-neutral-800 text-neutral-300 border-neutral-700 hover:border-neutral-500"
-                }`}
-              >{prov === "claude" ? "Claude Code" : "Codex"}</button>
-            ))}
-          </div>
-        )}
       </div>
 
       {/* Team Summary Bar 는 기본 토글 안 첫 child 로 이동 — 사용자 피드백:

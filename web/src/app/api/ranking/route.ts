@@ -119,20 +119,25 @@ export async function GET(req: NextRequest) {
     ORDER BY us.user_id, us.updated_at DESC
   `);
 
-  // hasCodexData = 랭킹 scope (personal/active) 안에 의미 있는 Codex 데이터 1+. UI Tabs 분기.
-  const codexCheck = await db.execute(sql`
-    SELECT 1
-    FROM user_snapshots us
-    JOIN users u ON u.id = us.user_id
-    WHERE u.personal = true
-      AND u.ranking_hidden = false
-      AND u.deleted_at IS NULL
-      AND u.suspended_at IS NULL
-      AND us.provider = 'codex'
-      AND (us.total_cost > 0 OR us.sessions_count > 0)
-    LIMIT 1
-  `);
-  const hasCodexData = ((codexCheck.rows as unknown[] | undefined)?.length ?? 0) > 0;
+  // hasCodexData / hasClaudeData = 랭킹 scope (personal/active) 안에 의미 있는 provider 별 사용량 1+.
+  // dashboard 와 동일 패턴 — provider segmented control 의 disabled chip 분기에 사용.
+  async function checkRankingProviderUsage(prov: "claude" | "codex"): Promise<boolean> {
+    const rows = await db.execute(sql`
+      SELECT 1
+      FROM user_snapshots us
+      JOIN users u ON u.id = us.user_id
+      WHERE u.personal = true
+        AND u.ranking_hidden = false
+        AND u.deleted_at IS NULL
+        AND u.suspended_at IS NULL
+        AND us.provider = ${prov}
+        AND (us.total_cost > 0 OR us.sessions_count > 0)
+      LIMIT 1
+    `);
+    return ((rows.rows as unknown[] | undefined)?.length ?? 0) > 0;
+  }
+  const hasCodexData = await checkRankingProviderUsage("codex");
+  const hasClaudeData = await checkRankingProviderUsage("claude");
 
   // "최근 30일" = 오늘 포함 30 calendar days. setDate(-30) 은 31일 윈도우라 -29 사용.
   const thirtyAgo = new Date();
@@ -262,5 +267,6 @@ export async function GET(req: NextRequest) {
     myRank,
     period: "30d",
     hasCodexData,
+    hasClaudeData,
   });
 }

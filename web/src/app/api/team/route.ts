@@ -230,29 +230,34 @@ export async function GET(req: NextRequest) {
           .where(and(inArray(userSnapshots.userId, teamMemberIds), userSnapTeamScope, eq(userSnapshots.provider, provider)))
       : [];
 
-  // hasCodexData = 팀 멤버 중 의미 있는 Codex 사용량 (cost/sessions > 0) 1+. UI Tabs 표시 조건.
-  const teamCodexCheck = IS_LOCAL_MODE
-    ? await db
-        .select({ id: userSnapshots.id })
-        .from(userSnapshots)
-        .where(and(
-          eq(userSnapshots.provider, "codex"),
-          or(gt(userSnapshots.totalCost, 0), gt(userSnapshots.sessionsCount, 0)),
-        ))
-        .limit(1)
-    : teamMemberIds.length > 0
+  // hasCodexData / hasClaudeData = 팀 멤버 중 의미 있는 provider 별 사용량 (cost/sessions > 0) 1+.
+  // dashboard 와 동일 패턴 — provider segmented control 의 disabled chip 분기에 사용.
+  async function checkProviderUsage(prov: "claude" | "codex"): Promise<boolean> {
+    const rows = IS_LOCAL_MODE
       ? await db
           .select({ id: userSnapshots.id })
           .from(userSnapshots)
           .where(and(
-            inArray(userSnapshots.userId, teamMemberIds),
-            userSnapTeamScope,
-            eq(userSnapshots.provider, "codex"),
+            eq(userSnapshots.provider, prov),
             or(gt(userSnapshots.totalCost, 0), gt(userSnapshots.sessionsCount, 0)),
           ))
           .limit(1)
-      : [];
-  const hasCodexData = teamCodexCheck.length > 0;
+      : teamMemberIds.length > 0
+        ? await db
+            .select({ id: userSnapshots.id })
+            .from(userSnapshots)
+            .where(and(
+              inArray(userSnapshots.userId, teamMemberIds),
+              userSnapTeamScope,
+              eq(userSnapshots.provider, prov),
+              or(gt(userSnapshots.totalCost, 0), gt(userSnapshots.sessionsCount, 0)),
+            ))
+            .limit(1)
+        : [];
+    return rows.length > 0;
+  }
+  const hasCodexData = await checkProviderUsage("codex");
+  const hasClaudeData = await checkProviderUsage("claude");
 
   // user_id → 그 user 의 모든 device snap (배열). multi-device 사용자는 len>=2.
   const snapsByUser = new Map<number, Array<{ snap: typeof userSnapshots.$inferSelect; tokenName: string | null; tokenPlatform: unknown }>>();
@@ -1150,6 +1155,7 @@ export async function GET(req: NextRequest) {
     memberUsage,
     dailyUnitCostByMember,
     hasCodexData,
+    hasClaudeData,
     // 30일 일별 방문 매트릭스 — ENGAGEMENT 카드용
     dailyVisits30d: {
       dates: visit30Dates,
