@@ -2531,62 +2531,27 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
 
         {/* Row 1.6: 활용지수 + 토큰단가 (또는 API 추천). embedded 모드 — main
             grid 안에서 다른 카드 row 들과 동일 스타일.
-            Phase 3a-2: Codex 탭이면 그 옆 빈자리에 D (모델 fallback) 카드 추가. */}
+            Phase 3a-2: Codex 탭이면 활용지수 카드 안에 모델 fallback 한 줄 표시 (UsageHero 안). */}
         {data.powerIndex && (
-          provider === "codex" ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <UsageHero
-                embedded
-                powerIndex={data.powerIndex.score}
-                activeDays={data.powerIndex.activeDays}
-                avgDailyTokens={data.powerIndex.avgDailyTokens}
-                periodDays={data.planHealth?.periodDays ?? 30}
-                periodLabel={periodLabel(period, t)}
-                declaredTier={data.user.planTier ?? null}
-                declaredTierLabel={data.planHealth?.declaredLimits?.label ?? null}
-                priceForPeriod={data.planHealth?.priceForPeriod ?? null}
-                totalWindowTokens={data.planHealth?.totalWindowTokens ?? 0}
-                nonCacheTotalWindowTokens={data.planHealth?.nonCacheTotalWindowTokens ?? null}
-                cacheHitPctForPeriod={data.planHealth?.cacheHitPctForPeriod ?? null}
-                viewOnly={viewOnly}
-                isEstimatedTier={data.planHealth?.isEstimatedTier ?? false}
-                hasActivity={chartData.some((d) => (d.cost ?? 0) > 0)}
-                apiRecommendation={data.planHealth?.apiRecommendation ?? null}
-              />
-              {/* D 카드 — 모델 fallback 카운트. OpenAI 가 overload 등으로 의도한
-                  모델 대신 다른 모델 라우팅한 횟수. 품질/신뢰도 metric. */}
-              <div data-testid="dash-card-codex-fallback" className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-amber-500 rounded p-4 flex flex-col gap-2">
-                <span className="text-xs font-mono font-bold text-amber-400 uppercase tracking-wider">🔁 모델 fallback</span>
-                <div className="text-3xl font-bold text-neutral-100 font-mono">
-                  {(data.codexFallbackCount ?? 0).toLocaleString()}<span className="text-lg text-neutral-500">회</span>
-                </div>
-                <p className="text-xs text-neutral-400 font-mono">의도한 모델 대신 라우팅</p>
-                <p className="text-[10px] text-neutral-600 font-mono mt-1 leading-relaxed">
-                  OpenAI 의 overload 등으로 gpt-5 → 다른 모델 자동 fallback 발생 횟수.
-                  높으면 모델 신뢰도 ↓.
-                </p>
-              </div>
-            </div>
-          ) : (
-            <UsageHero
-              embedded
-              powerIndex={data.powerIndex.score}
-              activeDays={data.powerIndex.activeDays}
-              avgDailyTokens={data.powerIndex.avgDailyTokens}
-              periodDays={data.planHealth?.periodDays ?? 30}
-              periodLabel={periodLabel(period, t)}
-              declaredTier={data.user.planTier ?? null}
-              declaredTierLabel={data.planHealth?.declaredLimits?.label ?? null}
-              priceForPeriod={data.planHealth?.priceForPeriod ?? null}
-              totalWindowTokens={data.planHealth?.totalWindowTokens ?? 0}
-              nonCacheTotalWindowTokens={data.planHealth?.nonCacheTotalWindowTokens ?? null}
-              cacheHitPctForPeriod={data.planHealth?.cacheHitPctForPeriod ?? null}
-              viewOnly={viewOnly}
-              isEstimatedTier={data.planHealth?.isEstimatedTier ?? false}
-              hasActivity={chartData.some((d) => (d.cost ?? 0) > 0)}
-              apiRecommendation={data.planHealth?.apiRecommendation ?? null}
-            />
-          )
+          <UsageHero
+            embedded
+            powerIndex={data.powerIndex.score}
+            activeDays={data.powerIndex.activeDays}
+            avgDailyTokens={data.powerIndex.avgDailyTokens}
+            periodDays={data.planHealth?.periodDays ?? 30}
+            periodLabel={periodLabel(period, t)}
+            declaredTier={data.user.planTier ?? null}
+            declaredTierLabel={data.planHealth?.declaredLimits?.label ?? null}
+            priceForPeriod={data.planHealth?.priceForPeriod ?? null}
+            totalWindowTokens={data.planHealth?.totalWindowTokens ?? 0}
+            nonCacheTotalWindowTokens={data.planHealth?.nonCacheTotalWindowTokens ?? null}
+            cacheHitPctForPeriod={data.planHealth?.cacheHitPctForPeriod ?? null}
+            viewOnly={viewOnly}
+            isEstimatedTier={data.planHealth?.isEstimatedTier ?? false}
+            hasActivity={chartData.some((d) => (d.cost ?? 0) > 0)}
+            apiRecommendation={data.planHealth?.apiRecommendation ?? null}
+            codexFallbackCount={provider === "codex" ? (data.codexFallbackCount ?? 0) : null}
+          />
         )}
 
         {/* Row 2: 팀 내 내 위치 + 활동 히트맵 (반셀 2열). 사용자 피드백:

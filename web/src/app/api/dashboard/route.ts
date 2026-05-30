@@ -427,11 +427,14 @@ export async function GET(req: NextRequest) {
       const dailyModels = (r as { models?: Record<string, { reasoningOutputTokens?: number; outputTokens?: number; isFallback?: boolean }> }).models;
       if (!dailyModels) continue;
       for (const [name, info] of Object.entries(dailyModels)) {
-        if (!codexModelStats[name]) codexModelStats[name] = { reasoning: 0, output: 0, fallback: 0 };
-        codexModelStats[name].reasoning += info.reasoningOutputTokens ?? 0;
-        codexModelStats[name].output += info.outputTokens ?? 0;
+        // codeburn 은 "GPT-5.4" (대문자), ccusage 는 "gpt-5.4" (소문자) 라 직접 매칭 안 됨.
+        // 양쪽 lowercase 정규화 후 매칭.
+        const key = name.toLowerCase();
+        if (!codexModelStats[key]) codexModelStats[key] = { reasoning: 0, output: 0, fallback: 0 };
+        codexModelStats[key].reasoning += info.reasoningOutputTokens ?? 0;
+        codexModelStats[key].output += info.outputTokens ?? 0;
         if (info.isFallback) {
-          codexModelStats[name].fallback += 1;
+          codexModelStats[key].fallback += 1;
           codexFallbackCount += 1;
         }
       }
@@ -585,8 +588,9 @@ export async function GET(req: NextRequest) {
     const cacheWrite = m.cacheWriteTokens ?? 0;
     const denom = input + cacheRead + cacheWrite;
     const cacheHit = denom > 0 ? (cacheRead / denom) * 100 : 0;
-    // Phase 3a-2: Codex 일 때 모델별 reasoning ratio (ccusage 의 models{}.{모델명} 키 매칭).
-    const codexStat = codexModelStats[m.name ?? ""];
+    // Phase 3a-2: Codex 일 때 모델별 reasoning ratio. ccusage 와 codeburn 의 모델명 대소문자
+    // 다를 수 있어 lowercase 매칭 (위 집계도 lowercase 키).
+    const codexStat = codexModelStats[(m.name ?? "").toLowerCase()];
     const modelReasoningRatio = codexStat && codexStat.output > 0
       ? (codexStat.reasoning / codexStat.output) * 100
       : null;

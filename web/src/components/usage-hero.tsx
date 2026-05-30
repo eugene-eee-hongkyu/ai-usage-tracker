@@ -50,6 +50,9 @@ interface UsageHeroProps {
   // 제거. dashboard 첫 진입 시 "활용지수/토큰단가" 가 Daily Cost/Plan 절감
   // 아래로 내려가는 새 레이아웃에서 사용.
   embedded?: boolean;
+  // Phase 3a-2 (2026-05-30): Codex 탭일 때 활용지수 카드 안에 한 줄로 모델 fallback
+  // 카운트 표시. null/undefined 면 Claude 탭 (또는 데이터 없음) — 표시 안 함.
+  codexFallbackCount?: number | null;
 }
 
 function tierOptions(m: Messages): Array<{ value: string; label: string }> {
@@ -160,6 +163,7 @@ export function UsageHero({
   viewOnly = false,
   isEstimatedTier = false,
   embedded = false,
+  codexFallbackCount = null,
 }: UsageHeroProps) {
   const { m } = useMessages();
   const power = powerGrade(powerIndex, m);
@@ -342,6 +346,12 @@ export function UsageHero({
                 {" · "}{m.common.dailyAvg} <span className="text-neutral-300">{fmtTokens(Math.round(avgDailyTokens))}</span> {m.common.tokens}
               </p>
               <p className="text-[12px] text-neutral-600">{m.usageHero.powerFormula}</p>
+              {/* Phase 3a-2: Codex 탭일 때 활용지수 카드 안 한 줄로 모델 fallback 정보. */}
+              {codexFallbackCount != null && (
+                <p className="text-[12px] text-amber-400/80" title="OpenAI overload 등으로 의도한 모델 안 받고 다른 모델로 라우팅된 횟수">
+                  🔁 모델 fallback <span className="text-amber-300">{codexFallbackCount.toLocaleString()}회</span>
+                </p>
+              )}
             </div>
 
             {breakdownOpen && (() => {
