@@ -808,10 +808,17 @@ function TeamPositionCard({
   team,
   currentUserName,
   periodLabel,
+  meCostOverride,
+  meTokensOverride,
 }: {
   team: TeamRankPayload;
   currentUserName: string;
   periodLabel: string;
+  // 영진님 (me) row 의 cost / tokens 를 chartData.reduce 값 (= Hero / Plan 절감과
+  // 같은 source) 으로 override. 2026-05-30 정정 — byEfficiency 의 totalCost
+  // (codeburn snap.totalCost 기반) 와 화면 다른 metric 간 불일치 해소.
+  meCostOverride?: number;
+  meTokensOverride?: number;
 }) {
   const { m } = useMessages();
   const dv = m.dashboardView;
@@ -836,6 +843,15 @@ function TeamPositionCard({
       existing.efficiencyScore = ((existing.efficiencyScore ?? 0) + (m.efficiencyScore ?? 0)) / 2;
     } else {
       userMap.set(m.userId, { ...m });
+    }
+  }
+  // me (currentUserName) 의 cost / tokens 를 Hero / Plan 절감과 같은 source 로 override.
+  if (meCostOverride !== undefined || meTokensOverride !== undefined) {
+    for (const m of userMap.values()) {
+      if (m.name === currentUserName) {
+        if (meCostOverride !== undefined) m.totalCost = meCostOverride;
+        if (meTokensOverride !== undefined) m.totalTokens = meTokensOverride;
+      }
     }
   }
   const members = Array.from(userMap.values());
@@ -1781,6 +1797,11 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
           return (
             <div className="space-y-4">
               {/* HERO: 이번 달 본전 회수 (있을 때) — 회수율 + 절감액 + 본전 돌파일 */}
+              {/* 2026-05-30 정정: cost 값들을 모두 apiCost (= chartData.reduce) 로 통일.
+                  옛 코드는 mr.monthCostUsd (server 의 ccusage 직접 합산) — chartData.reduce
+                  (codeburn rawDaily date set 안 ccusage 보정) 와 차이 ($14 정도). 화면 내
+                  여러 cost 값이 미세하게 달라 혼란. apiCost 로 통일. breakEvenDate /
+                  remainingEstimateUsd 등 mr 의 고유 값은 그대로. */}
               {mr && mr.monthlyPriceUsd > 0 ? (
                 <div data-testid="dash-plan-recovery-hero">
                   <p className="text-[10px] font-mono text-neutral-500 uppercase tracking-wider mb-1">
@@ -1788,22 +1809,22 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
                   </p>
                   <div className="flex items-baseline gap-3 flex-wrap">
                     <span className={`text-3xl sm:text-4xl font-mono font-bold tracking-tight ${
-                      mr.recoveryPct >= 100 ? "text-emerald-400" : "text-neutral-200"
+                      apiCost >= mr.monthlyPriceUsd ? "text-emerald-400" : "text-neutral-200"
                     }`}>
-                      {mr.recoveryPct}%
+                      {mr.monthlyPriceUsd > 0 ? Math.round((apiCost / mr.monthlyPriceUsd) * 100) : 0}%
                     </span>
-                    {mr.recoveryPct >= 100 ? (
+                    {apiCost >= mr.monthlyPriceUsd ? (
                       <span className="text-emerald-300 text-sm font-mono">
-                        ▼ {fmtExact(mr.monthCostUsd - mr.monthlyPriceUsd)} 절감
+                        ▼ {fmtExact(apiCost - mr.monthlyPriceUsd)} 절감
                       </span>
                     ) : (
                       <span className="text-neutral-400 text-sm font-mono">
-                        본전까지 {fmtExact(mr.monthlyPriceUsd - mr.monthCostUsd)}
+                        본전까지 {fmtExact(mr.monthlyPriceUsd - apiCost)}
                       </span>
                     )}
                   </div>
                   <p className="text-xs font-mono text-neutral-500 mt-1.5">
-                    Plan ${mr.monthlyPriceUsd} · 사용 {fmtExact(mr.monthCostUsd)}
+                    Plan ${mr.monthlyPriceUsd} · 사용 {fmtExact(apiCost)}
                   </p>
                   <div className="text-[11px] font-mono text-neutral-500 mt-1 space-y-0.5">
                     {mr.breakEvenDate ? (
@@ -2076,11 +2097,16 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
       v >= 1000 ? `$${(v / 1000).toFixed(1)}k`.replace(".0k", "k") :
       v >= 100 ? `$${Math.round(v).toLocaleString()}` :
       v >= 1 ? `$${v.toFixed(2)}` : `$${v.toFixed(2)}`;
+    // 2026-05-30 cap: 각 row 의 cost (= codeburn 의 byProject / byModel / byActivity 합) 가
+    // apiCost (= chartData.reduce = ccusage 보정 cost 합, 화면 표준값) 를 넘는 경우
+    // cap. codeburn 자체 계산 vs ccusage 합산 차이 + multi-device merge 정합성 위해.
+    const apiCostCap = chartData.reduce((s, d) => s + (d.cost ?? 0), 0);
+    const cap = (v: number) => apiCostCap > 0 ? Math.min(v, apiCostCap) : v;
     type Row = { label: string; name: string; cost: number; color: string };
     const rows: Row[] = [];
-    if (topProject) rows.push({ label: "Project", name: topProject.name, cost: topProject.cost, color: "text-yellow-300" });
-    if (topModel) rows.push({ label: "Model", name: topModel.name, cost: topModel.cost, color: "text-pink-300" });
-    if (topActivity) rows.push({ label: "Activity", name: topActivity.name, cost: topActivity.cost, color: "text-violet-300" });
+    if (topProject) rows.push({ label: "Project", name: topProject.name, cost: cap(topProject.cost), color: "text-yellow-300" });
+    if (topModel) rows.push({ label: "Model", name: topModel.name, cost: cap(topModel.cost), color: "text-pink-300" });
+    if (topActivity) rows.push({ label: "Activity", name: topActivity.name, cost: cap(topActivity.cost), color: "text-violet-300" });
     return (
       <div data-testid="dash-card-cost-top3" data-track-dwell="cost_top3" className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-amber-500 rounded">
         <div className="px-3 py-2 border-b border-neutral-800">
@@ -2640,6 +2666,8 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
                   team={teamRankData}
                   currentUserName={targetName}
                   periodLabel={periodLabel(period, t)}
+                  meCostOverride={chartData.reduce((s, d) => s + (d.cost ?? 0), 0)}
+                  meTokensOverride={chartTokenData.reduce((s, d) => s + (d.tokens ?? 0), 0)}
                 />
                 {activityHeatmapBlock}
               </div>
