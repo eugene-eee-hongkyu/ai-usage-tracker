@@ -136,7 +136,6 @@ interface PlanHealthApiResponse {
   cacheHitPctForPeriod: number | null;
   priceForPeriod: number | null;
   periodDays: number;
-  isEstimatedTier?: boolean;
   apiRecommendation?: {
     monthlyCost30d: number;
     recommendedTier: "api" | "pro" | "max5" | "max20" | "team_standard" | "team_premium" | "team";
@@ -1735,7 +1734,6 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
           const limits = data.planHealth?.declaredLimits ?? null;
           const tierLabel = limits?.label ?? null;
           const monthlyPrice = limits?.monthlyPriceUsd ?? null;
-          const isEstimated = data.planHealth?.isEstimatedTier === true;
           const barMax = Math.max(apiCost, planCost);
           const apiPct = (apiCost / barMax) * 100;
           const planPct = (planCost / barMax) * 100;
@@ -1852,9 +1850,8 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
                     <span className="text-[11px] font-mono text-neutral-500 uppercase tracking-wider">
                       {t.dashboard.cards.planSavingsPlanLabel}
                       {tierLabel && monthlyPrice !== null && (
-                        <span className={`ml-2 normal-case ${isEstimated ? "text-amber-500/70" : "text-neutral-600"}`}>
+                        <span className="ml-2 normal-case text-neutral-600">
                           {tierLabel} · ${monthlyPrice}{t.dashboard.cards.planSavingsMonthlySuffix}
-                          {isEstimated && ` (${t.dashboard.cards.planSavingsEstimatedLabel})`}
                         </span>
                       )}
                     </span>
@@ -2559,7 +2556,6 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
             nonCacheTotalWindowTokens={data.planHealth?.nonCacheTotalWindowTokens ?? null}
             cacheHitPctForPeriod={data.planHealth?.cacheHitPctForPeriod ?? null}
             viewOnly={viewOnly}
-            isEstimatedTier={data.planHealth?.isEstimatedTier ?? false}
             hasActivity={chartData.some((d) => (d.cost ?? 0) > 0)}
             apiRecommendation={data.planHealth?.apiRecommendation ?? null}
             codexFallbackCount={provider === "codex" ? (data.codexFallbackCount ?? 0) : null}

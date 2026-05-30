@@ -11,8 +11,6 @@ import { isAdmin } from "@/lib/admin";
 import { computeDailyEfficiencyScore, computePowerIndex } from "@/lib/rules";
 import {
   analyzePlanHealth,
-  getPlanLimits,
-  estimateTierFromMonthlyCost,
   type PlanTier,
 } from "@/lib/plan-health";
 import { getCcusageDaily } from "@/lib/ccusage-row";
@@ -1113,31 +1111,10 @@ export async function GET(req: NextRequest) {
   // 누적, 향후 카드 부활 시 즉시 사용 가능). UI 에선 더 이상 표시 안 함.
   const blockCountInPeriod = planBlockRows.length;
 
-  // priceForPeriod — 월 요금을 period 일수에 비례 배분.
-  // tier 미입력 사용자도 추정 (P90 + cost) 으로 단가 계산. UI 에서 (추정) 명시.
-  //   estimateTier 우선순위: declaredTier > P90 추정 > cost 추정 (max 채택)
+  // 2026-05-30: priceForPeriod — declared tier 만 사용 (AI 추정 제거). 미입력은 null.
+  // 사용자가 modal 강제로 입력 유도되므로 미입력은 잠시 transient.
   const declaredLimits = planHealth.declaredLimits;
-  let effectiveLimits = declaredLimits;
-  let isEstimatedTier = false;
-  if (!effectiveLimits) {
-    // 30일 cost (period 무관 anchor) 별도 query 후 종합 추정.
-    const cost30dStart = new Date(Date.now() - 30 * 86_400_000);
-    const cost30dRows = await db
-      .select({ costUsd: userBlocks.costUsd })
-      .from(userBlocks)
-      .where(and(
-        eq(userBlocks.userId, user[0].id),
-        gte(userBlocks.startedAt, cost30dStart),
-        userBlocksTeamScope,
-      ));
-    const monthlyCost30d = cost30dRows.reduce((s, r) => s + Number(r.costUsd ?? 0), 0);
-    // P90 token 신호는 cache 포함이라 단위 안 맞아 폐기 — cost 단독 추정.
-    const combined = estimateTierFromMonthlyCost(monthlyCost30d);
-    if (combined !== "unknown") {
-      effectiveLimits = getPlanLimits(combined);
-      isEstimatedTier = true;
-    }
-  }
+  const effectiveLimits = declaredLimits;
   const monthlyPriceUsd = effectiveLimits?.monthlyPriceUsd ?? null;
   const priceForPeriod = monthlyPriceUsd !== null
     ? (monthlyPriceUsd * periodDays) / 30
@@ -1159,47 +1136,9 @@ export async function GET(req: NextRequest) {
     // 5h 0번 / 1주 1번 사례로 misleading 확인 → low | normal 만.
     edgeCase: "low" | "normal";
   };
-  let apiRecommendation: ApiRecommendation | null = null;
-  if (declaredLimits?.tier === "api") {
-    // 30일 cost — userBlocks 합산. 위 isEstimatedTier 블록에서 이미 계산했을 수도
-    // 있으나 declaredLimits 가 있어 거기 안 들어감. 별도 query.
-    const cost30dStart = new Date(Date.now() - 30 * 86_400_000);
-    const cost30dRows = await db
-      .select({ costUsd: userBlocks.costUsd })
-      .from(userBlocks)
-      .where(and(
-        eq(userBlocks.userId, user[0].id),
-        gte(userBlocks.startedAt, cost30dStart),
-        userBlocksTeamScope,
-      ));
-    const monthlyCost30d = cost30dRows.reduce((s, r) => s + Number(r.costUsd ?? 0), 0);
-    const recommended = estimateTierFromMonthlyCost(monthlyCost30d);
-    if (monthlyCost30d < 20 || recommended === "unknown") {
-      // 사용량이 Pro 최저 (\$20/월) 보다 적음 — 어떤 plan 도 종량제보다 비쌈.
-      apiRecommendation = {
-        monthlyCost30d,
-        recommendedTier: "api",
-        recommendedTierLabel: "API 종량제 유지",
-        planMonthlyPrice: 0,
-        savingsAmount: 0,
-        savingsPct: 0,
-        edgeCase: "low",
-      };
-    } else {
-      const recLimits = getPlanLimits(recommended);
-      const savings = monthlyCost30d - recLimits.monthlyPriceUsd;
-      const savingsPct = monthlyCost30d > 0 ? Math.round((savings / monthlyCost30d) * 100) : 0;
-      apiRecommendation = {
-        monthlyCost30d,
-        recommendedTier: recommended,
-        recommendedTierLabel: recLimits.label,
-        planMonthlyPrice: recLimits.monthlyPriceUsd,
-        savingsAmount: savings,
-        savingsPct,
-        edgeCase: "normal",
-      };
-    }
-  }
+  // 2026-05-30: API tier 사용자에게 어떤 Plan 으로 옮기면 절감되는지 추천도 AI 추정 의존이라
+  // 폐기. 사용자가 직접 OpenAI / Anthropic billing 보고 판단.
+  const apiRecommendation: ApiRecommendation | null = null;
 
   // Power Index — period 비례 정규화. fallback 적용된 값 사용.
   const powerActiveDays = effectiveActiveDays;
@@ -1240,10 +1179,6 @@ export async function GET(req: NextRequest) {
     },
     planHealth: {
       ...planHealth,
-      // declaredLimits 가 null 이면 추정 effectiveLimits 로 override.
-      // UI 에서 isEstimatedTier 로 (추정) 시각 구분.
-      declaredLimits: effectiveLimits ?? planHealth.declaredLimits,
-      isEstimatedTier,
       totalWindowTokens,    // fallback 적용된 값으로 override
       nonCacheTotalWindowTokens,
       realUsagePct,

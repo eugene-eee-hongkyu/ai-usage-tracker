@@ -54,40 +54,11 @@ export function calculateP90(values: number[]): number {
   return sorted[idx];
 }
 
-// P90 token 으로 tier 자동 추정. 커뮤니티 한도 boundaries 사용.
-export function estimateTierFromP90(p90Tokens: number): Exclude<PlanTier, null> | "unknown" {
-  if (p90Tokens === 0) return "unknown";
-  // P90 이 한도의 80% 넘으면 그 tier 적정. 80% 미만이면 한 단계 아래도 가능.
-  if (p90Tokens <= PLAN_LIMITS.pro.estimated5hTokenLimit * 0.8) return "pro";
-  if (p90Tokens <= PLAN_LIMITS.max5.estimated5hTokenLimit * 0.8) return "max5";
-  return "max20";
-}
-
-// API 환산 cost 로 tier 추정. cache leverage 가 사용자별 5×~100× 다양해서
-// cost-only 추정은 본질적으로 부정확. 보수적 임계 (Pro 가입자도 cache 잘
-// 쓰면 cost 수백 \$ 만들 수 있음) — 사용자 피드백 (<REDACTED> Pro \$176/월) 반영.
-//   ≥ \$500: max20 (cache 100× leverage 가정해도 max20 가입자 신호 강함)
-//   ≥ \$200: max5  (plan price 2× 본전)
-//   그 외   : pro  (보수적 default)
-// 본인 입력 modal 강력 유도 (UsageHero) → 추정 부정확 시 사용자가 정정.
-export function estimateTierFromMonthlyCost(monthlyCostUsd: number): Exclude<PlanTier, null> | "unknown" {
-  if (monthlyCostUsd <= 0) return "unknown";
-  if (monthlyCostUsd >= 500) return "max20";
-  if (monthlyCostUsd >= 200) return "max5";
-  return "pro";
-}
-
-// 두 tier 추정 비교 — 더 높은 tier (보수적이지 않은 = 가능성 더 높은) 선택.
-// <REDACTED> 같은 max20 사용자가 P90 보수로 max5 추정되는 케이스 보정.
-const TIER_RANK: Record<string, number> = {
-  unknown: -1, pro: 0, team_standard: 0, max5: 1, team: 1, max20: 2, team_premium: 2, api: 3,
-};
-export function maxTierEstimate(
-  a: Exclude<PlanTier, null> | "unknown",
-  b: Exclude<PlanTier, null> | "unknown",
-): Exclude<PlanTier, null> | "unknown" {
-  return (TIER_RANK[a] >= TIER_RANK[b] ? a : b);
-}
+// AI 자동 추정 (estimateTierFromP90 / estimateTierFromMonthlyCost / maxTierEstimate) 은
+// 2026-05-30 사용자 결정으로 완전 제거. cache leverage 가 사용자별 5×~100× 다양해서
+// cost-only 추정은 본질적으로 부정확했고, 5h cap 단위가 비공개라 P90 추정도 단위 불일치.
+// 정책: 사용자가 직접 plan 입력. 미입력이면 dashboard / usage-hero 가 modal 강제 표시.
+// 정확한 가격·한도는 Anthropic billing (Claude) / OpenAI billing (Codex) 외부 페이지로 안내.
 
 export type Verdict =
   | "downgrade"   // 입력 plan 대비 사용량 낮음 — 한 단계 아래 검토
@@ -111,8 +82,7 @@ export interface PlanHealthInput {
 }
 
 export interface PlanHealthResult {
-  // 자동 추정
-  estimatedTier: Exclude<PlanTier, null> | "unknown";
+  // 2026-05-30: estimatedTier 응답 필드 제거 (자동 추정 폐기). 사용자 입력 기준만.
   p90Tokens: number;
   blockCount: number;            // 윈도우 안의 5h 블록 수 (데이터 충분성 지표)
   activeDays: number;             // 윈도우 안의 활성 일수
@@ -165,8 +135,6 @@ export function analyzePlanHealth(input: PlanHealthInput): PlanHealthResult {
   const blockCount = recent.length;
   const activeDays = uniqueDayCount(recent);
 
-  const estimatedTier = estimateTierFromP90(p90);
-
   const declaredTier = input.declaredTier;
   const declaredLimits = declaredTier ? PLAN_LIMITS[declaredTier] : null;
 
@@ -197,7 +165,6 @@ export function analyzePlanHealth(input: PlanHealthInput): PlanHealthResult {
   if (dataInsufficient) {
     reasoning.push(`데이터 부족 — 최근 ${windowDays}일 중 활성일 ${activeDays}일 (권장 7일 이상)`);
     return {
-      estimatedTier,
       p90Tokens: p90,
       blockCount,
       activeDays,
@@ -216,11 +183,10 @@ export function analyzePlanHealth(input: PlanHealthInput): PlanHealthResult {
   }
 
   if (!declaredLimits) {
-    // 사용자가 tier 입력 안 함 → 자동 추정만 보여줌. verdict 는 unknown.
-    reasoning.push(`자동 추정 tier: ${estimatedTier === "unknown" ? "정보 부족" : PLAN_LIMITS[estimatedTier].label}`);
-    reasoning.push("본인 tier 를 입력하면 적정성 평가 가능");
+    // 사용자가 tier 입력 안 함 — 정책상 modal 강제이므로 본 분기는 잠시의 transient 상태.
+    // 추정 안 함, verdict unknown.
+    reasoning.push("Plan 미입력 — 본인 tier 를 입력해 주세요 (Anthropic billing 페이지에서 확인 가능)");
     return {
-      estimatedTier,
       p90Tokens: p90,
       blockCount,
       activeDays,
@@ -229,7 +195,7 @@ export function analyzePlanHealth(input: PlanHealthInput): PlanHealthResult {
       utilizationPct: 0,
       hitCount: 0,
       verdict: "unknown",
-      recommendedTier: estimatedTier === "unknown" ? null : estimatedTier,
+      recommendedTier: null,
       recommendedSavingsUsd: 0,
       actionFirst: false,
       reasoning,
@@ -298,7 +264,6 @@ export function analyzePlanHealth(input: PlanHealthInput): PlanHealthResult {
   }
 
   return {
-    estimatedTier,
     p90Tokens: p90,
     blockCount,
     activeDays,
@@ -345,7 +310,6 @@ export interface TeamMemberPlan {
   monthlyCostRecommendedUsd: number;
   verdict: Verdict;
   actionFirst: boolean;
-  isEstimated: boolean;       // 본인 declaredTier 없어 추정값으로 평가됨
   // verdict 근거 숫자 — UI 에서 "왜 이 평가인가" 설명 inline 표시.
   utilizationPct: number;     // P90 / 한도 (declaredTier 없으면 0)
   hitCount: number;            // 한도 도달한 5h 블록 수
@@ -365,7 +329,6 @@ export function summarizeTeamPlans(members: Array<{
   userId: number;
   name: string;
   health: PlanHealthResult;
-  isEstimated?: boolean;
 }>): TeamPlanSummary {
   const memberRows: TeamMemberPlan[] = [];
   const currentDist: Record<string, number> = {};
@@ -378,12 +341,10 @@ export function summarizeTeamPlans(members: Array<{
     const h = m.health;
     const declared = h.declaredTier;
     const recommended = h.recommendedTier;
-    const isEstimated = !!m.isEstimated;
-    // 추정 멤버는 "현재" 비용에 합산 안 함 (실제 결제 미발생). 권장 비용도
-    // 추정값 기반이라 절감액 노이즈 방지 위해 제외.
-    const currentCostMember = !isEstimated && declared && declared !== "api"
+    // 2026-05-30: 추정 멤버 분기 삭제. declared null 은 modal 강제로 잠시 transient.
+    const currentCostMember = declared && declared !== "api"
       ? PLAN_LIMITS[declared].monthlyPriceUsd : 0;
-    const recCostMember = !isEstimated && recommended && recommended !== "api"
+    const recCostMember = recommended && recommended !== "api"
       ? PLAN_LIMITS[recommended].monthlyPriceUsd : 0;
 
     memberRows.push({
@@ -395,7 +356,6 @@ export function summarizeTeamPlans(members: Array<{
       monthlyCostRecommendedUsd: recCostMember,
       verdict: h.verdict,
       actionFirst: h.actionFirst,
-      isEstimated,
       utilizationPct: h.utilizationPct,
       hitCount: h.hitCount,
     });

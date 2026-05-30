@@ -138,7 +138,6 @@ export async function GET(req: NextRequest) {
     } | null;
     planSavings: {
       tierLabel: string;
-      isEstimated: boolean;     // null → tier 미입력
       actualCost: number;
       planCostToday: number;
       savingsAmount: number;
@@ -212,7 +211,6 @@ export async function GET(req: NextRequest) {
         : 0;
       return {
         tierLabel: limits.label,
-        isEstimated: false,
         actualCost,
         planCostToday,
         savingsAmount,

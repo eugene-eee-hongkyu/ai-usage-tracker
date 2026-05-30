@@ -28,7 +28,6 @@ interface CardData {
   } | null;
   planSavings: {
     tierLabel: string;
-    isEstimated: boolean;
     actualCost: number;
     planCostToday: number;
     savingsAmount: number;

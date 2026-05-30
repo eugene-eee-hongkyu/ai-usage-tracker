@@ -20,7 +20,6 @@ interface TeamMemberPlan {
   monthlyCostRecommendedUsd: number;
   verdict: "downgrade" | "fit" | "tight" | "over" | "unknown";
   actionFirst: boolean;
-  isEstimated: boolean;
   utilizationPct: number;
   hitCount: number;
 }
@@ -130,10 +129,9 @@ export function TeamPlanHealthCard({ summary }: { summary: TeamPlanSummary }) {
                   className="border-b border-amber-900/20 hover:bg-amber-900/10 transition-colors"
                 >
                   <td className="py-1.5 text-neutral-300">{mb.name}</td>
-                  <td className={`py-1.5 px-2 ${mb.isEstimated ? "text-amber-300" : "text-neutral-400"}`}>
+                  <td className="py-1.5 px-2 text-neutral-400">
                     {TIER_LABEL[declared] ?? declared}
-                    {mb.isEstimated && <span className="text-[10px] text-amber-400/70">{m.teamPlanHealth.estimated}</span>}
-                    {!mb.isEstimated && mb.declaredTier === null && <span className="text-[10px] text-neutral-600">{m.teamPlanHealth.notEntered}</span>}
+                    {mb.declaredTier === null && <span className="text-[10px] text-neutral-600">{m.teamPlanHealth.notEntered}</span>}
                   </td>
                   <td className={`py-1.5 px-2 ${VERDICT_COLOR[mb.verdict]}`}>
                     {verdictLabel(mb.verdict, m)}

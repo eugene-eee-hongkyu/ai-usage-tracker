@@ -15,14 +15,14 @@
 //   - 30일 = rolling now - 30d
 //   - 팀 활용지수 = Power Index (활성 멤버 평균, lib/rules computePowerIndex)
 //   - 팀 토큰 단가 = (Σ plan_price) / (Σ tokens) × 1M USD/MTok (cache 포함)
-//   - tier 미입력 멤버는 monthlyCost 로 추정 (estimateTierFromMonthlyCost)
+//   - tier 미입력 멤버는 집계 미포함 (2026-05-30: AI 추정 폐기)
 
 import { NextResponse } from "next/server";
 import { db, teams, teamMembers, users, userBlocks } from "@/lib/db";
 import { requireBillingAdmin } from "@/lib/auth-guards";
 import { eq, and, isNull, gte, inArray } from "drizzle-orm";
 import { computePowerIndex } from "@/lib/rules";
-import { getPlanLimits, estimateTierFromMonthlyCost, type PlanTier } from "@/lib/plan-health";
+import { getPlanLimits, type PlanTier } from "@/lib/plan-health";
 import { anonymizeName } from "@/lib/anonymize";
 
 export const dynamic = "force-dynamic";
@@ -139,13 +139,11 @@ export async function GET() {
       ta.powerCount += 1;
     }
 
-    // tier 결정 — declared 우선, 없으면 30일 monthlyCost 로 추정
+    // 2026-05-30: AI 추정 폐기. declared null 인 멤버는 monthlyPriceUsd=0 (집계 미포함).
+    // 멤버는 modal 강제로 입력 유도 — 미입력은 잠시 transient.
     const declared = (m.planTier ?? null) as PlanTier;
-    const estimated = declared === null ? estimateTierFromMonthlyCost(cost) : null;
-    const effective: PlanTier =
-      declared ?? (estimated && estimated !== "unknown" ? estimated : null);
     const monthlyPriceUsd =
-      effective !== null ? (getPlanLimits(effective).monthlyPriceUsd ?? 0) : 0;
+      declared !== null ? (getPlanLimits(declared).monthlyPriceUsd ?? 0) : 0;
 
     // 토큰 단가 — tier 파악된 멤버만 합산 (price × 30/30 = price 그대로)
     if (monthlyPriceUsd > 0 && tokens > 0) {

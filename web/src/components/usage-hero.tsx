@@ -41,8 +41,6 @@ interface UsageHeroProps {
   } | null;
   // viewOnly = 어드민이 멤버 dashboard 봄. tier select / hint 숨기고 read-only 라벨만.
   viewOnly?: boolean;
-  // tier 가 자동 추정값이면 (declared 없음) UI 에 "(추정)" 라벨 + 시각 구분.
-  isEstimatedTier?: boolean;
   // tier 미입력 + activity 0 케이스 — 팝업 메시지 분기.
   // false 이면 tier 입력 권유보다 CLI sync 확인 안내가 우선 actionable.
   hasActivity?: boolean;
@@ -161,7 +159,6 @@ export function UsageHero({
   cacheHitPctForPeriod,
   apiRecommendation,
   viewOnly = false,
-  isEstimatedTier = false,
   embedded = false,
   codexFallbackCount = null,
 }: UsageHeroProps) {
@@ -424,14 +421,8 @@ export function UsageHero({
               </div>
               <div className="flex items-center gap-1.5 flex-wrap">
                 {viewOnly ? (
-                  <span data-testid="plan-tier-readonly" className={`bg-neutral-800 border text-[11px] font-mono rounded px-1.5 py-0.5 ${
-                    isEstimatedTier
-                      ? "border-amber-700/60 text-amber-300"
-                      : "border-neutral-700 text-neutral-300"
-                  }`}>
-                    {declaredTierLabel
-                      ? (isEstimatedTier ? `${declaredTierLabel} (${m.common.estimate})` : declaredTierLabel)
-                      : m.usageHero.tierReadonlyNoTier}
+                  <span data-testid="plan-tier-readonly" className="bg-neutral-800 border border-neutral-700 text-neutral-300 text-[11px] font-mono rounded px-1.5 py-0.5">
+                    {declaredTierLabel ?? m.usageHero.tierReadonlyNoTier}
                   </span>
                 ) : (
                   <select
@@ -514,9 +505,7 @@ export function UsageHero({
                 </div>
                 <div className="mt-3 text-xs font-mono text-neutral-500 space-y-0.5">
                   <p>
-                    <span className={isEstimatedTier ? "text-amber-300" : "text-neutral-300"}>
-                      {declaredTierLabel ?? "—"}{isEstimatedTier && ` (${m.common.estimate})`}
-                    </span>
+                    <span className="text-neutral-300">{declaredTierLabel ?? "—"}</span>
                     <span className="text-neutral-600"> · {periodLabel} {fmtPrice(priceForPeriod!)}</span>
                   </p>
                   <p>

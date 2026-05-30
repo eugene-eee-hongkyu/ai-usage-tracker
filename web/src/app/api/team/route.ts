@@ -10,7 +10,6 @@ import {
   analyzePlanHealth,
   summarizeTeamPlans,
   getPlanLimits,
-  estimateTierFromMonthlyCost,
   type PlanTier,
 } from "@/lib/plan-health";
 import { computeEfficiencyScore, computeDailyEfficiencyScore, computePowerIndex } from "@/lib/rules";
@@ -726,7 +725,6 @@ export async function GET(req: NextRequest) {
     userId: number;
     name: string;
     health: ReturnType<typeof analyzePlanHealth>;
-    isEstimated: boolean;
   }> = [];
   // memberStats lookup — today/8days fallback 에 ov 기반 totalTokens 사용.
   const memberStatsById = new Map(memberStats.map((m) => [m.userId, m]));
@@ -739,10 +737,7 @@ export async function GET(req: NextRequest) {
     memberKey: string;
     powerIndex: number;
     declaredTier: string | null;
-    estimatedTier: string | null;
-    effectiveTier: string | null;     // declared > estimated
-    monthlyPriceUsd: number | null;   // effectiveTier 의 plan price
-    isEstimated: boolean;             // true 면 추정 (UI 에서 점선 / "(추정)" 표시)
+    monthlyPriceUsd: number | null;   // declaredTier 의 plan price (null 미입력)
     activeDays: number;
     totalTokens: number;
   };
@@ -765,25 +760,18 @@ export async function GET(req: NextRequest) {
     const blocks = planBlocksByUser.get(u.id) ?? [];
     const declared = (u.planTier ?? null) as PlanTier;
 
-    // 추정 tier — 30일 cost 만 사용. P90 token 신호는 cache_read 포함이라
-    // 한도 (220k non-cache 기준) 와 단위 불일치 → 거의 항상 max20 분류되어
-    // cost 신호를 묻어버림 → 폐기. cost 단독 + 보수적 임계 (Pro $176 케이스
-    // 보호) 로 정확도 ↑.
+    // 2026-05-30: AI 추정 폐기. declared 만 사용 — 미입력은 modal 강제로 잠시 transient.
     const monthlyCost30d = monthlyCostByUser.get(u.id) ?? 0;
-    const combinedEstimateTier = estimateTierFromMonthlyCost(monthlyCost30d);
-    const isEstimatedMember = declared === null && combinedEstimateTier !== "unknown";
-    const effectiveDeclared: PlanTier = declared ?? (isEstimatedMember ? (combinedEstimateTier as Exclude<PlanTier, null>) : null);
 
     const health = analyzePlanHealth({
       blocks,
-      declaredTier: effectiveDeclared,
+      declaredTier: declared,
       cacheHitPct: snap?.cacheHitPct ?? undefined,
       oneShotRate: snap?.overallOneShot != null ? snap.overallOneShot * 100 : undefined,
       windowDays: periodDays,
-      // cost-based verdict 신호 — 멤버의 최근 30일 API 환산 비용.
       monthlyCostUsd: monthlyCost30d,
     });
-    memberHealthList.push({ userId: u.id, name: u.name, health, isEstimated: isEstimatedMember });
+    memberHealthList.push({ userId: u.id, name: u.name, health });
 
     // ccusage daily 기반 활용지수·토큰단가 입력값. 이전엔 user_blocks 합 (overview
     // fallback) 으로 5h 단위였으나 단위 통일 (2026-05-22 결정) — memberStats.totalTokens
@@ -805,13 +793,9 @@ export async function GET(req: NextRequest) {
       teamAvgDailyTokensSum += memAvgDailyTokens;
     }
 
-    // Effective tier 는 위에서 health 계산 시 결정함 (effectiveDeclared).
-    // memberUsage 응답엔 declared / estimated / effective 모두 노출.
-    const estimatedTierForUsage = isEstimatedMember
-      ? (combinedEstimateTier as Exclude<PlanTier, null>)
-      : null;
-    const effectiveLimits = effectiveDeclared
-      ? getPlanLimits(effectiveDeclared as Exclude<PlanTier, null>)
+    // declared tier 만 사용. 미입력 멤버는 monthlyPriceUsd null → 토큰 단가 등 집계 미포함.
+    const effectiveLimits = declared
+      ? getPlanLimits(declared as Exclude<PlanTier, null>)
       : null;
     const monthlyPriceUsd = effectiveLimits?.monthlyPriceUsd ?? null;
 
@@ -821,10 +805,7 @@ export async function GET(req: NextRequest) {
       memberKey: `${u.name}__${u.id}`,
       powerIndex: memScore,
       declaredTier: declared ?? null,
-      estimatedTier: estimatedTierForUsage,
-      effectiveTier: effectiveDeclared ?? null,
       monthlyPriceUsd,
-      isEstimated: isEstimatedMember,
       activeDays: effectiveActiveDays,
       totalTokens: effectiveTokens,
     });
@@ -859,13 +840,12 @@ export async function GET(req: NextRequest) {
     const todayYmd = `${getPart("year")}-${getPart("month")}-${getPart("day")}`;
     const monthStartYmd = todayYmd.slice(0, 7) + "-01";
     // 제외 대상 멤버 set — memberKey 기준.
-    // 1) effectiveTier='api': 종량제라 plan 가격 0 → 본전 회수 framing 무의미.
-    // 2) effectiveTier=null (tier 미입력 + 추정 unknown): plan price 가 분모에
-    //    안 들어가는데 cost 는 분자에 들어가 회수율이 200%+ 부풀려지는 단위
-    //    불일치. Plan 가입자 cost / Plan 가격 정의와 일관 (2026-05-28 결정).
+    // 1) declaredTier='api': 종량제라 plan 가격 0 → 본전 회수 framing 무의미.
+    // 2) declaredTier=null (tier 미입력): plan price 분모 없는데 cost 분자 들어가
+    //    부풀려지는 단위 불일치. modal 강제로 잠시 transient.
     const excludedMemberKeys = new Set(
       memberUsage
-        .filter((m) => m.effectiveTier === "api" || m.effectiveTier === null)
+        .filter((m) => m.declaredTier === "api" || m.declaredTier === null)
         .map((m) => m.memberKey)
     );
     const memberMonthCost = new Map<string, number>();

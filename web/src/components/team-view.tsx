@@ -187,10 +187,7 @@ interface TeamData {
     memberKey: string;
     powerIndex: number;
     declaredTier: string | null;
-    estimatedTier: string | null;
-    effectiveTier: string | null;
     monthlyPriceUsd: number | null;
-    isEstimated: boolean;
     activeDays: number;
     totalTokens: number;
   }>;
@@ -902,7 +899,7 @@ export function TeamView({ adminMode = false }: { adminMode?: boolean }) {
             return (
               <span key={m.userId} className="flex items-center gap-1 text-[10px] font-mono text-neutral-400">
                 <span className="w-2 h-2 rounded-full inline-block" style={{ background: color }} />
-                {m.name}{m.isEstimated && <span className="text-amber-400">{t.teamView.estimateBadge}</span>}
+                {m.name}
               </span>
             );
           })}
@@ -946,7 +943,6 @@ export function TeamView({ adminMode = false }: { adminMode?: boolean }) {
                     dataKey={m.memberKey}
                     stroke={color}
                     strokeWidth={1.5}
-                    strokeDasharray={m.isEstimated ? "4 3" : undefined}
                     dot={false}
                     connectNulls={false}
                   />
