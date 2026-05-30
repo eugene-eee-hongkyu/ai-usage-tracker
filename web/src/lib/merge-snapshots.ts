@@ -1,3 +1,5 @@
+import { normalizeCcusageRow } from "@/lib/ccusage-row";
+
 // Multi-device snapshot 합산 헬퍼.
 // 영진님 같은 multi-device 사용자가 dashboard 의 device chip 옆 "합산" 버튼 클릭 시
 // dashboard route 에서 사용. user_snapshots 의 device 별 row N 개를 1 virtual row 로
@@ -167,8 +169,13 @@ export function mergeRawJson(rawJsons: AnyObj[]): AnyObj {
       result[pk] = mergePeriodData(periodItems);
     }
   }
-  // 최상위 ccusageDaily — 모든 device 의 daily 배열 date 별 group sum
-  const topCcDaily = rawJsons.flatMap((r) => (r?.ccusageDaily as { daily?: AnyObj[] } | undefined)?.daily ?? []);
+  // 최상위 ccusageDaily — 모든 device 의 daily 배열 date 별 group sum.
+  // ccusage 19.x 옛 형식은 `period` 키, 새 형식은 `date` 키. 두 device 가 다른
+  // ccusage 버전이면 (영진님 dev2 = 옛/period, dev11 = 새/date) date 기준 group 시
+  // 옛 형식 row 가 date undefined 라 통째로 skip. normalize 로 date 통일 후 group.
+  const topCcDaily = rawJsons
+    .flatMap((r) => (r?.ccusageDaily as { daily?: AnyObj[] } | undefined)?.daily ?? [])
+    .map((row) => normalizeCcusageRow(row as Parameters<typeof normalizeCcusageRow>[0]) as AnyObj);
   if (topCcDaily.length > 0) {
     const merged = groupSumByKey(topCcDaily, "date", [
       "totalCost", "totalTokens", "inputTokens", "outputTokens",
