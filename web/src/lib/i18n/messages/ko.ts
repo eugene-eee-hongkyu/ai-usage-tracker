@@ -363,6 +363,8 @@ export const ko: DeepPartial<Messages> = {
     team: "팀",
     members: "팀원",
     ranking: "랭킹",
+    users: "사용자",
+    settings: "세팅",
     home: "홈페이지",
   },
   metricModal: {

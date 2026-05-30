@@ -354,6 +354,8 @@ export interface Messages {
     team: string;
     members: string;
     ranking: string;
+    users: string;
+    settings: string;
     home: string;
   };
   metricModal: {
@@ -1056,6 +1058,8 @@ export const en: Messages = {
     team: "Team",
     members: "Members",
     ranking: "Ranking",
+    users: "Users",
+    settings: "Settings",
     home: "Home",
   },
   metricModal: {

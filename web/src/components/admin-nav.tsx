@@ -5,8 +5,10 @@ import { usePathname } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { useMessages } from "@/lib/use-i18n";
 
-// admin context 의 app-level nav — [ADMIN] 배지 + 회사명 + 팀/팀원/랭킹 탭.
-// Platform Admin view-as 모드면 view-as 팀명 우선 표시 (실제 보고 있는 팀 = view-as team).
+// admin context 의 app-level nav — [ADMIN] 배지 + 회사명 + 평탄한 5 탭
+// (팀원·팀·랭킹·사용자·세팅). 이전엔 [팀·팀원·랭킹] 만 노출하고 users/settings 는
+// 직접 URL 진입이라 admin 의 모든 페이지를 한눈에 못 봤음 (2026-05-30 사용자 피드백).
+// Platform Admin view-as 모드면 view-as 팀명 우선 표시.
 export function AdminNav() {
   const path = usePathname();
   const { m } = useMessages();
@@ -18,9 +20,11 @@ export function AdminNav() {
   const teamName = u?.viewAsTeamName ?? u?.currentTeamName ?? null;
 
   const tabs = [
-    { href: "/admin/team", label: m.adminNav.team },
     { href: "/admin/members", label: m.adminNav.members },
+    { href: "/admin/team", label: m.adminNav.team },
     { href: "/admin/team/ranking", label: m.adminNav.ranking },
+    { href: "/admin/users", label: m.adminNav.users },
+    { href: "/admin/settings", label: m.adminNav.settings },
   ];
 
   // active 판정 — 가장 긴 prefix 매칭. /admin/team/ranking 진입 시 ranking 만
