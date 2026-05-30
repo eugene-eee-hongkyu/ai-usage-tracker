@@ -121,7 +121,7 @@ interface PowerIndexSummary {
 
 // Plan Health 응답 타입 — API route 가 lib/plan-health 의 PlanHealthResult 에 추가 필드
 // (nonCacheTotalWindowTokens / cacheHitPctForPeriod / priceForPeriod / periodDays /
-// isEstimatedTier / blockCountInPeriod) 를 덧붙여 반환. UI 는 이 확장 타입을 사용.
+// isEstimatedTier) 를 덧붙여 반환. UI 는 이 확장 타입을 사용.
 interface PlanHealthApiResponse {
   declaredTier: "pro" | "max5" | "max20" | "team" | "api" | null;
   declaredLimits: {
@@ -132,19 +132,9 @@ interface PlanHealthApiResponse {
   } | null;
   totalWindowTokens: number;
   nonCacheTotalWindowTokens: number | null;
-  blockCountInPeriod: number;
   cacheHitPctForPeriod: number | null;
   priceForPeriod: number | null;
   periodDays: number;
-  apiRecommendation?: {
-    monthlyCost30d: number;
-    recommendedTier: "api" | "pro" | "max5" | "max20" | "team_standard" | "team_premium" | "team";
-    recommendedTierLabel: string;
-    planMonthlyPrice: number;
-    savingsAmount: number;
-    savingsPct: number;
-    edgeCase: "low" | "normal";
-  } | null;
   monthRecovery?: {
     monthlyPriceUsd: number;
     monthCostUsd: number;
@@ -175,8 +165,6 @@ interface DashboardData {
   mcpServers: NameCalls[];
   availableSnapshots?: { weekly: SnapshotMeta[]; monthly: SnapshotMeta[]; daily?: SnapshotMeta[] };
   snapshot?: SnapshotInfo | null;
-  // blocks: API 에서 여전히 보내지만 (user_blocks 데이터 누적 유지) UI 에서 안 씀.
-  blocks?: unknown;
   efficiencyScore?: EfficiencyScoreSummary | null;
   // M6f (2026-05-25): device-scope. user 가 노트북 N대 쓰면 N entries.
   devices?: DeviceMeta[];
@@ -214,7 +202,6 @@ interface DeviceMeta {
 }
 
 interface EfficiencyScoreSummary {
-  today: number | null;
   yesterday: number | null;
   delta: number | null;
   streak: number;
@@ -2644,7 +2631,6 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
             cacheHitPctForPeriod={data.planHealth?.cacheHitPctForPeriod ?? null}
             viewOnly={viewOnly}
             hasActivity={chartData.some((d) => (d.cost ?? 0) > 0)}
-            apiRecommendation={data.planHealth?.apiRecommendation ?? null}
             codexFallbackCount={provider === "codex" ? (data.codexFallbackCount ?? 0) : null}
             provider={provider}
           />

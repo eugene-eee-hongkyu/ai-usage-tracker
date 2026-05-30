@@ -3,14 +3,13 @@ export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import { db, userSnapshots, users, periodSnapshots, dailyVisits, userBlocks, teamMembers, apiTokens, IS_LOCAL_MODE } from "@/lib/db";
+import { db, userSnapshots, users, periodSnapshots, dailyVisits, teamMembers, apiTokens, IS_LOCAL_MODE } from "@/lib/db";
 import { getAuthedEmail } from "@/lib/local-user";
 import { getEffectiveTeamId } from "@/lib/effective-team";
-import { and, asc, desc, eq, gt, gte, isNull, lt, inArray, or, sql } from "drizzle-orm";
+import { and, desc, eq, gt, isNull, inArray, or, sql } from "drizzle-orm";
 import { isAdmin } from "@/lib/admin";
 import { computeDailyEfficiencyScore, computePowerIndex } from "@/lib/rules";
 import {
-  analyzePlanHealth,
   getPlanLimits,
   type PlanTier,
 } from "@/lib/plan-health";
@@ -254,10 +253,9 @@ export async function GET(req: NextRequest) {
     ? undefined
     : (selectedTokenId !== null ? eq(periodSnapshots.tokenId, selectedTokenId) : undefined);
 
-  // Multi-provider scope — 모든 user_snapshots / period_snapshots / user_blocks query 에 적용.
+  // Multi-provider scope — 모든 user_snapshots / period_snapshots query 에 적용.
   const providerScopeForSnap = eq(userSnapshots.provider, provider);
   const providerScopeForPeriod = eq(periodSnapshots.provider, provider);
-  const providerScopeForBlocks = eq(userBlocks.provider, provider);
 
   // Multi-provider 분기 (2026-05-29 M):
   //   supportsMultiProvider = selectedDeviceId 의 CLI 가 Codex 분리 호출 지원 (>= 0.3.0)
@@ -349,7 +347,6 @@ export async function GET(req: NextRequest) {
   const teamScope = IS_LOCAL_MODE ? undefined : eq(periodSnapshots.teamId, effectiveTeamId!);
   const userSnapTeamScope = IS_LOCAL_MODE ? undefined : eq(userSnapshots.teamId, effectiveTeamId!);
   const dailyVisitsTeamScope = IS_LOCAL_MODE ? undefined : eq(dailyVisits.teamId, effectiveTeamId!);
-  const userBlocksTeamScope = IS_LOCAL_MODE ? undefined : eq(userBlocks.teamId, effectiveTeamId!);
 
   // Available snapshot list (always returned for dropdown population) — 선택한 device 의 snapshot 만
   const availableWeeklyRows = await db
@@ -404,9 +401,6 @@ export async function GET(req: NextRequest) {
       .offset(dayOffset - 1);
     if (rows[0]) snapshotRow = { periodType: "daily", periodStart: rows[0].periodStart, capturedAt: rows[0].capturedAt, rawJson: rows[0].rawJson };
   }
-
-  // Suppress unused import warning when snapshots feature isn't yet exercised
-  void asc;
 
   if (!snap[0]) {
     return NextResponse.json({
@@ -949,7 +943,6 @@ export async function GET(req: NextRequest) {
   // snapshot 모드 (지난주/지난달 등) 면 점수 섹션 숨김 — historical 분석 모드와
   // self-motivation 모드 분리. UI 의 conditional 이 null 받으면 자동 hide.
   const efficiencyScore = snapshotRow ? null : {
-    today: todayScore,
     yesterday: yesterdayScore,
     delta: scoreDelta,
     streak: cacheStreak,
@@ -980,135 +973,6 @@ export async function GET(req: NextRequest) {
     ? strictTodayCc.totalTokens   // strict today = 단일 일이라 avg = total
     : (activeDays > 0 ? (tRead + tWrite + tInput + tOutput) / activeDays : 0);
 
-  // Active blocks — ccusage blocks 기반 wall-clock 집계.
-  // gap/active-without-end 는 ingest 단계에서 이미 필터됨.
-  // period 따라 윈도우 변경: today=null(미표시), month=달 시작, 8days/30days=상대,
-  // all=90일(retention 한계).
-  const blocksWindowStart = (() => {
-    const now = new Date();
-    switch (period) {
-      case "today": return null;
-      case "month": return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
-      case "8days": return new Date(now.getTime() - 8 * 86_400_000);
-      case "30days": return new Date(now.getTime() - 30 * 86_400_000);
-      case "all": return new Date(now.getTime() - 90 * 86_400_000);
-      default: return new Date(now.getTime() - 30 * 86_400_000);
-    }
-  })();
-  const blockRows = blocksWindowStart
-    ? await db
-        .select()
-        .from(userBlocks)
-        .where(and(
-          eq(userBlocks.userId, user[0].id),
-          gte(userBlocks.startedAt, blocksWindowStart),
-          userBlocksTeamScope,
-          providerScopeForBlocks,
-        ))
-        .orderBy(asc(userBlocks.startedAt))
-    : [];
-
-  const minutesArr = blockRows.map((b) => b.minutes);
-  const sortedMinutes = [...minutesArr].sort((a, b) => a - b);
-  const medianMinutes = sortedMinutes.length === 0
-    ? 0
-    : sortedMinutes.length % 2
-      ? sortedMinutes[Math.floor(sortedMinutes.length / 2)]
-      : (sortedMinutes[sortedMinutes.length / 2 - 1] + sortedMinutes[sortedMinutes.length / 2]) / 2;
-  const totalBlockMinutes = minutesArr.reduce((s, m) => s + m, 0);
-  const totalBlockTokens = blockRows.reduce((s, b) => s + Number(b.totalTokens ?? 0), 0);
-  const tokensPerMinute = totalBlockMinutes > 0 ? totalBlockTokens / totalBlockMinutes : 0;
-
-  const distribution = { lt30: 0, m30to60: 0, h1to2: 0, h2to4: 0, h4plus: 0 };
-  for (const m of minutesArr) {
-    if (m < 30) distribution.lt30++;
-    else if (m < 60) distribution.m30to60++;
-    else if (m < 120) distribution.h1to2++;
-    else if (m < 240) distribution.h2to4++;
-    else distribution.h4plus++;
-  }
-
-  let longest: { minutes: number; startedAt: string | null } = { minutes: 0, startedAt: null };
-  for (const b of blockRows) {
-    if (b.minutes > longest.minutes) {
-      longest = { minutes: b.minutes, startedAt: b.startedAt.toISOString() };
-    }
-  }
-  const blockActiveDays = new Set(
-    blockRows.map((b) => b.startedAt.toISOString().slice(0, 10))
-  ).size;
-
-  // 직전 동일 길이 윈도우 트렌드 비교용 (period === "all" 은 retention 한계로
-  // prev 없음). prev 윈도우 = [start - length, start).
-  let prevTrend: {
-    countDeltaPct: number | null;
-    avgMinutesDeltaPct: number | null;
-    tokensPerMinuteDeltaPct: number | null;
-    hasPrevData: boolean;
-  } | null = null;
-  if (blocksWindowStart && period !== "all") {
-    const windowMs = Date.now() - blocksWindowStart.getTime();
-    const prevStart = new Date(blocksWindowStart.getTime() - windowMs);
-    const prevEnd = blocksWindowStart;
-    const prevRows = await db
-      .select({ minutes: userBlocks.minutes, totalTokens: userBlocks.totalTokens })
-      .from(userBlocks)
-      .where(and(
-        eq(userBlocks.userId, user[0].id),
-        gte(userBlocks.startedAt, prevStart),
-        lt(userBlocks.startedAt, prevEnd),
-        userBlocksTeamScope,
-        providerScopeForBlocks,
-      ));
-    const prevCount = prevRows.length;
-    const prevTotalMin = prevRows.reduce((s, r) => s + r.minutes, 0);
-    const prevTotalTok = prevRows.reduce((s, r) => s + Number(r.totalTokens ?? 0), 0);
-    const prevAvgMin = prevCount ? prevTotalMin / prevCount : 0;
-    const prevTokPerMin = prevTotalMin > 0 ? prevTotalTok / prevTotalMin : 0;
-    const pct = (cur: number, prev: number): number | null => {
-      if (prev === 0) return cur === 0 ? null : null; // "new" 케이스 — UI 에서 다르게 표기 가능하나 단순화
-      return Math.round(((cur - prev) / prev) * 100);
-    };
-    prevTrend = {
-      countDeltaPct: pct(blockRows.length, prevCount),
-      avgMinutesDeltaPct: pct(blockRows.length ? totalBlockMinutes / blockRows.length : 0, prevAvgMin),
-      tokensPerMinuteDeltaPct: pct(tokensPerMinute, prevTokPerMin),
-      hasPrevData: prevCount > 0,
-    };
-  }
-
-  // 패턴 분류. median 우선, 그 다음 분포 비율로 보정.
-  // 5개 미만이면 단발형 (tooFewData 와 별개로 5~9 도 신호 약함).
-  const totalBlocks = blockRows.length;
-  let pattern: "몰입형" | "분산형" | "균형형" | "단발형" = "균형형";
-  if (totalBlocks < 10) {
-    pattern = "단발형";
-  } else if (medianMinutes >= 240 || distribution.h4plus / totalBlocks >= 0.5) {
-    pattern = "몰입형";
-  } else if (medianMinutes < 60 || (distribution.lt30 + distribution.m30to60) / totalBlocks >= 0.5) {
-    pattern = "분산형";
-  }
-
-  // period === "today" 면 카드 자체 미표시 (blocks=null).
-  // 그 외 기간에서 블록 5개 미만이면 tooFewData=true 로 카드는 보이되 안내 문구.
-  const blocks = period === "today"
-    ? null
-    : {
-        count: blockRows.length,
-        activeDays: blockActiveDays,
-        avgMinutes: blockRows.length ? Math.round(totalBlockMinutes / blockRows.length) : 0,
-        medianMinutes: Math.round(medianMinutes),
-        maxMinutes: longest.minutes,
-        longestStartedAt: longest.startedAt,
-        tokensPerMinute: Math.round(tokensPerMinute),
-        totalMinutes: totalBlockMinutes,
-        totalTokens: totalBlockTokens,
-        distribution,
-        tooFewData: blockRows.length < 5,
-        pattern,
-        trend: prevTrend,
-      };
-
   // period → days 환산. all 은 retention 한계 (90일) 로 cap.
   const periodDays = (() => {
     const now = new Date();
@@ -1125,33 +989,6 @@ export async function GET(req: NextRequest) {
     }
   })();
 
-  // Plan Health & Power Index — period 비례 정규화. window 도 period 기반.
-  const planBlocksWindowStart = (() => {
-    const now = new Date();
-    switch (period) {
-      case "today": return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
-      case "month": return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
-      case "8days": return new Date(now.getTime() - 8 * 86_400_000);
-      case "30days": return new Date(now.getTime() - 30 * 86_400_000);
-      case "all": return new Date(now.getTime() - 90 * 86_400_000);
-      default: return new Date(now.getTime() - 30 * 86_400_000);
-    }
-  })();
-  const planBlockRows = await db
-    .select({
-      totalTokens: userBlocks.totalTokens,
-      startedAt: userBlocks.startedAt,
-      costUsd: userBlocks.costUsd,
-    })
-    .from(userBlocks)
-    .where(and(
-      eq(userBlocks.userId, user[0].id),
-      gte(userBlocks.startedAt, planBlocksWindowStart),
-      userBlocksTeamScope,
-    ));
-  // cost-based verdict 신호 — period 의 API 환산 비용.
-  // ccusage cost = PAYG 가격 환산. plan price 와 비교해 Plan ROI 평가.
-  const planBlocksMonthlyCost = planBlockRows.reduce((s, b) => s + Number(b.costUsd ?? 0), 0);
   // 2026-05-30 Phase 2: provider 따라 사용자 plan tier 분기.
   //   claude → user.plan_tier → PLAN_LIMITS lookup
   //   codex  → user.codex_plan_tier → CODEX_PLAN_LIMITS lookup
@@ -1169,18 +1006,6 @@ export async function GET(req: NextRequest) {
     }
     return getPlanLimits(declaredTierForProvider as Exclude<PlanTier, null>);
   })();
-  const planHealth = analyzePlanHealth({
-    blocks: planBlockRows.map((b) => ({
-      totalTokens: Number(b.totalTokens ?? 0),
-      startedAt: b.startedAt,
-    })),
-    declaredTier: declaredTierForProvider,
-    declaredLimits: declaredLimitsForProvider,
-    cacheHitPct: cacheHitPct > 0 ? cacheHitPct : undefined,
-    oneShotRate: snap[0]?.overallOneShot ? snap[0].overallOneShot * 100 : undefined,
-    windowDays: periodDays,
-    monthlyCostUsd: planBlocksMonthlyCost,
-  });
 
   // Period 단위 ccusage daily 집계 — totalWindowTokens / cache hit / non-cache 의
   // 단일 출처. 이전엔 user_blocks 합 (+ overview fallback) 으로 5h 단위, codeburn
@@ -1221,40 +1046,15 @@ export async function GET(req: NextRequest) {
   const nonCacheTotalWindowTokens = ccusagePeriodAgg.totalTokens > 0
     ? ccusagePeriodAgg.inputTokens + ccusagePeriodAgg.outputTokens
     : null;
-  // realUsagePct — 5h cap 단위 분석. ccusage daily 통일로 산정 불가, 항상 null.
-  const realUsagePct = null;
-  // blockCountInPeriod — 응답 shape 유지용 (user_blocks 데이터는 ingest 가 계속
-  // 누적, 향후 카드 부활 시 즉시 사용 가능). UI 에선 더 이상 표시 안 함.
-  const blockCountInPeriod = planBlockRows.length;
 
   // 2026-05-30: priceForPeriod — declared tier 만 사용 (AI 추정 제거). 미입력은 null.
   // 사용자가 modal 강제로 입력 유도되므로 미입력은 잠시 transient.
-  const declaredLimits = planHealth.declaredLimits;
+  const declaredLimits = declaredLimitsForProvider;
   const effectiveLimits = declaredLimits;
   const monthlyPriceUsd = effectiveLimits?.monthlyPriceUsd ?? null;
   const priceForPeriod = monthlyPriceUsd !== null
     ? (monthlyPriceUsd * periodDays) / 30
     : null;
-
-  // API tier (PAYG) 사용자 추천 플랜 — UsageHero 의 토큰 단가 자리에 표시.
-  // 지난 30일 실제 cost 기준 cheapest plan 추천 + 절감액 계산. plan 가격이 API 비용
-  // 보다 비싸면 (= 사용량 적음) 'low' edge case → API 종량제 유지 권장.
-  type ApiRecommendation = {
-    monthlyCost30d: number;
-    recommendedTier: Exclude<PlanTier, null> | "api";
-    recommendedTierLabel: string;
-    planMonthlyPrice: number;
-    savingsAmount: number;
-    savingsPct: number;
-    // "high" 분기 제거 (2026-05-22). 옛 분기는 cost > $400 → "Max 20x 한도
-    // 자주 도달 위험" 메시지였으나, cache leverage 사용자별 5×~100× 다양해서
-    // monthlyCost30d 가 부풀려진 cache 친 cost 라 한도 도달과 무관. eugene
-    // 5h 0번 / 1주 1번 사례로 misleading 확인 → low | normal 만.
-    edgeCase: "low" | "normal";
-  };
-  // 2026-05-30: API tier 사용자에게 어떤 Plan 으로 옮기면 절감되는지 추천도 AI 추정 의존이라
-  // 폐기. 사용자가 직접 OpenAI / Anthropic billing 보고 판단.
-  const apiRecommendation: ApiRecommendation | null = null;
 
   // Power Index — period 비례 정규화. fallback 적용된 값 사용.
   const powerActiveDays = effectiveActiveDays;
@@ -1302,16 +1102,13 @@ export async function GET(req: NextRequest) {
       periodScore,
     },
     planHealth: {
-      ...planHealth,
-      totalWindowTokens,    // fallback 적용된 값으로 override
+      declaredTier: declaredTierForProvider,
+      declaredLimits,
+      totalWindowTokens,
       nonCacheTotalWindowTokens,
-      realUsagePct,
-      blockCountInPeriod,
       cacheHitPctForPeriod,
       priceForPeriod,
       periodDays,
-      // API tier (PAYG) 사용자 추천. 다른 tier 면 null.
-      apiRecommendation,
       // 본전 회수 (이번 달 단위, period 무관) — 사용자 인터뷰 "월 요금제
       // 뽕 뽑기" 핵심 framing. monthlyPriceUsd 있을 때만 (declared 또는
       // 추정 tier). API tier / tier 미입력 / activity 0 은 null.
@@ -1396,7 +1193,6 @@ export async function GET(req: NextRequest) {
     mcpServers: toNameCalls(d.mcpServers ?? []),
     availableSnapshots,
     snapshot: snapshotInfo,
-    blocks,
     efficiencyScore,
     devices,
     selectedDeviceId: selectedTokenId,
