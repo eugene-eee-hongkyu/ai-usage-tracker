@@ -47,6 +47,8 @@ export const users = sqliteTable("users", {
   // LOCAL_MODE 는 단일 사용자라 사실상 안 쓰이지만 schema sync 정합성 위해 보유.
   provider: text("provider"),
   planTier: text("plan_tier"),
+  // Codex plan tier — Phase 2 (2026-05-30). LOCAL_MODE 도 PG schema 와 동기화 유지.
+  codexPlanTier: text("codex_plan_tier"),
   role: text("role").notNull().default("member"),
   permissions: text("permissions", { mode: "json" }).notNull().default(sql`'{}'`),
   suspendedAt: integer("suspended_at", { mode: "timestamp_ms" }),
