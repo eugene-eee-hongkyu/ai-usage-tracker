@@ -29,16 +29,18 @@
 
 | 탭 | 진입 | 기대 노출 |
 |---|---|---|
-| /platform-admin/all-users | "All Team Users" | 모든 팀 사용자 카드 그리드. iskra 멤버 (본인, 영진님, oreo) 노출. 외부 회사 멤버도 노출 |
+| /platform-admin/all-users | "All Team Users" | "All Users · 오늘" 헤더 + "전체 N명 · 오늘 활동 M명". 사용자 카드 그리드. 각 카드 = 이름·팀 + 활동 상태 (✓ / ⚠ / ✗) + 마지막 sync 시각 + tokens / cost / cache hit / 1-shot + Plan 절감 + tier + Env (ccusage / npm / devices / codeburn / Node / Claude / OS). 2026-05-30 시점: 전체 11명, 오늘 활동 3명 |
 | /platform-admin/all-personal | "All Personal" | Personal 사용자 어드민 뷰 |
 | /platform-admin/all-teams | "All Teams" | 모든 팀 비교 (활용지수 desc). Codex scope 누락 없음 (commit ae5aabb) — claude / codex 양쪽 metric 포함 |
 | /platform-admin/audit | "Audit" | audit_logs hash chain integrity 표시. prev_hash / row_hash 연쇄 |
 | /platform-admin/settings | "Settings" | Platform 옵션 |
 
 **본인 특이 검증**:
-- /platform-admin/all-users 의 사용자 카드 클릭 → view-as 진입
+- /platform-admin/all-users 의 사용자 카드 클릭 → **view-as 활성 + /admin/members 로 landing** (자동 /dashboard X)
+- view-as 활성 상태에서 /dashboard 진입 시 → 그 사용자 시점 dashboard-view (Hero 5 카드 + gauge + 모든 Block)
 - view-as 진입 시 effective-team 격리 (effective-team.ts) — view-as 한 사용자의 팀으로 화면 전환
 - view-as 종료 → 본인 시점 복귀, view-as cookie 정리
+- **device 분리 = 카드 분리로 노출** — 영진님 (device 2) 케이스가 all-users 에 **카드 2 개로 분리** 표시 (Mac + Windows 별, 한 쪽은 활동 있고 다른 쪽은 "오늘 데이터 없음" 분기 가능). 이게 M6f 동작
 
 ---
 

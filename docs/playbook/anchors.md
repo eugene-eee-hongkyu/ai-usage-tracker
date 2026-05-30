@@ -83,8 +83,11 @@
 
 ### 본인 검증 가능 여부 (진입 경로)
 
-- ✓ **/team → 영진님 멤버 카드 → /team/[userId]/dashboard** — 어드민이 멤버 시점 dashboard view (CONTEXT.md 명시 경로). 가장 간단
-- ✓ /platform-admin/all-users → 영진님 view-as → 전체 화면 영진님 시점 — view-as 모드 유지 시 다른 화면도 그 시점
+2026-05-30 prod 검증 결과 두 경로가 **등가 아님**:
+
+- **/team → 영진님 카드 → /team/4** = 단순화된 프로필 view (Hero 4 카드 + heatmap 4 weeks + Top projects 10). device 분리 / gauge / planSavings 등 없음. CONTEXT.md 의 "/team/[userId]/dashboard" 경로는 실제 /team/[userId] 로 redirect (CONTEXT.md stale)
+- **/platform-admin/all-users → 영진님 카드 → /admin/members landing → /dashboard navigate** = view-as 활성 상태 풀 dashboard-view (Hero 5 카드 + gauge + 모든 Block 모두 노출). **이 경로가 진짜 매트릭스 검증용**
+- **device 2 분리 = /platform-admin/all-users 의 카드 2 개로 노출** (Mac + Windows 별, 한 쪽은 활동 있고 다른 쪽 "오늘 데이터 없음" 가능)
 - ✗ /setup-status (영진님 본인 device 관리 화면) — 영진님 본인만. 필요 시 본인에게 요청
 
 ---
@@ -113,8 +116,10 @@
 
 ### 검증 대상 화면 (본인 진입 경로)
 
-- ✓ /team → oreo 멤버 카드 → /team/[userId]/dashboard provider=codex (간단)
-- ✓ /platform-admin/all-users → oreo view-as → /dashboard provider=codex (전체 view-as)
+2026-05-30 검증 결과:
+
+- ✗ /team → oreo 멤버 카드 → /team/2 = "No data yet" 분기 노출 (DB 데이터 있어도 최근 활동 기준 미충족 시), provider 토글도 안 그림. Codex 경고 검증 불가
+- ✓ **/platform-admin/all-users → oreo 카드 → /admin/members landing → /dashboard** = view-as 활성, Hero 5 카드 (938.3M / $634.22 / 97.6% / 69% / Active 6 days) + efficiency "No data / No activity" 노출. 이게 Codex efficiency 경고 케이스의 진앙 가능성. Codex 토글 후 정확한 경고 표현 검증 필요 (다음 라운드)
 
 ### 깨졌을 때 신호
 

@@ -19,6 +19,7 @@
 - longest-prefix active 매칭 — /admin/team/ranking 진입 시 ranking 만 active (line 82-85)
 - amber bar 라벨 "Admin"
 - ViewAsBanner 노출 (view-as 진행 중일 때)
+- **/platform-admin/all-users 카드 클릭 시 view-as 활성 + /admin/members 로 landing** (2026-05-30 prod 검증). 그 사용자 시점 풀 dashboard 보려면 /dashboard 로 별도 navigate
 
 ---
 

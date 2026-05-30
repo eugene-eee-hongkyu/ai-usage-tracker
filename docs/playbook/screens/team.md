@@ -65,19 +65,33 @@ team-view.tsx 의 const Block 들 (provider segmented control 공유 — useProv
 
 ---
 
-## /team/[userId] (멤버 프로필) 검증
+## /team/[userId] (멤버 프로필) 검증 — 2026-05-30 prod 검증
 
-본인 진입 → 영진님 카드 클릭:
-- [ ] 영진님 프로필 노출
-- [ ] 본인 권한 (platform admin) → "/dashboard 으로 view 보기" 진입 가능
-- [ ] device 별 사용 정보 노출 (영진님 = 2 device)
+**중요: 단순화된 프로필 view 이지 dashboard-view 풀 화면이 아님.** 구조:
+
+| 영역 | 노출 |
+|---|---|
+| 헤더 | "← Team ranking" 링크 + "{name} profile" 제목 |
+| provider 토글 | Claude Code / Codex (데이터 있을 때만) |
+| Hero 4 카드 | Total cost / Sessions / Cache hit / 🔥 Streak |
+| Activity heatmap | **4 weeks**, by cost (본인 /dashboard 는 24 weeks) |
+| Top projects | 10 개 list (project path + cost + sessions) |
+
+**없는 것** (본인 /dashboard 와 다름):
+- device 별 line 분리 (M6f 의 device 분리는 /platform-admin/all-users 의 카드 분리로 노출)
+- gauge / planSavings / unitCost / efficiency 카드 / cacheStreak / Activity heatmap 24 weeks
+- Codex modal 자동 trigger
+- AI tier 추정 카드 (이건 본인 /dashboard 에도 없음, 일관)
+
+**"No data yet" 분기** — 최근 활동 없는 멤버는 hero / heatmap / projects 모두 미노출, "Data is collected automatically after the user finishes their first Claude Code session." 카피만. provider 토글도 안 그림. (2026-05-30 oreo 케이스 검증 — DB 데이터 있어도 최근 활동 기준 미충족 시 이 분기)
 
 ---
 
-## /team/[userId]/dashboard (어드민이 멤버 시점 dashboard view)
+## /team/[userId]/dashboard → 실제로는 /team/[userId] 로 redirect
 
-- /dashboard 와 동일 컴포넌트 (dashboard-view) 가 멤버 데이터로 렌더
-- dashboard.md 매트릭스 그대로 적용 (anchor 별)
+CONTEXT.md 에 "/team/[userId]/dashboard — 어드민이 멤버 시점 dashboard view" 로 적혀있으나 **2026-05-30 prod 검증 시 /team/4/dashboard → /team/4 로 redirect**. 파일은 존재 (`web/src/app/team/[userId]/dashboard/page.tsx`) 하나 routing 결과는 단순화 view. CONTEXT.md 갱신 필요 (별 이슈).
+
+**대신 멤버 시점 풀 dashboard 보려면**: /platform-admin/all-users → 멤버 카드 클릭 → view-as 활성 → /admin/members landing → /dashboard 로 navigate (view-as 유지 상태로 멤버 시점 dashboard 노출)
 
 ---
 

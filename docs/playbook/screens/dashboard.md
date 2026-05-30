@@ -72,24 +72,25 @@ provider 토글은 dashboard / team / ranking 간 공유 (useProviderPreference,
 
 | provider | 진입 방법 | 기대 노출 |
 |---|---|---|
-| Claude Code | /platform-admin → view-as 영진님 → /dashboard | **device 분리 line 2 개** (Mac + Windows) — M6f token_id 분기. 1 개로 합쳐 보이면 회귀. team badge "iskra" (z21labs.xyz 도메인 가입자임에도). Unit Cost plan tier select 에 Max 5x 선택됨 (plan_tier=max5) |
-| Codex | provider 토글 → Codex | claude+codex 양쪽 데이터 보유 (확인됨). Codex 카드 노출. codex_plan_tier=null 이므로 Codex modal 자동 trigger 검증 가능 |
+| Claude Code | /platform-admin/all-users → 영진님 카드 → view-as → /dashboard | team badge "iskra" (z21labs.xyz 도메인 가입자임에도). Unit Cost plan tier select 에 Max 5x 선택됨 (plan_tier=max5). **device 분리는 /dashboard 내부 line 이 아니라 /platform-admin/all-users 에서 카드 2 개로 분리** (M6f 동작, 2026-05-30 prod 검증). 본인 카드는 첫 번째 (Mac 활동 있음), 두 번째는 Windows ("오늘 데이터 없음" 가능) |
+| Codex | provider 토글 → Codex | claude+codex 양쪽 데이터 보유 (확인됨). Codex 카드 노출. codex_plan_tier=null 이지만 **다른 사용자 view-as 시 Codex modal 자동 trigger 안 뜸** (본인 dashboard 진입 시만 의도된 듯, 2026-05-30 검증) |
 
 **영진님 특이 검증**:
 - dual domain 표시 정합성 — 이메일은 z21labs.xyz 인데 team 은 iskra
-- device 별 line 의 라벨이 device 이름 (api_tokens.name) 으로 노출되는지
+- /platform-admin/all-users 에 영진님 카드 2 개 노출 (M6f device 분리) — 1 개로 합치면 회귀
+- 카드의 OS 분기 (macOS arm64 + win32 x64) 확인
 - device_count = 2 유지 (DB 변경 시 회귀 신호)
 
 ### Anchor 3 — oreo (user_id=2, view-as, Codex baseline)
 
-| provider | 진입 방법 | 기대 노출 |
+| provider | 진입 방법 | 기대 노출 (2026-05-30 본인 시점 부분 검증) |
 |---|---|---|
-| Claude Code | view-as oreo → /dashboard | claude 데이터 보유 (max20). Hero + gauge + planSavings + unitCost + activityHeatmap 등 모두 노출 |
-| Codex | provider 토글 → Codex | **efficiencyBlock 합계 경고 노출** (현재 baseline — state.md 보류 항목). 경고 사라지면 진단 풀린 것인지 / 데이터 변동인지 / 회귀인지 확인 필요. **codex_plan_tier=null** 이므로 Codex modal 자동 trigger (Free 옵션 없음, commit 47e49e5 / ce1b364) 노출 여부 검증 |
+| Claude Code | /platform-admin/all-users → oreo 카드 → /admin/members landing → /dashboard | Hero 5 카드 (Active 6 days / 938.3M tokens / $634.22 cost / 97.6% cache / 69% 1-shot) + admin 5 탭 + 비용 원인 Top 3 + efficiency 카드. plan_tier=max20 게이지 |
+| Codex | provider 토글 → Codex | **efficiencyBlock 합계 경고 노출 가능성** — 본인 시점 efficiency 카드 가 "Score No data / No activity" 로 표시 (2026-05-30 부분 검증). 이게 state.md 의 "Codex 합계 경고" 케이스 진앙으로 추정. 정확한 경고 표현은 다음 라운드 codex 토글 후 검증 |
 
 **oreo 특이 검증**:
 - Codex 전용 metric (Phase 3a, commit 9cd7a4c / 8cf6dea / af07e7f) 노출
-- Codex modal 자동 trigger — codex_plan_tier=null 상태에서 codex 토글 진입 시 modal 노출 정상 동작 (사용자 입력 강제, Phase 1)
+- Codex modal 자동 trigger 는 다른 사용자 view-as 시 안 뜸 — 본인 dashboard 진입 시만 의도된 동작
 - Codex plan tier 카드의 Free 옵션 없음 (commit 47e49e5)
 
 ---
