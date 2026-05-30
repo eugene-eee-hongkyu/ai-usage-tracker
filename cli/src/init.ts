@@ -11,7 +11,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const SERVER_URL = process.env.USAGE_TRACKER_URL ?? "https://aiusage.z21labs.world";
 // Multi-provider (2026-05-29 M): 0.3.x 부터 Claude + Codex 분리 호출.
 // dashboard 가 envInfo.cliVersion >= 0.3.0 으로 Codex 탭 활성 분기.
-export const CLI_VERSION = "0.3.0";
+export const CLI_VERSION = "0.3.2";
 
 // === 새 (z21labs) ===
 const KEYTAR_SERVICE = "z21labs-usage-tracker";
@@ -871,7 +871,7 @@ export async function runRepair() {
 
   // 최종 종료 표시 — 사용자가 "어디서 끝났는지" 헷갈리지 않도록 강조 블록.
   console.log("\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-  console.log("✨ 업데이트 완료 — 이 메시지가 보이면 정상입니다");
+  console.log(`✨ AI Usage Tracker v${CLI_VERSION} 업데이트 완료`);
   console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
   console.log("   이제 자동으로 사용량이 수집됩니다.");
   console.log(`   📊 대시보드:  ${SERVER_URL}/dashboard`);
@@ -936,7 +936,7 @@ export async function runInit() {
 
   // 최종 종료 표시 — 사용자가 "어디서 끝났는지" 헷갈리지 않도록 강조 블록.
   console.log("\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-  console.log("✨ 설치 완료 — 이 메시지가 보이면 정상입니다");
+  console.log(`✨ AI Usage Tracker v${CLI_VERSION} 설치 완료`);
   console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
   console.log("   이제 자동으로 사용량이 수집됩니다.");
   console.log(`   📊 대시보드:  ${SERVER_URL}/dashboard`);
