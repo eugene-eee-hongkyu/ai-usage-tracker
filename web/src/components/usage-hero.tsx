@@ -59,9 +59,9 @@ function tierOptions(m: Messages, provider: "claude" | "codex"): Array<{ value: 
   // 첫 옵션은 placeholder (강제 선택 유도) — value="" 일 때 "확인" 버튼 disabled.
   // Phase 2 (2026-05-30): Codex provider 분기. AI 추정 제거 → 사용자 무조건 선택.
   if (provider === "codex") {
+    // ChatGPT Free 는 Codex CLI 사용 불가라 의도적으로 제외 (2026-05-30 사용자 결정).
     return [
       { value: "",            label: m.usageHero.tierModalPickPlaceholder },
-      { value: "free",        label: "Free ($0/mo)" },
       { value: "plus",        label: "ChatGPT Plus ($20/mo)" },
       { value: "business",    label: "ChatGPT Business ($30/mo)" },
       { value: "pro",         label: "ChatGPT Pro ($200/mo)" },

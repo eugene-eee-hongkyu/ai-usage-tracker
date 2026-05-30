@@ -5,8 +5,8 @@
 
 import type { PlanLimits } from "./plan-health";
 
+// Free 는 의도적으로 제외 (2026-05-30 사용자 결정) — ChatGPT Free 는 Codex CLI 사용 불가.
 export type CodexPlanTier =
-  | "free"
   | "plus"
   | "business"
   | "pro"
@@ -15,7 +15,6 @@ export type CodexPlanTier =
   | "api";
 
 export const CODEX_PLAN_LIMITS: Record<CodexPlanTier, PlanLimits> = {
-  free:       { tier: "free",       label: "Free",                monthlyPriceUsd: 0,   estimated5hTokenLimit: 0 },
   plus:       { tier: "plus",       label: "ChatGPT Plus",        monthlyPriceUsd: 20,  estimated5hTokenLimit: 0 },
   business:   { tier: "business",   label: "ChatGPT Business",    monthlyPriceUsd: 30,  estimated5hTokenLimit: 0 },
   pro:        { tier: "pro",        label: "ChatGPT Pro",         monthlyPriceUsd: 200, estimated5hTokenLimit: 0 },
@@ -27,7 +26,7 @@ export const CODEX_PLAN_LIMITS: Record<CodexPlanTier, PlanLimits> = {
 };
 
 export const VALID_CODEX_TIERS: CodexPlanTier[] = [
-  "free", "plus", "business", "pro", "team", "enterprise", "api",
+  "plus", "business", "pro", "team", "enterprise", "api",
 ];
 
 export function getCodexPlanLimits(tier: CodexPlanTier): PlanLimits {
