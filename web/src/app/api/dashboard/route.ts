@@ -608,15 +608,12 @@ export async function GET(req: NextRequest) {
   // 이전 fix 에서 ccusageRows.reduce 로 단순화했더니 period 무시되어 30days 토글이
   // 무의미해진 회귀 — 영진님 merge 30days = 전체 $1317 (정확값 $867) 차이 큼.
   const ccusageHasData = Object.keys(ccusageMap).length > 0;
-  const periodDateSet = new Set(
-    (d.daily ?? [])
-      .map((day) => day.date)
-      .filter((dt): dt is string => typeof dt === "string" && dt.length > 0)
-  );
+  // 2026-05-30: correctedTotalCost = daily.reduce. daily 가 이미 ccusage rows 의 period
+  // 윈도우 filter 결과라 그 합 = period 안 ccusage totalCost 합. 옛 periodDateSet path
+  // (codeburn d.daily 의 date 기준) 가 codeburn rawDaily 의 date 만 봐서 ccusage 의
+  // 추가 date 빠지는 회귀 — daily 자체 합과 일관 보장.
   const correctedTotalCost = ccusageHasData
-    ? ccusageRows
-        .filter((r) => r.date && periodDateSet.has(r.date))
-        .reduce((s, r) => s + ((r as { totalCost?: number }).totalCost ?? 0), 0)
+    ? daily.reduce((s, d) => s + (d.cost ?? 0), 0)
     : null;
 
   // Heatmap (period 무관). ccusage 우선, 없으면 codeburn all daily.
