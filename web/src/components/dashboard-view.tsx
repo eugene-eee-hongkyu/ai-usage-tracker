@@ -30,6 +30,7 @@ import { PrivacyBanner } from "@/components/privacy-banner";
 import { StaleSyncBanner } from "@/components/stale-sync-banner";
 import { CliUpdateBanner } from "@/components/cli-update-banner";
 import { ProviderSegmentedControl } from "@/components/provider-segmented-control";
+import { useProviderPreference } from "@/lib/use-provider-preference";
 import { track, EVENTS } from "@/lib/analytics/mixpanel";
 import { useTrackScrollDepth } from "@/lib/analytics/use-track-scroll-depth";
 import { useTrackSectionDwell } from "@/lib/analytics/use-track-section-dwell";
@@ -1005,8 +1006,8 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
   const [dayOffset, setDayOffset] = useState(0);
   // M6f: 사용자가 노트북 N대 쓰면 device chip 으로 선택. null = server 가 가장 최근 device 자동 결정.
   const [deviceId, setDeviceId] = useState<number | null>(null);
-  // Multi-provider (2026-05-29 M): Claude / Codex 분리 탭. default = claude (대다수).
-  const [provider, setProvider] = useState<"claude" | "codex">("claude");
+  // Multi-provider — 마지막 선택 localStorage 기억 (화면 간 공유). lazy init 이라 race 없음.
+  const [provider, setProvider] = useProviderPreference();
 
   const apiUrl = (p: Period, wOff: number, mOff: number, dOff: number, devId: number | null, prov: "claude" | "codex") => {
     const params = new URLSearchParams({ period: p });

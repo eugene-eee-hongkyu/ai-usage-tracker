@@ -13,6 +13,7 @@ import { Nav } from "@/components/nav";
 import { track, EVENTS } from "@/lib/analytics/mixpanel";
 import { useTrackScrollDepth } from "@/lib/analytics/use-track-scroll-depth";
 import { ProviderSegmentedControl } from "@/components/provider-segmented-control";
+import { useProviderPreference } from "@/lib/use-provider-preference";
 
 type Metric = "cost" | "tokens" | "cacheHit" | "streak" | "saving";
 
@@ -93,8 +94,8 @@ export default function RankingPage() {
   const [byMetric, setByMetric] = useState<Partial<Record<Metric, RankingResponse>>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  // Multi-provider Phase 2 (2026-05-30 M): Provider Tabs. default = claude.
-  const [provider, setProvider] = useState<"claude" | "codex">("claude");
+  // Multi-provider — 마지막 선택 localStorage 기억 (dashboard / team 과 공유).
+  const [provider, setProvider] = useProviderPreference();
 
   useEffect(() => {
     if (status === "unauthenticated") router.push("/login");

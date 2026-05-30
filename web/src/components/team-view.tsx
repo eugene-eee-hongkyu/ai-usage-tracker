@@ -23,6 +23,7 @@ import { track, EVENTS } from "@/lib/analytics/mixpanel";
 import { useTrackScrollDepth } from "@/lib/analytics/use-track-scroll-depth";
 import { useTrackSectionDwell } from "@/lib/analytics/use-track-section-dwell";
 import { ProviderSegmentedControl } from "@/components/provider-segmented-control";
+import { useProviderPreference } from "@/lib/use-provider-preference";
 
 type Period = "today" | "8days" | "month" | "30days" | "all";
 type GradeLevel = "exemplary" | "good" | "moderate" | "insufficient" | "warning";
@@ -375,8 +376,8 @@ export function TeamView({ adminMode = false }: { adminMode?: boolean }) {
   const { data: session, status } = useSession();
   const router = useRouter();
   const [period, setPeriod] = useState<Period>("month");
-  // Multi-provider Phase 2 (2026-05-30 M): Provider Tabs. default = claude.
-  const [provider, setProvider] = useState<"claude" | "codex">("claude");
+  // Multi-provider — 마지막 선택 localStorage 기억 (dashboard / ranking 과 공유).
+  const [provider, setProvider] = useProviderPreference();
 
   // team_view 진입 시 1회. adminMode (admin view-as) 와 분리.
   useEffect(() => {
