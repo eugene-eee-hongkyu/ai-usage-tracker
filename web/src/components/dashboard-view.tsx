@@ -17,7 +17,8 @@ import { useLocalMode } from "@/lib/use-local-mode";
 import { useMessages } from "@/lib/use-i18n";
 import type { Messages } from "@/lib/i18n";
 import { Nav } from "@/components/nav";
-import { AdminNav } from "@/components/admin-nav";
+// AdminNav 제거 (2026-05-30) — admin layout 의 sub-nav 로 통합. adminMode=true 는
+// /admin/members 페이지에서 view-as dashboard 렌더 시 — 이미 admin layout 안.
 import { CacheHitModal, OneShotRateModal, CostPerSessionModal, CallsPerSessionModal, CostPerCallModal, TokenVolumeModal } from "@/components/metric-modal";
 import { computeTokenLevel } from "@/lib/rules";
 import { ActivityCalendar } from "react-activity-calendar";
@@ -908,7 +909,8 @@ interface TeamRankPayload {
 
 export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dashboard_period", adminMode = false }: { targetUserId?: string; onMemberSelect?: (userId: string) => void; storageKey?: string; adminMode?: boolean }) {
   const viewOnly = !!targetUserId;
-  const NavComponent = adminMode ? AdminNav : Nav;
+  // adminMode 면 admin layout sub-nav 가 이미 표시 → 본 컴포넌트는 nav 안 렌더.
+  const NavComponent = adminMode ? () => null : Nav;
   const { data: session, status } = useSession();
   const router = useRouter();
   const [period, setPeriod] = useState<Period>("8days");

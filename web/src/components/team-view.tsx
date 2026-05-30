@@ -5,7 +5,9 @@ import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { useLocalMode } from "@/lib/use-local-mode";
 import { Nav } from "@/components/nav";
-import { AdminNav } from "@/components/admin-nav";
+// AdminNav 제거 (2026-05-30) — admin layout 의 sub-nav (팀원·팀·랭킹·사용자·세팅 5 탭)
+// 으로 통합. adminMode=true 호출은 /admin/team page 에서만 — 그 페이지가 admin layout
+// 안이라 layout sub-nav 가 이미 표시.
 import { PageFooter } from "@/components/page-footer";
 import { TeamPlanHealthCard, type TeamPlanSummary } from "@/components/team-plan-health-card";
 import { TeamUsageHero } from "@/components/team-usage-hero";
@@ -365,7 +367,8 @@ function MemberTokenTooltip({ active, payload, label }: { active?: boolean; payl
 
 export function TeamView({ adminMode = false }: { adminMode?: boolean }) {
   const { m: t } = useMessages();
-  const NavComponent = adminMode ? AdminNav : Nav;
+  // adminMode 면 admin layout 의 sub-nav 가 이미 표시되므로 본 컴포넌트는 nav 안 렌더.
+  const NavComponent = adminMode ? () => null : Nav;
   const { data: session, status } = useSession();
   const router = useRouter();
   const [period, setPeriod] = useState<Period>("month");

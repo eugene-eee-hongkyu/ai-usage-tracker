@@ -38,11 +38,16 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   if (status === "loading" || isLocalMode === null || loading) return null;
   if (status === "authenticated" && !isAnyAdmin) return null;
 
+  // 2026-05-30: 평탄화 — 옛 [Users / Team / Settings] 3 탭에서 5 탭으로 확장. AdminNav
+  // (amber bar) 의 [팀·팀원·랭킹] 을 여기로 흡수해서 admin 의 모든 페이지가 한 줄에서
+  // 접근 가능. 권한 — 팀원/사용자 = Membership Admin, 팀/랭킹 = Billing Admin,
+  // 세팅 = Platform Admin 또는 Team Owner.
   const tabs: Array<{ href: string; label: string; visible: boolean }> = [
-    { href: "/admin/users", label: "Users", visible: isMembershipAdmin },
-    { href: "/admin/team", label: "Team", visible: isBillingAdmin },
-    // Settings: Platform Admin 또는 Team Owner. 자기 팀 권한 부여 + 비활성 사용자 + 보관.
-    { href: "/admin/settings", label: "Settings", visible: isPlatformAdmin || isTeamOwner },
+    { href: "/admin/members", label: "팀원", visible: isMembershipAdmin },
+    { href: "/admin/team", label: "팀", visible: isBillingAdmin },
+    { href: "/admin/team/ranking", label: "랭킹", visible: isBillingAdmin },
+    { href: "/admin/users", label: "사용자", visible: isMembershipAdmin },
+    { href: "/admin/settings", label: "세팅", visible: isPlatformAdmin || isTeamOwner },
   ];
 
   return (
@@ -55,21 +60,28 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             Admin
           </span>
           <span className="text-slate-700">/</span>
-          {tabs
-            .filter((t) => t.visible)
-            .map((t) => (
+          {(() => {
+            const visible = tabs.filter((t) => t.visible);
+            // longest-prefix active — /admin/team/ranking 진입 시 ranking 만 active,
+            // /admin/team 은 dim. 가드 없으면 둘 다 startsWith 매칭으로 동시 active.
+            const activeHref =
+              visible
+                .filter((t) => path === t.href || path.startsWith(t.href + "/"))
+                .sort((a, b) => b.href.length - a.href.length)[0]?.href ?? null;
+            return visible.map((t) => (
               <Link
                 key={t.href}
                 href={t.href}
                 className={`text-sm px-3 py-1 rounded transition-colors ${
-                  path.startsWith(t.href)
+                  activeHref === t.href
                     ? "bg-slate-800 text-slate-100"
                     : "text-slate-400 hover:text-slate-200"
                 }`}
               >
                 {t.label}
               </Link>
-            ))}
+            ));
+          })()}
         </div>
         {children}
       </div>
