@@ -146,7 +146,12 @@ export default function RankingPage() {
             "랭킹" h1 제거 (사용자 피드백: nav 가 이미 [랭킹] 활성). 부제는 컨텍스트 (30일 / 익명 / 참여자 수) 라 유지. */}
         <ProviderSegmentedControl
           value={provider}
-          onChange={setProvider}
+          // provider 토글 시 옛 byMetric 즉시 폐기 — fetch 응답 도착 전까지 옛 scope 데이터가
+          // 잔상으로 보이는 버그 방지. team-view 와 동일 패턴.
+          onChange={(p) => {
+            if (p !== provider) setByMetric({});
+            setProvider(p);
+          }}
           hasClaudeData={byMetric.cost?.hasClaudeData ?? true}
           hasCodexData={byMetric.cost?.hasCodexData ?? false}
           testIdPrefix="ranking-provider"

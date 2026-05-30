@@ -488,6 +488,22 @@ export function TeamView({ adminMode = false }: { adminMode?: boolean }) {
   if (!data) return (
     <div className="min-h-screen bg-neutral-950">
       <NavComponent />
+      {/* loading 중에도 provider segmented control 은 유지 — 토글 즉시 setData(null) 분기로
+          들어와도 사용자가 다시 토글 가능. hasData flags 는 알 수 없으니 둘 다 enabled 가정. */}
+      <div className="border-b border-neutral-800">
+        <div className="max-w-6xl mx-auto px-4 pt-3 pb-2">
+          <ProviderSegmentedControl
+            value={provider}
+            onChange={(p) => {
+              if (p !== provider) setData(null);
+              setProvider(p);
+            }}
+            hasClaudeData={true}
+            hasCodexData={true}
+            testIdPrefix="team-provider"
+          />
+        </div>
+      </div>
       <div className="flex items-center justify-center h-64">
         <div className="animate-pulse text-neutral-500 text-sm font-mono">{t.teamView.loading}</div>
       </div>
@@ -1615,7 +1631,14 @@ export function TeamView({ adminMode = false }: { adminMode?: boolean }) {
         <div className="max-w-6xl mx-auto px-4 pt-3 pb-2">
           <ProviderSegmentedControl
             value={provider}
-            onChange={setProvider}
+            // provider 토글 시 옛 data 즉시 폐기 — fetch 응답 도착 전까지 옛 scope (예:
+            // claude 의 memberNames) 가 차트에 잔상으로 남는 버그 방지. 사용자 피드백:
+            // "codex 탭에 데이터 없는 멤버가 보인다" (2026-05-30). period 변경엔 적용 안 함
+            // — 멤버 set 은 동일이라 잔상이 무해 (데이터만 갱신).
+            onChange={(p) => {
+              if (p !== provider) setData(null);
+              setProvider(p);
+            }}
             hasClaudeData={data.hasClaudeData ?? true}
             hasCodexData={data.hasCodexData ?? false}
             testIdPrefix="team-provider"
