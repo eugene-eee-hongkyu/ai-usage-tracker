@@ -34,7 +34,7 @@
 - [ ] AI 자동 tier 추정 카드 노출 안 됨 (Phase 1 제거 회귀 X) — Unit Cost 카드 의 plan tier select 가 사용자 입력 채널
 - [ ] 토글 전환 시 잔상 / 빈 깜빡임 없음
 - [ ] 페이지 하단 transparency-card ("What your admin can see") 노출
-- [ ] **(잠재 회귀 확인)** Daily Unit Cost 가 period=8days 일 때 30 일 보임? — memory `project_unit_cost_chart_30days` 정책 일치 여부. 사용자 결정 대기 항목
+- [ ] Daily Unit Cost 차트가 period 토글 따라 노출 일수 변경 (today 1 일 / 8days 8 일 / 30days 30 일)
 
 ### /team
 
@@ -66,7 +66,9 @@
 
 ## Anchor 2 — 영진님 (user_id=4, youngjin.kim@z21labs.xyz, view-as)
 
-진입: /platform-admin/all-users → 영진님 카드 → view-as
+진입 경로 (둘 중 편한 쪽):
+- **A (간단)** /team → 영진님 멤버 카드 클릭 → /team/[userId]/dashboard (어드민이 멤버 시점 dashboard view, CONTEXT.md)
+- **B (전체 view-as)** /platform-admin/all-users → 영진님 카드 → view-as 진입 (view-as 모드 유지, 다른 화면도 그 시점)
 
 ### /dashboard
 
@@ -90,7 +92,9 @@
 
 ## Anchor 3 — oreo (user_id=2, jinwoo.park@z21labs.xyz, view-as, Codex baseline)
 
-진입: /platform-admin/all-users → oreo → view-as → /dashboard
+진입 경로 (둘 중 편한 쪽):
+- **A (간단)** /team → oreo 멤버 카드 클릭 → /team/[userId]/dashboard
+- **B (전체 view-as)** /platform-admin/all-users → oreo → view-as → /dashboard
 
 ### /dashboard provider=claude
 
@@ -123,4 +127,4 @@
 
 | 날짜 | release commit | 결과 | 비고 |
 |---|---|---|---|
-| 2026-05-30 | 24bf0dd (playbook 작성 직후) | Anchor 1 (본인) /dashboard 부분 통과, 정정 사항 발견 → screens md 갱신 | Hero 5 카드 / Period 토글 / nav / Daily Activity 차트 / "Show details" 가 dashboard.md 매트릭스에 누락되어 있어 추가. Daily Unit Cost 가 period=8days 일 때 8 일치만 보여 `unit_cost_chart_30days` 정책 회귀 의심 — 사용자 확인 대기. ranking.md 의 "streak" 라벨 → "연속 활성일" 정정. Anchor 2 / 3 (영진님 / oreo view-as) 미실행 (이번 라운드는 Anchor 1 + 코드 정적 검증 + DB 검증 위주) |
+| 2026-05-30 | 24bf0dd (playbook 작성 직후) | Anchor 1 (본인) /dashboard 통과 + 정정 사항 반영 완료 | Hero 5 카드 / Period 토글 / nav / Daily Activity 차트 / "Show details" 누락 보완. Daily Unit Cost = period 따라 일수 변하는 게 정상 동작 (잘못된 memory 삭제). ranking "streak" 라벨 → "연속 활성일" 정정. view-as 진입 경로에 /team/[userId]/dashboard 옵션 추가. Anchor 2 / 3 (영진님 / oreo) 화면 검증은 다음 release 때 |

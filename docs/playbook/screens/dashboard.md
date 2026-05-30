@@ -113,16 +113,7 @@ provider 토글은 dashboard / team / ranking 간 공유 (useProviderPreference,
 | Codex tier 에 Free 옵션 재등장 | commit 47e49e5 회귀 |
 | Hero 5 카드 1 개 누락 | UsageHero 컴포넌트 회귀 |
 | Period 토글 옵션 변동 | dashboard-view line 55 (Period type) 변경 |
-| Daily Unit Cost 가 항상 30 일 고정 | API tier 분기 (line 1553) 또는 data.dailyPlanUnitCost 길이 강제 변경 |
-
----
-
-## 잠재 회귀 / 정책 변동 (2026-05-30 playbook 1차 실행 발견)
-
-- **Daily Unit Cost 차트가 period 따라감** — period=8days 본인 시점 진입 시 8 일치만 노출 확인. memory `project_unit_cost_chart_30days` 는 "항상 30일 (사용자 결정 2026-05-21)" 로 기록되어 있어 모순. 두 가지 가능성:
-  - A. **정책 회귀** — API 또는 chart 로직이 period 따라가도록 변경됨 → 사용자가 정책 유지 원하면 fix 필요
-  - B. **정책 의도적 폐기** — period 따라가도록 변경 의도 → memory 삭제 + 본 매트릭스 가정 변경
-- 사용자 확인 후 결정. 진단 entry point: `web/src/app/api/dashboard/route.ts` 의 `dailyPlanUnitCost` 응답이 period 따라 잘리는지 / 30 일 그대로인지 확인.
+| Daily Unit Cost 가 period 토글 무시 (항상 같은 길이) | API tier 분기 (line 1553) 또는 data.dailyPlanUnitCost 길이 강제 변경 |
 
 ---
 

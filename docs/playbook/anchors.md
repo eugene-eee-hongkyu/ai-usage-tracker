@@ -81,10 +81,11 @@
 - M6f token_id 로직 회귀 → device 분리 사라지고 합쳐서 표시
 - 영진님 계정 suspend / delete / 팀 이전 → anchor 자체 무효, 갱신 필요
 
-### 본인 검증 가능 여부
+### 본인 검증 가능 여부 (진입 경로)
 
-- ✓ /dashboard, /admin/users, /team — 본인이 platform admin view-as 로 가능
-- ✗ /setup-status (영진님 본인 device 관리 화면) — 영진님 본인만. 필요 시 본인에게 요청.
+- ✓ **/team → 영진님 멤버 카드 → /team/[userId]/dashboard** — 어드민이 멤버 시점 dashboard view (CONTEXT.md 명시 경로). 가장 간단
+- ✓ /platform-admin/all-users → 영진님 view-as → 전체 화면 영진님 시점 — view-as 모드 유지 시 다른 화면도 그 시점
+- ✗ /setup-status (영진님 본인 device 관리 화면) — 영진님 본인만. 필요 시 본인에게 요청
 
 ---
 
@@ -110,9 +111,10 @@
 - Codex provider 전용 metric (Phase 3a, commit 9cd7a4c / 8cf6dea / af07e7f) 정확성
 - Codex plan tier 분리 카드 (codex_plan_tier 컬럼, commit ce1b364) 노출
 
-### 검증 대상 화면 (본인 view-as)
+### 검증 대상 화면 (본인 진입 경로)
 
-- /dashboard provider=codex
+- ✓ /team → oreo 멤버 카드 → /team/[userId]/dashboard provider=codex (간단)
+- ✓ /platform-admin/all-users → oreo view-as → /dashboard provider=codex (전체 view-as)
 
 ### 깨졌을 때 신호
 
