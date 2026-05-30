@@ -177,7 +177,24 @@ export async function GET(req: NextRequest) {
         .select({ userId: teamMembers.userId })
         .from(teamMembers)
         .where(and(eq(teamMembers.teamId, effectiveTeamId!), isNull(teamMembers.deletedAt)));
-  const teamMemberIds = teamMemberIdRows.map((r) => r.userId);
+  let teamMemberIds = teamMemberIdRows.map((r) => r.userId);
+
+  // Multi-provider Phase 2 (2026-05-30): Codex 탭은 의미 있는 Codex 사용량 (cost/sessions > 0)
+  // 있는 멤버만 표시. 가드 없으면 Codex 안 쓰는 멤버 카드가 빈 데이터 (0/null) 로 노출되어
+  // Team Plan Health / Engagement / Efficiency 카드 노이즈. 이 필터로 멤버 리스트 자체를
+  // 좁히면 후속 모든 카드 (allUsers / allSnapsWithToken / daily_visits 등) 자연 적용.
+  if (provider === "codex" && !IS_LOCAL_MODE && teamMemberIds.length > 0) {
+    const codexUserRows = await db
+      .select({ userId: userSnapshots.userId })
+      .from(userSnapshots)
+      .where(and(
+        inArray(userSnapshots.userId, teamMemberIds),
+        eq(userSnapshots.teamId, effectiveTeamId!),
+        eq(userSnapshots.provider, "codex"),
+        or(gt(userSnapshots.totalCost, 0), gt(userSnapshots.sessionsCount, 0)),
+      ));
+    teamMemberIds = Array.from(new Set(codexUserRows.map((r) => r.userId)));
+  }
   const allUsers = IS_LOCAL_MODE
     ? await db.select().from(users)
     : teamMemberIds.length > 0
