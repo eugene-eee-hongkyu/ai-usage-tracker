@@ -412,16 +412,29 @@ export async function GET(req: NextRequest) {
     };
   }
 
-  // Multi-provider Phase 3a — Codex 전용 metric: 추론 비중 (reasoning ratio).
-  // Codex (gpt-5 reasoning / o-series) 의 hidden CoT token 비율 = "보이지 않는 비용".
-  // ccusageDaily.daily[].reasoningOutputTokens 합산 ÷ outputTokens. Claude 는 null.
+  // Multi-provider Phase 3a — Codex 전용 metric.
+  // 추론 비중 (전체) + 모델별 reasoning ratio + fallback 카운트 한 번에 집계.
+  // ccusageDaily.daily[].models[모델명] = {reasoningOutputTokens, outputTokens, isFallback}
   let reasoningRatio: number | null = null;
+  let codexFallbackCount = 0;
+  const codexModelStats: Record<string, { reasoning: number; output: number; fallback: number }> = {};
   if (provider === "codex") {
     let totalOutput = 0;
     let totalReasoning = 0;
     for (const r of ccusageRows) {
       totalOutput += r.outputTokens ?? 0;
       totalReasoning += (r as { reasoningOutputTokens?: number }).reasoningOutputTokens ?? 0;
+      const dailyModels = (r as { models?: Record<string, { reasoningOutputTokens?: number; outputTokens?: number; isFallback?: boolean }> }).models;
+      if (!dailyModels) continue;
+      for (const [name, info] of Object.entries(dailyModels)) {
+        if (!codexModelStats[name]) codexModelStats[name] = { reasoning: 0, output: 0, fallback: 0 };
+        codexModelStats[name].reasoning += info.reasoningOutputTokens ?? 0;
+        codexModelStats[name].output += info.outputTokens ?? 0;
+        if (info.isFallback) {
+          codexModelStats[name].fallback += 1;
+          codexFallbackCount += 1;
+        }
+      }
     }
     reasoningRatio = totalOutput > 0 ? (totalReasoning / totalOutput) * 100 : 0;
   }
@@ -572,7 +585,12 @@ export async function GET(req: NextRequest) {
     const cacheWrite = m.cacheWriteTokens ?? 0;
     const denom = input + cacheRead + cacheWrite;
     const cacheHit = denom > 0 ? (cacheRead / denom) * 100 : 0;
-    return { name: m.name ?? "", cost: m.cost ?? 0, calls: m.calls ?? 0, cacheHitPct: cacheHit };
+    // Phase 3a-2: Codex 일 때 모델별 reasoning ratio (ccusage 의 models{}.{모델명} 키 매칭).
+    const codexStat = codexModelStats[m.name ?? ""];
+    const modelReasoningRatio = codexStat && codexStat.output > 0
+      ? (codexStat.reasoning / codexStat.output) * 100
+      : null;
+    return { name: m.name ?? "", cost: m.cost ?? 0, calls: m.calls ?? 0, cacheHitPct: cacheHit, reasoningRatio: modelReasoningRatio };
   });
 
   const toNameCalls = (arr: RawNameCalls[]) =>
@@ -1279,5 +1297,6 @@ export async function GET(req: NextRequest) {
     supportsMultiProvider,
     hasCodexData,
     reasoningRatio,
+    codexFallbackCount,
   });
 }

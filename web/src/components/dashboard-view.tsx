@@ -93,7 +93,7 @@ interface TopSession {
 
 interface DailyRow { date: string; cost: number; sessions: number }
 interface DailyTokenRow { date: string; totalTokens: number }
-interface Model { name: string; cost: number; calls: number; cacheHitPct: number }
+interface Model { name: string; cost: number; calls: number; cacheHitPct: number; reasoningRatio?: number | null }
 interface NameCalls { name: string; calls: number }
 
 interface SnapshotMeta {
@@ -187,6 +187,8 @@ interface DashboardData {
   hasCodexData?: boolean;
   // Phase 3a — Codex 추론 비중 (reasoningOutputTokens ÷ outputTokens × 100). Claude 면 null.
   reasoningRatio?: number | null;
+  // Phase 3a-2 — Codex 모델 fallback (isFallback=true) 발생 카운트. Claude 면 0.
+  codexFallbackCount?: number;
 }
 
 interface DeviceMeta {
@@ -2528,26 +2530,63 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
         )}
 
         {/* Row 1.6: 활용지수 + 토큰단가 (또는 API 추천). embedded 모드 — main
-            grid 안에서 다른 카드 row 들과 동일 스타일. */}
+            grid 안에서 다른 카드 row 들과 동일 스타일.
+            Phase 3a-2: Codex 탭이면 그 옆 빈자리에 D (모델 fallback) 카드 추가. */}
         {data.powerIndex && (
-          <UsageHero
-            embedded
-            powerIndex={data.powerIndex.score}
-            activeDays={data.powerIndex.activeDays}
-            avgDailyTokens={data.powerIndex.avgDailyTokens}
-            periodDays={data.planHealth?.periodDays ?? 30}
-            periodLabel={periodLabel(period, t)}
-            declaredTier={data.user.planTier ?? null}
-            declaredTierLabel={data.planHealth?.declaredLimits?.label ?? null}
-            priceForPeriod={data.planHealth?.priceForPeriod ?? null}
-            totalWindowTokens={data.planHealth?.totalWindowTokens ?? 0}
-            nonCacheTotalWindowTokens={data.planHealth?.nonCacheTotalWindowTokens ?? null}
-            cacheHitPctForPeriod={data.planHealth?.cacheHitPctForPeriod ?? null}
-            viewOnly={viewOnly}
-            isEstimatedTier={data.planHealth?.isEstimatedTier ?? false}
-            hasActivity={chartData.some((d) => (d.cost ?? 0) > 0)}
-            apiRecommendation={data.planHealth?.apiRecommendation ?? null}
-          />
+          provider === "codex" ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <UsageHero
+                embedded
+                powerIndex={data.powerIndex.score}
+                activeDays={data.powerIndex.activeDays}
+                avgDailyTokens={data.powerIndex.avgDailyTokens}
+                periodDays={data.planHealth?.periodDays ?? 30}
+                periodLabel={periodLabel(period, t)}
+                declaredTier={data.user.planTier ?? null}
+                declaredTierLabel={data.planHealth?.declaredLimits?.label ?? null}
+                priceForPeriod={data.planHealth?.priceForPeriod ?? null}
+                totalWindowTokens={data.planHealth?.totalWindowTokens ?? 0}
+                nonCacheTotalWindowTokens={data.planHealth?.nonCacheTotalWindowTokens ?? null}
+                cacheHitPctForPeriod={data.planHealth?.cacheHitPctForPeriod ?? null}
+                viewOnly={viewOnly}
+                isEstimatedTier={data.planHealth?.isEstimatedTier ?? false}
+                hasActivity={chartData.some((d) => (d.cost ?? 0) > 0)}
+                apiRecommendation={data.planHealth?.apiRecommendation ?? null}
+              />
+              {/* D 카드 — 모델 fallback 카운트. OpenAI 가 overload 등으로 의도한
+                  모델 대신 다른 모델 라우팅한 횟수. 품질/신뢰도 metric. */}
+              <div data-testid="dash-card-codex-fallback" className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-amber-500 rounded p-4 flex flex-col gap-2">
+                <span className="text-xs font-mono font-bold text-amber-400 uppercase tracking-wider">🔁 모델 fallback</span>
+                <div className="text-3xl font-bold text-neutral-100 font-mono">
+                  {(data.codexFallbackCount ?? 0).toLocaleString()}<span className="text-lg text-neutral-500">회</span>
+                </div>
+                <p className="text-xs text-neutral-400 font-mono">의도한 모델 대신 라우팅</p>
+                <p className="text-[10px] text-neutral-600 font-mono mt-1 leading-relaxed">
+                  OpenAI 의 overload 등으로 gpt-5 → 다른 모델 자동 fallback 발생 횟수.
+                  높으면 모델 신뢰도 ↓.
+                </p>
+              </div>
+            </div>
+          ) : (
+            <UsageHero
+              embedded
+              powerIndex={data.powerIndex.score}
+              activeDays={data.powerIndex.activeDays}
+              avgDailyTokens={data.powerIndex.avgDailyTokens}
+              periodDays={data.planHealth?.periodDays ?? 30}
+              periodLabel={periodLabel(period, t)}
+              declaredTier={data.user.planTier ?? null}
+              declaredTierLabel={data.planHealth?.declaredLimits?.label ?? null}
+              priceForPeriod={data.planHealth?.priceForPeriod ?? null}
+              totalWindowTokens={data.planHealth?.totalWindowTokens ?? 0}
+              nonCacheTotalWindowTokens={data.planHealth?.nonCacheTotalWindowTokens ?? null}
+              cacheHitPctForPeriod={data.planHealth?.cacheHitPctForPeriod ?? null}
+              viewOnly={viewOnly}
+              isEstimatedTier={data.planHealth?.isEstimatedTier ?? false}
+              hasActivity={chartData.some((d) => (d.cost ?? 0) > 0)}
+              apiRecommendation={data.planHealth?.apiRecommendation ?? null}
+            />
+          )
         )}
 
         {/* Row 2: 팀 내 내 위치 + 활동 히트맵 (반셀 2열). 사용자 피드백:
@@ -2630,6 +2669,7 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
                 <span className="w-16 text-right">cost</span>
                 <span className="w-14 text-right">cache</span>
                 <span className="w-14 text-right">calls</span>
+                {provider === "codex" && <span className="w-14 text-right">reason</span>}
               </div>
               <div className="space-y-1">
                 {(data.models ?? []).map((m) => {
@@ -2643,6 +2683,11 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
                       <span className="w-16 text-yellow-400 text-right">{fmt$(m.cost)}</span>
                       <span className="w-14 text-emerald-400 text-right">{m.cacheHitPct.toFixed(1)}%</span>
                       <span className="w-14 text-neutral-500 text-right">{m.calls.toLocaleString()}</span>
+                      {provider === "codex" && (
+                        <span className="w-14 text-violet-400 text-right" title="reasoning ratio (hidden CoT 비중)">
+                          {m.reasoningRatio != null ? `${m.reasoningRatio.toFixed(1)}%` : "—"}
+                        </span>
+                      )}
                     </div>
                   );
                 })}
