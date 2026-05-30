@@ -815,7 +815,30 @@ function TeamPositionCard({
 }) {
   const { m } = useMessages();
   const dv = m.dashboardView;
-  const members = team.byEfficiency ?? [];
+  // byEfficiency 는 device 단위 row (M6f) — 영진님 같은 multi-device 사용자는
+  // 같은 userId 로 N row. team position 카드는 user 단위 ranking 이라 합산 필요.
+  // totalCost / totalTokens / callsCount / sessionsCount: 단순합.
+  // cacheHitPct: calls 분모 가중평균. efficiencyScore: 평균.
+  // 다른 필드 (name / avatarUrl / topProject 등): 첫 row 유지.
+  const rawMembers = team.byEfficiency ?? [];
+  const userMap = new Map<number, typeof rawMembers[number]>();
+  for (const m of rawMembers) {
+    const existing = userMap.get(m.userId);
+    if (existing) {
+      const sumCalls = (existing.callsCount ?? 0) + (m.callsCount ?? 0);
+      const cacheWeighted = ((existing.cacheHitPct ?? 0) * (existing.callsCount ?? 0))
+        + ((m.cacheHitPct ?? 0) * (m.callsCount ?? 0));
+      existing.totalCost = (existing.totalCost ?? 0) + (m.totalCost ?? 0);
+      existing.totalTokens = (existing.totalTokens ?? 0) + (m.totalTokens ?? 0);
+      existing.sessionsCount = (existing.sessionsCount ?? 0) + (m.sessionsCount ?? 0);
+      existing.callsCount = sumCalls;
+      existing.cacheHitPct = sumCalls > 0 ? cacheWeighted / sumCalls : (existing.cacheHitPct ?? 0);
+      existing.efficiencyScore = ((existing.efficiencyScore ?? 0) + (m.efficiencyScore ?? 0)) / 2;
+    } else {
+      userMap.set(m.userId, { ...m });
+    }
+  }
+  const members = Array.from(userMap.values());
   const usage = team.memberUsage ?? [];
   if (members.length === 0) return null;
   // 본인 매칭 — name 기반 (동명이인 quirk team-view 와 동일).
@@ -903,12 +926,17 @@ function TeamPositionCard({
 interface TeamMember { userId: string; name: string }
 
 // 팀 내 내 위치 카드용 — /api/team 응답 일부.
+// device 별 row (M6f) — 같은 userId 가 N row 가능. 가중평균 / 합산을 위해
+// callsCount / sessionsCount / efficiencyScore 도 같이 받는다 (API 는 항상 제공).
 interface TeamRankMember {
   userId: number;
   name: string;
   totalCost: number;
   totalTokens: number;
   cacheHitPct: number;
+  callsCount?: number;
+  sessionsCount?: number;
+  efficiencyScore?: number;
 }
 interface TeamRankMemberUsage {
   userId: number;

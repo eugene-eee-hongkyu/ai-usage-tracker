@@ -569,14 +569,21 @@ export async function GET(req: NextRequest) {
   }));
 
   // Recompute period totals from ccusage-corrected daily (only override if ccusage data exists)
-  // 2026-05-22 정책: "cost 는 ccusage daily 로 통일". 옛 코드는 daily.reduce (codeburn
-  // rawDaily 의 ccusage 보정 후) 였는데 codeburn rawDaily 의 date 만 iterate 라 ccusage
-  // 가 codeburn 에 없는 date 의 cost 가 빠짐 (회귀). 정책 정확히 따르려면 ccusage
-  // daily 의 totalCost 직접 합산. merge 모드 (영진님 시범) 에서 차이 큼 — 단일 device
-  // 도 같은 문제 있었음 (예: 본인 dev2 $740 → 보정 $813 인데 정확값 $981).
+  // 2026-05-22 정책: "cost 는 ccusage daily 로 통일". period 윈도우 안 ccusage row 만
+  // 합산. codeburn rawDaily 의 date set 을 윈도우로 사용 (period=today 면 today,
+  // 8days/30days/month 는 그 길이 윈도우, all 은 전체).
+  // 이전 fix 에서 ccusageRows.reduce 로 단순화했더니 period 무시되어 30days 토글이
+  // 무의미해진 회귀 — 영진님 merge 30days = 전체 $1317 (정확값 $867) 차이 큼.
   const ccusageHasData = Object.keys(ccusageMap).length > 0;
+  const periodDateSet = new Set(
+    (d.daily ?? [])
+      .map((day) => day.date)
+      .filter((dt): dt is string => typeof dt === "string" && dt.length > 0)
+  );
   const correctedTotalCost = ccusageHasData
-    ? ccusageRows.reduce((s, r) => s + ((r as { totalCost?: number }).totalCost ?? 0), 0)
+    ? ccusageRows
+        .filter((r) => r.date && periodDateSet.has(r.date))
+        .reduce((s, r) => s + ((r as { totalCost?: number }).totalCost ?? 0), 0)
     : null;
 
   // Heatmap (period 무관). ccusage 우선, 없으면 codeburn all daily.
