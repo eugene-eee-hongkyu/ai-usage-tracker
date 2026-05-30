@@ -47,6 +47,7 @@ provider 토글은 dashboard / team / ranking 간 공유 (useProviderPreference,
 - provider segmented control "Claude Code" / "Codex" 두 버튼 노출
 - period 토글 (today / 8days / month / 30days / all + Earlier 드롭다운) 노출 (dashboard-view line 55)
 - 한쪽 provider 에 데이터 없으면 토글은 보이되 선택 시 빈 상태 카피 노출 (data=null 분기)
+- **hasClaudeData / hasCodexData 가드** — user_snapshots 의 total_cost > 0 OR sessions > 0, **OR period_snapshots 의 raw_json->overview->cost > 0** (누적 이력). 2026-05-30 fix — user_snapshots 만 보면 "오늘 시점" 만 반영해서 어제까지 활발히 쓴 멤버가 disabled 처리되는 회귀 발생 (oreo 케이스)
 - 토글 전환 시 화면 깜빡임 없이 카드 series 만 교체 (잔상 fix, commit 151c72b)
 - about-popover (헤더 "i" 버튼) 빌드 SHA 노출
 - AI 자동 tier 추정 카드 노출 X (Phase 1 제거, commit bbc4eed) — 사용자 입력 강제 (Unit Cost 카드 의 select 가 사용자 입력 채널)
@@ -106,6 +107,7 @@ provider 토글은 dashboard / team / ranking 간 공유 (useProviderPreference,
 
 | 증상 | 1차 의심 |
 |---|---|
+| 멤버가 어제까지 사용했는데 provider chip disabled + "사용 기록 없음" modal | hasClaudeData / hasCodexData 가 user_snapshots 만 보고 period_snapshots 누적 가드 누락 (2026-05-30 fix 회귀) |
 | 영진님 device line 1 개로 합침 | M6f token_id 분기 (user_snapshots.token_id 컬럼 사용 회귀) |
 | 영진님 team badge "iskra" 가 아닌 z21labs | auto-join 도메인 매핑 회귀 (teams.auto_join_domains) |
 | oreo Codex 경고 사라짐 | efficiencyBlock 의 경고 트리거 조건 변경 또는 oreo 데이터 분포 변화 |

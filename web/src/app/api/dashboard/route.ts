@@ -6,7 +6,7 @@ import { authOptions } from "@/lib/auth";
 import { db, userSnapshots, users, periodSnapshots, dailyVisits, userBlocks, teamMembers, apiTokens, IS_LOCAL_MODE } from "@/lib/db";
 import { getAuthedEmail } from "@/lib/local-user";
 import { getEffectiveTeamId } from "@/lib/effective-team";
-import { and, asc, desc, eq, gt, gte, isNull, lt, inArray, or } from "drizzle-orm";
+import { and, asc, desc, eq, gt, gte, isNull, lt, inArray, or, sql } from "drizzle-orm";
 import { isAdmin } from "@/lib/admin";
 import { computeDailyEfficiencyScore, computePowerIndex } from "@/lib/rules";
 import {
@@ -263,6 +263,10 @@ export async function GET(req: NextRequest) {
   // 단순 row 존재가 아니라 실제 사용 (cost > 0 또는 sessions > 0) 가드.
   // 새 CLI 가 안 쓰는 provider 에도 빈 응답 (cost=0, sessions=0) 을 row 로 저장하므로
   // 가드 없으면 false positive. UI Provider segmented control 의 disabled 분기에 사용.
+  //
+  // user_snapshots 만 보면 "오늘 시점" 만 반영 — 어제까지 활발히 썼는데 오늘만 안 쓴
+  // 사용자가 disabled 처리됨 (2026-05-30 oreo 케이스 회귀). 그러므로 누적 이력은
+  // period_snapshots 의 raw_json->overview->cost > 0 row 1+ 로도 OR 가드.
   const codexSnaps = await db
     .select({ id: userSnapshots.id })
     .from(userSnapshots)
@@ -273,7 +277,17 @@ export async function GET(req: NextRequest) {
       or(gt(userSnapshots.totalCost, 0), gt(userSnapshots.sessionsCount, 0)),
     ))
     .limit(1);
-  const hasCodexData = codexSnaps.length > 0;
+  const codexPeriods = await db
+    .select({ id: periodSnapshots.id })
+    .from(periodSnapshots)
+    .where(and(
+      eq(periodSnapshots.userId, user[0].id),
+      eq(periodSnapshots.provider, "codex"),
+      IS_LOCAL_MODE ? undefined : eq(periodSnapshots.teamId, effectiveTeamId!),
+      sql`(${periodSnapshots.rawJson}->'overview'->>'cost')::numeric > 0`,
+    ))
+    .limit(1);
+  const hasCodexData = codexSnaps.length > 0 || codexPeriods.length > 0;
   const claudeSnaps = await db
     .select({ id: userSnapshots.id })
     .from(userSnapshots)
@@ -284,7 +298,17 @@ export async function GET(req: NextRequest) {
       or(gt(userSnapshots.totalCost, 0), gt(userSnapshots.sessionsCount, 0)),
     ))
     .limit(1);
-  const hasClaudeData = claudeSnaps.length > 0;
+  const claudePeriods = await db
+    .select({ id: periodSnapshots.id })
+    .from(periodSnapshots)
+    .where(and(
+      eq(periodSnapshots.userId, user[0].id),
+      eq(periodSnapshots.provider, "claude"),
+      IS_LOCAL_MODE ? undefined : eq(periodSnapshots.teamId, effectiveTeamId!),
+      sql`(${periodSnapshots.rawJson}->'overview'->>'cost')::numeric > 0`,
+    ))
+    .limit(1);
+  const hasClaudeData = claudeSnaps.length > 0 || claudePeriods.length > 0;
 
   const snap = await db
     .select()

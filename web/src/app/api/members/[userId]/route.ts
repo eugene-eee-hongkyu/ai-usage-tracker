@@ -3,10 +3,10 @@ export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import { db, userSnapshots, users, teamMembers, IS_LOCAL_MODE } from "@/lib/db";
+import { db, userSnapshots, users, teamMembers, periodSnapshots, IS_LOCAL_MODE } from "@/lib/db";
 import { getAuthedEmail } from "@/lib/local-user";
 import { getEffectiveTeamId } from "@/lib/effective-team";
-import { and, eq, gt, isNull, or } from "drizzle-orm";
+import { and, eq, gt, isNull, or, sql } from "drizzle-orm";
 import { isAdmin } from "@/lib/admin";
 
 interface DailyRow { date: string; cost: number; sessions: number }
@@ -88,6 +88,9 @@ export async function GET(
     .limit(1);
 
   // hasCodexData = 이 멤버의 의미 있는 Codex 사용량 1+. UI Tabs 분기.
+  // user_snapshots 만 보면 "오늘 시점" 만 반영 — 어제까지 활발히 썼는데 오늘만
+  // 안 쓴 멤버가 disabled (2026-05-30 oreo 회귀). period_snapshots 누적
+  // 이력 (raw_json->overview->cost > 0) 도 OR 가드.
   const codexCheck = await db
     .select({ id: userSnapshots.id })
     .from(userSnapshots)
@@ -97,7 +100,16 @@ export async function GET(
       or(gt(userSnapshots.totalCost, 0), gt(userSnapshots.sessionsCount, 0)),
     ))
     .limit(1);
-  const hasCodexData = codexCheck.length > 0;
+  const codexPeriods = await db
+    .select({ id: periodSnapshots.id })
+    .from(periodSnapshots)
+    .where(and(
+      eq(periodSnapshots.userId, userId),
+      eq(periodSnapshots.provider, "codex"),
+      sql`(${periodSnapshots.rawJson}->'overview'->>'cost')::numeric > 0`,
+    ))
+    .limit(1);
+  const hasCodexData = codexCheck.length > 0 || codexPeriods.length > 0;
 
   if (!snap[0]) {
     return NextResponse.json({
