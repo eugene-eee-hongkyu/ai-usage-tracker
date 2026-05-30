@@ -11,8 +11,10 @@ import { isAdmin } from "@/lib/admin";
 import { computeDailyEfficiencyScore, computePowerIndex } from "@/lib/rules";
 import {
   analyzePlanHealth,
+  getPlanLimits,
   type PlanTier,
 } from "@/lib/plan-health";
+import { getCodexPlanLimits, type CodexPlanTier, VALID_CODEX_TIERS } from "@/lib/codex-plans";
 import { getCcusageDaily } from "@/lib/ccusage-row";
 import { PINNED } from "@/lib/pinned-versions";
 
@@ -359,7 +361,13 @@ export async function GET(req: NextRequest) {
 
   if (!snap[0]) {
     return NextResponse.json({
-      user: { name: user[0].name, lastSyncedAt: user[0].lastSyncedAt, timezone: user[0].timezone ?? null },
+      user: {
+        name: user[0].name,
+        lastSyncedAt: user[0].lastSyncedAt,
+        timezone: user[0].timezone ?? null,
+        planTier: user[0].planTier ?? null,
+        codexPlanTier: (user[0] as { codexPlanTier?: string | null }).codexPlanTier ?? null,
+      },
       overview: null,
       daily: [],
       activities: [],
@@ -1052,14 +1060,30 @@ export async function GET(req: NextRequest) {
   // cost-based verdict 신호 — period 의 API 환산 비용.
   // ccusage cost = PAYG 가격 환산. plan price 와 비교해 Plan ROI 평가.
   const planBlocksMonthlyCost = planBlockRows.reduce((s, b) => s + Number(b.costUsd ?? 0), 0);
+  // 2026-05-30 Phase 2: provider 따라 사용자 plan tier 분기.
+  //   claude → user.plan_tier → PLAN_LIMITS lookup
+  //   codex  → user.codex_plan_tier → CODEX_PLAN_LIMITS lookup
+  // 미입력 (null) 은 modal 강제로 잠시 transient.
+  const declaredTierForProvider: string | null =
+    provider === "codex"
+      ? ((user[0] as { codexPlanTier?: string | null }).codexPlanTier ?? null)
+      : (user[0].planTier ?? null);
+  const declaredLimitsForProvider = (() => {
+    if (!declaredTierForProvider) return null;
+    if (provider === "codex") {
+      return (VALID_CODEX_TIERS as string[]).includes(declaredTierForProvider)
+        ? getCodexPlanLimits(declaredTierForProvider as CodexPlanTier)
+        : null;
+    }
+    return getPlanLimits(declaredTierForProvider as Exclude<PlanTier, null>);
+  })();
   const planHealth = analyzePlanHealth({
     blocks: planBlockRows.map((b) => ({
       totalTokens: Number(b.totalTokens ?? 0),
       startedAt: b.startedAt,
     })),
-    declaredTier: (user[0].planTier ?? null) as PlanTier,
-    // period 의 cacheHitPct (overview 에서 계산된 값 사용 — period 정확도 ↑).
-    // snap[0].cacheHitPct (누적 평균) 보다 period 의 실제 값이 정확.
+    declaredTier: declaredTierForProvider,
+    declaredLimits: declaredLimitsForProvider,
     cacheHitPct: cacheHitPct > 0 ? cacheHitPct : undefined,
     oneShotRate: snap[0]?.overallOneShot ? snap[0].overallOneShot * 100 : undefined,
     windowDays: periodDays,
@@ -1158,7 +1182,15 @@ export async function GET(req: NextRequest) {
   }));
 
   return NextResponse.json({
-    user: { name: user[0].name, lastSyncedAt: user[0].lastSyncedAt, timezone: user[0].timezone ?? null, planTier: user[0].planTier ?? null },
+    // 2026-05-30 Phase 2: provider 별 plan tier 모두 반환. usage-hero modal 이
+    // 현재 provider 의 값을 보고 자동 open 결정.
+    user: {
+      name: user[0].name,
+      lastSyncedAt: user[0].lastSyncedAt,
+      timezone: user[0].timezone ?? null,
+      planTier: user[0].planTier ?? null,
+      codexPlanTier: (user[0] as { codexPlanTier?: string | null }).codexPlanTier ?? null,
+    },
     overview: {
       cost: finalCost,
       sessions,

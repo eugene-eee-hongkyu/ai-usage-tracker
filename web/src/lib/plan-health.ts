@@ -10,11 +10,13 @@
 
 export type PlanTier = "pro" | "max5" | "max20" | "team_standard" | "team_premium" | "team" | "api" | null;
 
+// PlanLimits — Claude / Codex 공용 구조. tier 는 string 으로 generic (Claude 는
+// PLAN_LIMITS 키, Codex 는 CODEX_PLAN_LIMITS 키 — 충돌 없는 별도 lookup table).
 export interface PlanLimits {
-  tier: Exclude<PlanTier, null>;
+  tier: string;
   label: string;
   monthlyPriceUsd: number;
-  // 5h 블록당 추정 token 한도. 커뮤니티 P90 기반.
+  // 5h 블록당 추정 token 한도. Codex 는 0 (한도 추정 안 함).
   estimated5hTokenLimit: number;
 }
 
@@ -69,15 +71,17 @@ export type Verdict =
 
 export interface PlanHealthInput {
   blocks: BlockSample[];
-  declaredTier: PlanTier; // 사용자가 명시한 tier (null 이면 추정만)
+  // 2026-05-30 Phase 2: declaredTier (Claude PlanTier 한정) → declaredLimits (provider-agnostic).
+  // caller 가 provider 따라 PLAN_LIMITS / CODEX_PLAN_LIMITS 에서 직접 lookup 후 전달.
+  // null = 사용자 미입력 (modal 강제 흐름).
+  declaredLimits: PlanLimits | null;
+  // tier 식별자 (응답 평탄화용). label 만 쓰는 곳도 있고 'api' 같은 키로 분기하는 곳도 있어 분리 유지.
+  declaredTier: string | null;
   cacheHitPct?: number;   // 행동 변경 vs plan 변경 분기용
   oneShotRate?: number;
   // 분석 윈도우 — 기본 최근 30일
   windowDays?: number;
   // 월 API 환산 비용 ($) — cost-based verdict 의 핵심 신호.
-  // 과거 P90 / 5h 한도 비교는 ccusage totalTokens (cache_read 포함) 와
-  // community-estimated limit (단위 불명확) 간 단위 불일치로 비현실적
-  // 수치 (정환님 Max5 99821% 등) 발생 → cost 비율로 교체.
   monthlyCostUsd?: number;
 }
 
@@ -87,13 +91,15 @@ export interface PlanHealthResult {
   blockCount: number;            // 윈도우 안의 5h 블록 수 (데이터 충분성 지표)
   activeDays: number;             // 윈도우 안의 활성 일수
 
-  // 사용자 명시 tier 대비 평가 (declaredTier 있을 때만 의미 있음)
-  declaredTier: PlanTier;
+  // 사용자 명시 tier 대비 평가 (declaredLimits 있을 때만 의미 있음)
+  declaredTier: string | null;     // 키 (응답 직렬화용 — 카드 분기에서 'api' 같은 키 사용)
   declaredLimits: PlanLimits | null;
-  utilizationPct: number;        // p90 / declared limit (declaredTier 없으면 0)
+  utilizationPct: number;        // p90 / declared limit (declaredLimits 없으면 0)
   hitCount: number;               // p90 ≥ 한도 인 블록 수
   verdict: Verdict;
-  recommendedTier: PlanTier;      // 권장 tier
+  // recommendedTier — Claude 에서 downgrade 분기 시 nextTierDown 결과. Codex 는
+  // null (다운그레이드 추천 안 함, 사용자가 OpenAI billing 직접 확인).
+  recommendedTier: string | null;
   recommendedSavingsUsd: number;  // 권장 적용 시 월 절감액 (음수면 추가 비용)
 
   // 행동 변경 vs plan 변경 분기 메시지
@@ -136,7 +142,7 @@ export function analyzePlanHealth(input: PlanHealthInput): PlanHealthResult {
   const activeDays = uniqueDayCount(recent);
 
   const declaredTier = input.declaredTier;
-  const declaredLimits = declaredTier ? PLAN_LIMITS[declaredTier] : null;
+  const declaredLimits = input.declaredLimits;
 
   // 윈도우 안 총 토큰 (활용률 계산 + hero card 표시용)
   const totalWindowTokens = tokens.reduce((s, t) => s + t, 0);
@@ -155,7 +161,7 @@ export function analyzePlanHealth(input: PlanHealthInput): PlanHealthResult {
   let utilizationPct = 0;
   let hitCount = 0;
   let verdict: Verdict = "unknown";
-  let recommendedTier: PlanTier = declaredTier;
+  let recommendedTier: string | null = declaredTier;
   let recommendedSavingsUsd = 0;
   // actionFirst 는 cost-based 로직에서 더 이상 사용 안 함 — 항상 false.
   // (과거: cache_hit / one_shot 낮을 때 plan 업그레이드 전 행동 개선 권장)
@@ -236,7 +242,9 @@ export function analyzePlanHealth(input: PlanHealthInput): PlanHealthResult {
 
     if (ratio < 0.5) {
       verdict = "downgrade";
-      const down = nextTierDown(declaredTier);
+      // nextTierDown 는 Claude PlanTier 키만 인식 — Codex tier 이면 null 반환 →
+      // recommendedTier = declaredTier 유지 (Codex 는 자동 다운그레이드 추천 없음).
+      const down = nextTierDown(declaredTier as PlanTier);
       if (down) {
         recommendedTier = down;
         recommendedSavingsUsd = planPrice - PLAN_LIMITS[down].monthlyPriceUsd;
@@ -244,7 +252,7 @@ export function analyzePlanHealth(input: PlanHealthInput): PlanHealthResult {
         reasoning.push(`${PLAN_LIMITS[down].label} 다운그레이드 가능, 월 $${recommendedSavingsUsd} 절감`);
       } else {
         recommendedTier = declaredTier;
-        reasoning.push(`월 API 환산 ${costFmt} — ${declaredLimits.label} ${planFmt} 의 ${utilizationPct}% (사용량 낮지만 이미 최하위 tier)`);
+        reasoning.push(`월 API 환산 ${costFmt} — ${declaredLimits.label} ${planFmt} 의 ${utilizationPct}% (사용량 낮음)`);
       }
     } else if (ratio <= 2) {
       verdict = "fit";
@@ -304,8 +312,8 @@ function nextTierDown(tier: PlanTier): Exclude<PlanTier, null> | null {
 export interface TeamMemberPlan {
   userId: number;
   name: string;
-  declaredTier: PlanTier;
-  recommendedTier: PlanTier;
+  declaredTier: string | null;
+  recommendedTier: string | null;
   monthlyCostNowUsd: number;
   monthlyCostRecommendedUsd: number;
   verdict: Verdict;
@@ -341,11 +349,16 @@ export function summarizeTeamPlans(members: Array<{
     const h = m.health;
     const declared = h.declaredTier;
     const recommended = h.recommendedTier;
-    // 2026-05-30: 추정 멤버 분기 삭제. declared null 은 modal 강제로 잠시 transient.
-    const currentCostMember = declared && declared !== "api"
-      ? PLAN_LIMITS[declared].monthlyPriceUsd : 0;
-    const recCostMember = recommended && recommended !== "api"
-      ? PLAN_LIMITS[recommended].monthlyPriceUsd : 0;
+    // 2026-05-30 Phase 2: declaredLimits 직접 사용 (provider-agnostic). recommended ≠ declared
+    // 인 경우만 별도 lookup (Claude downgrade 분기 — Codex 는 항상 같아 lookup 안 함).
+    const currentCostMember =
+      h.declaredLimits && h.declaredLimits.tier !== "api"
+        ? h.declaredLimits.monthlyPriceUsd : 0;
+    let recCostMember = currentCostMember;
+    if (recommended && recommended !== declared) {
+      const recLimits = (PLAN_LIMITS as Record<string, PlanLimits>)[recommended];
+      recCostMember = recLimits && recLimits.tier !== "api" ? recLimits.monthlyPriceUsd : 0;
+    }
 
     memberRows.push({
       userId: m.userId,

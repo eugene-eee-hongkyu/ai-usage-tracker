@@ -51,11 +51,25 @@ interface UsageHeroProps {
   // Phase 3a-2 (2026-05-30): Codex 탭일 때 활용지수 카드 안에 한 줄로 모델 fallback
   // 카운트 표시. null/undefined 면 Claude 탭 (또는 데이터 없음) — 표시 안 함.
   codexFallbackCount?: number | null;
+  // Phase 2 (2026-05-30): provider — modal 옵션 / 저장 컬럼 분기. default 'claude' (호환).
+  provider?: "claude" | "codex";
 }
 
-function tierOptions(m: Messages): Array<{ value: string; label: string }> {
+function tierOptions(m: Messages, provider: "claude" | "codex"): Array<{ value: string; label: string }> {
   // 첫 옵션은 placeholder (강제 선택 유도) — value="" 일 때 "확인" 버튼 disabled.
-  // tierUnknown ("잘 모름") 은 의도적으로 제거 — 추정 사용자는 실제 tier 를 골라야 함.
+  // Phase 2 (2026-05-30): Codex provider 분기. AI 추정 제거 → 사용자 무조건 선택.
+  if (provider === "codex") {
+    return [
+      { value: "",            label: m.usageHero.tierModalPickPlaceholder },
+      { value: "free",        label: "Free ($0/mo)" },
+      { value: "plus",        label: "ChatGPT Plus ($20/mo)" },
+      { value: "business",    label: "ChatGPT Business ($30/mo)" },
+      { value: "pro",         label: "ChatGPT Pro ($200/mo)" },
+      { value: "team",        label: "ChatGPT Team ($30/user/mo)" },
+      { value: "enterprise",  label: "Enterprise (협의 · 추정 $200/mo)" },
+      { value: "api",         label: "OpenAI API (PAYG)" },
+    ];
+  }
   return [
     { value: "",               label: m.usageHero.tierModalPickPlaceholder },
     { value: "pro",            label: "Pro ($20/mo)" },
@@ -160,6 +174,7 @@ export function UsageHero({
   apiRecommendation,
   viewOnly = false,
   embedded = false,
+  provider = "claude",
   codexFallbackCount = null,
 }: UsageHeroProps) {
   const { m } = useMessages();
@@ -202,7 +217,7 @@ export function UsageHero({
       const res = await fetch("/api/user/plan-tier", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ planTier: tierValue }),
+        body: JSON.stringify({ planTier: tierValue, provider }),
       });
       if (res.ok) {
         setTimeout(() => window.location.reload(), 300);
@@ -220,7 +235,7 @@ export function UsageHero({
       const res = await fetch("/api/user/plan-tier", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ planTier: value || null }),
+        body: JSON.stringify({ planTier: value || null, provider }),
       });
       if (res.ok) {
         setTimeout(() => window.location.reload(), 300);
@@ -230,7 +245,7 @@ export function UsageHero({
     }
   };
 
-  const TIER_OPTIONS = tierOptions(m);
+  const TIER_OPTIONS = tierOptions(m, provider);
   const perDayUnit = m.common.perDay;
   const TOKEN_LEVEL_ROWS = tokenLevelRows(m, perDayUnit);
   const UNIT_COST_LEVEL_ROWS = unitCostLevelRows(m);
@@ -268,20 +283,45 @@ export function UsageHero({
               ))}
             </select>
           </div>
-          <div className="text-xs font-mono text-neutral-400 bg-neutral-950 border border-neutral-800 rounded p-3 space-y-1 leading-relaxed">
-            <p className="text-neutral-300">{m.usageHero.tierModalHintToggle}</p>
-            <p>{m.usageHero.tierModalStep1.split("{claudeAi}").map((part, i, arr) => (
-              i < arr.length - 1
-                ? <span key={i}>{part}<span className="text-neutral-200">claude.ai</span></span>
-                : <span key={i}>{part.split("{sub}").map((p2, j, arr2) => j < arr2.length - 1 ? <span key={j}>{p2}<span className="text-neutral-200">Subscription</span></span> : <span key={j}>{p2}</span>)}</span>
-            ))}</p>
-            <p>{m.usageHero.tierModalStep2.split("{cmd}").map((part, i, arr) => (
-              i < arr.length - 1
-                ? <span key={i}>{part}<span className="text-neutral-200">claude</span></span>
-                : <span key={i}>{part.split("{slash}").map((p2, j, arr2) => j < arr2.length - 1 ? <span key={j}>{p2}<span className="text-neutral-200">/usage</span></span> : <span key={j}>{p2}</span>)}</span>
-            ))}</p>
-            <p>{m.usageHero.tierModalStep3}</p>
-          </div>
+          {provider === "codex" ? (
+            <div className="text-xs font-mono text-neutral-400 bg-neutral-950 border border-neutral-800 rounded p-3 space-y-1.5 leading-relaxed">
+              <p className="text-neutral-300">정확한 가격·한도가 헷갈리면 OpenAI billing 페이지에서 직접 확인하세요.</p>
+              <p>
+                <a
+                  href="https://platform.openai.com/account/billing/overview"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-yellow-300 underline hover:text-yellow-200"
+                >platform.openai.com/account/billing</a>
+                <span className="text-neutral-600"> — OpenAI API / ChatGPT 구독 상태</span>
+              </p>
+              <p className="text-neutral-500">OpenAI 가 가격·한도를 자주 조정하므로 본 화면 정보는 참고용. 실제 결제 정보 우선.</p>
+            </div>
+          ) : (
+            <div className="text-xs font-mono text-neutral-400 bg-neutral-950 border border-neutral-800 rounded p-3 space-y-1 leading-relaxed">
+              <p className="text-neutral-300">{m.usageHero.tierModalHintToggle}</p>
+              <p>{m.usageHero.tierModalStep1.split("{claudeAi}").map((part, i, arr) => (
+                i < arr.length - 1
+                  ? <span key={i}>{part}<span className="text-neutral-200">claude.ai</span></span>
+                  : <span key={i}>{part.split("{sub}").map((p2, j, arr2) => j < arr2.length - 1 ? <span key={j}>{p2}<span className="text-neutral-200">Subscription</span></span> : <span key={j}>{p2}</span>)}</span>
+              ))}</p>
+              <p>{m.usageHero.tierModalStep2.split("{cmd}").map((part, i, arr) => (
+                i < arr.length - 1
+                  ? <span key={i}>{part}<span className="text-neutral-200">claude</span></span>
+                  : <span key={i}>{part.split("{slash}").map((p2, j, arr2) => j < arr2.length - 1 ? <span key={j}>{p2}<span className="text-neutral-200">/usage</span></span> : <span key={j}>{p2}</span>)}</span>
+              ))}</p>
+              <p>{m.usageHero.tierModalStep3}</p>
+              <p className="pt-1 border-t border-neutral-800 mt-2">
+                <a
+                  href="https://console.anthropic.com/settings/billing"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-yellow-300 underline hover:text-yellow-200"
+                >console.anthropic.com/settings/billing</a>
+                <span className="text-neutral-600"> — API tier 결제 정보</span>
+              </p>
+            </div>
+          )}
           <div className="flex items-center justify-end gap-2 pt-2">
             <button
               type="button"

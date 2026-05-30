@@ -10,8 +10,10 @@ import {
   analyzePlanHealth,
   summarizeTeamPlans,
   getPlanLimits,
+  type PlanLimits,
   type PlanTier,
 } from "@/lib/plan-health";
+import { getCodexPlanLimits, type CodexPlanTier, VALID_CODEX_TIERS } from "@/lib/codex-plans";
 import { computeEfficiencyScore, computeDailyEfficiencyScore, computePowerIndex } from "@/lib/rules";
 import { isAdmin } from "@/lib/admin";
 import { getCcusageDaily } from "@/lib/ccusage-row";
@@ -758,14 +760,26 @@ export async function GET(req: NextRequest) {
     // 추후 phase: 같은 user 의 모든 device ccusageDaily union 후 합산 (정확성 ↑).
     const snap = snapsByUser.get(u.id)?.[0]?.snap;
     const blocks = planBlocksByUser.get(u.id) ?? [];
-    const declared = (u.planTier ?? null) as PlanTier;
-
-    // 2026-05-30: AI 추정 폐기. declared 만 사용 — 미입력은 modal 강제로 잠시 transient.
+    // 2026-05-30 Phase 2: provider 따라 멤버의 plan tier 결정.
+    const declared: string | null =
+      provider === "codex"
+        ? ((u as { codexPlanTier?: string | null }).codexPlanTier ?? null)
+        : (u.planTier ?? null);
+    const declaredLimits: PlanLimits | null = (() => {
+      if (!declared) return null;
+      if (provider === "codex") {
+        return (VALID_CODEX_TIERS as string[]).includes(declared)
+          ? getCodexPlanLimits(declared as CodexPlanTier)
+          : null;
+      }
+      return getPlanLimits(declared as Exclude<PlanTier, null>);
+    })();
     const monthlyCost30d = monthlyCostByUser.get(u.id) ?? 0;
 
     const health = analyzePlanHealth({
       blocks,
       declaredTier: declared,
+      declaredLimits,
       cacheHitPct: snap?.cacheHitPct ?? undefined,
       oneShotRate: snap?.overallOneShot != null ? snap.overallOneShot * 100 : undefined,
       windowDays: periodDays,
@@ -793,11 +807,8 @@ export async function GET(req: NextRequest) {
       teamAvgDailyTokensSum += memAvgDailyTokens;
     }
 
-    // declared tier 만 사용. 미입력 멤버는 monthlyPriceUsd null → 토큰 단가 등 집계 미포함.
-    const effectiveLimits = declared
-      ? getPlanLimits(declared as Exclude<PlanTier, null>)
-      : null;
-    const monthlyPriceUsd = effectiveLimits?.monthlyPriceUsd ?? null;
+    // declaredLimits 가 위에서 provider 따라 lookup 됨. 미입력은 null.
+    const monthlyPriceUsd = declaredLimits?.monthlyPriceUsd ?? null;
 
     memberUsage.push({
       userId: u.id,

@@ -29,9 +29,12 @@ export const users = pgTable("users", {
   // (legacy fallback 1회 backfill 로 채움). Phase 4.2 의 정식 Account 모델 (옵션 B)
   // 도입 전까지 임시 가드.
   provider: text("provider"),
-  // 사용자가 명시한 Claude Code plan tier. 자동 추정과 별도로 본인 입력 받음.
-  // null 이면 추정만 사용. 값: 'pro' | 'max5' | 'max20' | 'team' | 'api'
+  // Claude Code plan tier — 사용자 입력. 미입력은 modal 강제 (2026-05-30 자동 추정 폐기).
+  // 값: 'pro' | 'max5' | 'max20' | 'team_standard' | 'team_premium' | 'team' | 'api'
   planTier: text("plan_tier"),
+  // Codex (OpenAI) plan tier — 사용자 입력. Claude 와 독립.
+  // 값: 'free' | 'plus' | 'business' | 'pro' | 'team' | 'enterprise' | 'api'
+  codexPlanTier: text("codex_plan_tier"),
   // admin-v1 (Phase 4.1) — 권한 + 라이프사이클.
   //   role: 'member' (default) | 'admin'. Owner 는 ADMIN_EMAIL env 화이트리스트 기반 (별도).
   //   permissions: { membershipAdmin: bool, billingAdmin: bool } JSON — 권한 분리 (Goodhart 회피).

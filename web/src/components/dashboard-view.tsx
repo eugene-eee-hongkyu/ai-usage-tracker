@@ -157,7 +157,7 @@ interface PlanHealthApiResponse {
 }
 
 interface DashboardData {
-  user: { name: string; lastSyncedAt: string | null; timezone: string | null; planTier: string | null };
+  user: { name: string; lastSyncedAt: string | null; timezone: string | null; planTier: string | null; codexPlanTier: string | null };
   planHealth?: PlanHealthApiResponse;
   powerIndex?: PowerIndexSummary;
   overview: Overview | null;
@@ -2248,7 +2248,12 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
         <div className="max-w-6xl mx-auto px-4 pt-3 pb-2">
           <ProviderSegmentedControl
             value={provider}
-            onChange={setProvider}
+            // provider 토글 시 옛 응답 즉시 폐기 — 카드들이 옛 provider 의 가격 / planTier 로
+            // 잠시 표시되는 잔상 방지 + modal 자동 trigger 도 새 응답 받고 평가.
+            onChange={(p) => {
+              if (p !== provider) setData(null);
+              setProvider(p);
+            }}
             hasClaudeData={data.hasClaudeData ?? true}
             hasCodexData={(data.hasCodexData ?? false) && (data.supportsMultiProvider ?? false)}
             codexNeedsCliUpdate={!(data.supportsMultiProvider ?? false)}
@@ -2549,7 +2554,12 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
             avgDailyTokens={data.powerIndex.avgDailyTokens}
             periodDays={data.planHealth?.periodDays ?? 30}
             periodLabel={periodLabel(period, t)}
-            declaredTier={data.user.planTier ?? null}
+            // Phase 2 (2026-05-30): provider 별 plan tier 결정. dashboard 응답에 두 컬럼 모두 포함.
+            declaredTier={
+              provider === "codex"
+                ? (data.user.codexPlanTier ?? null)
+                : (data.user.planTier ?? null)
+            }
             declaredTierLabel={data.planHealth?.declaredLimits?.label ?? null}
             priceForPeriod={data.planHealth?.priceForPeriod ?? null}
             totalWindowTokens={data.planHealth?.totalWindowTokens ?? 0}
@@ -2559,6 +2569,7 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
             hasActivity={chartData.some((d) => (d.cost ?? 0) > 0)}
             apiRecommendation={data.planHealth?.apiRecommendation ?? null}
             codexFallbackCount={provider === "codex" ? (data.codexFallbackCount ?? 0) : null}
+            provider={provider}
           />
         )}
 
