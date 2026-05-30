@@ -557,10 +557,42 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  const daily = rawDaily.map((day) => ({
-    ...day,
-    cost: ccusageMap[day.date]?.cost ?? day.cost,
-  }));
+  // 2026-05-30 정책: cost / token 은 ccusage daily 만 사용. 옛 코드는 codeburn rawDaily
+  // 의 date set 만 iterate 라 ccusage 의 codeburn 에 없는 date 가 빠짐 (영진님 dev2
+  // 의 옛 형식 row, multi-device merge 케이스 등). ccusage rows 의 period 윈도우
+  // 안 row 직접 사용. sessions / calls 는 ccusage 에 없어 codeburn rawDaily 매핑 (0 fallback).
+  const tzForPeriod = user[0].timezone ?? "UTC";
+  const todayPartsForPeriod = new Intl.DateTimeFormat("en-CA", {
+    timeZone: tzForPeriod, year: "numeric", month: "2-digit", day: "2-digit",
+  }).formatToParts(new Date());
+  const getTodayPart = (t: string) => todayPartsForPeriod.find((p) => p.type === t)?.value ?? "00";
+  const todayYmdForPeriod = `${getTodayPart("year")}-${getTodayPart("month")}-${getTodayPart("day")}`;
+  const isInPeriodWindow = (date: string): boolean => {
+    if (period === "all") return true;
+    if (period === "today") return date === todayYmdForPeriod;
+    if (period === "month") {
+      return date >= todayYmdForPeriod.slice(0, 7) + "-01" && date <= todayYmdForPeriod;
+    }
+    const n = period === "8days" ? 8 : 30;
+    const [y, mo, dy] = todayYmdForPeriod.split("-").map(Number);
+    const startUtc = new Date(Date.UTC(y, mo - 1, dy));
+    startUtc.setUTCDate(startUtc.getUTCDate() - (n - 1));
+    const startYmd = startUtc.toISOString().slice(0, 10);
+    return date >= startYmd && date <= todayYmdForPeriod;
+  };
+  const rawDailyByDate: Record<string, { sessions?: number; calls?: number }> = {};
+  for (const dy of rawDaily) {
+    if (dy.date) rawDailyByDate[dy.date] = { sessions: dy.sessions, calls: dy.calls };
+  }
+  const daily = ccusageRows
+    .filter((r) => r.date && isInPeriodWindow(r.date))
+    .map((r) => ({
+      date: r.date!,
+      cost: (r as { totalCost?: number }).totalCost ?? 0,
+      sessions: rawDailyByDate[r.date!]?.sessions ?? 0,
+      calls: rawDailyByDate[r.date!]?.calls ?? 0,
+    }))
+    .sort((a, b) => a.date.localeCompare(b.date));
   const activeDays = daily.filter((day) => day.cost > 0).length;
 
   const dailyTokens = daily.map((day) => ({
