@@ -1081,10 +1081,16 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
     fetch("/api/team")
       .then((r) => r.json())
       .then((d) => {
-        const list: TeamMember[] = (d.byEfficiency ?? []).map((m: { userId: string; name: string }) => ({
-          userId: m.userId,
-          name: m.name,
-        }));
+        // byEfficiency 는 device 단위 row (M6f) — 영진님 같은 multi-device 사용자는
+        // 같은 userId 로 N row. dropdown 은 user 단위이므로 userId 기준 dedup.
+        // 의도된 device 분리 (메인 list / 카드) 는 그대로 유지.
+        const seen = new Set<string | number>();
+        const list: TeamMember[] = [];
+        for (const m of (d.byEfficiency ?? []) as Array<{ userId: string; name: string }>) {
+          if (seen.has(m.userId)) continue;
+          seen.add(m.userId);
+          list.push({ userId: m.userId, name: m.name });
+        }
         setTeamMembers(list);
       })
       .catch(() => {});
