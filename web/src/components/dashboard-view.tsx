@@ -1797,11 +1797,9 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
           return (
             <div className="space-y-4">
               {/* HERO: 이번 달 본전 회수 (있을 때) — 회수율 + 절감액 + 본전 돌파일 */}
-              {/* 2026-05-30 정정: cost 값들을 모두 apiCost (= chartData.reduce) 로 통일.
-                  옛 코드는 mr.monthCostUsd (server 의 ccusage 직접 합산) — chartData.reduce
-                  (codeburn rawDaily date set 안 ccusage 보정) 와 차이 ($14 정도). 화면 내
-                  여러 cost 값이 미세하게 달라 혼란. apiCost 로 통일. breakEvenDate /
-                  remainingEstimateUsd 등 mr 의 고유 값은 그대로. */}
+              {/* 2026-05-30 정정: 모든 cost 값을 apiCost (chartData 합) 로 통일.
+                  본전 회수 % 와 절감액 의 분모 = planCost (priceForPeriod, period 따라 비례).
+                  즉 8days = $26.7 / today = $3.33 / month = $100 (1 인의 monthly price). */}
               {mr && mr.monthlyPriceUsd > 0 ? (
                 <div data-testid="dash-plan-recovery-hero">
                   <p className="text-[10px] font-mono text-neutral-500 uppercase tracking-wider mb-1">
@@ -1809,22 +1807,22 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
                   </p>
                   <div className="flex items-baseline gap-3 flex-wrap">
                     <span className={`text-3xl sm:text-4xl font-mono font-bold tracking-tight ${
-                      apiCost >= mr.monthlyPriceUsd ? "text-emerald-400" : "text-neutral-200"
+                      apiCost >= planCost ? "text-emerald-400" : "text-neutral-200"
                     }`}>
-                      {mr.monthlyPriceUsd > 0 ? Math.round((apiCost / mr.monthlyPriceUsd) * 100) : 0}%
+                      {planCost > 0 ? Math.round((apiCost / planCost) * 100) : 0}%
                     </span>
-                    {apiCost >= mr.monthlyPriceUsd ? (
+                    {apiCost >= planCost ? (
                       <span className="text-emerald-300 text-sm font-mono">
-                        ▼ {fmtExact(apiCost - mr.monthlyPriceUsd)} 절감
+                        ▼ {fmtExact(apiCost - planCost)} 절감
                       </span>
                     ) : (
                       <span className="text-neutral-400 text-sm font-mono">
-                        본전까지 {fmtExact(mr.monthlyPriceUsd - apiCost)}
+                        본전까지 {fmtExact(planCost - apiCost)}
                       </span>
                     )}
                   </div>
                   <p className="text-xs font-mono text-neutral-500 mt-1.5">
-                    Plan ${mr.monthlyPriceUsd} · 사용 {fmtExact(apiCost)}
+                    Plan {fmtExact(planCost)} · 사용 {fmtExact(apiCost)}
                   </p>
                   <div className="text-[11px] font-mono text-neutral-500 mt-1 space-y-0.5">
                     {mr.breakEvenDate ? (
