@@ -66,11 +66,17 @@ function mergeOverview(overviews: AnyObj[]): MergedOverview {
   return { cost, calls, sessions, tokens, cacheHitPercent };
 }
 
-function recomputeOneShotRate<T extends { oneShotTurns?: number; turns?: number; oneShotRate?: number }>(arr: T[]): void {
+function recomputeOneShotRate<T extends { oneShotTurns?: number; editTurns?: number; oneShotRate?: number | null }>(arr: T[]): void {
+  // codeburn 의 activities[].oneShotRate 정의: oneShotTurns / editTurns * 100.
+  // turns 분모 (이전 잘못된 구현) 가 아니라 editTurns 분모 — editable 한 활동만의 비율.
+  // editTurns=0 (Exploration / Conversation 등) 은 oneShotRate null 유지 — dashboard 의
+  // `rate != null` 필터에서 제외되어야 가중평균이 의미 있음.
   for (const item of arr) {
-    const turns = n(item.turns);
-    if (turns > 0) {
-      item.oneShotRate = (n(item.oneShotTurns) / turns) * 100;
+    const editTurns = n(item.editTurns);
+    if (editTurns > 0) {
+      item.oneShotRate = (n(item.oneShotTurns) / editTurns) * 100;
+    } else {
+      item.oneShotRate = null;
     }
   }
 }

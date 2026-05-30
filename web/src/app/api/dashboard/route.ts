@@ -569,9 +569,14 @@ export async function GET(req: NextRequest) {
   }));
 
   // Recompute period totals from ccusage-corrected daily (only override if ccusage data exists)
+  // 2026-05-22 정책: "cost 는 ccusage daily 로 통일". 옛 코드는 daily.reduce (codeburn
+  // rawDaily 의 ccusage 보정 후) 였는데 codeburn rawDaily 의 date 만 iterate 라 ccusage
+  // 가 codeburn 에 없는 date 의 cost 가 빠짐 (회귀). 정책 정확히 따르려면 ccusage
+  // daily 의 totalCost 직접 합산. merge 모드 (영진님 시범) 에서 차이 큼 — 단일 device
+  // 도 같은 문제 있었음 (예: 본인 dev2 $740 → 보정 $813 인데 정확값 $981).
   const ccusageHasData = Object.keys(ccusageMap).length > 0;
   const correctedTotalCost = ccusageHasData
-    ? daily.reduce((s, day) => s + day.cost, 0)
+    ? ccusageRows.reduce((s, r) => s + ((r as { totalCost?: number }).totalCost ?? 0), 0)
     : null;
 
   // Heatmap (period 무관). ccusage 우선, 없으면 codeburn all daily.
@@ -917,16 +922,10 @@ export async function GET(req: NextRequest) {
 
   // Apply ccusage-corrected cost to overview-derived metrics.
   // period="today" 면 strict today (사용자 timezone 기준 오늘 행) ccusage 값으로 override.
-  //
-  // mergeDevices (2026-05-30 시범): merge 모드면 ccusage 보정 path 를 우회.
-  // dashboard 의 daily.map 이 codeburn rawDaily 의 date 만 iterate 해서 ccusage
-  // 가 codeburn daily 에 없는 date 의 cost 가 빠짐 — merge 모드에서 이 mismatch
-  // 가 커져 손실 큰 케이스 (영진님 dev2+dev11 = $1496 인데 API $1021). raw 의
-  // overview.cost 는 mergeRawJson 단계에서 정확히 두 device 합산됨 ($1496) — 그대로
-  // 사용. ccusage 보정 자체 회귀는 별도 진단.
+  // 그 외엔 correctedTotalCost (= ccusage daily 직접 합산, 2026-05-22 정책).
   const finalCost = strictTodayCc
     ? strictTodayCc.cost
-    : (mergeDevices ? cost : (correctedTotalCost ?? cost));
+    : (correctedTotalCost ?? cost);
   const finalCostPerCall = calls > 0 ? finalCost / calls : 0;
 
   // period="today" 면 cacheHitPct / outputInputRatio / avgDailyTokens 도 ccusage 의
