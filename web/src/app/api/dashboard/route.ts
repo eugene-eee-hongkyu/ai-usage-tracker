@@ -412,6 +412,20 @@ export async function GET(req: NextRequest) {
     };
   }
 
+  // Multi-provider Phase 3a — Codex 전용 metric: 추론 비중 (reasoning ratio).
+  // Codex (gpt-5 reasoning / o-series) 의 hidden CoT token 비율 = "보이지 않는 비용".
+  // ccusageDaily.daily[].reasoningOutputTokens 합산 ÷ outputTokens. Claude 는 null.
+  let reasoningRatio: number | null = null;
+  if (provider === "codex") {
+    let totalOutput = 0;
+    let totalReasoning = 0;
+    for (const r of ccusageRows) {
+      totalOutput += r.outputTokens ?? 0;
+      totalReasoning += (r as { reasoningOutputTokens?: number }).reasoningOutputTokens ?? 0;
+    }
+    reasoningRatio = totalOutput > 0 ? (totalReasoning / totalOutput) * 100 : 0;
+  }
+
   // Override codeburn daily cost with ccusage calendar-day cost (codeburn week
   // truncates the boundary day mid-hour, ccusage gives the full day total)
   let rawDaily = d.daily ?? [];
@@ -1264,5 +1278,6 @@ export async function GET(req: NextRequest) {
     selectedDeviceId: selectedTokenId,
     supportsMultiProvider,
     hasCodexData,
+    reasoningRatio,
   });
 }

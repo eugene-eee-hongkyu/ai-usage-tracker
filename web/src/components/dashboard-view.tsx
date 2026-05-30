@@ -185,6 +185,8 @@ interface DashboardData {
   // Tabs 표시 = !supportsMultiProvider || hasCodexData (옛 CLI 업데이트 유도 || Codex 사용자)
   supportsMultiProvider?: boolean;
   hasCodexData?: boolean;
+  // Phase 3a — Codex 추론 비중 (reasoningOutputTokens ÷ outputTokens × 100). Claude 면 null.
+  reasoningRatio?: number | null;
 }
 
 interface DeviceMeta {
@@ -2649,46 +2651,66 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
             </div>
           </div>
 
-          {/* By Project */}
-          <div data-testid="dash-card-by-project" className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-yellow-500 rounded">
-            <div className="px-3 py-2 border-b border-neutral-800 flex items-center justify-between">
-              <span className="text-xs font-mono font-bold text-yellow-400 uppercase tracking-wider">By Project</span>
-              {data.projects.length > 15 && (
-                <span className="flex items-center gap-1 text-[10px] font-mono bg-yellow-900/40 text-yellow-300 border border-yellow-700/60 rounded px-1.5 py-0.5">
-                  ↕ scroll · {data.projects.length}
-                </span>
-              )}
-            </div>
-            <div className="p-3">
-              <div className="flex text-xs text-neutral-600 font-mono mb-1.5 pr-1">
-                <span className="flex-1">project</span>
-                <span className="w-16 text-right">cost</span>
-                <span className="w-14 text-right">avg/s</span>
-                <span className="w-6 text-right">s</span>
+          {/* By Project (Claude 탭) / Reasoning 비중 (Codex 탭).
+              Phase 3a — Codex 일 때 by project 는 Row 5 의 Shell Commands 자리로 이동 (Codex 는
+              shell 데이터 없음). 이 자리는 Codex 의 추론 비중 카드. */}
+          {provider === "codex" ? (
+            <div data-testid="dash-card-reasoning-ratio" className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-violet-500 rounded">
+              <div className="px-3 py-2 border-b border-neutral-800">
+                <span className="text-xs font-mono font-bold text-violet-400 uppercase tracking-wider">🧠 Reasoning 비중</span>
               </div>
-              <div className={data.projects.length > 15 ? "overflow-y-auto max-h-[300px] no-scrollbar" : ""}>
-                <div className="space-y-1">
-                  {data.projects.map((p) => {
-                    const displayPath = formatPath(p.path || p.name);
-                    return (
-                      <div key={p.name} className="flex items-center gap-1.5 text-xs font-mono">
-                        <div className="w-16 h-1.5 bg-neutral-800 rounded overflow-hidden shrink-0">
-                          <div className="h-full bg-yellow-500 rounded" style={{ width: `${(p.cost / maxProjectCost) * 100}%` }} />
+              <div className="p-3 flex flex-col gap-2">
+                <div className="text-3xl font-bold text-neutral-100 font-mono">
+                  {(data.reasoningRatio ?? 0).toFixed(1)}<span className="text-lg text-neutral-500">%</span>
+                </div>
+                <p className="text-xs text-neutral-400 font-mono">output 토큰 중 hidden CoT 비중</p>
+                <p className="text-[10px] text-neutral-600 font-mono mt-1 leading-relaxed">
+                  Codex (gpt-5 reasoning / o-series) 의 추론 토큰 = 답변에 보이지 않지만 같은 가격으로 청구되는 hidden thinking.
+                  높을수록 깊이 생각해서 답함.
+                </p>
+              </div>
+            </div>
+          ) : (
+            <div data-testid="dash-card-by-project" className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-yellow-500 rounded">
+              <div className="px-3 py-2 border-b border-neutral-800 flex items-center justify-between">
+                <span className="text-xs font-mono font-bold text-yellow-400 uppercase tracking-wider">By Project</span>
+                {data.projects.length > 15 && (
+                  <span className="flex items-center gap-1 text-[10px] font-mono bg-yellow-900/40 text-yellow-300 border border-yellow-700/60 rounded px-1.5 py-0.5">
+                    ↕ scroll · {data.projects.length}
+                  </span>
+                )}
+              </div>
+              <div className="p-3">
+                <div className="flex text-xs text-neutral-600 font-mono mb-1.5 pr-1">
+                  <span className="flex-1">project</span>
+                  <span className="w-16 text-right">cost</span>
+                  <span className="w-14 text-right">avg/s</span>
+                  <span className="w-6 text-right">s</span>
+                </div>
+                <div className={data.projects.length > 15 ? "overflow-y-auto max-h-[300px] no-scrollbar" : ""}>
+                  <div className="space-y-1">
+                    {data.projects.map((p) => {
+                      const displayPath = formatPath(p.path || p.name);
+                      return (
+                        <div key={p.name} className="flex items-center gap-1.5 text-xs font-mono">
+                          <div className="w-16 h-1.5 bg-neutral-800 rounded overflow-hidden shrink-0">
+                            <div className="h-full bg-yellow-500 rounded" style={{ width: `${(p.cost / maxProjectCost) * 100}%` }} />
+                          </div>
+                          <span className="flex-1 text-neutral-300 overflow-hidden whitespace-nowrap" style={{ direction: "rtl", textOverflow: "ellipsis", textAlign: "left" }} title={p.path || p.name}>{displayPath}</span>
+                          <span className="w-16 text-yellow-400 text-right">{fmt$(p.cost)}</span>
+                          <span className="w-14 text-neutral-500 text-right">{fmt$(p.avgCost)}</span>
+                          <span className="w-6 text-neutral-600 text-right">{p.sessions}</span>
                         </div>
-                        <span className="flex-1 text-neutral-300 overflow-hidden whitespace-nowrap" style={{ direction: "rtl", textOverflow: "ellipsis", textAlign: "left" }} title={p.path || p.name}>{displayPath}</span>
-                        <span className="w-16 text-yellow-400 text-right">{fmt$(p.cost)}</span>
-                        <span className="w-14 text-neutral-500 text-right">{fmt$(p.avgCost)}</span>
-                        <span className="w-6 text-neutral-600 text-right">{p.sessions}</span>
-                      </div>
-                    );
-                  })}
-                  {data.projects.length === 0 && (
-                    <p className="text-neutral-600 text-xs font-mono">no data</p>
-                  )}
+                      );
+                    })}
+                    {data.projects.length === 0 && (
+                      <p className="text-neutral-600 text-xs font-mono">no data</p>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
+          )}
         </div>
 
         {/* Row 4: Top Sessions + By Activity — 이상치 / 카테고리 점검 */}
@@ -2818,40 +2840,83 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
             </div>
           </div>
 
-          {/* Shell Commands */}
-          <div data-testid="dash-card-shell-cmd" className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-orange-500 rounded">
-            <div className="px-3 py-2 border-b border-neutral-800 flex items-center justify-between">
-              <span className="text-xs font-mono font-bold text-orange-400 uppercase tracking-wider">Shell Commands</span>
-              {(data.shellCommands ?? []).length > 15 && (
-                <span className="flex items-center gap-1 text-[10px] font-mono bg-orange-900/40 text-orange-300 border border-orange-700/60 rounded px-1.5 py-0.5">
-                  ↕ scroll · {(data.shellCommands ?? []).length}
-                </span>
-              )}
-            </div>
-            <div className="p-3">
-              <div className="flex text-xs text-neutral-600 font-mono mb-1.5">
-                <span className="flex-1">command</span>
-                <span className="w-16 text-right">calls</span>
+          {/* Shell Commands (Claude 탭) / By Project (Codex 탭).
+              Phase 3a — Codex 는 shell 데이터 없음 → 이 자리에 by project 카드 이동. */}
+          {provider === "codex" ? (
+            <div data-testid="dash-card-by-project" className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-yellow-500 rounded">
+              <div className="px-3 py-2 border-b border-neutral-800 flex items-center justify-between">
+                <span className="text-xs font-mono font-bold text-yellow-400 uppercase tracking-wider">By Project</span>
+                {data.projects.length > 15 && (
+                  <span className="flex items-center gap-1 text-[10px] font-mono bg-yellow-900/40 text-yellow-300 border border-yellow-700/60 rounded px-1.5 py-0.5">
+                    ↕ scroll · {data.projects.length}
+                  </span>
+                )}
               </div>
-              <div className={(data.shellCommands ?? []).length > 15 ? "overflow-y-auto max-h-[300px] no-scrollbar" : ""}>
-                <div className="space-y-1">
-                  {(data.shellCommands ?? []).map((s) => {
-                    const maxCalls = Math.max(...(data.shellCommands ?? []).map((x) => x.calls), 0.01);
-                    return (
-                      <div key={s.name} className="flex items-center gap-1.5 text-xs font-mono">
-                        <div className="w-16 h-1.5 bg-neutral-800 rounded overflow-hidden shrink-0">
-                          <div className="h-full bg-orange-500 rounded" style={{ width: `${(s.calls / maxCalls) * 100}%` }} />
+              <div className="p-3">
+                <div className="flex text-xs text-neutral-600 font-mono mb-1.5 pr-1">
+                  <span className="flex-1">project</span>
+                  <span className="w-16 text-right">cost</span>
+                  <span className="w-14 text-right">avg/s</span>
+                  <span className="w-6 text-right">s</span>
+                </div>
+                <div className={data.projects.length > 15 ? "overflow-y-auto max-h-[300px] no-scrollbar" : ""}>
+                  <div className="space-y-1">
+                    {data.projects.map((p) => {
+                      const displayPath = formatPath(p.path || p.name);
+                      return (
+                        <div key={p.name} className="flex items-center gap-1.5 text-xs font-mono">
+                          <div className="w-16 h-1.5 bg-neutral-800 rounded overflow-hidden shrink-0">
+                            <div className="h-full bg-yellow-500 rounded" style={{ width: `${(p.cost / maxProjectCost) * 100}%` }} />
+                          </div>
+                          <span className="flex-1 text-neutral-300 overflow-hidden whitespace-nowrap" style={{ direction: "rtl", textOverflow: "ellipsis", textAlign: "left" }} title={p.path || p.name}>{displayPath}</span>
+                          <span className="w-16 text-yellow-400 text-right">{fmt$(p.cost)}</span>
+                          <span className="w-14 text-neutral-500 text-right">{fmt$(p.avgCost)}</span>
+                          <span className="w-6 text-neutral-600 text-right">{p.sessions}</span>
                         </div>
-                        <span className="flex-1 text-neutral-300 truncate">{s.name}</span>
-                        <span className="w-16 text-blue-400 text-right">{s.calls.toLocaleString()}</span>
-                      </div>
-                    );
-                  })}
-                  {(data.shellCommands ?? []).length === 0 && <p className="text-neutral-600 text-xs font-mono">no data</p>}
+                      );
+                    })}
+                    {data.projects.length === 0 && (
+                      <p className="text-neutral-600 text-xs font-mono">no data</p>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
+          ) : (
+            <div data-testid="dash-card-shell-cmd" className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-orange-500 rounded">
+              <div className="px-3 py-2 border-b border-neutral-800 flex items-center justify-between">
+                <span className="text-xs font-mono font-bold text-orange-400 uppercase tracking-wider">Shell Commands</span>
+                {(data.shellCommands ?? []).length > 15 && (
+                  <span className="flex items-center gap-1 text-[10px] font-mono bg-orange-900/40 text-orange-300 border border-orange-700/60 rounded px-1.5 py-0.5">
+                    ↕ scroll · {(data.shellCommands ?? []).length}
+                  </span>
+                )}
+              </div>
+              <div className="p-3">
+                <div className="flex text-xs text-neutral-600 font-mono mb-1.5">
+                  <span className="flex-1">command</span>
+                  <span className="w-16 text-right">calls</span>
+                </div>
+                <div className={(data.shellCommands ?? []).length > 15 ? "overflow-y-auto max-h-[300px] no-scrollbar" : ""}>
+                  <div className="space-y-1">
+                    {(data.shellCommands ?? []).map((s) => {
+                      const maxCalls = Math.max(...(data.shellCommands ?? []).map((x) => x.calls), 0.01);
+                      return (
+                        <div key={s.name} className="flex items-center gap-1.5 text-xs font-mono">
+                          <div className="w-16 h-1.5 bg-neutral-800 rounded overflow-hidden shrink-0">
+                            <div className="h-full bg-orange-500 rounded" style={{ width: `${(s.calls / maxCalls) * 100}%` }} />
+                          </div>
+                          <span className="flex-1 text-neutral-300 truncate">{s.name}</span>
+                          <span className="w-16 text-blue-400 text-right">{s.calls.toLocaleString()}</span>
+                        </div>
+                      );
+                    })}
+                    {(data.shellCommands ?? []).length === 0 && <p className="text-neutral-600 text-xs font-mono">no data</p>}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* 새 Row: MCP Servers + 체류 히트맵 — 사용자 요청: core/shell 아래. */}
