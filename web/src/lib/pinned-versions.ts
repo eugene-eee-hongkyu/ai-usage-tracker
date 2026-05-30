@@ -9,5 +9,5 @@ export const PINNED = {
   CODEBURN: "0.9.7",
   CCUSAGE: "19.0.2",
   NODE_RECOMMENDED: "22",
-  USAGE_TRACKER_RECOMMENDED: "0.3.0",
+  USAGE_TRACKER_RECOMMENDED: "0.3.2",
 } as const;
