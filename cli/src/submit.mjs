@@ -13,11 +13,18 @@ import { homedir, arch as osArch, release as osRelease } from "os";
 // M6e: CLI 자체 버전. init.ts 의 CLI_VERSION 과 동기화.
 // 새 릴리즈 시 두 파일 같이 bump.
 // Multi-provider (2026-05-29 M): 0.3.x 부터 Claude + Codex 분리 호출.
-const CLI_VERSION = "0.3.0";
+// 0.3.2 (2026-05-30 oreo 회귀): partial submit 허용 + telemetry buffer + provider 직렬화.
+const CLI_VERSION = "0.3.2";
 
 // 직전 sync 실패 정보를 다음 sync 가 함께 보내기 위한 marker.
 // 실패 시 catch 블록에서 write, 성공 시 다음 envInfo 수집에서 read + 삭제.
 const LAST_ERROR_FILE = join(homedir(), ".z21labs", "last-error.json");
+
+// Telemetry buffer (E) — 모든 실패 (codeburn / ccusage / HTTP / network) 누적.
+// 매 ingest body 에 함께 전송 → 서버 200 ack 시 clear. ack 실패 시 유지 (다음
+// 까지 누적). max N 줄 LRU.
+const TELEMETRY_FILE_PATH = "telemetry-buffer.jsonl"; // STABLE_DIR_EARLY 기준, 아래에서 join
+const MAX_TELEMETRY_LINES = 200;
 
 // 새 위치 우선, 옛 위치 fallback (마이그 안 된 머신 대응)
 const NEW_STABLE_DIR = join(homedir(), ".z21labs", "usage-tracker");
@@ -40,6 +47,33 @@ const log = (msg) => {
   const line = `[${ts()}] ${msg}\n`;
   try { appendFileSync(SUBMIT_LOG, line); } catch {}
 };
+
+// Telemetry buffer helpers — local jsonl. 매 fail event 1 줄 append, max N 줄 유지.
+const TELEMETRY_FILE = join(STABLE_DIR_EARLY, TELEMETRY_FILE_PATH);
+function pushTelemetry(kind, detail) {
+  try {
+    const line = JSON.stringify({ at: ts(), kind, detail }) + "\n";
+    appendFileSync(TELEMETRY_FILE, line);
+    // LRU trim
+    const all = readFileSync(TELEMETRY_FILE, "utf8").split("\n").filter(Boolean);
+    if (all.length > MAX_TELEMETRY_LINES) {
+      writeFileSync(TELEMETRY_FILE, all.slice(-MAX_TELEMETRY_LINES).join("\n") + "\n");
+    }
+  } catch {}
+}
+function readTelemetryAll() {
+  try {
+    if (!existsSync(TELEMETRY_FILE)) return [];
+    return readFileSync(TELEMETRY_FILE, "utf8")
+      .split("\n")
+      .filter(Boolean)
+      .map((l) => { try { return JSON.parse(l); } catch { return null; } })
+      .filter(Boolean);
+  } catch { return []; }
+}
+function clearTelemetry() {
+  try { unlinkSync(TELEMETRY_FILE); } catch {}
+}
 
 // Self-detach: SessionEnd hook 부모 프로세스는 VS Code 종료 시 SIGKILL될 수 있음.
 // _USAGE_TRACKER_DETACHED 없으면 자신을 detached 백그라운드로 재생성하고 즉시 종료.
@@ -153,9 +187,11 @@ function spawnCcusageDaily(provider) {
         if (code === 127 || /not found|not recognized|cannot find/i.test(stderr)) {
           ccusageStatus[provider] = "missing";
           log(`ccusage NOT INSTALLED (${provider}) — token graphs will be empty. Run: npm install -g ccusage`);
+          pushTelemetry("ccusage_missing", { provider });
         } else {
           ccusageStatus[provider] = "error";
           log(`ccusage ${provider} exited ${code} — ${stderr.trim().slice(0, 200)}`);
+          pushTelemetry("ccusage_fail", { provider, code, stderr: stderr.trim().slice(0, 500) });
         }
         return resolve(null);
       }
@@ -173,9 +209,11 @@ function spawnCcusageDaily(provider) {
       if (err && err.code === "ENOENT") {
         ccusageStatus[provider] = "missing";
         log(`ccusage NOT INSTALLED (${provider}) — token graphs will be empty. Run: npm install -g ccusage`);
+        pushTelemetry("ccusage_missing", { provider });
       } else {
         ccusageStatus[provider] = "error";
         log(`ccusage ${provider} spawn error: ${err?.message ?? err}`);
+        pushTelemetry("ccusage_fail", { provider, reason: err?.message ?? String(err) });
       }
       resolve(null);
     });
@@ -183,6 +221,7 @@ function spawnCcusageDaily(provider) {
       proc.kill();
       ccusageStatus[provider] = "timeout";
       log(`ccusage ${provider} timeout (600s)`);
+      pushTelemetry("ccusage_timeout", { provider });
       resolve(null);
     }, 600_000);
   });
@@ -318,7 +357,9 @@ async function collectForProvider(provider) {
       providerReport[PERIODS[i]] = r.value;
       okPeriods.push(PERIODS[i]);
     } else {
-      failPeriods.push(`${provider}/${PERIODS[i]}:${r.status === "rejected" ? r.reason?.message ?? r.reason : "empty"}`);
+      const reason = r.status === "rejected" ? r.reason?.message ?? String(r.reason) : "empty";
+      failPeriods.push(`${provider}/${PERIODS[i]}:${reason}`);
+      pushTelemetry("codeburn_fail", { provider, period: PERIODS[i], reason });
     }
   }
   const ccusageDaily = ccResult.status === "fulfilled" ? ccResult.value : null;
@@ -351,9 +392,11 @@ async function main() {
     try {
       const PROVIDERS = ["claude", "codex"];
       log(`spawning ${PROVIDERS.length} providers × (codeburn x${PERIODS.length} + ccusage daily + ccusage blocks)...`);
-      const providerResults = await Promise.all(PROVIDERS.map((p) => collectForProvider(p)));
-      const claudeResult = providerResults[0];
-      const codexResult = providerResults[1];
+      // F1 (2026-05-30 oreo 회귀): provider 간 직렬 — 동시 spawn 14 → 7 로
+      // 줄여 자원 경합으로 인한 codeburn timeout 가능성 ↓. 영진님 (정상) 도 동일.
+      // provider 내부는 그대로 동시 (Promise.allSettled).
+      const claudeResult = await collectForProvider("claude");
+      const codexResult = await collectForProvider("codex");
 
       const allOk = [
         ...claudeResult.okPeriods.map((p) => `claude/${p}`),
@@ -371,27 +414,29 @@ async function main() {
       log(`spawn done — ok=[${allOk.join(",")}]${allFail.length ? ` fail=[${allFail.join(",")}]` : ""}, ccusage claude=${ccusageStatus.claude} codex=${ccusageStatus.codex}`);
 
       // body schema (신): { claude: { today, week, month, 30days, all, ccusageDaily, ccusageBlocks },
-      //                    codex: { ... }, envInfo, ccusageMissing? }
+      //                    codex: { ... }, envInfo, ccusageMissing?,
+      //                    claudeFailPeriods?, codexFailPeriods?, recentTelemetry? }
       // 서버 run-ingest 가 양쪽 분기 처리. 옛 형태 (provider key 없음) 도 backward compat 으로 claude 처리.
       //
-      // 2026-05-30 (oreo 회귀 대응, C): codeburn PERIODS 5 개 중 1+ 실패한 provider 는
-      // body 에서 통째로 제외 (key 자체 생략). 서버는 그 provider 의 raw_json 을 안 받아
-      // 기존 풀데이터 유지 (다음 풀 ingest 까지 partial overwrite 차단). 양쪽 모두
-      // partial fail 면 ingest 자체 skip (위 hasAnyClaude/hasAnyCodex 가드 외 추가 가드).
-      report = {};
-      if (claudeResult.failPeriods.length === 0) {
-        report.claude = claudeResult.providerReport;
-      } else {
-        log(`SKIP claude submit — partial codeburn fail: ${claudeResult.failPeriods.join(", ")}`);
+      // 2026-05-30 v0.3.2 (oreo 회귀 대응): partial submit 허용. 서버는 raw_json 키
+      // 단위 jsonb merge (B) 라 기존 풀데이터 보존. partial 실패 정보는 claudeFailPeriods
+      // / codexFailPeriods + telemetry 로 같이 전송 → 서버에서 진단 가능.
+      report = {
+        claude: claudeResult.providerReport,
+        codex: codexResult.providerReport,
+      };
+      if (claudeResult.failPeriods.length > 0) {
+        report.claudeFailPeriods = claudeResult.failPeriods;
       }
-      if (codexResult.failPeriods.length === 0) {
-        report.codex = codexResult.providerReport;
-      } else {
-        log(`SKIP codex submit — partial codeburn fail: ${codexResult.failPeriods.join(", ")}`);
+      if (codexResult.failPeriods.length > 0) {
+        report.codexFailPeriods = codexResult.failPeriods;
       }
-      if (!report.claude && !report.codex) {
-        log(`ERROR: both providers partial fail — nothing to submit`);
-        return;
+      // E: 누적 telemetry (codeburn / ccusage / HTTP / network 모든 실패 history).
+      // 매 ingest 마다 그 시점 buffer 모두 전송. 서버 ack 성공 후 clear (아래 ingest 응답 처리).
+      const telemetry = readTelemetryAll();
+      if (telemetry.length > 0) {
+        report.recentTelemetry = telemetry;
+        log(`recentTelemetry: ${telemetry.length} events attached`);
       }
       // 양쪽 모두 missing 일 때만 ccusageMissing 플래그 — 한쪽만 missing 은 정상 (Codex 안 쓰는 사용자).
       if (ccusageStatus.claude === "missing" && ccusageStatus.codex === "missing") {
@@ -417,7 +462,10 @@ async function main() {
         body: JSON.stringify(report),
       });
       log(`ingest response: ${resp.status} ${resp.statusText}`);
-      if (!resp.ok) {
+      if (resp.ok) {
+        // E: 서버 ack 성공 → telemetry buffer clear (다음 ingest 에 같은 events 중복 전송 방지).
+        clearTelemetry();
+      } else {
         process.stderr.write(`[usage-tracker] ingest failed: ${resp.status}\n`);
         // M6e: 실패 marker — 다음 sync 의 envInfo 에 함께 전달되어 web 에 표시.
         try {
@@ -426,6 +474,7 @@ async function main() {
             JSON.stringify({ kind: "http", status: resp.status, statusText: resp.statusText, at: new Date().toISOString() }),
           );
         } catch { /* ignore */ }
+        pushTelemetry("http_fail", { status: resp.status, statusText: resp.statusText });
       }
     } catch (e) {
       log(`ERROR: ingest network — ${e?.message ?? e}`);
@@ -436,6 +485,7 @@ async function main() {
           JSON.stringify({ kind: "network", message: String(e?.message ?? e), at: new Date().toISOString() }),
         );
       } catch { /* ignore */ }
+      pushTelemetry("network_fail", { message: String(e?.message ?? e) });
     }
   } finally {
     releaseLock();

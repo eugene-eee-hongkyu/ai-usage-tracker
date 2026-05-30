@@ -363,7 +363,11 @@ async function runIngestForProvider(
     .onConflictDoUpdate({
       target: [userSnapshots.userId, userSnapshots.teamId, userSnapshots.tokenId, userSnapshots.provider],
       set: {
-        rawJson: sql`excluded.raw_json`,
+        // B (2026-05-30 oreo 회귀): raw_json 의 키 단위 jsonb merge —
+        // partial submit 와도 기존 키 (today, week, month, 30days, all, ccusageDaily,
+        // ccusageBlocks) 보존. 새 키만 덮어쓰임. CLI 의 codeburn 일부 실패 (partial body)
+        // 가 풀데이터 삭제하지 않게 방어. `||` 는 오른쪽 우선 (excluded 새 값이 기존 덮음).
+        rawJson: sql`COALESCE(${userSnapshots.rawJson}, '{}'::jsonb) || excluded.raw_json`,
         totalCost: sql`excluded.total_cost`,
         sessionsCount: sql`excluded.sessions_count`,
         callsCount: sql`excluded.calls_count`,

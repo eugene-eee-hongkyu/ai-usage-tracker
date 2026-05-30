@@ -110,11 +110,38 @@ export async function POST(req: NextRequest) {
 
   // M6e: 매칭된 token 의 last_used_at + metadata 갱신. fallback (users 단일 hash)
   // 경로면 matchedTokenId=null 이라 skip — 옛 CLI 가 metadata 안 보내도 안전.
+  //
+  // 2026-05-30 v0.3.2 (oreo 회귀): metadata 에 envInfo 외 partial 진단 정보 함께 저장.
+  // - lastIngestTelemetry: 최근 100-200 줄 누적 실패 events (codeburn/ccusage/HTTP/network)
+  // - lastClaudeFailPeriods / lastCodexFailPeriods: 이번 ingest 에서 실패한 codeburn period
+  // - lastIngestAt: 이번 ingest 시각 (마지막 fail 시점과 별개)
+  // 모두 nullable, 옛 CLI body 면 비어 정상.
   const envInfo = (body as { envInfo?: unknown })?.envInfo;
+  const recentTelemetry = (body as { recentTelemetry?: unknown })?.recentTelemetry;
+  const claudeFailPeriods = (body as { claudeFailPeriods?: unknown })?.claudeFailPeriods;
+  const codexFailPeriods = (body as { codexFailPeriods?: unknown })?.codexFailPeriods;
   if (matchedTokenId !== null) {
     const metadataUpdate: { lastUsedAt: Date; metadata?: unknown } = { lastUsedAt: new Date() };
+    const mergedMetadata: Record<string, unknown> = {};
     if (envInfo && typeof envInfo === "object") {
-      metadataUpdate.metadata = envInfo;
+      Object.assign(mergedMetadata, envInfo as Record<string, unknown>);
+    }
+    if (Array.isArray(recentTelemetry)) {
+      mergedMetadata.lastIngestTelemetry = recentTelemetry;
+    }
+    if (Array.isArray(claudeFailPeriods) && claudeFailPeriods.length > 0) {
+      mergedMetadata.lastClaudeFailPeriods = claudeFailPeriods;
+    } else {
+      mergedMetadata.lastClaudeFailPeriods = null;
+    }
+    if (Array.isArray(codexFailPeriods) && codexFailPeriods.length > 0) {
+      mergedMetadata.lastCodexFailPeriods = codexFailPeriods;
+    } else {
+      mergedMetadata.lastCodexFailPeriods = null;
+    }
+    mergedMetadata.lastIngestAt = new Date().toISOString();
+    if (Object.keys(mergedMetadata).length > 0) {
+      metadataUpdate.metadata = mergedMetadata;
     }
     await db.update(apiTokens).set(metadataUpdate).where(eq(apiTokens.id, matchedTokenId));
   }
