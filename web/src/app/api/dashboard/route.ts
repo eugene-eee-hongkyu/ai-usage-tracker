@@ -237,9 +237,10 @@ export async function GET(req: NextRequest) {
     const [major, minor] = v.split(".").map((n) => parseInt(n, 10) || 0);
     return major > 0 || (major === 0 && minor >= 3);
   })();
-  // hasCodexData = "의미 있는 Codex 사용 데이터 존재" — 단순 row 존재가 아니라
-  // 실제 사용 (cost > 0 또는 sessions > 0) 가드. 새 CLI 가 Codex 안 쓰는 사용자에도
-  // 빈 응답 (cost=0, sessions=0) 을 매번 row 로 저장하므로 가드 없으면 false positive.
+  // hasCodexData / hasClaudeData = "의미 있는 provider 별 사용 데이터 존재" —
+  // 단순 row 존재가 아니라 실제 사용 (cost > 0 또는 sessions > 0) 가드.
+  // 새 CLI 가 안 쓰는 provider 에도 빈 응답 (cost=0, sessions=0) 을 row 로 저장하므로
+  // 가드 없으면 false positive. UI Provider segmented control 의 disabled 분기에 사용.
   const codexSnaps = await db
     .select({ id: userSnapshots.id })
     .from(userSnapshots)
@@ -251,6 +252,17 @@ export async function GET(req: NextRequest) {
     ))
     .limit(1);
   const hasCodexData = codexSnaps.length > 0;
+  const claudeSnaps = await db
+    .select({ id: userSnapshots.id })
+    .from(userSnapshots)
+    .where(and(
+      eq(userSnapshots.userId, user[0].id),
+      eq(userSnapshots.provider, "claude"),
+      IS_LOCAL_MODE ? undefined : eq(userSnapshots.teamId, effectiveTeamId!),
+      or(gt(userSnapshots.totalCost, 0), gt(userSnapshots.sessionsCount, 0)),
+    ))
+    .limit(1);
+  const hasClaudeData = claudeSnaps.length > 0;
 
   const snap = await db
     .select()
@@ -338,6 +350,7 @@ export async function GET(req: NextRequest) {
       selectedDeviceId: selectedTokenId,
       supportsMultiProvider,
       hasCodexData,
+      hasClaudeData,
     });
   }
 
@@ -1300,6 +1313,7 @@ export async function GET(req: NextRequest) {
     selectedDeviceId: selectedTokenId,
     supportsMultiProvider,
     hasCodexData,
+    hasClaudeData,
     reasoningRatio,
     codexFallbackCount,
   });

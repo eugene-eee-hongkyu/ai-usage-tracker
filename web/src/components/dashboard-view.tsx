@@ -179,12 +179,14 @@ interface DashboardData {
   // M6f (2026-05-25): device-scope. user 가 노트북 N대 쓰면 N entries.
   devices?: DeviceMeta[];
   selectedDeviceId?: number | null;
-  // Multi-provider (2026-05-29 M): Codex 탭 분기.
+  // Multi-provider (2026-05-29 M → 2026-05-30 reorder): provider segmented control.
   //   supportsMultiProvider — selectedDeviceId 의 CLI 가 Codex 분리 호출 지원 (>= 0.3.0)
-  //   hasCodexData          — user_snapshots 에 provider='codex' row 1+ 존재
-  // Tabs 표시 = !supportsMultiProvider || hasCodexData (옛 CLI 업데이트 유도 || Codex 사용자)
+  //   hasCodexData          — user_snapshots 에 provider='codex' row 1+ 의미 있는 사용
+  //   hasClaudeData         — user_snapshots 에 provider='claude' row 1+ 의미 있는 사용
+  // Provider row 는 항상 표시. 데이터 없는 쪽은 disabled chip + 클릭 시 dialog 안내.
   supportsMultiProvider?: boolean;
   hasCodexData?: boolean;
+  hasClaudeData?: boolean;
   // Phase 3a — Codex 추론 비중 (reasoningOutputTokens ÷ outputTokens × 100). Claude 면 null.
   reasoningRatio?: number | null;
   // Phase 3a-2 — Codex 모델 fallback (isFallback=true) 발생 카운트. Claude 면 0.
@@ -998,6 +1000,8 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
   const [deviceId, setDeviceId] = useState<number | null>(null);
   // Multi-provider (2026-05-29 M): Claude / Codex 분리 탭. default = claude (대다수).
   const [provider, setProvider] = useState<"claude" | "codex">("claude");
+  // 2026-05-30 reorder: 데이터 없는 provider 클릭 시 안내 dialog. null = 닫힘.
+  const [disabledProviderDialog, setDisabledProviderDialog] = useState<"claude" | "codex" | null>(null);
 
   const apiUrl = (p: Period, wOff: number, mOff: number, dOff: number, devId: number | null, prov: "claude" | "codex") => {
     const params = new URLSearchParams({ period: p });
@@ -2224,9 +2228,89 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
         hidden={viewOnly || isLocalMode === true}
       />
 
-      {/* Period Tabs */}
+      {/* 2026-05-30 reorder: 위계 = provider (어떤 AI) > device (어디서) > period (언제).
+          provider 는 항상 표시 (다른 AI 도 지원한다는 신호 + multi-provider 인지),
+          데이터 없는 쪽은 disabled chip + 클릭 시 dialog 안내. device 는 2대+ 일 때만.
+          period 는 가장 자주 쓰는 컨트롤이라 메인 강조 (큰 탭) 유지. */}
       <div className="border-b border-neutral-800">
-        <div className="max-w-6xl mx-auto px-4 pt-3 pb-2 flex gap-1 items-center">
+        {/* Provider segmented control — 항상 표시 */}
+        {(() => {
+          const hasClaude = data.hasClaudeData ?? true; // 옛 CLI (필드 없음) 는 모두 claude provider 라 true
+          const hasCodex = data.hasCodexData ?? false;
+          const supportsMP = data.supportsMultiProvider ?? false;
+          const providers: Array<{ key: "claude" | "codex"; label: string; hasData: boolean }> = [
+            { key: "claude", label: "Claude Code", hasData: hasClaude },
+            { key: "codex", label: "Codex", hasData: hasCodex && supportsMP },
+          ];
+          return (
+            <div className="max-w-6xl mx-auto px-4 pt-3 pb-2 flex gap-2 items-center">
+              <span className="text-[10px] font-mono text-neutral-600 uppercase tracking-wider">provider</span>
+              <div className="inline-flex rounded-md border border-neutral-700 bg-neutral-900 p-0.5">
+                {providers.map((prov) => {
+                  const selected = provider === prov.key;
+                  const disabled = !prov.hasData;
+                  return (
+                    <button
+                      key={prov.key}
+                      data-testid={`dash-provider-${prov.key}`}
+                      onClick={() => {
+                        if (disabled) {
+                          setDisabledProviderDialog(prov.key);
+                        } else {
+                          setProvider(prov.key);
+                        }
+                      }}
+                      className={`text-xs font-mono rounded px-3 py-1 transition-colors ${
+                        selected && !disabled
+                          ? "bg-indigo-600 text-white"
+                          : disabled
+                            ? "text-neutral-600 hover:text-neutral-400 cursor-help"
+                            : "text-neutral-300 hover:text-neutral-100"
+                      }`}
+                    >{prov.label}</button>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })()}
+        {/* Device chips — 2대+ 일 때만 표시. selectedDeviceId 와 동기화. */}
+        {(data.devices?.length ?? 0) >= 2 && (
+          <div className="max-w-6xl mx-auto px-4 pb-2 flex flex-wrap gap-1.5 items-center">
+            <span className="text-[10px] font-mono text-neutral-600 uppercase tracking-wider mr-1">device:</span>
+            {data.devices!.map((dev) => {
+              const isSelected = (deviceId ?? data.selectedDeviceId) === dev.tokenId;
+              const sinceMs = dev.snapshotUpdatedAt ? Date.now() - new Date(dev.snapshotUpdatedAt).getTime() : null;
+              const ageLabel = sinceMs === null
+                ? "no data"
+                : sinceMs < 3_600_000 ? `${Math.floor(sinceMs / 60_000)}m ago`
+                : sinceMs < 86_400_000 ? `${Math.floor(sinceMs / 3_600_000)}h ago`
+                : `${Math.floor(sinceMs / 86_400_000)}d ago`;
+              const isStale = sinceMs !== null && sinceMs > 3 * 86_400_000;
+              const icon = dev.platform === "darwin" ? "🍎" : dev.platform === "win32" ? "🪟" : dev.platform === "linux" ? "🐧" : "💻";
+              return (
+                <button
+                  key={dev.tokenId}
+                  data-testid={`dash-device-${dev.tokenId}`}
+                  onClick={() => setDeviceId(dev.tokenId)}
+                  className={`text-xs font-mono border rounded px-2 py-1 transition-colors flex items-center gap-1.5 ${
+                    isSelected
+                      ? "bg-indigo-600 text-white border-indigo-500"
+                      : "bg-neutral-800 text-neutral-300 border-neutral-700 hover:border-neutral-500"
+                  }`}
+                >
+                  <span>{icon}</span>
+                  <span className="truncate max-w-[160px]">{dev.name}</span>
+                  <span className={`text-[10px] ${isStale ? "text-amber-400" : isSelected ? "text-indigo-100" : "text-neutral-500"}`}>
+                    · {ageLabel}{isStale ? " ⚠" : ""}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        )}
+        {/* Period main tabs — 위계는 하위지만 클릭 빈도가 가장 높아 visual weight 유지 */}
+        <div className="max-w-6xl mx-auto px-4 pt-1 pb-2 flex gap-1 items-center">
           {(["today", "8days", "month", "30days", "all"] as Period[]).map((p) => (
             <button
               key={p}
@@ -2312,62 +2396,6 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
             </select>
           )}
         </div>
-        {/* Multi-provider (2026-05-29 M): Claude / Codex 탭.
-            표시 조건 = !supportsMultiProvider (옛 CLI — 업데이트 유도) || hasCodexData (새 CLI + Codex 사용자).
-            둘 다 아니면 (새 CLI + Codex 안 씀) 탭 라인 자체 숨김 — 사용자 선택지 없는데 노출 = 노이즈. */}
-        {(!data.supportsMultiProvider || data.hasCodexData) && (
-          <div className="max-w-6xl mx-auto px-4 pb-2 flex gap-1.5 items-center">
-            <span className="text-[10px] font-mono text-neutral-600 uppercase tracking-wider mr-1">provider:</span>
-            {(["claude", "codex"] as const).map((prov) => (
-              <button
-                key={prov}
-                data-testid={`dash-provider-${prov}`}
-                onClick={() => setProvider(prov)}
-                className={`text-xs font-mono border rounded px-3 py-1 transition-colors ${
-                  provider === prov
-                    ? "bg-indigo-600 text-white border-indigo-500"
-                    : "bg-neutral-800 text-neutral-300 border-neutral-700 hover:border-neutral-500"
-                }`}
-              >{prov === "claude" ? "Claude Code" : "Codex"}</button>
-            ))}
-          </div>
-        )}
-        {/* M6f: device chip row — user 가 노트북 N대 사용 시 표시. 1개면 숨김.
-            클릭하면 그 device 의 데이터로 dashboard 갱신. server 가 selectedDeviceId 결정 → 동기화. */}
-        {(data.devices?.length ?? 0) >= 2 && (
-          <div className="max-w-6xl mx-auto px-4 pb-2 flex flex-wrap gap-1.5 items-center">
-            <span className="text-[10px] font-mono text-neutral-600 uppercase tracking-wider mr-1">device:</span>
-            {data.devices!.map((dev) => {
-              const isSelected = (deviceId ?? data.selectedDeviceId) === dev.tokenId;
-              const sinceMs = dev.snapshotUpdatedAt ? Date.now() - new Date(dev.snapshotUpdatedAt).getTime() : null;
-              const ageLabel = sinceMs === null
-                ? "no data"
-                : sinceMs < 3_600_000 ? `${Math.floor(sinceMs / 60_000)}m ago`
-                : sinceMs < 86_400_000 ? `${Math.floor(sinceMs / 3_600_000)}h ago`
-                : `${Math.floor(sinceMs / 86_400_000)}d ago`;
-              const isStale = sinceMs !== null && sinceMs > 3 * 86_400_000;
-              const icon = dev.platform === "darwin" ? "🍎" : dev.platform === "win32" ? "🪟" : dev.platform === "linux" ? "🐧" : "💻";
-              return (
-                <button
-                  key={dev.tokenId}
-                  data-testid={`dash-device-${dev.tokenId}`}
-                  onClick={() => setDeviceId(dev.tokenId)}
-                  className={`text-xs font-mono border rounded px-2 py-1 transition-colors flex items-center gap-1.5 ${
-                    isSelected
-                      ? "bg-indigo-600 text-white border-indigo-500"
-                      : "bg-neutral-800 text-neutral-300 border-neutral-700 hover:border-neutral-500"
-                  }`}
-                >
-                  <span>{icon}</span>
-                  <span className="truncate max-w-[160px]">{dev.name}</span>
-                  <span className={`text-[10px] ${isStale ? "text-amber-400" : isSelected ? "text-indigo-100" : "text-neutral-500"}`}>
-                    · {ageLabel}{isStale ? " ⚠" : ""}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-        )}
       </div>
 
       {/* M6f: stale device 경고 — multi-device 사용자에서 한쪽 노트북이 3일+ sync 안 되면
@@ -3006,6 +3034,86 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
           onClose={() => setShowTokenModal(false)}
         />
       )}
+      {disabledProviderDialog && (
+        <ProviderDisabledDialog
+          provider={disabledProviderDialog}
+          supportsMultiProvider={data.supportsMultiProvider ?? false}
+          onClose={() => setDisabledProviderDialog(null)}
+        />
+      )}
+    </div>
+  );
+}
+
+// 2026-05-30: provider segmented control 에서 disabled chip 클릭 시 표시.
+// "Claude Code 쓰면 자동으로 잡힙니다" 같은 짧은 안내. 작은 dialog 라 ModalShell 대신 inline.
+function ProviderDisabledDialog({
+  provider,
+  supportsMultiProvider,
+  onClose,
+}: {
+  provider: "claude" | "codex";
+  supportsMultiProvider: boolean;
+  onClose: () => void;
+}) {
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [onClose]);
+
+  const isClaude = provider === "claude";
+  const title = isClaude ? "Claude Code 사용 기록 없음" : "Codex 사용 기록 없음";
+  const needsCliUpdate = provider === "codex" && !supportsMultiProvider;
+
+  return (
+    <div
+      className="fixed inset-0 bg-black/70 z-50 flex items-start justify-center overflow-y-auto p-4"
+      onClick={onClose}
+      data-testid={`provider-disabled-dialog-${provider}`}
+    >
+      <div
+        className="bg-slate-900 border border-slate-700 rounded-xl w-full max-w-md my-16 shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-800">
+          <h2 className="text-sm font-semibold text-slate-200">{title}</h2>
+          <button
+            onClick={onClose}
+            className="text-slate-500 hover:text-slate-300 text-xl leading-none w-7 h-7 flex items-center justify-center rounded hover:bg-slate-800 transition-colors"
+          >×</button>
+        </div>
+        <div className="px-5 py-5 space-y-3 text-sm text-slate-300 leading-relaxed">
+          {isClaude ? (
+            <>
+              <p>이 계정에는 아직 <span className="text-cyan-400 font-mono">Claude Code</span> 사용 기록이 없습니다.</p>
+              <p className="text-slate-400">
+                평소처럼 Claude Code 를 쓰시면 세션 종료마다 자동으로 사용량이 수집되어 여기에 표시됩니다.
+              </p>
+            </>
+          ) : needsCliUpdate ? (
+            <>
+              <p>이 계정에는 아직 <span className="text-cyan-400 font-mono">Codex</span> 사용 기록이 없습니다.</p>
+              <p className="text-slate-400">
+                현재 설치된 ai-usage-tracker CLI 버전은 Codex 사용량을 분리 집계하지 않습니다. CLI 를 최신 버전 (<span className="font-mono text-cyan-400">0.3.0+</span>) 으로 업데이트하면 Codex 사용량도 자동으로 잡힙니다.
+              </p>
+            </>
+          ) : (
+            <>
+              <p>이 계정에는 아직 <span className="text-cyan-400 font-mono">Codex</span> 사용 기록이 없습니다.</p>
+              <p className="text-slate-400">
+                Codex CLI 를 쓰시면 세션 종료마다 자동으로 사용량이 수집되어 여기에 표시됩니다. 별도 설정은 필요 없습니다.
+              </p>
+            </>
+          )}
+        </div>
+        <div className="px-5 py-3 border-t border-slate-800 flex justify-end">
+          <button
+            onClick={onClose}
+            className="text-xs font-mono bg-indigo-600 hover:bg-indigo-500 text-white rounded px-4 py-1.5 transition-colors"
+          >확인</button>
+        </div>
+      </div>
     </div>
   );
 }
