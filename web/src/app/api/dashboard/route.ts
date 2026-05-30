@@ -584,8 +584,9 @@ export async function GET(req: NextRequest) {
   for (const dy of rawDaily) {
     if (dy.date) rawDailyByDate[dy.date] = { sessions: dy.sessions, calls: dy.calls };
   }
-  const daily = ccusageRows
-    .filter((r) => r.date && isInPeriodWindow(r.date))
+  const dailyShared = ccusageRows
+    .filter((r) => r.date && isInPeriodWindow(r.date));
+  const daily = dailyShared
     .map((r) => ({
       date: r.date!,
       cost: (r as { totalCost?: number }).totalCost ?? 0,
@@ -1332,9 +1333,14 @@ export async function GET(req: NextRequest) {
         const getPart = (t: string) => todayParts.find((p) => p.type === t)?.value ?? "00";
         const todayYmd = `${getPart("year")}-${getPart("month")}-${getPart("day")}`;
         const monthStartYmd = todayYmd.slice(0, 7) + "-01";
-        const monthRows = ccusageRows
-          .filter((r) => r.date && r.date >= monthStartYmd && r.date <= todayYmd)
-          .sort((a, b) => (a.date ?? "").localeCompare(b.date ?? ""));
+        // 2026-05-30: period=month 일 때 daily 와 정확 동일 row set 사용.
+        // dailyShared 가 ccusageRows.filter(isInPeriodWindow) — period=month
+        // 면 이미 이번달 row 만. 다른 period 라도 monthRecovery 는 항상 이번달.
+        const monthRows = period === "month"
+          ? dailyShared.sort((a, b) => (a.date ?? "").localeCompare(b.date ?? ""))
+          : ccusageRows
+              .filter((r) => r.date && r.date >= monthStartYmd && r.date <= todayYmd)
+              .sort((a, b) => (a.date ?? "").localeCompare(b.date ?? ""));
         const daysElapsed = parseInt(getPart("day"), 10);
         // 해당 월의 총 일수 — UTC anchor 로 계산 (next month day 0 = current month last day).
         const yr = parseInt(getPart("year"), 10);
