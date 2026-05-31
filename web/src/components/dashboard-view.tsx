@@ -1303,9 +1303,17 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
     if (viewOnly) return (
       <div className="min-h-screen bg-neutral-950">
         <NavComponent />
-        <div className="flex items-center justify-center h-64">
-          <p className="text-neutral-500 font-mono text-sm">{t.dashboardView.noDataYet}</p>
-        </div>
+        <main className="max-w-lg mx-auto px-4 py-20 text-center space-y-5">
+          <h1 className="text-2xl font-bold text-neutral-100">아직 수집된 데이터가 없어요</h1>
+          <p className="text-neutral-400 text-sm leading-relaxed">
+            PC 에서 <span className="text-neutral-200 font-semibold">Claude Code</span> 나{" "}
+            <span className="text-neutral-200 font-semibold">Codex</span> 를 사용하시면 자동으로
+            메타데이터를 수집해서, 요금제 대비 얼마나 효과적으로 쓰고 있는지 한눈에 보여드려요.
+          </p>
+          <p className="text-neutral-500 text-xs leading-relaxed pt-1 border-t border-neutral-800/60">
+            Claude · ChatGPT 의 웹 / 앱 사용량은 서버에만 기록되어 이곳에 표시되지 않습니다.
+          </p>
+        </main>
       </div>
     );
 
