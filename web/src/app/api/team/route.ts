@@ -302,10 +302,6 @@ export async function GET(req: NextRequest) {
     visit30Dates.push(d.toISOString().slice(0, 10));
   }
 
-  // 2026-05-31 (phase1a): tokensPerMinute 카드가 team-view 에서 grep 0 건 (dead emit) 확인.
-  // user_blocks 기반 blocksAgg 통째 제거. response 의 tokensPerMinute 는 항상 null 로 emit
-  // (schema 안정성 — 옛 클라이언트가 필드 존재 가정할 수 있어 키 유지).
-
   // Accumulators for team-level aggregations
   const activityAgg = new Map<string, { totalCost: number; totalTurns: number; members: Set<number> }>();
   const dailyMemberMap = new Map<string, Record<string, number>>();
@@ -424,7 +420,6 @@ export async function GET(req: NextRequest) {
           ccusageMissing,
           monthVisits,
           avgDwellSec,
-          tokensPerMinute: null,
         };
       }
 
@@ -587,9 +582,6 @@ export async function GET(req: NextRequest) {
         });
       }
 
-      // tokensPerMinute — phase1a (2026-05-31) 부터 항상 null. user_blocks deprecation.
-      const tokensPerMinute = null;
-
       // 사용량 (token volume) — 개인 EFFICIENCY 카드의 "사용량" 과 동일 정의.
       // period 내 활성일 = d.daily 중 cost > 0 인 날. totalTokens / activeDays.
       const memberActiveDays = (d.daily ?? []).filter((day) => (day.cost ?? 0) > 0).length;
@@ -617,7 +609,6 @@ export async function GET(req: NextRequest) {
         ccusageMissing,
         monthVisits,
         avgDwellSec,
-        tokensPerMinute,
       };
       });
     });

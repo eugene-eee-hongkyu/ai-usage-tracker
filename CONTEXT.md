@@ -41,7 +41,7 @@ ai-usage-tracker/
 │   │   ├── dashboard/            ← 개인 메인 (옛 detail 탭 통합, M6c 재구조)
 │   │   ├── team/                 ← 우리 팀 한눈에
 │   │   │   ├── [userId]/         ← 멤버 프로필
-│   │   │   └── [userId]/dashboard/ ← 어드민이 멤버 시점으로 dashboard view
+│   │   │   └── [userId]/dashboard/ → /team/[userId] redirect (멤버 profile 페이지 표시, dashboard-view 컴포넌트 안 거침)
 │   │   ├── ranking/              ← 전체 personal 사용자 랭킹 (5 metric, 마스킹)
 │   │   ├── changelog/            ← 릴리즈 노트
 │   │   ├── suggest/              ← 사용자 제안 → Resend

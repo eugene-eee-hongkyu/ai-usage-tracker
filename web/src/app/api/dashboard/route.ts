@@ -626,14 +626,6 @@ export async function GET(req: NextRequest) {
   // 26주는 너무 빽빽 → 24주 (짝수, 카드 폭과 균형).
   const HEATMAP_WEEKS = 24;
   const heatmapBase = new Date();
-  const earliestDate = heatmapDailySource
-    .map((r) => r.date)
-    .filter((d): d is string => !!d)
-    .sort()[0];
-  const dataDays = earliestDate
-    ? Math.floor((heatmapBase.getTime() - new Date(earliestDate).getTime()) / 86_400_000) + 1
-    : 0;
-  void dataDays; // 옛 가변 로직 잔재 — 의도된 silence.
   const heatmapDays = HEATMAP_WEEKS * 7;
   const heatmapDaily: Array<{ date: string; cost: number }> = [];
   for (let i = heatmapDays - 1; i >= 0; i--) {
@@ -657,11 +649,6 @@ export async function GET(req: NextRequest) {
     .where(and(eq(dailyVisits.userId, user[0].id), dailyVisitsTeamScope));
   const visitMap: Record<string, { count: number; dwell: number }> = {};
   for (const r of visitRows) visitMap[r.date] = { count: r.count, dwell: r.dwell };
-  const visitEarliest = Object.keys(visitMap).sort()[0];
-  const visitDataDays = visitEarliest
-    ? Math.floor((heatmapBase.getTime() - new Date(visitEarliest).getTime()) / 86_400_000) + 1
-    : 0;
-  void visitDataDays; // 옛 가변 로직 잔재
   const visitDays = HEATMAP_WEEKS * 7;
   const visitDaily: Array<{ date: string; visitCount: number; dwellSec: number }> = [];
   for (let i = visitDays - 1; i >= 0; i--) {

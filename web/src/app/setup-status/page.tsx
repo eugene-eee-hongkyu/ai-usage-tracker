@@ -144,7 +144,7 @@ export default function SetupStatusPage() {
             <div className="mt-3 space-y-1 text-sm text-yellow-500">
               <p>{en ? "Things to check:" : "점검 항목:"}</p>
               <ul className="list-disc list-inside space-y-1 text-yellow-400">
-                <li>{en ? "Claude Code SessionEnd hook is registered" : "Claude Code SessionEnd hook이 등록되어 있는지 확인"}</li>
+                <li>{en ? "Automatic collection (launchd/Task Scheduler) is running" : "자동 수집 (launchd / 작업 스케줄러) 가 동작 중인지 확인"}</li>
                 <li>{en ? "Network connectivity" : "네트워크 연결 상태 확인"}</li>
                 <li>{en ? "Reinstall CLI" : "CLI 재설치"}: <code className="bg-yellow-900 px-1 rounded">npx github:eugene-eee-hongkyu/ai-usage-tracker init</code></li>
               </ul>
