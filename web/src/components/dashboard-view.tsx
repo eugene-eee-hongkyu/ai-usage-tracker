@@ -1176,6 +1176,20 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
     if (data?.user?.timezone) setUserTz(data.user.timezone);
   }, [data?.user?.timezone]);
 
+  // 2026-05-31: provider 자동 fallback — Codex 데이터 0 인 사용자는 자동으로 Claude.
+  // localStorage 의 provider_pref 가 다른 화면 (team / ranking 등) 에서 "codex" 로
+  // 박혀 있어도 본인 dashboard 진입 시 codex 데이터 (cost + sessions) 가 모두 0
+  // 이면 즉시 claude 로 전환. useProviderPreference 의 setter 가 localStorage 도
+  // 같이 update → 다음 화면에서도 일관. provider 가 변경되면 deps 따라 fetch
+  // 재호출되어 새 (claude) 데이터로 자동 교체.
+  useEffect(() => {
+    if (!data) return;
+    if (provider !== "codex") return;
+    const ov = data.overview;
+    const noCodexData = !ov || ((ov.cost ?? 0) === 0 && (ov.sessions ?? 0) === 0);
+    if (noCodexData) setProvider("claude");
+  }, [data, provider, setProvider]);
+
   // overview 가 없는 사용자 (첫 sync 대기 중) 자동 polling. LOCAL_MODE 면 5초,
   // 서버 모드 면 4초. 옛 동작은 두 useEffect 가 분리되어 isLocalMode=false 사용자
   // 가 LOCAL_MODE 가드 통과 후 서버 polling 동시에 도는 race 가능 + AbortController
