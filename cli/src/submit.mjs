@@ -338,12 +338,18 @@ async function collectForProvider(provider) {
       //   periodKey — '2026-W22' 등 period key 메타
       //   generated — ISO timestamp 메타
       //   currency  — 'USD' 메타 (서버 default 와 동일)
+      // 2026-05-31 phase4 결정 추가: tools / shellCommands 카드 deprecate.
+      //   tools         — Bash/Read 등 사용 횟수 카드 (Codex 에 의미 없음)
+      //   shellCommands — git/npm 등 실행 횟수 카드 (Codex 에 의미 없음)
+      //   mcpServers 는 유지.
       const v = r.value;
       delete v.summary;
       delete v.period;
       delete v.periodKey;
       delete v.generated;
       delete v.currency;
+      delete v.tools;
+      delete v.shellCommands;
       providerReport[PERIODS[i]] = v;
       okPeriods.push(PERIODS[i]);
     } else {

@@ -113,10 +113,9 @@ function mergePeriodData(items: AnyObj[]): AnyObj {
   const projectsFlat = items.flatMap((i) => (i.projects as AnyObj[]) ?? []);
   const projects = groupSumByKey(projectsFlat, "name", ["cost", "calls", "sessions"]);
 
-  // tools / mcpServers / shellCommands — name 별 calls 합산
-  const tools = groupSumByKey(items.flatMap((i) => (i.tools as AnyObj[]) ?? []), "name", ["calls"]);
+  // mcpServers — name 별 calls 합산. tools / shellCommands 는 2026-05-31 phase4
+  // 결정으로 카드 deprecate (data-pipeline-slim-phase2to4 run F3 결정).
   const mcpServers = groupSumByKey(items.flatMap((i) => (i.mcpServers as AnyObj[]) ?? []), "name", ["calls"]);
-  const shellCommands = groupSumByKey(items.flatMap((i) => (i.shellCommands as AnyObj[]) ?? []), "name", ["calls"]);
 
   // topSessions — 다른 sessionId 라 단순 concat + cost desc top N
   const allSessions = items.flatMap((i) => (i.topSessions as AnyObj[]) ?? []);
@@ -144,9 +143,7 @@ function mergePeriodData(items: AnyObj[]): AnyObj {
     activities,
     models,
     projects,
-    tools,
     mcpServers,
-    shellCommands,
     topSessions,
     daily,
     ccusageDaily: { daily: ccusageDaily },

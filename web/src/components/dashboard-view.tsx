@@ -160,8 +160,6 @@ interface DashboardData {
   projects: Project[];
   topSessions: TopSession[];
   models: Model[];
-  tools: NameCalls[];
-  shellCommands: NameCalls[];
   mcpServers: NameCalls[];
   availableSnapshots?: { weekly: SnapshotMeta[]; monthly: SnapshotMeta[]; daily?: SnapshotMeta[] };
   snapshot?: SnapshotInfo | null;
@@ -2908,47 +2906,12 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
           </div>
         </div>
 
-        {/* Row 5: Core Tools + Shell Commands */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-
-          {/* Core Tools */}
-          <div data-testid="dash-card-core-tools" className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-teal-500 rounded">
-            <div className="px-3 py-2 border-b border-neutral-800 flex items-center justify-between">
-              <span className="text-xs font-mono font-bold text-teal-400 uppercase tracking-wider">Core Tools</span>
-              {(data.tools ?? []).length > 15 && (
-                <span className="flex items-center gap-1 text-[10px] font-mono bg-teal-900/40 text-teal-300 border border-teal-700/60 rounded px-1.5 py-0.5">
-                  ↕ scroll · {(data.tools ?? []).length}
-                </span>
-              )}
-            </div>
-            <div className="p-3">
-              <div className="flex text-xs text-neutral-600 font-mono mb-1.5">
-                <span className="flex-1">tool</span>
-                <span className="w-16 text-right">calls</span>
-              </div>
-              <div className={(data.tools ?? []).length > 15 ? "overflow-y-auto max-h-[300px] no-scrollbar" : ""}>
-                <div className="space-y-1">
-                  {(data.tools ?? []).map((t) => {
-                    const maxCalls = Math.max(...(data.tools ?? []).map((x) => x.calls), 0.01);
-                    return (
-                      <div key={t.name} className="flex items-center gap-1.5 text-xs font-mono">
-                        <div className="w-16 h-1.5 bg-neutral-800 rounded overflow-hidden shrink-0">
-                          <div className="h-full bg-teal-500 rounded" style={{ width: `${(t.calls / maxCalls) * 100}%` }} />
-                        </div>
-                        <span className="flex-1 text-neutral-300 truncate">{t.name}</span>
-                        <span className="w-16 text-blue-400 text-right">{t.calls.toLocaleString()}</span>
-                      </div>
-                    );
-                  })}
-                  {(data.tools ?? []).length === 0 && <p className="text-neutral-600 text-xs font-mono">no data</p>}
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Shell Commands (Claude 탭) / By Project (Codex 탭).
-              Phase 3a — Codex 는 shell 데이터 없음 → 이 자리에 by project 카드 이동. */}
-          {provider === "codex" ? (
+        {/* Row 5 (Codex 탭 전용): By Project — 2026-05-31 phase4 결정으로
+            Core Tools / Shell Commands 카드 deprecate (data-pipeline-slim-phase2to4
+            run F3 결정). Codex 탭은 Row 3 에 By Project 없어서 (Reasoning 비중 점거)
+            여기 단일 카드로 유지. Claude 탭은 Row 5 자체 사라지고 다음 row 로 직진. */}
+        {provider === "codex" && (
+          <div className="grid grid-cols-1 gap-4">
             <div data-testid="dash-card-by-project" className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-yellow-500 rounded">
               <div className="px-3 py-2 border-b border-neutral-800 flex items-center justify-between">
                 <span className="text-xs font-mono font-bold text-yellow-400 uppercase tracking-wider">By Project</span>
@@ -2988,42 +2951,8 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
                 </div>
               </div>
             </div>
-          ) : (
-            <div data-testid="dash-card-shell-cmd" className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-orange-500 rounded">
-              <div className="px-3 py-2 border-b border-neutral-800 flex items-center justify-between">
-                <span className="text-xs font-mono font-bold text-orange-400 uppercase tracking-wider">Shell Commands</span>
-                {(data.shellCommands ?? []).length > 15 && (
-                  <span className="flex items-center gap-1 text-[10px] font-mono bg-orange-900/40 text-orange-300 border border-orange-700/60 rounded px-1.5 py-0.5">
-                    ↕ scroll · {(data.shellCommands ?? []).length}
-                  </span>
-                )}
-              </div>
-              <div className="p-3">
-                <div className="flex text-xs text-neutral-600 font-mono mb-1.5">
-                  <span className="flex-1">command</span>
-                  <span className="w-16 text-right">calls</span>
-                </div>
-                <div className={(data.shellCommands ?? []).length > 15 ? "overflow-y-auto max-h-[300px] no-scrollbar" : ""}>
-                  <div className="space-y-1">
-                    {(data.shellCommands ?? []).map((s) => {
-                      const maxCalls = Math.max(...(data.shellCommands ?? []).map((x) => x.calls), 0.01);
-                      return (
-                        <div key={s.name} className="flex items-center gap-1.5 text-xs font-mono">
-                          <div className="w-16 h-1.5 bg-neutral-800 rounded overflow-hidden shrink-0">
-                            <div className="h-full bg-orange-500 rounded" style={{ width: `${(s.calls / maxCalls) * 100}%` }} />
-                          </div>
-                          <span className="flex-1 text-neutral-300 truncate">{s.name}</span>
-                          <span className="w-16 text-blue-400 text-right">{s.calls.toLocaleString()}</span>
-                        </div>
-                      );
-                    })}
-                    {(data.shellCommands ?? []).length === 0 && <p className="text-neutral-600 text-xs font-mono">no data</p>}
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
+          </div>
+        )}
 
         {/* 새 Row: MCP Servers + 체류 히트맵 — 사용자 요청: core/shell 아래. */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">

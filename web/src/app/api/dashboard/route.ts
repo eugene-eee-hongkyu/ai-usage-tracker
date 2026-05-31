@@ -88,8 +88,6 @@ interface RawPeriodData {
   projects?: RawProject[];
   topSessions?: RawTopSession[];
   models?: RawModel[];
-  tools?: RawNameCalls[];
-  shellCommands?: RawNameCalls[];
   mcpServers?: RawNameCalls[];
 }
 
@@ -1187,8 +1185,6 @@ export async function GET(req: NextRequest) {
     projects,
     topSessions,
     models,
-    tools: toNameCalls(d.tools ?? []),
-    shellCommands: toNameCalls(d.shellCommands ?? []),
     mcpServers: toNameCalls(d.mcpServers ?? []),
     availableSnapshots,
     snapshot: snapshotInfo,
