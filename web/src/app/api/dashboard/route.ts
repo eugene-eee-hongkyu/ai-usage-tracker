@@ -83,7 +83,6 @@ interface RawNameCalls { name?: string; calls?: number }
 
 interface RawPeriodData {
   overview?: RawOverview;
-  summary?: RawOverview;
   daily?: Array<{ date: string; cost: number; sessions: number; calls?: number }>;
   activities?: RawActivity[];
   projects?: RawProject[];
@@ -431,7 +430,7 @@ export async function GET(req: NextRequest) {
   const d: RawPeriodData = snapshotRow
     ? (snapshotRow.rawJson as RawPeriodData) ?? {}
     : getPeriodData(snap[0].rawJson, period);
-  const ov = d.overview ?? d.summary ?? {};
+  const ov = d.overview ?? {};
 
   const cost = ov.cost ?? ov.totalCost ?? 0;
   const sessions = ov.sessions ?? ov.totalSessions ?? 0;

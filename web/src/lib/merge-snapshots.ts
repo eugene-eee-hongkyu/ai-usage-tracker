@@ -89,7 +89,7 @@ function mergePeriodData(items: AnyObj[]): AnyObj {
   if (items.length === 0) return {};
 
   // overview
-  const overviews = items.map((i) => (i.overview as AnyObj) ?? (i.summary as AnyObj) ?? {});
+  const overviews = items.map((i) => (i.overview as AnyObj) ?? {});
   const overview = mergeOverview(overviews);
 
   // activities — category 별 group by, cost / turns / editTurns / oneShotTurns 합산
@@ -150,10 +150,6 @@ function mergePeriodData(items: AnyObj[]): AnyObj {
     topSessions,
     daily,
     ccusageDaily: { daily: ccusageDaily },
-    period: items[0].period,
-    periodKey: items[0].periodKey,
-    currency: items[0].currency ?? "USD",
-    generated: new Date().toISOString(),
   };
 }
 

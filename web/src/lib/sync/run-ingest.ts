@@ -32,7 +32,6 @@ interface CodeburnOverview {
 
 interface CodeburnPeriodReport {
   overview?: CodeburnOverview;
-  summary?: CodeburnOverview;
   activities?: CodeburnActivity[];
 }
 
@@ -182,7 +181,7 @@ async function runIngestForProvider(
   body: unknown
 ): Promise<void> {
   const base = getBaseReport(body);
-  const ov = base.overview ?? base.summary ?? {};
+  const ov = base.overview ?? {};
   const activities = base.activities ?? [];
 
   const totalCost = ov.cost ?? ov.totalCost ?? 0;

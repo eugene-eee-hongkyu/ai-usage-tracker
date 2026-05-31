@@ -332,7 +332,19 @@ async function collectForProvider(provider) {
   for (let i = 0; i < PERIODS.length; i++) {
     const r = cbResults[i];
     if (r.status === "fulfilled" && r.value) {
-      providerReport[PERIODS[i]] = r.value;
+      // 2026-05-31 phase3: codeburn 응답의 dead/soft-dead sub-key prune. UI 0 참조 확정.
+      //   summary   — overview 의 옛 schema fallback (현재 codeburn 은 overview 만 emit)
+      //   period    — 'today' 등 period 식별자 메타
+      //   periodKey — '2026-W22' 등 period key 메타
+      //   generated — ISO timestamp 메타
+      //   currency  — 'USD' 메타 (서버 default 와 동일)
+      const v = r.value;
+      delete v.summary;
+      delete v.period;
+      delete v.periodKey;
+      delete v.generated;
+      delete v.currency;
+      providerReport[PERIODS[i]] = v;
       okPeriods.push(PERIODS[i]);
     } else {
       const reason = r.status === "rejected" ? r.reason?.message ?? String(r.reason) : "empty";
