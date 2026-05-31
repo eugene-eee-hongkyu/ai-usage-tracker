@@ -227,9 +227,6 @@ function spawnCcusageDaily(provider) {
   });
 }
 
-// ccusage blocks — wall-clock 분 단위 분석용 5h 빌링 블록 데이터.
-// daily가 성공하면 blocks도 보통 성공함. 실패해도 daily 진단 메시지가 이미
-// 있으니 blocks 별도 로깅은 최소화 (성공/실패만 한 줄).
 // 사용자 환경 진단 정보. ingest body 에 envInfo 로 포함되어 user_snapshots.rawJson
 // 에 저장됨. /setup-status 페이지가 이걸 읽어 "내 환경" 카드 렌더링.
 // 비민감 정보만 — Node 버전 / npm root 권한 / codeburn·ccusage 버전 / 매니저 종류.
@@ -316,37 +313,18 @@ function collectEnvInfo() {
   };
 }
 
-function spawnCcusageBlocks(provider) {
-  return new Promise((resolve) => {
-    const stdoutChunks = [];
-    const proc = spawn("ccusage", [provider, "blocks", "--json"], {
-      stdio: ["ignore", "pipe", "pipe"],
-      shell: true,
-      env: childEnv,
-    });
-    proc.stdout.on("data", (d) => stdoutChunks.push(d));
-    proc.on("close", (code) => {
-      if (code !== 0) return resolve(null);
-      try {
-        resolve(JSON.parse(Buffer.concat(stdoutChunks).toString("utf8").trim()));
-      } catch { resolve(null); }
-    });
-    proc.on("error", () => resolve(null));
-    setTimeout(() => { proc.kill(); resolve(null); }, 600_000);
-  });
-}
-
-// provider 1개 분량 — codeburn × PERIODS + ccusage daily + ccusage blocks.
+// provider 1개 분량 — codeburn × PERIODS + ccusage daily.
 // 빈 환경 (~/.codex/sessions/ 없는 사용자) 도 안전 — overview 0 + 빈 배열 응답이라 그대로 박아 보냄.
+// 2026-05-31 phase1b: spawnCcusageBlocks 호출 + body 안 ccusageBlocks 키 제거.
+// user_blocks 테이블 deprecated — plan-health / ranking 모두 user_snapshots.raw_json.ccusageDaily
+// 합산으로 source 교체됨 (phase1a commit 5716d39). 송신량 ~5-10 KB / sync 절감.
 async function collectForProvider(provider) {
   const settled = await Promise.allSettled([
     ...PERIODS.map((p) => spawnCodeburn(provider, p)),
     spawnCcusageDaily(provider),
-    spawnCcusageBlocks(provider),
   ]);
   const cbResults = settled.slice(0, PERIODS.length);
   const ccResult = settled[PERIODS.length];
-  const blocksResult = settled[PERIODS.length + 1];
 
   const okPeriods = [];
   const failPeriods = [];
@@ -364,12 +342,6 @@ async function collectForProvider(provider) {
   }
   const ccusageDaily = ccResult.status === "fulfilled" ? ccResult.value : null;
   if (ccusageDaily) providerReport.ccusageDaily = ccusageDaily;
-  const ccusageBlocks = blocksResult.status === "fulfilled" ? blocksResult.value : null;
-  if (ccusageBlocks) {
-    providerReport.ccusageBlocks = ccusageBlocks;
-    const cnt = Array.isArray(ccusageBlocks?.blocks) ? ccusageBlocks.blocks.length : 0;
-    log(`${provider}: ccusage blocks ok — ${cnt} blocks`);
-  }
   return { providerReport, okPeriods, failPeriods };
 }
 
@@ -391,7 +363,7 @@ async function main() {
     let report = {};
     try {
       const PROVIDERS = ["claude", "codex"];
-      log(`spawning ${PROVIDERS.length} providers × (codeburn x${PERIODS.length} + ccusage daily + ccusage blocks)...`);
+      log(`spawning ${PROVIDERS.length} providers × (codeburn x${PERIODS.length} + ccusage daily)...`);
       // F1 (2026-05-30 oreo 회귀): provider 간 직렬 — 동시 spawn 14 → 7 로
       // 줄여 자원 경합으로 인한 codeburn timeout 가능성 ↓. 영진님 (정상) 도 동일.
       // provider 내부는 그대로 동시 (Promise.allSettled).
@@ -413,7 +385,7 @@ async function main() {
       }
       log(`spawn done — ok=[${allOk.join(",")}]${allFail.length ? ` fail=[${allFail.join(",")}]` : ""}, ccusage claude=${ccusageStatus.claude} codex=${ccusageStatus.codex}`);
 
-      // body schema (신): { claude: { today, week, month, 30days, all, ccusageDaily, ccusageBlocks },
+      // body schema (신): { claude: { today, week, month, 30days, all, ccusageDaily },
       //                    codex: { ... }, envInfo, ccusageMissing?,
       //                    claudeFailPeriods?, codexFailPeriods?, recentTelemetry? }
       // 서버 run-ingest 가 양쪽 분기 처리. 옛 형태 (provider key 없음) 도 backward compat 으로 claude 처리.

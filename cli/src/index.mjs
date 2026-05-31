@@ -1898,7 +1898,7 @@ import * as readline from "readline";
 import { fileURLToPath } from "url";
 var __dirname2 = path.dirname(fileURLToPath(import.meta.url));
 var SERVER_URL = process.env.USAGE_TRACKER_URL ?? "https://aiusage.z21labs.world";
-var CLI_VERSION = "0.3.0";
+var CLI_VERSION = "0.3.2";
 var KEYTAR_SERVICE = "z21labs-usage-tracker";
 var KEYTAR_ACCOUNT = "api-key";
 var CLAUDE_SETTINGS_PATH = path.join(os.homedir(), ".claude", "settings.json");
@@ -2645,7 +2645,7 @@ async function runRepair() {
   runHistoricalBackfill(apiKey);
   console.log(`
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
-  console.log("✨ 업데이트 완료 — 이 메시지가 보이면 정상입니다");
+  console.log(`✨ AI Usage Tracker v${CLI_VERSION} 업데이트 완료`);
   console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
   console.log("   이제 자동으로 사용량이 수집됩니다.");
   console.log(`   \uD83D\uDCCA 대시보드:  ${SERVER_URL}/dashboard`);
@@ -2701,7 +2701,7 @@ async function runInit() {
   runHistoricalBackfill(apiKey);
   console.log(`
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
-  console.log("✨ 설치 완료 — 이 메시지가 보이면 정상입니다");
+  console.log(`✨ AI Usage Tracker v${CLI_VERSION} 설치 완료`);
   console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
   console.log("   이제 자동으로 사용량이 수집됩니다.");
   console.log(`   \uD83D\uDCCA 대시보드:  ${SERVER_URL}/dashboard`);
@@ -2822,42 +2822,14 @@ function spawnCcusageDaily(provider) {
     }, 600000);
   });
 }
-function spawnCcusageBlocks(provider) {
-  return new Promise((resolve) => {
-    const chunks = [];
-    const proc = spawn2("ccusage", [provider, "blocks", "--json"], {
-      stdio: ["ignore", "pipe", "pipe"],
-      shell: true,
-      env: childEnv
-    });
-    proc.stdout.on("data", (d) => chunks.push(d));
-    proc.on("close", (code) => {
-      if (code !== 0)
-        return resolve(null);
-      try {
-        resolve(JSON.parse(Buffer.concat(chunks).toString("utf8").trim()));
-      } catch {
-        resolve(null);
-      }
-    });
-    proc.on("error", () => resolve(null));
-    setTimeout(() => {
-      proc.kill();
-      resolve(null);
-    }, 600000);
-  });
-}
 async function collectForProvider(provider) {
-  const [results, ccusageDaily, ccusageBlocks] = await Promise.all([
+  const [results, ccusageDaily] = await Promise.all([
     Promise.all(PERIODS.map((p) => spawnCodeburn(provider, p))),
-    spawnCcusageDaily(provider),
-    spawnCcusageBlocks(provider)
+    spawnCcusageDaily(provider)
   ]);
   const providerReport = Object.fromEntries(PERIODS.map((p, i) => [p, results[i]]));
   if (ccusageDaily)
     providerReport.ccusageDaily = ccusageDaily;
-  if (ccusageBlocks)
-    providerReport.ccusageBlocks = ccusageBlocks;
   return providerReport;
 }
 async function postTo(dest, payload) {

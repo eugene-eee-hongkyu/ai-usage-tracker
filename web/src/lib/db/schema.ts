@@ -3,7 +3,6 @@ import {
   serial,
   text,
   integer,
-  bigint,
   boolean,
   real,
   timestamp,
@@ -332,41 +331,11 @@ export const periodSnapshots = pgTable(
   })
 );
 
-// ccusage blocks --json 을 5h 빌링 블록 단위로 누적. wall-clock 분 단위 분석을
-// 위한 유일한 데이터 원천 (ccusage daily 는 날짜 기준이라 분 단위 정보 없음).
-// gap 블록(isGap=true)·actualEndTime null 인 미종료 active 는 저장하지 않음.
-// 동일 block_id 가 재수집되면 ended_at/minutes/totals 를 갱신.
-export const userBlocks = pgTable(
-  "user_blocks",
-  {
-    id: serial("id").primaryKey(),
-    // Phase 4.2: 팀별 분리. M6a backfill 시 모든 기존 row → iskra.world.
-    teamId: integer("team_id")
-      .notNull()
-      .references(() => teams.id),
-    userId: integer("user_id")
-      .notNull()
-      .references(() => users.id),
-    blockId: text("block_id").notNull(),
-    // Multi-provider (2026-05-29 M): ccusage blocks 의 provider 분기 저장.
-    // 기존 row default 'claude' 마킹. 마이그 0016.
-    provider: text("provider").notNull().default("claude"),
-    startedAt: timestamp("started_at", { withTimezone: true }).notNull(),
-    endedAt: timestamp("ended_at", { withTimezone: true }).notNull(),
-    minutes: integer("minutes").notNull(),
-    entries: integer("entries").notNull().default(0),
-    totalTokens: bigint("total_tokens", { mode: "number" }).notNull().default(0),
-    costUsd: real("cost_usd").notNull().default(0),
-    models: jsonb("models").notNull().default(sql`'[]'::jsonb`),
-    updatedAt: timestamp("updated_at").defaultNow().notNull(),
-  },
-  (t) => ({
-    userBlockProviderUniq: uniqueIndex("user_blocks_user_team_block_provider_uniq").on(t.userId, t.teamId, t.blockId, t.provider),
-    userStartedIdx: index("user_blocks_user_started_idx").on(t.userId, t.startedAt),
-    teamIdx: index("user_blocks_team_idx").on(t.teamId),
-    providerIdx: index("user_blocks_provider_idx").on(t.provider),
-  })
-);
+// 2026-05-31 phase1b: user_blocks 테이블 deprecated + drop (마이그 0018).
+// 모든 consumer (plan-health / ranking) 가 user_snapshots.raw_json.ccusageDaily
+// 합산으로 source 교체됨 (phase1a commit 5716d39). CLI ccusage blocks 송신 + 서버
+// extractBlocks/INSERT/DELETE 모두 제거됨. wall-clock 분 단위 metric 은 UI 미사용 (
+// tokensPerMinute team-view grep 0 건).
 
 // 사용자 제안 (Feedback / Feature Request).
 // /suggest 페이지에서 작성 → API 가 DB 에 저장 + Resend 로 info@z21labs.xyz 발송.

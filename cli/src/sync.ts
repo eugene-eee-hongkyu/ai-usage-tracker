@@ -53,38 +53,17 @@ function spawnCcusageDaily(provider: Provider): Promise<unknown> {
   });
 }
 
-function spawnCcusageBlocks(provider: Provider): Promise<unknown> {
-  return new Promise((resolve) => {
-    const chunks: Buffer[] = [];
-    const proc = spawn("ccusage", [provider, "blocks", "--json"], {
-      stdio: ["ignore", "pipe", "pipe"],
-      shell: true,
-      env: childEnv,
-    });
-    proc.stdout.on("data", (d: Buffer) => chunks.push(d));
-    proc.on("close", (code: number) => {
-      if (code !== 0) return resolve(null);
-      try {
-        resolve(JSON.parse(Buffer.concat(chunks).toString("utf8").trim()));
-      } catch { resolve(null); }
-    });
-    proc.on("error", () => resolve(null));
-    setTimeout(() => { proc.kill(); resolve(null); }, 600_000);
-  });
-}
-
-// provider 1개 분량 — codeburn × PERIODS + ccusage daily + ccusage blocks.
+// provider 1개 분량 — codeburn × PERIODS + ccusage daily.
+// 2026-05-31 phase1b: ccusageBlocks 송신 제거 (user_blocks 테이블 deprecated).
 async function collectForProvider(provider: Provider): Promise<Record<string, unknown>> {
-  const [results, ccusageDaily, ccusageBlocks] = await Promise.all([
+  const [results, ccusageDaily] = await Promise.all([
     Promise.all(PERIODS.map((p) => spawnCodeburn(provider, p))),
     spawnCcusageDaily(provider),
-    spawnCcusageBlocks(provider),
   ]);
   const providerReport: Record<string, unknown> = Object.fromEntries(
     PERIODS.map((p, i) => [p, results[i]])
   );
   if (ccusageDaily) providerReport.ccusageDaily = ccusageDaily;
-  if (ccusageBlocks) providerReport.ccusageBlocks = ccusageBlocks;
   return providerReport;
 }
 

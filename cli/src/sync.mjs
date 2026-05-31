@@ -146,42 +146,14 @@ function spawnCcusageDaily(provider) {
     }, 600000);
   });
 }
-function spawnCcusageBlocks(provider) {
-  return new Promise((resolve) => {
-    const chunks = [];
-    const proc = spawn("ccusage", [provider, "blocks", "--json"], {
-      stdio: ["ignore", "pipe", "pipe"],
-      shell: true,
-      env: childEnv
-    });
-    proc.stdout.on("data", (d) => chunks.push(d));
-    proc.on("close", (code) => {
-      if (code !== 0)
-        return resolve(null);
-      try {
-        resolve(JSON.parse(Buffer.concat(chunks).toString("utf8").trim()));
-      } catch {
-        resolve(null);
-      }
-    });
-    proc.on("error", () => resolve(null));
-    setTimeout(() => {
-      proc.kill();
-      resolve(null);
-    }, 600000);
-  });
-}
 async function collectForProvider(provider) {
-  const [results, ccusageDaily, ccusageBlocks] = await Promise.all([
+  const [results, ccusageDaily] = await Promise.all([
     Promise.all(PERIODS.map((p) => spawnCodeburn(provider, p))),
-    spawnCcusageDaily(provider),
-    spawnCcusageBlocks(provider)
+    spawnCcusageDaily(provider)
   ]);
   const providerReport = Object.fromEntries(PERIODS.map((p, i) => [p, results[i]]));
   if (ccusageDaily)
     providerReport.ccusageDaily = ccusageDaily;
-  if (ccusageBlocks)
-    providerReport.ccusageBlocks = ccusageBlocks;
   return providerReport;
 }
 async function postTo(dest, payload) {

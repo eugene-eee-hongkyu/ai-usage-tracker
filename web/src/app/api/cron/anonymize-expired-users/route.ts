@@ -18,7 +18,6 @@ import {
   users,
   userSnapshots,
   periodSnapshots,
-  userBlocks,
   dailyVisits,
   apiTokens,
 } from "@/lib/db";
@@ -75,7 +74,7 @@ export async function GET(req: NextRequest) {
         // 1) 본인 활동 데이터 hard delete (FK 위반 없도록 사용자 row 갱신 전에)
         await tx.delete(userSnapshots).where(eq(userSnapshots.userId, t.id));
         await tx.delete(periodSnapshots).where(eq(periodSnapshots.userId, t.id));
-        await tx.delete(userBlocks).where(eq(userBlocks.userId, t.id));
+        // 2026-05-31 phase1b: userBlocks 테이블 deprecated, delete 라인 제거.
         await tx.delete(dailyVisits).where(eq(dailyVisits.userId, t.id));
         await tx.delete(apiTokens).where(eq(apiTokens.userId, t.id));
 

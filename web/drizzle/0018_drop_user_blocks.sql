@@ -1,0 +1,37 @@
+-- 2026-05-31 data-pipeline-slim-phase1b — user_blocks 테이블 drop.
+--
+-- 배경: ccusage blocks (5h 빌링 윈도우) 단위 row 가 source 였는데, 모든 consumer
+-- (plan-health / ranking) 가 user_snapshots.raw_json.ccusageDaily 합산으로 source 교체됨
+-- (phase1a commit 5716d39). wall-clock 분 단위 metric (tokensPerMinute) 도 UI 미사용
+-- (team-view grep 0 건). 추가로 user_blocks 가 사실 provider='claude' row 만 보존되던
+-- 잠재 버그 발견 (Codex tier 사용자 plan-health $0 회귀) — phase1a 에서 fix.
+--
+-- DROP 후 영향: CLI ccusageBlocks 송신 + 서버 extractBlocks/INSERT/DELETE 흐름도 같이
+-- 제거 (이 phase1b 의 코드 변경). 즉 신규 row 안 들어옴 + 기존 row 모두 사라짐.
+--
+-- 가역성: 빈 테이블 재생성 SQL (down) 가능. 단 row 데이터 복원 불가 (CLI 송신 끊김).
+
+DROP TABLE IF EXISTS user_blocks;
+
+-- ─────────────────────────────────────────────────────────────────────
+-- DOWN (수동 복원용 — 빈 테이블 재생성. row 데이터는 복원 불가)
+-- ─────────────────────────────────────────────────────────────────────
+-- CREATE TABLE user_blocks (
+--   id SERIAL PRIMARY KEY,
+--   team_id INTEGER NOT NULL REFERENCES teams(id),
+--   user_id INTEGER NOT NULL REFERENCES users(id),
+--   block_id TEXT NOT NULL,
+--   provider TEXT NOT NULL DEFAULT 'claude',
+--   started_at TIMESTAMPTZ NOT NULL,
+--   ended_at TIMESTAMPTZ NOT NULL,
+--   minutes INTEGER NOT NULL,
+--   entries INTEGER NOT NULL DEFAULT 0,
+--   total_tokens BIGINT NOT NULL DEFAULT 0,
+--   cost_usd REAL NOT NULL DEFAULT 0,
+--   models JSONB NOT NULL DEFAULT '[]'::jsonb,
+--   updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+-- );
+-- CREATE UNIQUE INDEX user_blocks_user_team_block_provider_uniq ON user_blocks(user_id, team_id, block_id, provider);
+-- CREATE INDEX user_blocks_user_started_idx ON user_blocks(user_id, started_at);
+-- CREATE INDEX user_blocks_team_idx ON user_blocks(team_id);
+-- CREATE INDEX user_blocks_provider_idx ON user_blocks(provider);

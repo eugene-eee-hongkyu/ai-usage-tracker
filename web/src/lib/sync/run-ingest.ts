@@ -3,29 +3,13 @@
 // 분기는 호출 측에서 (auth, user 식별) 처리, 이 모듈은 순수 데이터 변환·DB write.
 
 import { and, eq, lt, sql } from "drizzle-orm";
-import { db, userSnapshots, users, periodSnapshots, userBlocks } from "../db";
+import { db, userSnapshots, users, periodSnapshots } from "../db";
 import { normalizeCcusageRow } from "../ccusage-row";
 
-interface CcusageBlockRow {
-  id?: string;
-  startTime?: string;
-  endTime?: string;
-  actualEndTime?: string | null;
-  isActive?: boolean;
-  isGap?: boolean;
-  entries?: number;
-  totalTokens?: number;
-  costUSD?: number;
-  models?: string[];
-}
-
-function extractBlocks(body: unknown): CcusageBlockRow[] {
-  if (typeof body !== "object" || body === null) return [];
-  const b = body as Record<string, unknown>;
-  const cb = b.ccusageBlocks as { blocks?: unknown[] } | undefined;
-  if (!cb || !Array.isArray(cb.blocks)) return [];
-  return cb.blocks.filter((x): x is CcusageBlockRow => typeof x === "object" && x !== null);
-}
+// 2026-05-31 phase1b: extractBlocks + CcusageBlockRow + user_blocks INSERT/DELETE 흐름 제거.
+// user_blocks 테이블 deprecated — 모든 consumer (plan-health / ranking) 이 phase1a 에서
+// user_snapshots.raw_json.ccusageDaily 합산으로 교체됨. body 안 ccusageBlocks 키가 와도
+// 무시 (CLI 송신도 같이 제거 — submit.mjs / sync.ts / historical.mjs).
 
 interface CodeburnActivity {
   name?: string;
@@ -421,55 +405,9 @@ async function runIngestForProvider(
       )
     );
 
-  // ccusage blocks upsert. gap 블록 + actualEndTime null 인 active 는 스킵.
-  const blocks = extractBlocks(body);
-  for (const blk of blocks) {
-    if (blk.isGap) continue;
-    if (!blk.id || !blk.startTime || !blk.actualEndTime) continue;
-    const startedAt = new Date(blk.startTime);
-    const endedAt = new Date(blk.actualEndTime);
-    if (isNaN(startedAt.getTime()) || isNaN(endedAt.getTime())) continue;
-    const minutes = Math.max(0, Math.floor((endedAt.getTime() - startedAt.getTime()) / 60_000));
-    await db
-      .insert(userBlocks)
-      .values({
-        userId,
-        teamId,
-        blockId: blk.id,
-        provider,
-        startedAt,
-        endedAt,
-        minutes,
-        entries: blk.entries ?? 0,
-        totalTokens: blk.totalTokens ?? 0,
-        costUsd: blk.costUSD ?? 0,
-        models: blk.models ?? [],
-        updatedAt: now,
-      })
-      .onConflictDoUpdate({
-        target: [userBlocks.userId, userBlocks.teamId, userBlocks.blockId, userBlocks.provider],
-        set: {
-          endedAt: sql`excluded.ended_at`,
-          minutes: sql`excluded.minutes`,
-          entries: sql`excluded.entries`,
-          totalTokens: sql`excluded.total_tokens`,
-          costUsd: sql`excluded.cost_usd`,
-          models: sql`excluded.models`,
-          updatedAt: sql`excluded.updated_at`,
-        },
-      });
-  }
-
-  // 90일 이전 블록은 정리 (대시보드는 30일 윈도우, 여유 있게 90일 보존)
-  await db
-    .delete(userBlocks)
-    .where(
-      and(
-        eq(userBlocks.userId, userId),
-        eq(userBlocks.teamId, teamId),
-        lt(userBlocks.startedAt, new Date(Date.now() - 90 * 86_400_000)),
-      )
-    );
+  // 2026-05-31 phase1b: ccusage blocks upsert 흐름 제거. user_blocks 테이블 deprecated.
+  // plan-health / ranking 의 consumer 모두 phase1a 에서 ccusageDaily 합산으로 교체됨.
+  // CLI 도 ccusage blocks 송신 안 함 (submit.mjs / sync.ts / historical.mjs).
 
   // last_synced_at 갱신은 wrapper runIngest 가 양쪽 provider 호출 후 1회만 처리.
 }

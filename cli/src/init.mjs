@@ -11,7 +11,7 @@ import * as readline from "readline";
 import { fileURLToPath } from "url";
 var __dirname2 = path.dirname(fileURLToPath(import.meta.url));
 var SERVER_URL = process.env.USAGE_TRACKER_URL ?? "https://aiusage.z21labs.world";
-var CLI_VERSION = "0.3.0";
+var CLI_VERSION = "0.3.2";
 var KEYTAR_SERVICE = "z21labs-usage-tracker";
 var KEYTAR_ACCOUNT = "api-key";
 var CLAUDE_SETTINGS_PATH = path.join(os.homedir(), ".claude", "settings.json");
@@ -758,7 +758,7 @@ async function runRepair() {
   runHistoricalBackfill(apiKey);
   console.log(`
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
-  console.log("✨ 업데이트 완료 — 이 메시지가 보이면 정상입니다");
+  console.log(`✨ AI Usage Tracker v${CLI_VERSION} 업데이트 완료`);
   console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
   console.log("   이제 자동으로 사용량이 수집됩니다.");
   console.log(`   \uD83D\uDCCA 대시보드:  ${SERVER_URL}/dashboard`);
@@ -814,7 +814,7 @@ async function runInit() {
   runHistoricalBackfill(apiKey);
   console.log(`
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
-  console.log("✨ 설치 완료 — 이 메시지가 보이면 정상입니다");
+  console.log(`✨ AI Usage Tracker v${CLI_VERSION} 설치 완료`);
   console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
   console.log("   이제 자동으로 사용량이 수집됩니다.");
   console.log(`   \uD83D\uDCCA 대시보드:  ${SERVER_URL}/dashboard`);

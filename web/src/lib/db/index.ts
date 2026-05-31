@@ -33,7 +33,7 @@ const schema = pickSchema();
 export const users = schema.users;
 export const userSnapshots = schema.userSnapshots;
 export const periodSnapshots = schema.periodSnapshots;
-export const userBlocks = schema.userBlocks;
+// 2026-05-31 phase1b: userBlocks 테이블 deprecated + drop (마이그 0018).
 export const dailyVisits = schema.dailyVisits;
 
 // admin-v1: cloud-only 테이블. type 은 PG schema 직접 import.

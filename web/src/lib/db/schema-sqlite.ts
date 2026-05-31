@@ -176,37 +176,7 @@ export const periodSnapshots = sqliteTable(
   })
 );
 
-export const userBlocks = sqliteTable(
-  "user_blocks",
-  {
-    id: integer("id", { mode: "number" }).primaryKey({ autoIncrement: true }),
-    userId: integer("user_id", { mode: "number" })
-      .notNull()
-      .references(() => users.id),
-    teamId: integer("team_id", { mode: "number" })
-      .notNull()
-      .references(() => teams.id),
-    blockId: text("block_id").notNull(),
-    // Multi-provider (2026-05-29 M): PG 와 schema sync.
-    provider: text("provider").notNull().default("claude"),
-    startedAt: integer("started_at", { mode: "timestamp_ms" }).notNull(),
-    endedAt: integer("ended_at", { mode: "timestamp_ms" }).notNull(),
-    minutes: integer("minutes", { mode: "number" }).notNull(),
-    entries: integer("entries", { mode: "number" }).notNull().default(0),
-    totalTokens: integer("total_tokens", { mode: "number" }).notNull().default(0),
-    costUsd: real("cost_usd").notNull().default(0),
-    models: text("models", { mode: "json" }).notNull().default(sql`'[]'`),
-    updatedAt: integer("updated_at", { mode: "timestamp_ms" })
-      .notNull()
-      .default(sql`(unixepoch() * 1000)`),
-  },
-  (t) => ({
-    userTeamBlockProviderUniq: uniqueIndex("user_blocks_user_team_block_provider_uniq").on(t.userId, t.teamId, t.blockId, t.provider),
-    userStartedIdx: index("user_blocks_user_started_idx").on(t.userId, t.startedAt),
-    teamIdx: index("user_blocks_team_idx").on(t.teamId),
-    providerIdx: index("user_blocks_provider_idx").on(t.provider),
-  })
-);
+// 2026-05-31 phase1b: user_blocks deprecated + drop (마이그 0018). PG schema 와 동기.
 
 export const dailyVisits = sqliteTable(
   "daily_visits",
