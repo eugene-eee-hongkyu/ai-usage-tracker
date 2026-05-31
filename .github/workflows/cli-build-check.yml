@@ -1,0 +1,44 @@
+name: CLI build artifact sync check
+
+# CLI 의 source (.ts) 와 build artifact (.mjs) 동기화 보장.
+# bun build 후 .mjs 가 commit 된 것과 다르면 fail — 사용자 PC 의 CLI 는 .mjs 사용해서
+# source 와 artifact 가 불일치하면 prod 의 사용자가 옛 코드를 받음.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "cli/src/**"
+      - "cli/package.json"
+      - ".github/workflows/cli-build-check.yml"
+  pull_request:
+    paths:
+      - "cli/src/**"
+      - "cli/package.json"
+
+jobs:
+  build-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install CLI dependencies
+        working-directory: ./cli
+        run: bun install --frozen-lockfile || bun install
+
+      - name: Rebuild CLI artifacts
+        working-directory: ./cli
+        run: bun run build
+
+      - name: Check artifacts in sync with source
+        run: |
+          if ! git diff --exit-code cli/src/index.mjs cli/src/sync.mjs cli/src/init.mjs; then
+            echo "::error::CLI build artifact (.mjs) 가 source (.ts) 와 동기화 안 됨."
+            echo "::error::로컬에서 'cd cli && bun run build' 후 변경된 .mjs 파일 commit 필요."
+            exit 1
+          fi
+          echo "✓ CLI build artifacts 동기화 OK"
