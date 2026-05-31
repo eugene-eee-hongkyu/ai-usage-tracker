@@ -268,7 +268,10 @@ export const userSnapshots = pgTable(
       .references(() => users.id),
     // M6f (2026-05-25): device-scope snapshot. (user_id, team_id, token_id) 가 row 식별.
     // 같은 user 의 노트북 N대가 각자 row 1개씩 보유. dashboard 는 device 선택.
-    // nullable: phase1b 이전 legacy row 안전망 — 신규 row 는 항상 token_id 채움.
+    // M6f Phase 3 (2026-05-31): prod PG 의 NOT NULL constraint 는 마이그 0021 로
+    // 적용됨. schema.ts 시그니처는 LOCAL_MODE 의 matchedTokenId=null 호환 위해
+    // nullable 유지 (PG 의 NOT NULL 은 마이그로만 강제 — phase 1c 의 ccusageBlocks
+    // 키 정리 마이그와 동일 패턴).
     tokenId: integer("token_id").references(() => apiTokens.id),
     // Multi-provider (2026-05-29 M): Claude / Codex (/ Phase 2 Gemini 등) 분리.
     // ccusage / codeburn 양쪽이 단일 binary 로 모든 provider 지원 → provider 별
@@ -312,6 +315,8 @@ export const periodSnapshots = pgTable(
       .notNull()
       .references(() => users.id),
     // M6f (2026-05-25): device-scope snapshot. user_snapshots 와 동일 의도.
+    // M6f Phase 3 (2026-05-31): prod NOT NULL 은 마이그 0021. schema.ts 시그니처는
+    // LOCAL_MODE 호환 위해 nullable 유지.
     tokenId: integer("token_id").references(() => apiTokens.id),
     // Multi-provider (2026-05-29 M): user_snapshots 와 동일 정책. 기존 row
     // default 'claude' 마킹. 마이그 0016.
