@@ -39,6 +39,7 @@ export default function PlatformAdminLayout({ children }: { children: React.Reac
   if (status === "authenticated" && !isPlatformAdmin) return null;
 
   const tabs = [
+    { href: "/platform-admin/engagement", label: "Engagement" },
     { href: "/platform-admin/all-users", label: "All Team Users" },
     { href: "/platform-admin/all-personal", label: "All Personal" },
     { href: "/platform-admin/all-teams", label: "All Teams" },
