@@ -1917,8 +1917,9 @@ export function TeamView({ adminMode = false }: { adminMode?: boolean }) {
             {/* Row 5 (Core Tools + Shell Commands) 2026-05-31 phase4 F3 결정으로 deprecate. */}
 
             {/* Row 5.5: Top Sessions (admin only) — half-width + 빈 칸.
-                dashboard Active Blocks 와 동일 단독 row 패턴. */}
-            {adminUser && (
+                dashboard Active Blocks 와 동일 단독 row 패턴.
+                짧은 period (today/8days/month) 에선 표본 작아 의미 약해 hide. */}
+            {adminUser && !isShortPeriod && (
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                 {topSessionsBlock}
                 <div />
