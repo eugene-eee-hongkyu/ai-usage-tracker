@@ -414,6 +414,9 @@ export function TeamView({ adminMode = false }: { adminMode?: boolean }) {
   const { data: session, status } = useSession();
   const router = useRouter();
   const [period, setPeriod] = useState<Period>("month");
+  // 짧은 period (today/8days/month) — 표본 작아 Efficiency / Team Activities /
+  // By Model 카드는 의미 약함. 짧은 period 에서 hide. 긴 period (30days/all) 그대로.
+  const isShortPeriod = period === "today" || period === "8days" || period === "month";
   // Multi-provider — 마지막 선택 localStorage 기억 (dashboard / ranking 과 공유).
   const [provider, setProvider] = useProviderPreference();
 
@@ -1894,18 +1897,22 @@ export function TeamView({ adminMode = false }: { adminMode?: boolean }) {
 
             {detailsOpen && (<>
 
-            {/* Row 3: Efficiency (full-width) — 컬럼 6개 가독성 위해 1줄 차지. */}
-            {efficiencyBlock}
+            {/* Row 3 + Row 4 — 짧은 period (today/8days/month) 에선 표본 작아 의미
+                약해 hide. 긴 period (30days/all) 에서만 표시. */}
+            {!isShortPeriod && (<>
+              {/* Row 3: Efficiency (full-width) — 컬럼 6개 가독성 위해 1줄 차지. */}
+              {efficiencyBlock}
 
-            {/* Row 4: Team Activities + By Model — 분포 분석 묶음. */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              {/* Row 4: Team Activities + By Model — 분포 분석 묶음. */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
 
-              {/* Team Activities */}
-              {teamActivitiesBlock}
+                {/* Team Activities */}
+                {teamActivitiesBlock}
 
-              {/* By Model */}
-              {byModelBlock}
-            </div>
+                {/* By Model */}
+                {byModelBlock}
+              </div>
+            </>)}
 
             {/* Row 5 (Core Tools + Shell Commands) 2026-05-31 phase4 F3 결정으로 deprecate. */}
 
