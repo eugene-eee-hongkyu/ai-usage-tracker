@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db, periodSnapshots, users, teamMembers, apiTokens, IS_LOCAL_MODE } from "@/lib/db";
 import { ensureLocalUser } from "@/lib/local-user";
-import { eq, and, isNull, asc, desc } from "drizzle-orm";
+import { eq, and, isNull, asc } from "drizzle-orm";
 import crypto from "crypto";
 
 // 신규 사용자 onboarding / 노트북 장기 off 후 복귀 시 historical 데이터 backfill.
@@ -29,7 +29,6 @@ export async function POST(req: NextRequest) {
     const apiKey = req.headers.get("x-api-key");
     if (!apiKey) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
     const hash = crypto.createHash("sha256").update(apiKey).digest("hex");
-    // M6f (2026-05-25): device-scope. 1차 api_tokens 매칭, 2차 fallback (users.api_key_hash).
     const tokenRow = await db
       .select({
         tokenId: apiTokens.id,
@@ -41,29 +40,9 @@ export async function POST(req: NextRequest) {
       .innerJoin(users, eq(users.id, apiTokens.userId))
       .where(and(eq(apiTokens.hash, hash), isNull(apiTokens.revokedAt)))
       .limit(1);
-    if (tokenRow[0]) {
-      matchedTokenId = tokenRow[0].tokenId;
-      userRow = [{ id: tokenRow[0].userId, suspendedAt: tokenRow[0].suspendedAt, deletedAt: tokenRow[0].deletedAt }];
-    } else {
-      userRow = await db
-        .select({
-          id: users.id,
-          suspendedAt: users.suspendedAt,
-          deletedAt: users.deletedAt,
-        })
-        .from(users)
-        .where(eq(users.apiKeyHash, hash))
-        .limit(1);
-      if (userRow[0]) {
-        const recentToken = await db
-          .select({ id: apiTokens.id })
-          .from(apiTokens)
-          .where(and(eq(apiTokens.userId, userRow[0].id), isNull(apiTokens.revokedAt)))
-          .orderBy(desc(apiTokens.lastUsedAt), desc(apiTokens.createdAt))
-          .limit(1);
-        if (recentToken[0]) matchedTokenId = recentToken[0].id;
-      }
-    }
+    if (!tokenRow[0]) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+    matchedTokenId = tokenRow[0].tokenId;
+    userRow = [{ id: tokenRow[0].userId, suspendedAt: tokenRow[0].suspendedAt, deletedAt: tokenRow[0].deletedAt }];
   }
 
   if (!userRow[0]) return NextResponse.json({ error: "unauthorized" }, { status: 401 });

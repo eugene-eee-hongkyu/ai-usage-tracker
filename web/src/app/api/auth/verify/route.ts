@@ -82,16 +82,5 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ ok: true, source: "api_token", tokenId: tokenRow[0].tokenId });
   }
 
-  // 2차 (fallback, 1-2주 dual mode) — users.api_key_hash 매칭
-  const userRow = await db
-    .select({ id: users.id, deletedAt: users.deletedAt, suspendedAt: users.suspendedAt })
-    .from(users)
-    .where(eq(users.apiKeyHash, hash))
-    .limit(1);
-  if (userRow[0]) {
-    if (userRow[0].deletedAt || userRow[0].suspendedAt) return invalidResponse();
-    return NextResponse.json({ ok: true, source: "legacy" });
-  }
-
   return invalidResponse();
 }

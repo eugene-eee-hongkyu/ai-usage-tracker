@@ -6,7 +6,7 @@ import { db, users, teamMembers, apiTokens, IS_LOCAL_MODE } from "@/lib/db";
 import { ensureLocalUser } from "@/lib/local-user";
 import { runIngest } from "@/lib/sync/run-ingest";
 import { trackServer, EVENTS_SERVER } from "@/lib/analytics/mixpanel-server";
-import { eq, and, isNull, asc, desc, sql } from "drizzle-orm";
+import { eq, and, isNull, asc, sql } from "drizzle-orm";
 import crypto from "crypto";
 
 export async function POST(req: NextRequest) {
@@ -26,7 +26,6 @@ export async function POST(req: NextRequest) {
     const apiKey = req.headers.get("x-api-key");
     if (!apiKey) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
     const hash = crypto.createHash("sha256").update(apiKey).digest("hex");
-    // M6e (2026-05-21): 1차 — api_tokens.hash 매칭 (device-scope, revoke 가능).
     const tokenRow = await db
       .select({
         tokenId: apiTokens.id,
@@ -40,43 +39,17 @@ export async function POST(req: NextRequest) {
       .innerJoin(users, eq(users.id, apiTokens.userId))
       .where(and(eq(apiTokens.hash, hash), isNull(apiTokens.revokedAt)))
       .limit(1);
-    if (tokenRow[0]) {
-      matchedTokenId = tokenRow[0].tokenId;
-      userRow = [
-        {
-          id: tokenRow[0].userId,
-          timezone: tokenRow[0].timezone,
-          suspendedAt: tokenRow[0].suspendedAt,
-          deletedAt: tokenRow[0].deletedAt,
-          lastSyncedAt: tokenRow[0].lastSyncedAt,
-        },
-      ];
-    } else {
-      // Fallback (2026-05-21~ 1~2주 dual mode): users.api_key_hash 단일 컬럼 매칭.
-      // 백필 누락 또는 옛 init 흐름에서 발급된 키 안전망. 추후 phase 에서 제거.
-      userRow = await db
-        .select({
-          id: users.id,
-          timezone: users.timezone,
-          suspendedAt: users.suspendedAt,
-          deletedAt: users.deletedAt,
-          lastSyncedAt: users.lastSyncedAt,
-        })
-        .from(users)
-        .where(eq(users.apiKeyHash, hash))
-        .limit(1);
-      // M6f (2026-05-25): device-scope row 분리를 위해 fallback 도 token-binding 강제.
-      // 그 user 의 가장 최근 active token 을 채택 — backfill 행 1개와 일관 (row 한 자리만 사용).
-      if (userRow[0]) {
-        const recentToken = await db
-          .select({ id: apiTokens.id })
-          .from(apiTokens)
-          .where(and(eq(apiTokens.userId, userRow[0].id), isNull(apiTokens.revokedAt)))
-          .orderBy(desc(apiTokens.lastUsedAt), desc(apiTokens.createdAt))
-          .limit(1);
-        if (recentToken[0]) matchedTokenId = recentToken[0].id;
-      }
-    }
+    if (!tokenRow[0]) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+    matchedTokenId = tokenRow[0].tokenId;
+    userRow = [
+      {
+        id: tokenRow[0].userId,
+        timezone: tokenRow[0].timezone,
+        suspendedAt: tokenRow[0].suspendedAt,
+        deletedAt: tokenRow[0].deletedAt,
+        lastSyncedAt: tokenRow[0].lastSyncedAt,
+      },
+    ];
   }
 
   if (!userRow[0]) return NextResponse.json({ error: "unauthorized" }, { status: 401 });

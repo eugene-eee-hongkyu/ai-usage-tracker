@@ -141,7 +141,6 @@ function deriveUserTodayFromBody(body: unknown): string | null {
  *
  * tokenId: M6f (2026-05-25) device-scope 도입. (user, team, token) 단위로 row 분리 → 같은
  * user 의 노트북 N대 데이터가 서로 덮어쓰지 않음. dashboard 가 device 별로 보거나 합산 선택.
- * fallback (옛 users.api_key_hash 경로) 면 null — (user, team, null) 단일 legacy row.
  *
  * Multi-provider (2026-05-29 M): body 의 형태에 따라 분기.
  *   - 신 형태: body = { claude: {...}, codex: {...}, envInfo?, ccusageMissing? } — provider 별 별도 row.

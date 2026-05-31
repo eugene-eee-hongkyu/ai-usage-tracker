@@ -86,7 +86,6 @@ export async function GET(req: NextRequest) {
             name: "(deleted)",
             githubId: null,
             avatarUrl: null,
-            apiKeyHash: null,
             timezone: null,
             planTier: null,
             role: "deleted",

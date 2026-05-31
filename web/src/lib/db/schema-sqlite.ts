@@ -41,7 +41,6 @@ export const users = sqliteTable("users", {
   email: text("email").notNull().unique(),
   name: text("name").notNull(),
   avatarUrl: text("avatar_url"),
-  apiKeyHash: text("api_key_hash"),
   timezone: text("timezone"),
   // 보안 감사 (2026-05-28, H1 temp A): OAuth provider lock-in. PG schema 와 동기화.
   // LOCAL_MODE 는 단일 사용자라 사실상 안 쓰이지만 schema sync 정합성 위해 보유.

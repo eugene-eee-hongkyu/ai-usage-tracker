@@ -20,7 +20,6 @@ export const users = pgTable("users", {
   email: text("email").notNull().unique(),
   name: text("name").notNull(),
   avatarUrl: text("avatar_url"),
-  apiKeyHash: text("api_key_hash"),
   timezone: text("timezone"),
   // 보안 감사 (2026-05-28, H1 temp Option A): 최초 가입 OAuth provider 영구 기록.
   // signIn callback 이 기존 user 매칭 시 provider 가 다르면 reject — GitHub
@@ -269,8 +268,7 @@ export const userSnapshots = pgTable(
       .references(() => users.id),
     // M6f (2026-05-25): device-scope snapshot. (user_id, team_id, token_id) 가 row 식별.
     // 같은 user 의 노트북 N대가 각자 row 1개씩 보유. dashboard 는 device 선택.
-    // nullable: fallback (users.api_key_hash 매칭) 경로에서 token 결정 못 했을 때만.
-    // 안정화 (1-2주) 후 NOT NULL 강제 + COALESCE 인덱스 → 정상 인덱스 재구성 예정.
+    // nullable: phase1b 이전 legacy row 안전망 — 신규 row 는 항상 token_id 채움.
     tokenId: integer("token_id").references(() => apiTokens.id),
     // Multi-provider (2026-05-29 M): Claude / Codex (/ Phase 2 Gemini 등) 분리.
     // ccusage / codeburn 양쪽이 단일 binary 로 모든 provider 지원 → provider 별
