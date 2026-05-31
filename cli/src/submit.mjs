@@ -14,7 +14,8 @@ import { homedir, arch as osArch, release as osRelease } from "os";
 // 새 릴리즈 시 두 파일 같이 bump.
 // Multi-provider (2026-05-29 M): 0.3.x 부터 Claude + Codex 분리 호출.
 // 0.3.2 (2026-05-30 oreo 회귀): partial submit 허용 + telemetry buffer + provider 직렬화.
-const CLI_VERSION = "0.3.2";
+// 0.3.3 (2026-05-31): launchd / Task Scheduler 수집 주기 2시간 → 1시간 통일.
+const CLI_VERSION = "0.3.3";
 
 // 직전 sync 실패 정보를 다음 sync 가 함께 보내기 위한 marker.
 // 실패 시 catch 블록에서 write, 성공 시 다음 envInfo 수집에서 read + 삭제.
