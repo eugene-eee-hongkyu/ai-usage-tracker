@@ -180,7 +180,8 @@ export const joinRequests = pgTable(
 
 // admin-v1: API 토큰.
 // CLI sync 등 자동화용 토큰. 사용자가 본인 또는 admin 이 발급/회수.
-// scopes 는 향후 fine-grained 권한용 (현재는 ['ingest', 'read']).
+// 2026-05-31 phase1c: scopes 컬럼 drop (마이그 0019). 코드 grep 0 건의 dead column.
+// fine-grained 권한 부활 필요 시 ADD COLUMN 으로 복원 가능.
 export const apiTokens = pgTable(
   "api_tokens",
   {
@@ -194,7 +195,6 @@ export const apiTokens = pgTable(
       .references(() => users.id),
     name: text("name").notNull(),
     hash: text("hash").notNull(),
-    scopes: jsonb("scopes").notNull().default(sql`'[]'::jsonb`),
     // M6e (2026-05-21): device-scope 진단 정보. CLI 가 매 ingest 시 envInfo 보내면
     // 서버가 이 컬럼 UPDATE. 운영 디버그용 (OS / arch / cliVersion / claudeCodeVersion
     // / hookEnabled / lastError / installMethod 등).

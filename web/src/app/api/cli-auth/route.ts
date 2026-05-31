@@ -121,7 +121,7 @@ export async function GET(req: NextRequest) {
     if (existingDevice[0]) {
       await tx
         .update(apiTokens)
-        .set({ hash: apiKeyHash, scopes: ["ingest"] })
+        .set({ hash: apiKeyHash })
         .where(eq(apiTokens.id, existingDevice[0].id));
     } else {
       await tx.insert(apiTokens).values({
@@ -129,7 +129,6 @@ export async function GET(req: NextRequest) {
         userId,
         name: deviceName,
         hash: apiKeyHash,
-        scopes: ["ingest"],
       });
     }
   });

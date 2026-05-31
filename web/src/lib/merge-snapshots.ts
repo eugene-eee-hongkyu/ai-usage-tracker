@@ -184,11 +184,8 @@ export function mergeRawJson(rawJsons: AnyObj[]): AnyObj {
     merged.sort((a, b) => String(a.date).localeCompare(String(b.date)));
     result.ccusageDaily = { daily: merged };
   }
-  // ccusageBlocks — 모든 device 의 blocks 단순 concat (각 block 다른 5h 윈도우)
-  const topBlocks = rawJsons.flatMap((r) => (r?.ccusageBlocks as { blocks?: AnyObj[] } | undefined)?.blocks ?? []);
-  if (topBlocks.length > 0) {
-    result.ccusageBlocks = { blocks: topBlocks };
-  }
+  // 2026-05-31 phase1c: ccusageBlocks merge 라인 제거 (phase1b 에서 송신 / 저장 / 테이블
+  // 모두 정리됨). 옛 row 의 잔존 키도 phase1c 의 prod UPDATE SQL 으로 제거 예정.
   return result;
 }
 
