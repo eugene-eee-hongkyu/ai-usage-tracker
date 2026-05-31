@@ -959,6 +959,10 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
   // localStorage 읽기 전 첫 fetch 가 stale period 로 발사 + race 로 늦은 응답이
   // 덮어쓰는 버그 방지. 읽기 완료 후에만 fetch 허용.
   const [periodReady, setPeriodReady] = useState(false);
+  // 짧은 period (today/8days/month) — 표본 작아 by-model / by-project / top-sessions /
+  // by-activity / mcp-servers / efficiency 카드는 의미 약함. UI 단순화: 토글 자체
+  // hide + Streak + 체류 히트맵 두 카드만 표시. 긴 period (30days/all) 는 기존 그대로.
+  const isShortPeriod = period === "today" || period === "8days" || period === "month";
 
   // 로컬 모드 (.pkg/.app 설치 환경) 면 NextAuth session 없이도 작동.
   const isLocalMode = useLocalMode();
@@ -2528,9 +2532,12 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
           </span>
           {/* secondary — 효율 지표 (cache hit / 1-shot) 만. calls·sessions 는
               "얼마나 썼나" 는 token·cost 로 이미 알 수 있고 hero 띠는 한 줄
-              유지 우선이라 제거. */}
+              유지 우선이라 제거.
+              짧은 period 에서는 1-shot 도 hide (Efficiency 카드 자체가 사라지므로 일관). */}
           <span className="text-sm"><span className="text-emerald-400 font-bold">{ov.cacheHitPct.toFixed(1)}%</span><span className="text-neutral-500 ml-1 text-xs">cache hit</span></span>
-          <span className="text-sm"><span className="text-violet-400 font-bold">{Math.round(ov.oneShotRate * 100)}%</span><span className="text-neutral-500 ml-1 text-xs">1-shot</span></span>
+          {!isShortPeriod && (
+            <span className="text-sm"><span className="text-violet-400 font-bold">{Math.round(ov.oneShotRate * 100)}%</span><span className="text-neutral-500 ml-1 text-xs">1-shot</span></span>
+          )}
           <span className="text-neutral-600 text-xs self-center ml-auto flex items-center gap-3">
             <span>{tmpl(t.dashboardView.activeNDays, { n: ov.activeDays })}</span>
             {data.snapshot ? (
@@ -2694,10 +2701,21 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
           </div>
         )}
 
+        {/* 짧은 period (today/8days/month) — 토글 자체 hide. Cache Hit Streak +
+            체류 히트맵 두 카드만 상시 표시. 나머지 카드는 표본 작아 의미 약함. */}
+        {isShortPeriod && (cacheStreakBlock || dwellHeatmapBlock) && (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            {cacheStreakBlock ?? <div />}
+            {dwellHeatmapBlock ?? <div />}
+          </div>
+        )}
+
         {/* 자세히 보기 토글 — divider + 중앙 라벨 풀폭 패턴 (Medium / Notion 식).
             "여기부터 details" 메타포 + 위·아래 영역 시각 단절. by model · by
             project · top sessions · by activity · core tools · shell · MCP ·
-            체류 · Active Blocks 모두 토글 안. localStorage 선호 유지. */}
+            체류 · Active Blocks 모두 토글 안. localStorage 선호 유지.
+            긴 period (30days/all) 만 — 짧은 period 는 위 short-period row 로 대체. */}
+        {!isShortPeriod && (<>
         <div className="pt-4 pb-1">
           <div className="flex items-center gap-3">
             <hr className="flex-1 border-t border-neutral-800" />
@@ -2975,6 +2993,7 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
         </div>
 
         </>)}  {/* detailsOpen 토글 닫기 — Row 3 ~ Row 5 + 새 Row 모두 토글 안 */}
+        </>)}  {/* !isShortPeriod 닫기 — 긴 period (30days/all) 전용 토글 영역 */}
 
         {/* Daily Efficiency Score + Streak + 90일 잔디 + 팀 랭크 — 동기부여·게임화 패널.
             매일 보는 액션 카드가 아니라 주 1회 "이번 주 어땠지" 확인용. Core Tools /
