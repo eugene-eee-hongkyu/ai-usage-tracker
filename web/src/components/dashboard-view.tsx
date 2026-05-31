@@ -2691,22 +2691,23 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
           return activityHeatmapBlock;
         })()}
 
-        {/* Row 2.5 (신설): 비용 원인 Top 3 (반셀) + 빈 자리.
-            사용자 needs 1 ('얼마나 + 어디에 썼나') 직접 답 카드. 팀 내 내
-            위치 아래 자연스러운 위치. 옆 자리는 추후 다른 카드 추가 자리. */}
-        {costCauseTop3Block && (
+        {/* Row 2.5: 비용 원인 Top 3 (반셀) + 옆 자리.
+            짧은 period 면 옆 자리에 Cache Hit Streak 동거 (사용자 needs 1 + 동기부여
+            짝). 긴 period 면 빈 자리 (추후 다른 카드 자리). */}
+        {(costCauseTop3Block || (isShortPeriod && cacheStreakBlock)) && (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            {costCauseTop3Block}
-            <div />
+            {costCauseTop3Block ?? <div />}
+            {isShortPeriod ? (cacheStreakBlock ?? <div />) : <div />}
           </div>
         )}
 
-        {/* 짧은 period (today/8days/month) — 토글 자체 hide. Cache Hit Streak +
-            체류 히트맵 두 카드만 상시 표시. 나머지 카드는 표본 작아 의미 약함. */}
-        {isShortPeriod && (cacheStreakBlock || dwellHeatmapBlock) && (
+        {/* 짧은 period (today/8days/month) — 토글 자체 hide. 체류 히트맵을 왼쪽
+            단독으로 표시 (오른쪽은 추후 자리). Cache Hit Streak 는 위 Row 2.5 의
+            Cost Top 3 옆으로 이동. */}
+        {isShortPeriod && dwellHeatmapBlock && (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            {cacheStreakBlock ?? <div />}
-            {dwellHeatmapBlock ?? <div />}
+            {dwellHeatmapBlock}
+            <div />
           </div>
         )}
 
