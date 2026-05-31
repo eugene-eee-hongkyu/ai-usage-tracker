@@ -18,12 +18,13 @@
 //   - tier 미입력 멤버는 집계 미포함 (2026-05-30: AI 추정 폐기)
 
 import { NextResponse } from "next/server";
-import { db, teams, teamMembers, users, userBlocks } from "@/lib/db";
+import { db, teams, teamMembers, users, userSnapshots } from "@/lib/db";
 import { requireBillingAdmin } from "@/lib/auth-guards";
-import { eq, and, isNull, gte, inArray } from "drizzle-orm";
+import { eq, and, isNull, inArray } from "drizzle-orm";
 import { computePowerIndex } from "@/lib/rules";
 import { getPlanLimits, type PlanTier } from "@/lib/plan-health";
 import { anonymizeName } from "@/lib/anonymize";
+import { getCcusageDaily } from "@/lib/ccusage-row";
 
 export const dynamic = "force-dynamic";
 
@@ -74,30 +75,36 @@ export async function GET() {
     return NextResponse.json({ myTeamId, teams: [], members: [] });
   }
 
-  // 3) 30일 윈도우 user_blocks SUM by (team_id, user_id)
+  // 3) 30일 윈도우 user_snapshots.raw_json.ccusageDaily SUM by (team_id, user_id)
   //   - totalTokens: 토큰 합 (cache 포함)
-  //   - costUsd: 비용 합
-  //   - activeDays: distinct date 카운트는 별도 — startedAt 의 YYYY-MM-DD set
-  const blockRows = await db
+  //   - cost: ccusage 의 totalCost 합 (Codex 는 costUSD — normalize 가 통일)
+  //   - activeDays: ccusageDaily 의 date set
+  // 2026-05-31 phase1a (data-pipeline-slim): user_blocks 테이블에서 ccusageDaily 로 source 교체.
+  // 5h block 단위 → daily 단위. 총합은 동일, activeDays 도 동일 (둘 다 distinct date).
+  // multi-device 사용자는 N row → in-memory union 으로 date 별 합산.
+  const snapRows = await db
     .select({
-      teamId: userBlocks.teamId,
-      userId: userBlocks.userId,
-      totalTokens: userBlocks.totalTokens,
-      costUsd: userBlocks.costUsd,
-      startedAt: userBlocks.startedAt,
+      teamId: userSnapshots.teamId,
+      userId: userSnapshots.userId,
+      rawJson: userSnapshots.rawJson,
     })
-    .from(userBlocks)
-    .where(and(inArray(userBlocks.teamId, teamIds), gte(userBlocks.startedAt, windowStart)));
+    .from(userSnapshots)
+    .where(inArray(userSnapshots.teamId, teamIds));
 
-  // (teamId, userId) → { tokens, cost, activeDates: Set<string> }
+  const windowStartYmd = windowStart.toISOString().slice(0, 10);
   type MemberAgg = { tokens: number; cost: number; activeDates: Set<string> };
   const memberAgg = new Map<string, MemberAgg>();
-  for (const b of blockRows) {
-    const key = `${b.teamId}__${b.userId}`;
+  for (const s of snapRows) {
+    const key = `${s.teamId}__${s.userId}`;
     const agg = memberAgg.get(key) ?? { tokens: 0, cost: 0, activeDates: new Set<string>() };
-    agg.tokens += Number(b.totalTokens ?? 0);
-    agg.cost += Number(b.costUsd ?? 0);
-    agg.activeDates.add(b.startedAt.toISOString().slice(0, 10));
+    const ccDaily = getCcusageDaily(s.rawJson);
+    for (const row of ccDaily) {
+      const date = row.date;
+      if (!date || date < windowStartYmd) continue;
+      agg.tokens += row.totalTokens ?? 0;
+      agg.cost += (row as { totalCost?: number }).totalCost ?? 0;
+      agg.activeDates.add(date);
+    }
     memberAgg.set(key, agg);
   }
 

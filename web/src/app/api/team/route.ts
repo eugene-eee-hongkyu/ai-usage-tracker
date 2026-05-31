@@ -3,7 +3,7 @@ export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import { db, userSnapshots, users, dailyVisits, userBlocks, teamMembers, apiTokens, teams, IS_LOCAL_MODE } from "@/lib/db";
+import { db, userSnapshots, users, dailyVisits, teamMembers, apiTokens, teams, IS_LOCAL_MODE } from "@/lib/db";
 import { getAuthedEmail } from "@/lib/local-user";
 import { getEffectiveTeamId } from "@/lib/effective-team";
 import {
@@ -203,7 +203,6 @@ export async function GET(req: NextRequest) {
       : [];
   const userSnapTeamScope = IS_LOCAL_MODE ? undefined : eq(userSnapshots.teamId, effectiveTeamId!);
   const dailyVisitsTeamScope = IS_LOCAL_MODE ? undefined : eq(dailyVisits.teamId, effectiveTeamId!);
-  const userBlocksTeamScope = IS_LOCAL_MODE ? undefined : eq(userBlocks.teamId, effectiveTeamId!);
 
   // M6f (2026-05-26): multi-device 사용자는 token 별 row 가 N개. team 화면도 device
   // 별 row 로 분리 표시 — 가중평균 위험 회피 + 개인 dashboard 의 device chip 모델과 일관.
@@ -307,37 +306,9 @@ export async function GET(req: NextRequest) {
     visit30Dates.push(d.toISOString().slice(0, 10));
   }
 
-  // user_blocks 기반 멤버별 분당 토큰 집계. period 별 윈도우는 dashboard 와 동일.
-  // today 면 빈 Map (효율성 테이블에 0 표시되거나 ─ 으로 표기).
-  const blocksWindowStart = (() => {
-    const now = new Date();
-    switch (period) {
-      case "today": return null;
-      case "month": return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
-      case "8days": return new Date(now.getTime() - 8 * 86_400_000);
-      case "30days": return new Date(now.getTime() - 30 * 86_400_000);
-      case "all": return new Date(now.getTime() - 90 * 86_400_000);
-      default: return new Date(now.getTime() - 30 * 86_400_000);
-    }
-  })();
-  const blockRows = blocksWindowStart
-    ? await db
-        .select({
-          userId: userBlocks.userId,
-          minutes: userBlocks.minutes,
-          totalTokens: userBlocks.totalTokens,
-        })
-        .from(userBlocks)
-        .where(and(gte(userBlocks.startedAt, blocksWindowStart), userBlocksTeamScope))
-    : [];
-  const blocksAgg = new Map<number, { totalMinutes: number; totalTokens: number; count: number }>();
-  for (const r of blockRows) {
-    const cur = blocksAgg.get(r.userId) ?? { totalMinutes: 0, totalTokens: 0, count: 0 };
-    cur.totalMinutes += r.minutes;
-    cur.totalTokens += Number(r.totalTokens ?? 0);
-    cur.count += 1;
-    blocksAgg.set(r.userId, cur);
-  }
+  // 2026-05-31 (phase1a): tokensPerMinute 카드가 team-view 에서 grep 0 건 (dead emit) 확인.
+  // user_blocks 기반 blocksAgg 통째 제거. response 의 tokensPerMinute 는 항상 null 로 emit
+  // (schema 안정성 — 옛 클라이언트가 필드 존재 가정할 수 있어 키 유지).
 
   // Accumulators for team-level aggregations
   const activityAgg = new Map<string, { totalCost: number; totalTurns: number; members: Set<number> }>();
@@ -630,10 +601,8 @@ export async function GET(req: NextRequest) {
         });
       }
 
-      const blocksOfUser = blocksAgg.get(u.id);
-      const tokensPerMinute = blocksOfUser && blocksOfUser.totalMinutes > 0
-        ? Math.round(blocksOfUser.totalTokens / blocksOfUser.totalMinutes)
-        : null;
+      // tokensPerMinute — phase1a (2026-05-31) 부터 항상 null. user_blocks deprecation.
+      const tokensPerMinute = null;
 
       // 사용량 (token volume) — 개인 EFFICIENCY 카드의 "사용량" 과 동일 정의.
       // period 내 활성일 = d.daily 중 cost > 0 인 날. totalTokens / activeDays.
@@ -697,31 +666,57 @@ export async function GET(req: NextRequest) {
       default: return new Date(now.getTime() - 30 * 86_400_000);
     }
   })();
-  const planBlockRows = await db
-    .select({
-      userId: userBlocks.userId,
-      totalTokens: userBlocks.totalTokens,
-      startedAt: userBlocks.startedAt,
-    })
-    .from(userBlocks)
-    .where(and(gte(userBlocks.startedAt, planBlocksWindowStart), userBlocksTeamScope));
-  const planBlocksByUser = new Map<number, Array<{ totalTokens: number; startedAt: Date }>>();
-  for (const r of planBlockRows) {
-    const arr = planBlocksByUser.get(r.userId) ?? [];
-    arr.push({ totalTokens: Number(r.totalTokens ?? 0), startedAt: r.startedAt });
-    planBlocksByUser.set(r.userId, arr);
+  // 2026-05-31 phase1a: user_blocks 테이블 deprecation 의 사전 작업.
+  // planBlockRows / cost30dRows → user_snapshots.raw_json.ccusageDaily 합산으로 교체.
+  // 단위: 5h block → daily row 1 개로 매핑. analyzePlanHealth 의 blocks 입력 형태 유지
+  // (totalTokens, startedAt). retention 90 일 cap 은 ccusageDaily 안에서 자연 처리됨.
+  //
+  // Provider 분리 핵심: plan-health 는 declared plan (claude_plan_tier 또는 codex_plan_tier)
+  // 의 가격 vs **해당 provider 의 cost** 비교 → snap.provider === 현재 provider 만 필터.
+  // user_blocks 시절에 codex 가 사실상 누락 (CLI 의 ccusage codex blocks 가 빈 응답)
+  // 이었던 잠재 버그도 이 fix 로 해결됨 — 이제 codex tier 사용자도 정확한 verdict.
+  function aggCcusageDailyForUser(
+    userId: number,
+    windowStart: Date,
+  ): { blocksLike: Array<{ totalTokens: number; startedAt: Date }>; totalCost: number } {
+    const snaps = snapsByUser.get(userId) ?? [];
+    const byDate = new Map<string, { totalTokens: number; totalCost: number }>();
+    for (const { snap } of snaps) {
+      // 현재 provider 의 snap 만 — multi-provider 분리 (2026-05-29) 후 row 가 provider 별.
+      if (snap.provider !== provider) continue;
+      const ccDaily = getCcusageDaily(snap.rawJson);
+      for (const row of ccDaily) {
+        const date = row.date;
+        if (!date) continue;
+        const rowDate = new Date(`${date}T00:00:00Z`);
+        if (rowDate < windowStart) continue;
+        const cur = byDate.get(date) ?? { totalTokens: 0, totalCost: 0 };
+        cur.totalTokens += row.totalTokens ?? 0;
+        cur.totalCost += (row as { totalCost?: number }).totalCost ?? 0;
+        byDate.set(date, cur);
+      }
+    }
+    const blocksLike: Array<{ totalTokens: number; startedAt: Date }> = [];
+    let totalCost = 0;
+    for (const [date, agg] of byDate) {
+      blocksLike.push({
+        totalTokens: agg.totalTokens,
+        startedAt: new Date(`${date}T00:00:00Z`),
+      });
+      totalCost += agg.totalCost;
+    }
+    return { blocksLike, totalCost };
   }
 
-  // 30일 cost (period 무관) — tier 추정의 보조 신호. user_blocks 의 cost_usd
-  // 30일 합. period 가 today 라도 추정은 항상 30일 anchor 로 안정적.
-  const cost30dWindowStart = new Date(Date.now() - 30 * 86_400_000);
-  const cost30dRows = await db
-    .select({ userId: userBlocks.userId, costUsd: userBlocks.costUsd })
-    .from(userBlocks)
-    .where(and(gte(userBlocks.startedAt, cost30dWindowStart), userBlocksTeamScope));
+  const planBlocksByUser = new Map<number, Array<{ totalTokens: number; startedAt: Date }>>();
   const monthlyCostByUser = new Map<number, number>();
-  for (const r of cost30dRows) {
-    monthlyCostByUser.set(r.userId, (monthlyCostByUser.get(r.userId) ?? 0) + Number(r.costUsd ?? 0));
+  const cost30dWindowStart = new Date(Date.now() - 30 * 86_400_000);
+  for (const u of allUsers) {
+    const planAgg = aggCcusageDailyForUser(u.id, planBlocksWindowStart);
+    planBlocksByUser.set(u.id, planAgg.blocksLike);
+    // 30일 cost 는 별도 window (period 와 무관, tier 추정 anchor).
+    const cost30Agg = aggCcusageDailyForUser(u.id, cost30dWindowStart);
+    monthlyCostByUser.set(u.id, cost30Agg.totalCost);
   }
   const memberHealthList: Array<{
     userId: number;
