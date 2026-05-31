@@ -41,13 +41,9 @@ WHERE provider = 'claude'
       AND model NOT ILIKE '%synthetic%'
   );
 
--- user_blocks — provider='claude' 가드 + models 컬럼 직접 검사 (block 단위 정밀).
-DELETE FROM user_blocks
-WHERE provider = 'claude'
-  AND EXISTS (
-    SELECT 1 FROM jsonb_array_elements_text(models::jsonb) AS m
-    WHERE m NOT ILIKE 'claude%' AND m NOT ILIKE '%synthetic%'
-  );
+-- 2026-05-31 phase1b: user_blocks 테이블 자체가 drop 됨 (0018_drop_user_blocks.sql).
+-- 옛 user_blocks DELETE 블록은 제거 — prior 실행 시 "relation does not exist" 로 전체
+-- 트랜잭션 rollback 됐던 원인. 현재는 user_snapshots / period_snapshots DELETE 만 묶음.
 
 COMMIT;
 
@@ -56,5 +52,3 @@ COMMIT;
 --     FROM user_snapshots WHERE user_id IN (2,4,9) GROUP BY user_id, provider;
 --   → provider='claude' 의 row 가 0 또는 새 분리 데이터 (Claude only) 만 남아있고,
 --     provider='codex' 의 row 는 보존 (영향 user 가 Codex 사용자면 1+).
---
---   같은 패턴으로 period_snapshots, user_blocks 도 확인.
