@@ -168,7 +168,7 @@ function runInstallShAndExit(): never {
 
 // Node 22 미만이면 codeburn (engines >=22) / ccusage (engines >=22.0.0) 가
 // EBADENGINE 경고만 띄우고 설치는 되지만 런타임 깨질 수 있다. 사용자 머신에서
-// launchd 가 매 2시간마다 silent 실패하는 만성 문제의 흔한 원인.
+// launchd 가 매 1시간마다 silent 실패하는 만성 문제의 흔한 원인.
 // 흐름: [자동 복구 (default)] → 거부 시 [강행] → 거부 시 [중단]
 function preflightNodeVersion(): void {
   const major = parseInt((process.versions.node ?? "0").split(".")[0], 10);
@@ -519,7 +519,7 @@ function registerLaunchd(submitPath: string): void {
     <string>${envPath}</string>
   </dict>
   <key>StartInterval</key>
-  <integer>7200</integer>
+  <integer>3600</integer>
   <key>StandardOutPath</key>
   <string>${path.join(STABLE_DIR, "daily.log")}</string>
   <key>StandardErrorPath</key>
@@ -592,7 +592,7 @@ function registerLaunchd(submitPath: string): void {
   // 다음 StartInterval 에서 도므로 치명적 아님).
   spawnSync("launchctl", ["kickstart", "-p", `${gui}/${label}`], { stdio: "ignore" });
 
-  console.log("✓ 자동 수집 등록 — 2시간마다 사용량을 보냅니다 (sleep 후 깨어나도 즉시 보충)");
+  console.log("✓ 자동 수집 등록 — 1시간마다 사용량을 보냅니다 (sleep 후 깨어나도 즉시 보충)");
 }
 
 function registerWindowsTask(submitPath: string): void {
@@ -602,18 +602,25 @@ function registerWindowsTask(submitPath: string): void {
 
   fs.writeFileSync(wrapperPath, `@echo off\r\n"${process.execPath}" "${submitPath}"\r\n`);
 
-  // XML 등록: StartWhenAvailable=true → 꺼져 있다가 켜지면 즉시 실행
+  // XML 등록: StartWhenAvailable=true → 꺼져 있다가 켜지면 즉시 실행.
+  // 단일 CalendarTrigger + Repetition(PT1H/P1D) 으로 매일 0시 시작 → 1시간마다 24회 반복.
+  // MultipleInstancesPolicy=IgnoreNew 라 이전 실행이 안 끝났을 때 다음 trigger 는 무시 → 중첩 안전.
   const xml = `<?xml version="1.0" encoding="UTF-16"?>
 <Task version="1.2" xmlns="http://schemas.microsoft.com/windows/2004/02/mit/task">
   <Triggers>
-    <CalendarTrigger><StartBoundary>2000-01-01T00:00:00</StartBoundary><ScheduleByDay><DaysInterval>1</DaysInterval></ScheduleByDay></CalendarTrigger>
-    <CalendarTrigger><StartBoundary>2000-01-01T06:00:00</StartBoundary><ScheduleByDay><DaysInterval>1</DaysInterval></ScheduleByDay></CalendarTrigger>
-    <CalendarTrigger><StartBoundary>2000-01-01T12:00:00</StartBoundary><ScheduleByDay><DaysInterval>1</DaysInterval></ScheduleByDay></CalendarTrigger>
-    <CalendarTrigger><StartBoundary>2000-01-01T18:00:00</StartBoundary><ScheduleByDay><DaysInterval>1</DaysInterval></ScheduleByDay></CalendarTrigger>
+    <CalendarTrigger>
+      <StartBoundary>2000-01-01T00:00:00</StartBoundary>
+      <ScheduleByDay><DaysInterval>1</DaysInterval></ScheduleByDay>
+      <Repetition>
+        <Interval>PT1H</Interval>
+        <Duration>P1D</Duration>
+        <StopAtDurationEnd>false</StopAtDurationEnd>
+      </Repetition>
+    </CalendarTrigger>
   </Triggers>
   <Settings>
     <StartWhenAvailable>true</StartWhenAvailable>
-    <ExecutionTimeLimit>PT2H</ExecutionTimeLimit>
+    <ExecutionTimeLimit>PT1H</ExecutionTimeLimit>
     <MultipleInstancesPolicy>IgnoreNew</MultipleInstancesPolicy>
   </Settings>
   <Actions>
@@ -629,7 +636,7 @@ function registerWindowsTask(submitPath: string): void {
   ], { stdio: "ignore" });
 
   if (result.status === 0) {
-    console.log("✓ 자동 수집 등록 — 하루 4회 (0/6/12/18시) 사용량을 보냅니다");
+    console.log("✓ 자동 수집 등록 — 1시간마다 사용량을 보냅니다");
   } else {
     console.log("⚠ 자동 수집 등록에 실패했어요 (수동으로도 가능합니다)");
   }

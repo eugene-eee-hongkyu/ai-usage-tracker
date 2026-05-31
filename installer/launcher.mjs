@@ -173,7 +173,7 @@ function ensureLaunchAgentMac() {
     <string>${syncPath}</string>
   </array>
   <key>StartInterval</key>
-  <integer>7200</integer>
+  <integer>3600</integer>
   <key>EnvironmentVariables</key>
   <dict>
     <key>TZ</key>

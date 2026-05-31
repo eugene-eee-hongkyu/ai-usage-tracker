@@ -456,7 +456,7 @@ function registerLaunchd(submitPath) {
     <string>${envPath}</string>
   </dict>
   <key>StartInterval</key>
-  <integer>7200</integer>
+  <integer>3600</integer>
   <key>StandardOutPath</key>
   <string>${path.join(STABLE_DIR, "daily.log")}</string>
   <key>StandardErrorPath</key>
@@ -517,7 +517,7 @@ function registerLaunchd(submitPath) {
     return;
   }
   spawnSync("launchctl", ["kickstart", "-p", `${gui}/${label}`], { stdio: "ignore" });
-  console.log("✓ 자동 수집 등록 — 2시간마다 사용량을 보냅니다 (sleep 후 깨어나도 즉시 보충)");
+  console.log("✓ 자동 수집 등록 — 1시간마다 사용량을 보냅니다 (sleep 후 깨어나도 즉시 보충)");
 }
 function registerWindowsTask(submitPath) {
   const taskName = "Z21labsUsageTracker";
@@ -529,14 +529,19 @@ function registerWindowsTask(submitPath) {
   const xml = `<?xml version="1.0" encoding="UTF-16"?>
 <Task version="1.2" xmlns="http://schemas.microsoft.com/windows/2004/02/mit/task">
   <Triggers>
-    <CalendarTrigger><StartBoundary>2000-01-01T00:00:00</StartBoundary><ScheduleByDay><DaysInterval>1</DaysInterval></ScheduleByDay></CalendarTrigger>
-    <CalendarTrigger><StartBoundary>2000-01-01T06:00:00</StartBoundary><ScheduleByDay><DaysInterval>1</DaysInterval></ScheduleByDay></CalendarTrigger>
-    <CalendarTrigger><StartBoundary>2000-01-01T12:00:00</StartBoundary><ScheduleByDay><DaysInterval>1</DaysInterval></ScheduleByDay></CalendarTrigger>
-    <CalendarTrigger><StartBoundary>2000-01-01T18:00:00</StartBoundary><ScheduleByDay><DaysInterval>1</DaysInterval></ScheduleByDay></CalendarTrigger>
+    <CalendarTrigger>
+      <StartBoundary>2000-01-01T00:00:00</StartBoundary>
+      <ScheduleByDay><DaysInterval>1</DaysInterval></ScheduleByDay>
+      <Repetition>
+        <Interval>PT1H</Interval>
+        <Duration>P1D</Duration>
+        <StopAtDurationEnd>false</StopAtDurationEnd>
+      </Repetition>
+    </CalendarTrigger>
   </Triggers>
   <Settings>
     <StartWhenAvailable>true</StartWhenAvailable>
-    <ExecutionTimeLimit>PT2H</ExecutionTimeLimit>
+    <ExecutionTimeLimit>PT1H</ExecutionTimeLimit>
     <MultipleInstancesPolicy>IgnoreNew</MultipleInstancesPolicy>
   </Settings>
   <Actions>
@@ -553,7 +558,7 @@ function registerWindowsTask(submitPath) {
     "/F"
   ], { stdio: "ignore" });
   if (result.status === 0) {
-    console.log("✓ 자동 수집 등록 — 하루 4회 (0/6/12/18시) 사용량을 보냅니다");
+    console.log("✓ 자동 수집 등록 — 1시간마다 사용량을 보냅니다");
   } else {
     console.log("⚠ 자동 수집 등록에 실패했어요 (수동으로도 가능합니다)");
   }
