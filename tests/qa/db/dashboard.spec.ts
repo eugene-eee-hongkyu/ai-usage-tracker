@@ -79,7 +79,9 @@ test.describe("DB-1 P2 정상 fixture", () => {
     expect(res.status()).toBe(200);
   });
 
-  test("[DB-1-11] 카드 12종 visible", async ({ page }) => {
+  test("[DB-1-11] 카드 10종 visible (Claude 탭)", async ({ page }) => {
+    // 2026-05-31 phase4 F3 결정: dash-card-core-tools / dash-card-shell-cmd 두 카드
+    // deprecate. mcpServers + activities/models/projects/topSessions 등 나머지 유지.
     await page.goto("/dashboard");
     await expect(page.getByTestId("dash-card-daily-tokens")).toBeVisible();
     await expect(page.getByTestId("dash-card-daily-cost")).toBeVisible();
@@ -89,11 +91,19 @@ test.describe("DB-1 P2 정상 fixture", () => {
     await expect(page.getByTestId("dash-card-top-sessions")).toBeVisible();
     await expect(page.getByTestId("dash-card-by-project")).toBeVisible();
     await expect(page.getByTestId("dash-card-by-activity")).toBeVisible();
-    await expect(page.getByTestId("dash-card-core-tools")).toBeVisible();
-    await expect(page.getByTestId("dash-card-shell-cmd")).toBeVisible();
     await expect(page.getByTestId("dash-card-mcp")).toBeVisible();
     // dwell heatmap: mount 시 /api/visit POST 가 daily_visits row insert → visitDaily.length>0 → 렌더.
     await expect(page.getByTestId("dash-card-dwell-heatmap")).toBeVisible();
+  });
+
+  test("[DB-1-11b] phase4 deprecate 회귀 방지 — Core Tools / Shell Commands 카드 미존재", async ({ page }) => {
+    // 2026-05-31 phase4 F3 결정 후속 (commit 26992b7) — 두 카드 영원히 미존재.
+    // 회귀 시 dashboard 의 Row 5 가 부활하면 fail.
+    await page.goto("/dashboard");
+    await expect(page.getByTestId("dash-card-core-tools")).toHaveCount(0);
+    await expect(page.getByTestId("dash-card-shell-cmd")).toHaveCount(0);
+    // mcpServers 는 유지 (사용자 의도) — 같이 회귀 안 되도록 visible 동시 확인.
+    await expect(page.getByTestId("dash-card-mcp")).toBeVisible();
   });
 
   test("[DB-1-12] overview-bar 비용 텍스트 양수 (period=all)", async ({ page }) => {

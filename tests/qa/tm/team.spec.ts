@@ -317,6 +317,17 @@ test.describe("TM 잔여", () => {
     await expect(page.getByTestId("team-card-cost")).toBeVisible();
   });
 
+  test("[TM-1-32] phase4 deprecate 회귀 방지 — Core Tools / Shell Commands 미존재", async ({ page }) => {
+    // 2026-05-31 phase4 F3 결정 후속 (commit a350552) — team 화면 Row 5
+    // (Core Tools + Shell Commands) 통째 사라짐. team-view 의 두 카드는
+    // data-testid 없이 const Block 패턴이라 텍스트 정확 매칭으로 검증.
+    seed("P2");
+    await signInAs(page, "P2");
+    await page.goto("/team");
+    await expect(page.getByText("Core Tools", { exact: true })).toHaveCount(0);
+    await expect(page.getByText("Shell Commands", { exact: true })).toHaveCount(0);
+  });
+
   test("[TM-1-13] 미수신 배지 (lastSyncedAt=null user)", async ({ page }) => {
     seed("team-mixed");
     await signInAs(page, "team-mixed");
