@@ -52,6 +52,12 @@ installer/electron/build-resources/cert.*
 # cli/package.json 의 `bin` (= ./src/index.mjs) 을 entry point 로 끌어씀.
 # 매 cli/src/*.ts 변경 후 `cd cli && bun run build` 결과를 함께 commit 할 것.
 
+# ── bun lockfile (untracked) ──────────────────────
+# root 는 npm (package-lock.json) 운영. cli 디렉토리에서 bun install 하면
+# workspaces 감지로 root 에 bun.lock 이 부산물 생성. 두 매니저 lockfile 공존은
+# 혼란이라 ignore. CI 는 bun-version 명시 고정 (cli-build-check.yml) 으로 결정성 보장.
+bun.lock
+
 # ── 하네스 내부 상태 ──────────────────────────────
 # Internal ops content lives in sibling repo `ai-usage-tracker-ops`.
 # Public clone sees broken symlinks here — that's intentional.
