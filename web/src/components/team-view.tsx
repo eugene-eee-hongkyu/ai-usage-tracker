@@ -297,6 +297,49 @@ function fmtDate(d: string): string {
   return m ? `${parseInt(m[1])}/${parseInt(m[2])}` : d;
 }
 
+// M6f multi-device 사용자가 byEfficiency 에 같은 userId 의 N row 로 등장 → userId 단위 합산.
+// dashboard 의 TeamPositionCard (dashboard-view.tsx:818-834) 와 같은 패턴.
+//   - cost / tokens / sessions / calls — 단순 합
+//   - cacheHitPct — calls 가중평균
+//   - overallOneShot — sessions 가중평균
+//   - outputInputRatio — calls 가중평균
+//   - efficiencyScore / avgDailyTokens — 평균 (device 간 동등 가중)
+//   - monthVisits / avgDwellSec — daily_visits 가 user 단위 저장이라 device 별 row 가 모두 동일 값 → 첫 row 유지 (합산 시 N배 부풀려짐)
+//   - lastSyncedAt — 더 최근 device 기준
+//   - deviceLabel / tokenId — null (합산 row sentinel)
+//   - ccusageMissing — 어느 device 라도 missing 이면 missing
+function dedupMembersByUserId(rows: MemberStat[]): MemberStat[] {
+  const map = new Map<number, MemberStat>();
+  for (const m of rows) {
+    const existing = map.get(m.userId);
+    if (!existing) {
+      map.set(m.userId, { ...m });
+      continue;
+    }
+    const sumCalls = existing.callsCount + m.callsCount;
+    const sumSessions = existing.sessionsCount + m.sessionsCount;
+    const cacheWeighted = existing.cacheHitPct * existing.callsCount + m.cacheHitPct * m.callsCount;
+    const oneShotWeighted = existing.overallOneShot * existing.sessionsCount + m.overallOneShot * m.sessionsCount;
+    const oirWeighted = existing.outputInputRatio * existing.callsCount + m.outputInputRatio * m.callsCount;
+    existing.totalCost += m.totalCost;
+    existing.totalTokens += m.totalTokens;
+    existing.sessionsCount = sumSessions;
+    existing.callsCount = sumCalls;
+    existing.cacheHitPct = sumCalls > 0 ? cacheWeighted / sumCalls : existing.cacheHitPct;
+    existing.overallOneShot = sumSessions > 0 ? oneShotWeighted / sumSessions : existing.overallOneShot;
+    existing.outputInputRatio = sumCalls > 0 ? oirWeighted / sumCalls : existing.outputInputRatio;
+    existing.efficiencyScore = (existing.efficiencyScore + m.efficiencyScore) / 2;
+    existing.avgDailyTokens = (existing.avgDailyTokens + m.avgDailyTokens) / 2;
+    if (m.lastSyncedAt && (!existing.lastSyncedAt || new Date(m.lastSyncedAt) > new Date(existing.lastSyncedAt))) {
+      existing.lastSyncedAt = m.lastSyncedAt;
+    }
+    existing.deviceLabel = null;
+    existing.tokenId = null;
+    if (m.ccusageMissing) existing.ccusageMissing = true;
+  }
+  return Array.from(map.values());
+}
+
 function fmtTokens(n: number): string {
   if (!Number.isFinite(n)) return "—";
   if (n >= 1_000_000_000) return `${(n / 1_000_000_000).toFixed(1)}B`;
@@ -516,7 +559,11 @@ export function TeamView({ adminMode = false }: { adminMode?: boolean }) {
     viewAsTeamName?: string | null;
   } | undefined;
   const teamDisplayName = sessionUser?.viewAsTeamName || sessionUser?.currentTeamName || "팀";
-  const members = data.byEfficiency;
+  // M6f multi-device 사용자가 byEfficiency 에 device 별로 N row 등장 → userId 단위 합산.
+  // Cost / Efficiency / Top Tokens / Engagement 등 모든 멤버 카드가 deduped 결과 사용.
+  // dailyByMember / dailyByMemberTokens 차트는 API 가 memberKey="name__userId" 로 이미 합산했고,
+  // teamActivities 도 user 단위 집계라 dedup 불필요.
+  const members = dedupMembersByUserId(data.byEfficiency);
   const sum = data.teamSummary;
   const byCost = [...members].sort((a, b) => b.totalCost - a.totalCost);
   const byTokens = [...members].sort((a, b) => b.totalTokens - a.totalTokens);
