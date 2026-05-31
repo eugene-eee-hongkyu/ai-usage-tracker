@@ -152,7 +152,7 @@ interface SuggestionParams {
   body: string;
 }
 
-const SUGGEST_TO = process.env.SUGGEST_TO_EMAIL ?? "info@z21lab.xyz";
+const SUGGEST_TO = process.env.SUGGEST_TO_EMAIL ?? "info@z21labs.xyz";
 
 const CATEGORY_LABEL: Record<string, string> = {
   feature: "새 기능",
@@ -204,7 +204,7 @@ interface CompatReportParams {
   markdown: string;
 }
 
-const COMPAT_TO = process.env.COMPAT_REPORT_TO_EMAIL ?? "info@z21lab.xyz";
+const COMPAT_TO = process.env.COMPAT_REPORT_TO_EMAIL ?? "info@z21labs.xyz";
 
 export async function sendCompatReport(p: CompatReportParams): Promise<SendResult> {
   const subject = `[AI Usage Tracker · CLI 호환성] ${p.pkg} ${p.from} → ${p.to} — ${p.verdictLabel}`.replace(/[\r\n]+/g, " ");

@@ -369,7 +369,7 @@ export const userBlocks = pgTable(
 );
 
 // 사용자 제안 (Feedback / Feature Request).
-// /suggest 페이지에서 작성 → API 가 DB 에 저장 + Resend 로 info@z21lab.xyz 발송.
+// /suggest 페이지에서 작성 → API 가 DB 에 저장 + Resend 로 info@z21labs.xyz 발송.
 // 메일 발송 실패해도 DB 에는 남김 (재발송 가능). emailedAt=null 이면 미발송.
 // userId nullable 아님 — 로그인 사용자만 작성 가능.
 export const suggestions = pgTable(

@@ -131,7 +131,7 @@ function SuggestPageInner() {
             <p className="text-emerald-200 font-semibold">✓ 보냈어요. 고마워요!</p>
             <p className="text-sm text-emerald-100/80">
               {done.emailed
-                ? "info@z21lab.xyz 로 전달됐고, 답이 필요하면 회신드릴게요."
+                ? "info@z21labs.xyz 로 전달됐고, 답이 필요하면 회신드릴게요."
                 : "저장은 됐지만 메일 전송에 실패했어요. 곧 재전송할게요."}
             </p>
             <div className="flex gap-2 pt-2">
