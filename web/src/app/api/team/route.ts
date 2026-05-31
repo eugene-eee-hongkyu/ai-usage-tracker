@@ -65,8 +65,6 @@ interface RawModel {
   cacheWriteTokens?: number;
 }
 
-interface RawNameCalls { name?: string; calls?: number }
-
 interface RawPeriodData {
   overview?: RawOverview;
   summary?: RawOverview;
@@ -75,8 +73,6 @@ interface RawPeriodData {
   topSessions?: RawTopSession[];
   daily?: Array<{ date: string; cost: number; sessions?: number; calls?: number }>;
   models?: RawModel[];
-  tools?: RawNameCalls[];
-  shellCommands?: RawNameCalls[];
 }
 
 function getPeriodData(raw: unknown, period: string): RawPeriodData {
@@ -317,8 +313,6 @@ export async function GET(req: NextRequest) {
   const dailyTokensMemberMap = new Map<string, Record<string, number>>();
   const allTopSessions: Array<{ userId: number; userName: string; id: string; date: string; project: string; cost: number; calls: number }> = [];
   const modelAgg = new Map<string, { cost: number; calls: number; cacheRead: number; cacheWrite: number; input: number }>();
-  const toolAgg = new Map<string, number>();
-  const shellAgg = new Map<string, number>();
 
   const memberStats = allUsers
     .flatMap((u) => {
@@ -577,14 +571,6 @@ export async function GET(req: NextRequest) {
         entry.cacheWrite += m.cacheWriteTokens ?? 0;
         entry.input += m.inputTokens ?? 0;
         modelAgg.set(name, entry);
-      }
-
-      // Aggregate tools and shell commands
-      for (const t of d.tools ?? []) {
-        if (t.name) toolAgg.set(t.name, (toolAgg.get(t.name) ?? 0) + (t.calls ?? 0));
-      }
-      for (const s of d.shellCommands ?? []) {
-        if (s.name) shellAgg.set(s.name, (shellAgg.get(s.name) ?? 0) + (s.calls ?? 0));
       }
 
       const efficiencyScore = computeEfficiencyScore(overallOneShot, cacheHitPct, totalCost, sessionsCount, callsCount, outputInputRatio);
@@ -996,16 +982,6 @@ export async function GET(req: NextRequest) {
     })
     .sort((a, b) => b.cost - a.cost);
 
-  const teamTools = [...toolAgg.entries()]
-    .map(([name, calls]) => ({ name, calls }))
-    .sort((a, b) => b.calls - a.calls)
-    .slice(0, 10);
-
-  const teamShellCommands = [...shellAgg.entries()]
-    .map(([name, calls]) => ({ name, calls }))
-    .sort((a, b) => b.calls - a.calls)
-    .slice(0, 10);
-
   // Industry comparison (최근 30일).
   // 외부 (Anthropic/엔터/ccusage) 와 비교할 우리 팀 통계:
   //  - active day cost: 각 (멤버, 활성일) 의 cost 분포 → avg, p50/75/90, max
@@ -1131,8 +1107,6 @@ export async function GET(req: NextRequest) {
     memberNames,
     topSessions,
     teamModels,
-    teamTools,
-    teamShellCommands,
     industryComparison,
     teamScore,
     teamPlanHealth,

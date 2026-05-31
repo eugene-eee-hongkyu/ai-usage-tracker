@@ -152,8 +152,6 @@ interface TeamData {
   memberNames: string[];
   topSessions: TopSession[];
   teamModels?: Array<{ name: string; cost: number; calls: number; cacheHitPct: number }>;
-  teamTools?: Array<{ name: string; calls: number }>;
-  teamShellCommands?: Array<{ name: string; calls: number }>;
   industryComparison?: IndustryComparison;
   teamScore?: {
     score: number | null;
@@ -452,8 +450,9 @@ export function TeamView({ adminMode = false }: { adminMode?: boolean }) {
   const [reloadKey, setReloadKey] = useState(0);
   const isLocalMode = useLocalMode();
 
-  // 자세히 보기 토글 — efficiency · Row 4 (Team Activities + By Model) ·
-  // Row 5 (Core Tools + Shell) 묶음. dashboard-view 와 동일 패턴.
+  // 자세히 보기 토글 — efficiency · Row 4 (Team Activities + By Model) 묶음.
+  // dashboard-view 와 동일 패턴. Row 5 (Core Tools + Shell) 은 2026-05-31 phase4
+  // F3 결정으로 deprecate.
   const [detailsOpen, setDetailsOpen] = useState(false);
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -1406,73 +1405,7 @@ export function TeamView({ adminMode = false }: { adminMode?: boolean }) {
     </div>
   );
 
-  // Core Tools
-  const coreToolsBlock = (
-    <div className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-teal-500 rounded">
-      <div className="px-3 py-2 border-b border-neutral-800">
-        <span className="text-xs font-mono font-bold text-teal-400 uppercase tracking-wider">Core Tools</span>
-      </div>
-      <div className="p-3">
-        {(data.teamTools ?? []).length === 0 ? (
-          <p className="text-neutral-600 text-xs font-mono">no data</p>
-        ) : (
-          <div className="space-y-1.5">
-            <div className="flex text-[10px] text-neutral-600 font-mono mb-1">
-              <span className="w-16 shrink-0" />
-              <span className="flex-1">tool</span>
-              <span className="w-16 text-right">calls</span>
-            </div>
-            {(() => {
-              const maxCalls = Math.max(...(data.teamTools ?? []).map((t) => t.calls), 1);
-              return (data.teamTools ?? []).map((t) => (
-                <div key={t.name} className="flex items-center gap-1.5 text-xs font-mono">
-                  <div className="w-16 h-1.5 bg-neutral-800 rounded overflow-hidden shrink-0">
-                    <div className="h-full bg-teal-500 rounded" style={{ width: `${(t.calls / maxCalls) * 100}%` }} />
-                  </div>
-                  <span className="flex-1 text-neutral-300 truncate">{t.name}</span>
-                  <span className="w-16 text-blue-400 text-right tabular-nums">{t.calls.toLocaleString()}</span>
-                </div>
-              ));
-            })()}
-          </div>
-        )}
-      </div>
-    </div>
-  );
-
-  // Shell Commands
-  const shellCommandsBlock = (
-    <div className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-orange-500 rounded">
-      <div className="px-3 py-2 border-b border-neutral-800">
-        <span className="text-xs font-mono font-bold text-orange-400 uppercase tracking-wider">Shell Commands</span>
-      </div>
-      <div className="p-3">
-        {(data.teamShellCommands ?? []).length === 0 ? (
-          <p className="text-neutral-600 text-xs font-mono">no data</p>
-        ) : (
-          <div className="space-y-1.5">
-            <div className="flex text-[10px] text-neutral-600 font-mono mb-1">
-              <span className="w-16 shrink-0" />
-              <span className="flex-1">command</span>
-              <span className="w-16 text-right">calls</span>
-            </div>
-            {(() => {
-              const maxCalls = Math.max(...(data.teamShellCommands ?? []).map((s) => s.calls), 1);
-              return (data.teamShellCommands ?? []).map((s) => (
-                <div key={s.name} className="flex items-center gap-1.5 text-xs font-mono">
-                  <div className="w-16 h-1.5 bg-neutral-800 rounded overflow-hidden shrink-0">
-                    <div className="h-full bg-orange-500 rounded" style={{ width: `${(s.calls / maxCalls) * 100}%` }} />
-                  </div>
-                  <span className="flex-1 text-neutral-300 truncate">{s.name}</span>
-                  <span className="w-16 text-blue-400 text-right tabular-nums">{s.calls.toLocaleString()}</span>
-                </div>
-              ));
-            })()}
-          </div>
-        )}
-      </div>
-    </div>
-  );
+  // Core Tools / Shell Commands 카드 정의 — 2026-05-31 phase4 F3 결정으로 deprecate.
 
   // Engagement (admin only)
   // engagementBlock 삭제 — dailyVisitsBlock 에 통합됨 (멤버 행 + engagement
@@ -1974,15 +1907,7 @@ export function TeamView({ adminMode = false }: { adminMode?: boolean }) {
               {byModelBlock}
             </div>
 
-            {/* Row 5: Core Tools + Shell Commands */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-
-              {/* Core Tools */}
-              {coreToolsBlock}
-
-              {/* Shell Commands */}
-              {shellCommandsBlock}
-            </div>
+            {/* Row 5 (Core Tools + Shell Commands) 2026-05-31 phase4 F3 결정으로 deprecate. */}
 
             {/* Row 5.5: Top Sessions (admin only) — half-width + 빈 칸.
                 dashboard Active Blocks 와 동일 단독 row 패턴. */}
