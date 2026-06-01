@@ -3288,7 +3288,8 @@ var TIMEOUT_MS = 600000;
 var PERIODS2 = ["today", "week", "month", "30days", "all"];
 function run(cmd, args) {
   return new Promise((resolve) => {
-    const proc = spawn3(cmd, args, { env: { ...process.env, TZ: Intl.DateTimeFormat().resolvedOptions().timeZone } });
+    const useShell = process.platform === "win32";
+    const proc = spawn3(cmd, args, { shell: useShell, env: { ...process.env, TZ: Intl.DateTimeFormat().resolvedOptions().timeZone } });
     let stdout = "";
     let stderr = "";
     proc.stdout.on("data", (b) => {

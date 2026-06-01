@@ -33,7 +33,13 @@ interface Capture {
 
 function run(cmd: string, args: string[]): Promise<{ stdout: string; stderr: string; code: number | null }> {
   return new Promise((resolve) => {
-    const proc = spawn(cmd, args, { env: { ...process.env, TZ: Intl.DateTimeFormat().resolvedOptions().timeZone } });
+    // Windows 의 ccusage / codeburn / npx 는 .cmd / .ps1 shim. spawn 의 default
+    // (shell=false) 면 PATHEXT 미적용 → exact filename 만 찾아 ENOENT. shell 모드로
+    // 위임해서 PATHEXT 가 자동 적용되게. macOS/Linux 는 shell=false 그대로 유지 (영진님
+    // Windows 보고 2026-06-01). 인자는 모두 단순 토큰 (semver / 'claude' 등) 이라
+    // shell quoting 위험 없음.
+    const useShell = process.platform === "win32";
+    const proc = spawn(cmd, args, { shell: useShell, env: { ...process.env, TZ: Intl.DateTimeFormat().resolvedOptions().timeZone } });
     let stdout = "";
     let stderr = "";
     proc.stdout.on("data", (b: Buffer) => { stdout += b.toString(); });
