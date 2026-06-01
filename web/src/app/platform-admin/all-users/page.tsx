@@ -48,6 +48,8 @@ interface CardData {
     nodeVersion: string | null;
     nodeManager: string | null;
     claudeCodeVersion: string | null;
+    cliVersion: string | null;
+    cliPinMatch: boolean | null;
     platform: string | null;
     osArch: string | null;
   };
@@ -252,6 +254,7 @@ function UserCard({
         <div className="min-w-0">
           <div className="text-sm font-semibold text-slate-100 truncate">{card.name}</div>
           <div className="text-[11px] text-slate-500 font-mono truncate">{card.teamName}</div>
+          <div className="text-[10px] text-slate-600 font-mono truncate" title={card.email}>{card.email}</div>
         </div>
         <div
           className="shrink-0 text-right"
@@ -363,6 +366,11 @@ function UserCard({
             {card.env.claudeCodeVersion && (
               <>Claude {card.env.claudeCodeVersion.replace(/ \(Claude Code\)/, "")}</>
             )}
+          </div>
+        )}
+        {card.env.cliVersion && (
+          <div className="text-slate-400">
+            CLI {versionWithMark(card.env.cliVersion, card.env.cliPinMatch)}
           </div>
         )}
         {(card.env.platform || card.env.osArch) && (

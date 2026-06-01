@@ -239,6 +239,14 @@ function collectEnvInfo() {
       return execSync(cmd, { stdio: ["ignore", "pipe", "ignore"], encoding: "utf8", timeout: 3000 }).trim();
     } catch { return null; }
   };
+  // ccusage / codeburn --version 출력 포맷이 버전 사이 바뀌어 PINNED 와 string match
+  // 어긋남 (영진님 Windows 발견: v19 '19.0.2' / v20 'ccusage 20.0.6' prefix 추가).
+  // semver 만 추출해 PINNED 비교 안정성 확보.
+  const semverOnly = (out) => {
+    if (!out) return null;
+    const m = out.match(/(\d+\.\d+\.\d+(?:-[\w.]+)?)/);
+    return m ? m[1] : out;
+  };
   const detectManager = (p) => {
     if (!p) return null;
     if (p.includes("/.nvm/")) return "nvm";
@@ -302,8 +310,8 @@ function collectEnvInfo() {
     nodeManager: detectManager(nodePath),
     npmRoot,
     npmRootWritable,
-    codeburnVersion: safeExec("codeburn --version"),
-    ccusageVersion: safeExec("ccusage --version"),
+    codeburnVersion: semverOnly(safeExec("codeburn --version")),
+    ccusageVersion: semverOnly(safeExec("ccusage --version")),
     // M6e 추가
     osRelease: osRelease(),
     osArch: osArch(),

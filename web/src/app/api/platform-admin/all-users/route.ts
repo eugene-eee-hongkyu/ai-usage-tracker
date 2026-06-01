@@ -155,6 +155,8 @@ export async function GET(req: NextRequest) {
       nodeVersion: string | null;
       nodeManager: string | null;
       claudeCodeVersion: string | null;
+      cliVersion: string | null;
+      cliPinMatch: boolean | null;
       platform: string | null;
       osArch: string | null;
     };
@@ -223,8 +225,10 @@ export async function GET(req: NextRequest) {
 
     const codeburnVersion = env.codeburnVersion ?? null;
     const ccusageVersion = env.ccusageVersion ?? null;
+    const cliVersion = env.cliVersion ?? null;
     const codeburnPinMatch = codeburnVersion === null ? null : codeburnVersion === PINNED.CODEBURN;
     const ccusagePinMatch = ccusageVersion === null ? null : ccusageVersion === PINNED.CCUSAGE;
+    const cliPinMatch = cliVersion === null ? null : cliVersion === PINNED.USAGE_TRACKER_RECOMMENDED;
 
     return {
       userId: r.userId,
@@ -249,6 +253,8 @@ export async function GET(req: NextRequest) {
         nodeVersion: env.nodeVersion ?? null,
         nodeManager: env.nodeManager ?? null,
         claudeCodeVersion: env.claudeCodeVersion ?? null,
+        cliVersion,
+        cliPinMatch,
         platform: env.platform ?? null,
         osArch: env.osArch ?? null,
       },
