@@ -17,7 +17,7 @@ export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest) {
   const guard = await requirePlatformAdmin();
-  if ("error" in guard) return guard.error;
+  if (guard.error) return guard.error;
 
   const tokenIdParam = req.nextUrl.searchParams.get("tokenId");
   const where = tokenIdParam
