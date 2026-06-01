@@ -113,10 +113,18 @@ export async function POST(req: NextRequest) {
       mergedMetadata.lastCodexFailPeriods = null;
     }
     mergedMetadata.lastIngestAt = new Date().toISOString();
+    // 2026-06-01: jsonb merge 로 변경. 옛 .set({metadata: obj}) 패턴은 SQL UPDATE
+    // SET metadata=$1 으로 column 전체 REPLACE → lastCompatCheck 같은 외부에서 추가된
+    // 키들이 매 ingest 마다 사라짐 (영진님 Windows 보고로 발견). coalesce + || 로
+    // 기존 jsonb 위에 새 키만 덮어쓰기.
     if (Object.keys(mergedMetadata).length > 0) {
-      metadataUpdate.metadata = mergedMetadata;
+      await db.update(apiTokens).set({
+        lastUsedAt: new Date(),
+        metadata: sql`coalesce(${apiTokens.metadata}, '{}'::jsonb) || ${JSON.stringify(mergedMetadata)}::jsonb`,
+      }).where(eq(apiTokens.id, matchedTokenId));
+    } else {
+      await db.update(apiTokens).set(metadataUpdate).where(eq(apiTokens.id, matchedTokenId));
     }
-    await db.update(apiTokens).set(metadataUpdate).where(eq(apiTokens.id, matchedTokenId));
   }
 
   // 가입 → 실제 사용 funnel 의 마지막 노드. distinct_id 는 user.id (client 측
