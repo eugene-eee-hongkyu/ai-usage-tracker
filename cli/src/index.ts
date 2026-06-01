@@ -53,9 +53,10 @@ program
 
 program
   .command("compat-check")
-  .description("ccusage 현재 버전 vs 비교 대상 버전 raw daily 출력 업로드 (글로벌 ccusage 미변경)")
-  .requiredOption("-t, --target <version>", "비교할 ccusage 버전 (예: 20.0.6) — latest 류 금지, 명시 버전만")
-  .action((opts) => runCompatCheck({ target: opts.target }));
+  .description("ccusage + codeburn 현재 vs 비교 대상 버전 raw 출력 업로드 (글로벌 미변경)")
+  .requiredOption("--ccusage-target <version>", "비교할 ccusage 버전 (예: 20.0.6) — 명시 버전만")
+  .requiredOption("--codeburn-target <version>", "비교할 codeburn 버전 (예: 0.9.11) — 명시 버전만")
+  .action((opts) => runCompatCheck({ ccusageTarget: opts.ccusageTarget, codeburnTarget: opts.codeburnTarget }));
 
 // Default command when run as `npx ... init` (positional)
 if (process.argv[2] === "init" || process.argv.length <= 2) {

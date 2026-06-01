@@ -11,8 +11,9 @@ import { db, apiTokens, IS_LOCAL_MODE } from "@/lib/db";
 import { eq, and, isNull, sql } from "drizzle-orm";
 import crypto from "crypto";
 
-// 250KB 4쌍 정도 가정 — 안전망 1MB 까지 허용.
-const MAX_BODY = 1_000_000;
+// ccusage 4 raw + codeburn 20 raw (5 period × 2 provider × 2 version) ≈ 1.6MB 추정.
+// Vercel function body limit ~4.5MB 안에서 안전망 5MB.
+const MAX_BODY = 5_000_000;
 
 export async function POST(req: NextRequest) {
   if (IS_LOCAL_MODE) {
@@ -42,7 +43,7 @@ export async function POST(req: NextRequest) {
   }
 
   // 최소 필수 키 — 형태만 확인. raw shape 검증은 분석 시 본인이 직접.
-  for (const k of ["cliVersion", "runAt", "os", "oldVersion", "newVersion", "claude", "codex"]) {
+  for (const k of ["cliVersion", "runAt", "os", "ccusage", "codeburn"]) {
     if (!(k in body)) {
       return NextResponse.json({ error: `missing key: ${k}` }, { status: 400 });
     }

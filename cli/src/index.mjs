@@ -3284,7 +3284,8 @@ function printMigrateReport(r, dryRun) {
 // src/compat-check.ts
 import { spawn as spawn3 } from "child_process";
 import * as os4 from "os";
-var TIMEOUT_MS = 120000;
+var TIMEOUT_MS = 600000;
+var PERIODS2 = ["today", "week", "month", "30days", "all"];
 function run(cmd, args) {
   return new Promise((resolve) => {
     const proc = spawn3(cmd, args, { env: { ...process.env, TZ: Intl.DateTimeFormat().resolvedOptions().timeZone } });
@@ -3312,69 +3313,145 @@ function run(cmd, args) {
     });
   });
 }
+function parseJson(stdout, label) {
+  try {
+    return { ok: true, raw: JSON.parse(stdout) };
+  } catch (e) {
+    return { ok: false, raw: null, error: `JSON parse (${label}): ${e.message}. head: ${stdout.slice(0, 200)}` };
+  }
+}
 async function captureCcusage(binary, provider) {
   const r = await run(binary[0], [...binary.slice(1), provider, "daily", "--json"]);
   if (r.code !== 0)
     return { ok: false, raw: null, error: `exit ${r.code}: ${r.stderr.trim().slice(0, 500)}` };
-  try {
-    return { ok: true, raw: JSON.parse(r.stdout) };
-  } catch (e) {
-    return { ok: false, raw: null, error: `JSON parse: ${e.message}. stdout head: ${r.stdout.slice(0, 200)}` };
-  }
+  return parseJson(r.stdout, `ccusage ${provider}`);
 }
-function rowsCount(raw) {
+async function captureCodeburn(binary, provider, period) {
+  const r = await run(binary[0], [...binary.slice(1), "report", "--format", "json", "--provider", provider, "--period", period]);
+  if (r.code !== 0)
+    return { ok: false, raw: null, error: `exit ${r.code}: ${r.stderr.trim().slice(0, 500)}` };
+  return parseJson(r.stdout, `codeburn ${provider}/${period}`);
+}
+function ccusageRowCount(raw) {
   const r = raw;
   return Array.isArray(r?.daily) ? r.daily.length : 0;
 }
+function codeburnSummary(raw) {
+  const r = raw;
+  const daily = Array.isArray(r?.daily) ? r.daily.length : 0;
+  const cost = r?.overview?.totalCost ?? 0;
+  const calls = r?.overview?.totalCalls ?? 0;
+  return `daily=${daily} cost=$${Number(cost).toFixed(2)} calls=${calls}`;
+}
+async function captureAllCcusage(binary, label) {
+  console.log(`    ccusage (${label}) — claude/codex daily...`);
+  const claude = await captureCcusage(binary, "claude");
+  const codex = await captureCcusage(binary, "codex");
+  console.log(`      claude: ${claude.ok ? `${ccusageRowCount(claude.raw)} rows` : `❌ ${claude.error}`}`);
+  console.log(`      codex:  ${codex.ok ? `${ccusageRowCount(codex.raw)} rows` : `❌ ${codex.error}`}`);
+  return { claude, codex };
+}
+async function captureAllCodeburn(binary, label) {
+  console.log(`    codeburn (${label}) — claude/codex × ${PERIODS2.length} period...`);
+  const out = {
+    claude: {},
+    codex: {}
+  };
+  for (const provider of ["claude", "codex"]) {
+    for (const period of PERIODS2) {
+      out[provider][period] = await captureCodeburn(binary, provider, period);
+    }
+    const ok = PERIODS2.filter((p) => out[provider][p].ok);
+    const fail = PERIODS2.filter((p) => !out[provider][p].ok);
+    const sampleOk = ok[0] ? `${ok[0]}: ${codeburnSummary(out[provider][ok[0]].raw)}` : "all failed";
+    console.log(`      ${provider}: ${ok.length}/${PERIODS2.length} ok — ${sampleOk}${fail.length ? ` (fail: ${fail.join(",")})` : ""}`);
+  }
+  return out;
+}
+function semverOk(v) {
+  return typeof v === "string" && /^\d+\.\d+\.\d+/.test(v);
+}
 async function runCompatCheck(opts = {}) {
-  const target = opts.target;
-  if (!target || !/^\d+\.\d+\.\d+/.test(target)) {
-    console.error("❌ 비교할 ccusage 버전을 명시해야 합니다.");
+  const ccusageTarget = opts.ccusageTarget;
+  const codeburnTarget = opts.codeburnTarget;
+  if (!semverOk(ccusageTarget) || !semverOk(codeburnTarget)) {
+    console.error("❌ 비교할 ccusage / codeburn 버전 둘 다 명시해야 합니다.");
     console.error("");
-    console.error("  예: npx -y github:eugene-eee-hongkyu/ai-usage-tracker compat-check --target 20.0.6");
+    console.error("  예:");
+    console.error("    npx -y github:eugene-eee-hongkyu/ai-usage-tracker compat-check \\");
+    console.error("      --ccusage-target 20.0.6 --codeburn-target 0.9.11");
     console.error("");
-    console.error("  버전 목록: https://github.com/ryoppippi/ccusage/releases");
+    console.error("  버전 목록:");
+    console.error("    ccusage  https://github.com/ryoppippi/ccusage/releases");
+    console.error("    codeburn https://github.com/getagentseal/codeburn/releases");
     process.exit(2);
   }
   console.log("");
-  console.log(`ccusage compat-check — 현재 prod 버전 vs ccusage@${target} raw 출력 비교`);
+  console.log(`ccusage + codeburn compat-check`);
+  console.log(`  ccusage  prod vs @${ccusageTarget}`);
+  console.log(`  codeburn prod vs @${codeburnTarget}`);
   console.log("");
   const dests = await loadDestinations();
   const dest = dests.find((d) => d.apiKey) ?? dests[0];
   if (!dest?.apiKey) {
-    console.error("❌ API key 없음. 먼저 `npx github:eugene-eee-hongkyu/ai-usage-tracker init` 로 가입/인증 후 다시 실행.");
-    process.exit(2);
+    console.error("❌ API key 없음. 먼저 `npx github:eugene-eee-hongkyu/ai-usage-tracker init` 후 다시 실행.");
+    process.exit(3);
   }
   console.log(`송신지: ${dest.url}`);
   console.log("");
-  console.log("[1/4] 현재 버전 (prod) 확인 중...");
-  const oldVer = await run("ccusage", ["--version"]);
-  if (oldVer.code !== 0) {
-    console.error(`❌ ccusage 실행 실패: ${oldVer.stderr.trim()}`);
+  console.log("[1/6] 옛 ccusage 버전 확인...");
+  const oldCcusageVer = await run("ccusage", ["--version"]);
+  if (oldCcusageVer.code !== 0) {
+    console.error(`❌ ccusage 미설치 또는 실행 실패: ${oldCcusageVer.stderr.trim()}`);
     console.error("   먼저 'npm i -g ccusage' 로 설치하고 다시 시도.");
-    process.exit(3);
+    process.exit(4);
   }
-  const oldVersion = oldVer.stdout.trim();
-  console.log(`    현재 버전: ${oldVersion}`);
-  console.log("[2/4] 현재 버전으로 claude/codex daily 캡처...");
-  const oldClaude = await captureCcusage(["ccusage"], "claude");
-  const oldCodex = await captureCcusage(["ccusage"], "codex");
-  console.log(`    claude: ${oldClaude.ok ? `${rowsCount(oldClaude.raw)} rows` : `❌ ${oldClaude.error}`}`);
-  console.log(`    codex:  ${oldCodex.ok ? `${rowsCount(oldCodex.raw)} rows` : `❌ ${oldCodex.error}`}`);
-  console.log(`[3/4] 비교 대상 버전 (${target}) 으로 동일 캡처 — npx 첫 호출 시 10-30초 다운로드 발생...`);
-  const newClaude = await captureCcusage(["npx", "-y", `ccusage@${target}`], "claude");
-  const newCodex = await captureCcusage(["npx", "-y", `ccusage@${target}`], "codex");
-  console.log(`    claude: ${newClaude.ok ? `${rowsCount(newClaude.raw)} rows` : `❌ ${newClaude.error}`}`);
-  console.log(`    codex:  ${newCodex.ok ? `${rowsCount(newCodex.raw)} rows` : `❌ ${newCodex.error}`}`);
-  console.log("[4/4] 서버 전송...");
+  const oldCcusageVersion = oldCcusageVer.stdout.trim();
+  console.log(`    prod ccusage: ${oldCcusageVersion}`);
+  console.log("[2/6] 옛 codeburn 버전 확인...");
+  const oldCodeburnVer = await run("codeburn", ["--version"]);
+  if (oldCodeburnVer.code !== 0) {
+    console.error(`❌ codeburn 미설치 또는 실행 실패: ${oldCodeburnVer.stderr.trim()}`);
+    console.error("   먼저 'npm i -g codeburn' 로 설치하고 다시 시도.");
+    process.exit(5);
+  }
+  const oldCodeburnVersion = oldCodeburnVer.stdout.trim().split(`
+`)[0];
+  console.log(`    prod codeburn: ${oldCodeburnVersion}`);
+  console.log("[3/6] 옛 ccusage 캡처...");
+  const ccusageOld = await captureAllCcusage(["ccusage"], "prod");
+  console.log("[4/6] 옛 codeburn 캡처 — 5 period × 2 provider...");
+  const codeburnOld = await captureAllCodeburn(["codeburn"], "prod");
+  console.log(`[5/6] 새 버전 캡처 — npx 첫 호출 시 다운로드 (각 도구 10-30초)...`);
+  const ccusageNew = await captureAllCcusage(["npx", "-y", `ccusage@${ccusageTarget}`], `@${ccusageTarget}`);
+  const codeburnNew = await captureAllCodeburn(["npx", "-y", `codeburn@${codeburnTarget}`], `@${codeburnTarget}`);
+  console.log("[6/6] 서버 전송...");
   const body = {
     cliVersion: CLI_VERSION,
     runAt: new Date().toISOString(),
     os: `${os4.platform()}-${os4.arch()}-${os4.release()}`,
-    oldVersion,
-    newVersion: target,
-    claude: { old: oldClaude.raw, new: newClaude.raw, oldError: oldClaude.error, newError: newClaude.error },
-    codex: { old: oldCodex.raw, new: newCodex.raw, oldError: oldCodex.error, newError: newCodex.error }
+    ccusage: {
+      oldVersion: oldCcusageVersion,
+      newVersion: ccusageTarget,
+      claude: { old: ccusageOld.claude.raw, new: ccusageNew.claude.raw, oldError: ccusageOld.claude.error, newError: ccusageNew.claude.error },
+      codex: { old: ccusageOld.codex.raw, new: ccusageNew.codex.raw, oldError: ccusageOld.codex.error, newError: ccusageNew.codex.error }
+    },
+    codeburn: {
+      oldVersion: oldCodeburnVersion,
+      newVersion: codeburnTarget,
+      claude: Object.fromEntries(PERIODS2.map((p) => [p, {
+        old: codeburnOld.claude[p].raw,
+        new: codeburnNew.claude[p].raw,
+        oldError: codeburnOld.claude[p].error,
+        newError: codeburnNew.claude[p].error
+      }])),
+      codex: Object.fromEntries(PERIODS2.map((p) => [p, {
+        old: codeburnOld.codex[p].raw,
+        new: codeburnNew.codex[p].raw,
+        oldError: codeburnOld.codex[p].error,
+        newError: codeburnNew.codex[p].error
+      }]))
+    }
   };
   const url = `${dest.url}/api/ccusage-compat`;
   const resp = await fetch(url, {
@@ -3385,11 +3462,11 @@ async function runCompatCheck(opts = {}) {
   const text = await resp.text();
   if (!resp.ok) {
     console.error(`❌ 서버 응답 ${resp.status}: ${text.slice(0, 500)}`);
-    process.exit(4);
+    process.exit(6);
   }
   console.log(`✓ 전송 완료 — 서버 응답: ${text.slice(0, 200)}`);
   console.log("");
-  console.log("끝. 사용자 prod ccusage 환경은 그대로입니다 (글로벌 설치 미변경).");
+  console.log("끝. 사용자 prod ccusage / codeburn 환경은 그대로입니다 (글로벌 설치 미변경).");
 }
 
 // src/index.ts
@@ -3406,7 +3483,7 @@ program2.command("migrate").description("primus → z21labs 마이그레이션 (
   if (r.errors.length > 0)
     process.exit(1);
 });
-program2.command("compat-check").description("ccusage 현재 버전 vs 비교 대상 버전 raw daily 출력 업로드 (글로벌 ccusage 미변경)").requiredOption("-t, --target <version>", "비교할 ccusage 버전 (예: 20.0.6) — latest 류 금지, 명시 버전만").action((opts) => runCompatCheck({ target: opts.target }));
+program2.command("compat-check").description("ccusage + codeburn 현재 vs 비교 대상 버전 raw 출력 업로드 (글로벌 미변경)").requiredOption("--ccusage-target <version>", "비교할 ccusage 버전 (예: 20.0.6) — 명시 버전만").requiredOption("--codeburn-target <version>", "비교할 codeburn 버전 (예: 0.9.11) — 명시 버전만").action((opts) => runCompatCheck({ ccusageTarget: opts.ccusageTarget, codeburnTarget: opts.codeburnTarget }));
 if (process.argv[2] === "init" || process.argv.length <= 2) {
   program2.parse(["node", "usage-tracker", "init", ...process.argv.slice(3)]);
 } else {
