@@ -15,7 +15,9 @@ import { homedir, arch as osArch, release as osRelease } from "os";
 // Multi-provider (2026-05-29 M): 0.3.x 부터 Claude + Codex 분리 호출.
 // 0.3.2 (2026-05-30 oreo 회귀): partial submit 허용 + telemetry buffer + provider 직렬화.
 // 0.3.3 (2026-05-31): launchd / Task Scheduler 수집 주기 2시간 → 1시간 통일.
-const CLI_VERSION = "0.3.3";
+// 0.3.4 (2026-06-01): ccusage 19.0.2 → 20.0.6 + codeburn 0.9.7 → 0.9.11 핀 bump
+//                     (검증 3 사용자: schema 호환 ✓, Anthropic cache write 가격 정정 반영).
+const CLI_VERSION = "0.3.4";
 
 // 직전 sync 실패 정보를 다음 sync 가 함께 보내기 위한 marker.
 // 실패 시 catch 블록에서 write, 성공 시 다음 envInfo 수집에서 read + 삭제.

@@ -11,7 +11,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const SERVER_URL = process.env.USAGE_TRACKER_URL ?? "https://aiusage.z21labs.world";
 // Multi-provider (2026-05-29 M): 0.3.x 부터 Claude + Codex 분리 호출.
 // dashboard 가 envInfo.cliVersion >= 0.3.0 으로 Codex 탭 활성 분기.
-export const CLI_VERSION = "0.3.3";
+export const CLI_VERSION = "0.3.4";
 
 // === 새 (z21labs) ===
 const KEYTAR_SERVICE = "z21labs-usage-tracker";
@@ -753,7 +753,7 @@ function checkCodeburn(): boolean {
 async function installCodeburn(): Promise<boolean> {
   try {
     // 사용자에겐 npm 상세 출력 안 보임 — 'inherit' → 'pipe' + 실패시에만 stderr.
-    execSync("npm install -g codeburn@0.9.7", { stdio: ["ignore", "ignore", "pipe"] });
+    execSync("npm install -g codeburn@0.9.11", { stdio: ["ignore", "ignore", "pipe"] });
     return true;
   } catch (e) {
     process.stderr.write(`   (codeburn 설치 실패: ${(e as Error).message?.slice(0, 80) ?? ""})\n`);
@@ -773,7 +773,7 @@ function checkCcusage(): boolean {
 
 async function installCcusage(): Promise<boolean> {
   try {
-    execSync("npm install -g ccusage@19.0.2", { stdio: ["ignore", "ignore", "pipe"] });
+    execSync("npm install -g ccusage@20.0.6", { stdio: ["ignore", "ignore", "pipe"] });
     return true;
   } catch (e) {
     process.stderr.write(`   (ccusage 설치 실패: ${(e as Error).message?.slice(0, 80) ?? ""})\n`);

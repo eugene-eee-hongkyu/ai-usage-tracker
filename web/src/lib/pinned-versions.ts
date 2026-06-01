@@ -6,8 +6,8 @@
 // device.metadata.cliVersion 이 이 값 미만이면 dashboard 상단에 CLI 업데이트 배너.
 
 export const PINNED = {
-  CODEBURN: "0.9.7",
-  CCUSAGE: "19.0.2",
+  CODEBURN: "0.9.11",
+  CCUSAGE: "20.0.6",
   NODE_RECOMMENDED: "22",
-  USAGE_TRACKER_RECOMMENDED: "0.3.3",
+  USAGE_TRACKER_RECOMMENDED: "0.3.4",
 } as const;

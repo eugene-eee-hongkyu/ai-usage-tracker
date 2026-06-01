@@ -1898,7 +1898,7 @@ import * as readline from "readline";
 import { fileURLToPath } from "url";
 var __dirname2 = path.dirname(fileURLToPath(import.meta.url));
 var SERVER_URL = process.env.USAGE_TRACKER_URL ?? "https://aiusage.z21labs.world";
-var CLI_VERSION = "0.3.3";
+var CLI_VERSION = "0.3.4";
 var KEYTAR_SERVICE = "z21labs-usage-tracker";
 var KEYTAR_ACCOUNT = "api-key";
 var CLAUDE_SETTINGS_PATH = path.join(os.homedir(), ".claude", "settings.json");
@@ -2542,7 +2542,7 @@ function checkCodeburn() {
 }
 async function installCodeburn() {
   try {
-    execSync("npm install -g codeburn@0.9.7", { stdio: ["ignore", "ignore", "pipe"] });
+    execSync("npm install -g codeburn@0.9.11", { stdio: ["ignore", "ignore", "pipe"] });
     return true;
   } catch (e) {
     process.stderr.write(`   (codeburn 설치 실패: ${e.message?.slice(0, 80) ?? ""})
@@ -2561,7 +2561,7 @@ function checkCcusage() {
 }
 async function installCcusage() {
   try {
-    execSync("npm install -g ccusage@19.0.2", { stdio: ["ignore", "ignore", "pipe"] });
+    execSync("npm install -g ccusage@20.0.6", { stdio: ["ignore", "ignore", "pipe"] });
     return true;
   } catch (e) {
     process.stderr.write(`   (ccusage 설치 실패: ${e.message?.slice(0, 80) ?? ""})
