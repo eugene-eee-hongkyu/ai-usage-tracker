@@ -5,6 +5,7 @@ import { runReset } from "./reset.js";
 import { runSync } from "./sync.js";
 import { runDoctor } from "./doctor.js";
 import { runMigrate, printMigrateReport } from "./migrate.js";
+import { runCompatCheck } from "./compat-check.js";
 
 const program = new Command();
 
@@ -49,6 +50,12 @@ program
     printMigrateReport(r, !!opts.dryRun);
     if (r.errors.length > 0) process.exit(1);
   });
+
+program
+  .command("compat-check")
+  .description("ccusage 신/구 버전 raw daily 출력 비교용 업로드 (글로벌 ccusage 미변경)")
+  .option("-t, --target <version>", "비교할 새 ccusage 버전", "20.0.6")
+  .action((opts) => runCompatCheck({ target: opts.target }));
 
 // Default command when run as `npx ... init` (positional)
 if (process.argv[2] === "init" || process.argv.length <= 2) {

@@ -3281,6 +3281,110 @@ function printMigrateReport(r, dryRun) {
   }
 }
 
+// src/compat-check.ts
+import { spawn as spawn3 } from "child_process";
+import * as os4 from "os";
+var DEFAULT_TARGET = "20.0.6";
+var TIMEOUT_MS = 120000;
+function run(cmd, args) {
+  return new Promise((resolve) => {
+    const proc = spawn3(cmd, args, { env: { ...process.env, TZ: Intl.DateTimeFormat().resolvedOptions().timeZone } });
+    let stdout = "";
+    let stderr = "";
+    proc.stdout.on("data", (b) => {
+      stdout += b.toString();
+    });
+    proc.stderr.on("data", (b) => {
+      stderr += b.toString();
+    });
+    const t = setTimeout(() => {
+      proc.kill("SIGKILL");
+      resolve({ stdout, stderr: stderr + `
+[timeout]`, code: null });
+    }, TIMEOUT_MS);
+    proc.on("close", (code) => {
+      clearTimeout(t);
+      resolve({ stdout, stderr, code });
+    });
+    proc.on("error", (e) => {
+      clearTimeout(t);
+      resolve({ stdout, stderr: stderr + `
+` + e.message, code: null });
+    });
+  });
+}
+async function captureCcusage(binary, provider) {
+  const r = await run(binary[0], [...binary.slice(1), provider, "daily", "--json"]);
+  if (r.code !== 0)
+    return { ok: false, raw: null, error: `exit ${r.code}: ${r.stderr.trim().slice(0, 500)}` };
+  try {
+    return { ok: true, raw: JSON.parse(r.stdout) };
+  } catch (e) {
+    return { ok: false, raw: null, error: `JSON parse: ${e.message}. stdout head: ${r.stdout.slice(0, 200)}` };
+  }
+}
+function rowsCount(raw) {
+  const r = raw;
+  return Array.isArray(r?.daily) ? r.daily.length : 0;
+}
+async function runCompatCheck(opts = {}) {
+  const target = opts.target ?? DEFAULT_TARGET;
+  console.log("");
+  console.log("ccusage compat-check — 신/구 버전 daily raw 출력 비교");
+  console.log("");
+  const dests = await loadDestinations();
+  const dest = dests.find((d) => d.apiKey) ?? dests[0];
+  if (!dest?.apiKey) {
+    console.error("❌ API key 없음. 먼저 `npx github:eugene-eee-hongkyu/ai-usage-tracker init` 로 가입/인증 후 다시 실행.");
+    process.exit(2);
+  }
+  console.log(`송신지: ${dest.url}`);
+  console.log("");
+  console.log("[1/4] 현재 버전 (prod) 확인 중...");
+  const oldVer = await run("ccusage", ["--version"]);
+  if (oldVer.code !== 0) {
+    console.error(`❌ ccusage 실행 실패: ${oldVer.stderr.trim()}`);
+    console.error("   먼저 'npm i -g ccusage' 로 설치하고 다시 시도.");
+    process.exit(3);
+  }
+  const oldVersion = oldVer.stdout.trim();
+  console.log(`    현재 버전: ${oldVersion}`);
+  console.log("[2/4] 현재 버전으로 claude/codex daily 캡처...");
+  const oldClaude = await captureCcusage(["ccusage"], "claude");
+  const oldCodex = await captureCcusage(["ccusage"], "codex");
+  console.log(`    claude: ${oldClaude.ok ? `${rowsCount(oldClaude.raw)} rows` : `❌ ${oldClaude.error}`}`);
+  console.log(`    codex:  ${oldCodex.ok ? `${rowsCount(oldCodex.raw)} rows` : `❌ ${oldCodex.error}`}`);
+  console.log(`[3/4] 새 버전 (${target}) 으로 동일 캡처 — npx 첫 호출 시 10-30초 다운로드 발생...`);
+  const newClaude = await captureCcusage(["npx", "-y", `ccusage@${target}`], "claude");
+  const newCodex = await captureCcusage(["npx", "-y", `ccusage@${target}`], "codex");
+  console.log(`    claude: ${newClaude.ok ? `${rowsCount(newClaude.raw)} rows` : `❌ ${newClaude.error}`}`);
+  console.log(`    codex:  ${newCodex.ok ? `${rowsCount(newCodex.raw)} rows` : `❌ ${newCodex.error}`}`);
+  console.log("[4/4] 서버 전송...");
+  const body = {
+    cliVersion: CLI_VERSION,
+    runAt: new Date().toISOString(),
+    os: `${os4.platform()}-${os4.arch()}-${os4.release()}`,
+    oldVersion,
+    newVersion: target,
+    claude: { old: oldClaude.raw, new: newClaude.raw, oldError: oldClaude.error, newError: newClaude.error },
+    codex: { old: oldCodex.raw, new: newCodex.raw, oldError: oldCodex.error, newError: newCodex.error }
+  };
+  const url = `${dest.url}/api/ccusage-compat`;
+  const resp = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "x-api-key": dest.apiKey },
+    body: JSON.stringify(body)
+  });
+  const text = await resp.text();
+  if (!resp.ok) {
+    console.error(`❌ 서버 응답 ${resp.status}: ${text.slice(0, 500)}`);
+    process.exit(4);
+  }
+  console.log(`✓ 전송 완료 — 서버 응답: ${text.slice(0, 200)}`);
+  console.log("");
+  console.log("끝. 사용자 prod ccusage 환경은 그대로입니다 (글로벌 설치 미변경).");
+}
+
 // src/index.ts
 var program2 = new Command;
 program2.name("usage-tracker").description("z21labs Claude Code usage tracker").version(CLI_VERSION);
@@ -3295,6 +3399,7 @@ program2.command("migrate").description("primus → z21labs 마이그레이션 (
   if (r.errors.length > 0)
     process.exit(1);
 });
+program2.command("compat-check").description("ccusage 신/구 버전 raw daily 출력 비교용 업로드 (글로벌 ccusage 미변경)").option("-t, --target <version>", "비교할 새 ccusage 버전", "20.0.6").action((opts) => runCompatCheck({ target: opts.target }));
 if (process.argv[2] === "init" || process.argv.length <= 2) {
   program2.parse(["node", "usage-tracker", "init", ...process.argv.slice(3)]);
 } else {
