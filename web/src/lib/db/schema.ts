@@ -393,3 +393,33 @@ export const dailyVisits = pgTable(
     teamIdx: index("daily_visits_team_idx").on(t.teamId),
   })
 );
+
+// 2026-06-01: ccusage / codeburn 핀 bump 전 사용자 머신에서 raw 출력 캡처 비교용.
+// 이전엔 api_tokens.metadata.lastCompatCheck 박았으나 ingest 가 metadata 통째
+// REPLACE 하던 버그로 매 sync 마다 증발. ingest 는 jsonb merge 로 fix 했고, 검증
+// 도구 데이터는 prod 메타와 완전 분리해 별 테이블로 격상 (영진님 지적). ccusage /
+// codeburn 새 버전 나올 때마다 반복 검증 — history 누적 보관.
+export const ccusageCompatRuns = pgTable(
+  "ccusage_compat_runs",
+  {
+    id: serial("id").primaryKey(),
+    userId: integer("user_id")
+      .notNull()
+      .references(() => users.id),
+    tokenId: integer("token_id")
+      .notNull()
+      .references(() => apiTokens.id),
+    ranAt: timestamp("ran_at").defaultNow().notNull(),
+    cliVersion: text("cli_version").notNull(),
+    os: text("os").notNull(),
+    ccusageOldVersion: text("ccusage_old_version").notNull(),
+    ccusageNewVersion: text("ccusage_new_version").notNull(),
+    codeburnOldVersion: text("codeburn_old_version").notNull(),
+    codeburnNewVersion: text("codeburn_new_version").notNull(),
+    // ccusage + codeburn raw 묶음 (사용자 한 run = 4 + 20 raw 캡처, 본인 추정 400KB).
+    payload: jsonb("payload").notNull(),
+  },
+  (t) => ({
+    userRanIdx: index("ccusage_compat_runs_user_ran_idx").on(t.userId, t.ranAt),
+  })
+);

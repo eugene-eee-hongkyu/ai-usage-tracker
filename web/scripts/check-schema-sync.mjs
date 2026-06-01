@@ -30,6 +30,7 @@ const SQLITE_IGNORED = new Set([
   "apiTokens",
   "auditLogs",
   "suggestions",
+  "ccusageCompatRuns",
 ]);
 
 // 마찬가지로 PG 에 없는 SQLite-only table (현재 없음). 미래용.

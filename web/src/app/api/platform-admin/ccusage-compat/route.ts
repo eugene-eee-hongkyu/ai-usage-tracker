@@ -1,41 +1,91 @@
 // GET /api/platform-admin/ccusage-compat
-// CLI `compat-check` 결과 (api_tokens.metadata.lastCompatCheck) 를 모든 token 에서 모아 반환.
+// ccusage_compat_runs 테이블의 모든 run 을 사용자명과 같이 반환.
+// Platform Admin 만. 본인이 jq + diff 로 분석.
 //
-// 권한: Platform Admin 만.
-// 응답: 각 token 별로 사용자명 + 디바이스명 + 마지막 compat-check payload.
-// 사용처: 본인이 jq + diff 로 직접 분석 — 별도 UI 안 만듬 (PoC 단계).
-//
-// 큰 raw payload (~250KB × N) 가 한 응답에 다 들어옴. 3명 × 1 token 가정 작음.
-// 한 token 만 좁히고 싶으면 ?tokenId=N 쿼리 파라미터.
+// 쿼리 파라미터:
+//   ?runId=N    — 단일 run 만 (raw payload 다운로드용)
+//   ?userId=N   — 특정 사용자의 모든 run history
+//   기본       — 최근 N건 (default 50)
 
 import { NextRequest, NextResponse } from "next/server";
 import { requirePlatformAdmin } from "@/lib/auth-guards";
-import { db, users, apiTokens } from "@/lib/db";
-import { eq, and, sql } from "drizzle-orm";
+import { db, users, ccusageCompatRuns } from "@/lib/db";
+import { eq, desc } from "drizzle-orm";
 
 export const dynamic = "force-dynamic";
+
+const DEFAULT_LIMIT = 50;
 
 export async function GET(req: NextRequest) {
   const guard = await requirePlatformAdmin();
   if (guard.error) return guard.error;
 
-  const tokenIdParam = req.nextUrl.searchParams.get("tokenId");
-  const where = tokenIdParam
-    ? and(sql`${apiTokens.metadata} ? 'lastCompatCheck'`, eq(apiTokens.id, parseInt(tokenIdParam)))
-    : sql`${apiTokens.metadata} ? 'lastCompatCheck'`;
+  const runId = req.nextUrl.searchParams.get("runId");
+  const userIdParam = req.nextUrl.searchParams.get("userId");
 
-  const rows = await db
-    .select({
-      tokenId: apiTokens.id,
-      userId: apiTokens.userId,
-      userName: users.name,
-      userEmail: users.email,
-      tokenName: apiTokens.name,
-      lastCompatCheck: sql<unknown>`${apiTokens.metadata}->'lastCompatCheck'`,
-    })
-    .from(apiTokens)
-    .innerJoin(users, eq(users.id, apiTokens.userId))
-    .where(where);
+  if (runId) {
+    const row = await db
+      .select({
+        id: ccusageCompatRuns.id,
+        userId: ccusageCompatRuns.userId,
+        userName: users.name,
+        userEmail: users.email,
+        tokenId: ccusageCompatRuns.tokenId,
+        ranAt: ccusageCompatRuns.ranAt,
+        cliVersion: ccusageCompatRuns.cliVersion,
+        os: ccusageCompatRuns.os,
+        ccusageOldVersion: ccusageCompatRuns.ccusageOldVersion,
+        ccusageNewVersion: ccusageCompatRuns.ccusageNewVersion,
+        codeburnOldVersion: ccusageCompatRuns.codeburnOldVersion,
+        codeburnNewVersion: ccusageCompatRuns.codeburnNewVersion,
+        payload: ccusageCompatRuns.payload,
+      })
+      .from(ccusageCompatRuns)
+      .innerJoin(users, eq(users.id, ccusageCompatRuns.userId))
+      .where(eq(ccusageCompatRuns.id, parseInt(runId)))
+      .limit(1);
+    if (!row[0]) return NextResponse.json({ error: "not found" }, { status: 404 });
+    return NextResponse.json(row[0]);
+  }
+
+  const rows = userIdParam
+    ? await db
+        .select({
+          id: ccusageCompatRuns.id,
+          userId: ccusageCompatRuns.userId,
+          userName: users.name,
+          tokenId: ccusageCompatRuns.tokenId,
+          ranAt: ccusageCompatRuns.ranAt,
+          cliVersion: ccusageCompatRuns.cliVersion,
+          os: ccusageCompatRuns.os,
+          ccusageOldVersion: ccusageCompatRuns.ccusageOldVersion,
+          ccusageNewVersion: ccusageCompatRuns.ccusageNewVersion,
+          codeburnOldVersion: ccusageCompatRuns.codeburnOldVersion,
+          codeburnNewVersion: ccusageCompatRuns.codeburnNewVersion,
+        })
+        .from(ccusageCompatRuns)
+        .innerJoin(users, eq(users.id, ccusageCompatRuns.userId))
+        .where(eq(ccusageCompatRuns.userId, parseInt(userIdParam)))
+        .orderBy(desc(ccusageCompatRuns.ranAt))
+        .limit(DEFAULT_LIMIT)
+    : await db
+        .select({
+          id: ccusageCompatRuns.id,
+          userId: ccusageCompatRuns.userId,
+          userName: users.name,
+          tokenId: ccusageCompatRuns.tokenId,
+          ranAt: ccusageCompatRuns.ranAt,
+          cliVersion: ccusageCompatRuns.cliVersion,
+          os: ccusageCompatRuns.os,
+          ccusageOldVersion: ccusageCompatRuns.ccusageOldVersion,
+          ccusageNewVersion: ccusageCompatRuns.ccusageNewVersion,
+          codeburnOldVersion: ccusageCompatRuns.codeburnOldVersion,
+          codeburnNewVersion: ccusageCompatRuns.codeburnNewVersion,
+        })
+        .from(ccusageCompatRuns)
+        .innerJoin(users, eq(users.id, ccusageCompatRuns.userId))
+        .orderBy(desc(ccusageCompatRuns.ranAt))
+        .limit(DEFAULT_LIMIT);
 
   return NextResponse.json({ count: rows.length, runs: rows });
 }
