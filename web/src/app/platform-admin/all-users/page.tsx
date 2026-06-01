@@ -48,6 +48,7 @@ interface CardData {
     nodeVersion: string | null;
     nodeManager: string | null;
     claudeCodeVersion: string | null;
+    codexCodeVersion: string | null;
     cliVersion: string | null;
     cliPinMatch: boolean | null;
     platform: string | null;
@@ -354,7 +355,7 @@ function UserCard({
           <span className="text-slate-700 mx-1.5">·</span>
           ccusage {versionWithMark(card.env.ccusageVersion, card.env.ccusagePinMatch)}
         </div>
-        {(card.env.nodeVersion || card.env.claudeCodeVersion) && (
+        {(card.env.nodeVersion || card.env.claudeCodeVersion || card.env.codexCodeVersion) && (
           <div className="text-slate-400">
             {card.env.nodeVersion && (
               <>
@@ -365,6 +366,12 @@ function UserCard({
             {card.env.nodeVersion && card.env.claudeCodeVersion && <span className="text-slate-700 mx-1.5">·</span>}
             {card.env.claudeCodeVersion && (
               <>Claude {card.env.claudeCodeVersion.replace(/ \(Claude Code\)/, "")}</>
+            )}
+            {card.env.codexCodeVersion && (
+              <>
+                {(card.env.nodeVersion || card.env.claudeCodeVersion) && <span className="text-slate-700 mx-1.5">·</span>}
+                Codex {card.env.codexCodeVersion}
+              </>
             )}
           </div>
         )}

@@ -33,9 +33,19 @@ interface EnvInfo {
   codeburnVersion?: string | null;
   ccusageVersion?: string | null;
   claudeCodeVersion?: string | null;
+  codexCodeVersion?: string | null;
   hookEnabled?: boolean;
   cliVersion?: string;
   installMethod?: string;
+}
+
+// 핀 매칭 안전망: ccusage v19 출력 '19.0.2' / v20 출력 'ccusage 20.0.6' 처럼 도구가
+// version 출력 포맷 바꾸면 string match 실패. submit.mjs 의 semverOnly 가 신규 sync
+// 부터 정정하지만, 옛 metadata 남아있는 사용자 안전망으로 endsWith 한 번 더 시도.
+// 예: 'ccusage 20.0.6'.endsWith('20.0.6') = true.
+function pinMatches(metadataVer: string | null, pin: string): boolean | null {
+  if (metadataVer === null) return null;
+  return metadataVer === pin || metadataVer.endsWith(pin);
 }
 
 function ccusageMissing(raw: unknown): boolean {
@@ -75,6 +85,12 @@ export async function GET(req: NextRequest) {
 
   // 모든 (deleted/suspended 제외) 사용자 + 팀 + snapshot + 가장 최근 사용 api_token.
   // 멀티팀 사용자는 team_members 행 수만큼 등장 (현재 코드베이스 의도 — 각 (user, team) 쌍 별도 카드).
+  //
+  // 2026-06-01: device 별 카드 의도 유지 (사용자 결정 — '여러 장비 쓰더라도 장비별로
+  // 잘 설치되어 있는지 health check'). M6f Phase 2 후 user_snapshots 가 token_id 별
+  // N row → 한 user N 카드 자연 device 별 분리. tokensByToken 으로 device 별 metadata
+  // 매핑해야 두 카드가 자기 device 정보 표시 (이전 tokensByUser 패턴은 모든 카드에
+  // 같은 first metadata 적용해 영진님 두 카드 모두 Windows metadata 로 보이던 회귀).
   const rows = await db
     .select({
       userId: users.id,
@@ -85,6 +101,7 @@ export async function GET(req: NextRequest) {
       lastSyncedAt: users.lastSyncedAt,
       teamId: teams.id,
       teamName: teams.name,
+      tokenId: userSnapshots.tokenId,
       rawJson: userSnapshots.rawJson,
     })
     .from(users)
@@ -98,10 +115,12 @@ export async function GET(req: NextRequest) {
       sql`${teams.type} = 'normal'`,
     ));
 
-  // 사용자별 device count + 가장 최근 사용 api_token 의 metadata (envInfo).
-  // 별도 query 로 가져와 in-memory join — 사용자 수가 적어 N+1 비용 무시.
+  // device 별 카드 health check 의도 — token_id 기준 metadata 매핑 (이전 tokensByUser
+  // 는 user 단위 first metadata 라 multi-device 사용자의 두 카드가 같은 metadata 표시
+  // 회귀). 추가로 userId 별 device count (모든 카드 공통 표시) 도 같이 모음.
   const tokenRows = await db
     .select({
+      tokenId: apiTokens.id,
       userId: apiTokens.userId,
       metadata: apiTokens.metadata,
       lastUsedAt: apiTokens.lastUsedAt,
@@ -110,13 +129,13 @@ export async function GET(req: NextRequest) {
     .where(isNull(apiTokens.revokedAt))
     .orderBy(apiTokens.userId, sql`${apiTokens.lastUsedAt} DESC NULLS LAST`);
 
-  const tokensByUser = new Map<number, { count: number; metadata: EnvInfo | null }>();
+  const tokensByToken = new Map<number, EnvInfo | null>();
+  const tokensByUser = new Map<number, { count: number; firstMetadata: EnvInfo | null }>();
   for (const t of tokenRows) {
-    const cur = tokensByUser.get(t.userId) ?? { count: 0, metadata: null };
+    tokensByToken.set(t.tokenId, (t.metadata as EnvInfo | null) ?? null);
+    const cur = tokensByUser.get(t.userId) ?? { count: 0, firstMetadata: null };
     cur.count += 1;
-    if (cur.metadata === null) {
-      cur.metadata = (t.metadata as EnvInfo | null) ?? null;
-    }
+    if (cur.firstMetadata === null) cur.firstMetadata = (t.metadata as EnvInfo | null) ?? null;
     tokensByUser.set(t.userId, cur);
   }
 
@@ -155,6 +174,7 @@ export async function GET(req: NextRequest) {
       nodeVersion: string | null;
       nodeManager: string | null;
       claudeCodeVersion: string | null;
+      codexCodeVersion: string | null;
       cliVersion: string | null;
       cliPinMatch: boolean | null;
       platform: string | null;
@@ -220,15 +240,18 @@ export async function GET(req: NextRequest) {
       };
     })();
 
-    const tokens = tokensByUser.get(r.userId) ?? { count: 0, metadata: null };
-    const env = tokens.metadata ?? {};
+    const userTokens = tokensByUser.get(r.userId) ?? { count: 0, firstMetadata: null };
+    // device 별 카드: row 의 token_id 가 있으면 그 device 의 metadata 사용.
+    // snapshot 없는 user (token_id null) 는 fallback 으로 user 의 첫 metadata.
+    const env = (r.tokenId !== null ? tokensByToken.get(r.tokenId) : null) ?? userTokens.firstMetadata ?? {};
 
     const codeburnVersion = env.codeburnVersion ?? null;
     const ccusageVersion = env.ccusageVersion ?? null;
     const cliVersion = env.cliVersion ?? null;
-    const codeburnPinMatch = codeburnVersion === null ? null : codeburnVersion === PINNED.CODEBURN;
-    const ccusagePinMatch = ccusageVersion === null ? null : ccusageVersion === PINNED.CCUSAGE;
-    const cliPinMatch = cliVersion === null ? null : cliVersion === PINNED.USAGE_TRACKER_RECOMMENDED;
+    const codexCodeVersion = env.codexCodeVersion ?? null;
+    const codeburnPinMatch = pinMatches(codeburnVersion, PINNED.CODEBURN);
+    const ccusagePinMatch = pinMatches(ccusageVersion, PINNED.CCUSAGE);
+    const cliPinMatch = pinMatches(cliVersion, PINNED.USAGE_TRACKER_RECOMMENDED);
 
     return {
       userId: r.userId,
@@ -245,7 +268,7 @@ export async function GET(req: NextRequest) {
         hookEnabled: env.hookEnabled ?? null,
         ccusageMissing: ccusageMissing(r.rawJson),
         npmRootWritable: env.npmRootWritable ?? null,
-        deviceCount: tokens.count,
+        deviceCount: userTokens.count,
         codeburnVersion,
         codeburnPinMatch,
         ccusageVersion,
@@ -253,6 +276,7 @@ export async function GET(req: NextRequest) {
         nodeVersion: env.nodeVersion ?? null,
         nodeManager: env.nodeManager ?? null,
         claudeCodeVersion: env.claudeCodeVersion ?? null,
+        codexCodeVersion,
         cliVersion,
         cliPinMatch,
         platform: env.platform ?? null,

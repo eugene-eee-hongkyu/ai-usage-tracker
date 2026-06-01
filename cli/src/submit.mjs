@@ -312,6 +312,10 @@ function collectEnvInfo() {
     npmRootWritable,
     codeburnVersion: semverOnly(safeExec("codeburn --version")),
     ccusageVersion: semverOnly(safeExec("ccusage --version")),
+    // codex CLI (@openai/codex) — Rust 기반, clap version 옵션 활성. 출력 prefix 있어도
+    // semverOnly 가 처리. 본인 머신 미설치 환경에선 null. PINNED 핀 의도 없음 (codex
+    // 데이터 ingest 만, 자체 동작 의존 0) — 표시만.
+    codexCodeVersion: semverOnly(safeExec("codex --version")),
     // M6e 추가
     osRelease: osRelease(),
     osArch: osArch(),
