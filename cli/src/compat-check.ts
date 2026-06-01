@@ -17,7 +17,6 @@ import * as os from "os";
 import { loadDestinations } from "./destinations.js";
 import { CLI_VERSION } from "./init.js";
 
-const DEFAULT_TARGET = "20.0.6";
 const TIMEOUT_MS = 120_000;
 
 type Provider = "claude" | "codex";
@@ -51,10 +50,18 @@ function rowsCount(raw: unknown): number {
 }
 
 export async function runCompatCheck(opts: { target?: string } = {}): Promise<void> {
-  const target = opts.target ?? DEFAULT_TARGET;
+  const target = opts.target;
+  if (!target || !/^\d+\.\d+\.\d+/.test(target)) {
+    console.error("❌ 비교할 ccusage 버전을 명시해야 합니다.");
+    console.error("");
+    console.error("  예: npx -y github:eugene-eee-hongkyu/ai-usage-tracker compat-check --target 20.0.6");
+    console.error("");
+    console.error("  버전 목록: https://github.com/ryoppippi/ccusage/releases");
+    process.exit(2);
+  }
 
   console.log("");
-  console.log("ccusage compat-check — 신/구 버전 daily raw 출력 비교");
+  console.log(`ccusage compat-check — 현재 prod 버전 vs ccusage@${target} raw 출력 비교`);
   console.log("");
 
   // destination 확인 — 인증 + URL 확보
@@ -84,8 +91,8 @@ export async function runCompatCheck(opts: { target?: string } = {}): Promise<vo
   console.log(`    claude: ${oldClaude.ok ? `${rowsCount(oldClaude.raw)} rows` : `❌ ${oldClaude.error}`}`);
   console.log(`    codex:  ${oldCodex.ok ? `${rowsCount(oldCodex.raw)} rows` : `❌ ${oldCodex.error}`}`);
 
-  // 새 버전 (npx 임시) — 글로벌 설치 안 함
-  console.log(`[3/4] 새 버전 (${target}) 으로 동일 캡처 — npx 첫 호출 시 10-30초 다운로드 발생...`);
+  // 비교 대상 버전 (npx 임시) — 글로벌 설치 안 함
+  console.log(`[3/4] 비교 대상 버전 (${target}) 으로 동일 캡처 — npx 첫 호출 시 10-30초 다운로드 발생...`);
   const newClaude = await captureCcusage(["npx", "-y", `ccusage@${target}`], "claude");
   const newCodex = await captureCcusage(["npx", "-y", `ccusage@${target}`], "codex");
   console.log(`    claude: ${newClaude.ok ? `${rowsCount(newClaude.raw)} rows` : `❌ ${newClaude.error}`}`);

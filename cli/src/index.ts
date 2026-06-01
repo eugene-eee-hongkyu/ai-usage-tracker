@@ -53,8 +53,8 @@ program
 
 program
   .command("compat-check")
-  .description("ccusage 신/구 버전 raw daily 출력 비교용 업로드 (글로벌 ccusage 미변경)")
-  .option("-t, --target <version>", "비교할 새 ccusage 버전", "20.0.6")
+  .description("ccusage 현재 버전 vs 비교 대상 버전 raw daily 출력 업로드 (글로벌 ccusage 미변경)")
+  .requiredOption("-t, --target <version>", "비교할 ccusage 버전 (예: 20.0.6) — latest 류 금지, 명시 버전만")
   .action((opts) => runCompatCheck({ target: opts.target }));
 
 // Default command when run as `npx ... init` (positional)

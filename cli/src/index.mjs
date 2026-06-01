@@ -3284,7 +3284,6 @@ function printMigrateReport(r, dryRun) {
 // src/compat-check.ts
 import { spawn as spawn3 } from "child_process";
 import * as os4 from "os";
-var DEFAULT_TARGET = "20.0.6";
 var TIMEOUT_MS = 120000;
 function run(cmd, args) {
   return new Promise((resolve) => {
@@ -3328,9 +3327,17 @@ function rowsCount(raw) {
   return Array.isArray(r?.daily) ? r.daily.length : 0;
 }
 async function runCompatCheck(opts = {}) {
-  const target = opts.target ?? DEFAULT_TARGET;
+  const target = opts.target;
+  if (!target || !/^\d+\.\d+\.\d+/.test(target)) {
+    console.error("❌ 비교할 ccusage 버전을 명시해야 합니다.");
+    console.error("");
+    console.error("  예: npx -y github:eugene-eee-hongkyu/ai-usage-tracker compat-check --target 20.0.6");
+    console.error("");
+    console.error("  버전 목록: https://github.com/ryoppippi/ccusage/releases");
+    process.exit(2);
+  }
   console.log("");
-  console.log("ccusage compat-check — 신/구 버전 daily raw 출력 비교");
+  console.log(`ccusage compat-check — 현재 prod 버전 vs ccusage@${target} raw 출력 비교`);
   console.log("");
   const dests = await loadDestinations();
   const dest = dests.find((d) => d.apiKey) ?? dests[0];
@@ -3354,7 +3361,7 @@ async function runCompatCheck(opts = {}) {
   const oldCodex = await captureCcusage(["ccusage"], "codex");
   console.log(`    claude: ${oldClaude.ok ? `${rowsCount(oldClaude.raw)} rows` : `❌ ${oldClaude.error}`}`);
   console.log(`    codex:  ${oldCodex.ok ? `${rowsCount(oldCodex.raw)} rows` : `❌ ${oldCodex.error}`}`);
-  console.log(`[3/4] 새 버전 (${target}) 으로 동일 캡처 — npx 첫 호출 시 10-30초 다운로드 발생...`);
+  console.log(`[3/4] 비교 대상 버전 (${target}) 으로 동일 캡처 — npx 첫 호출 시 10-30초 다운로드 발생...`);
   const newClaude = await captureCcusage(["npx", "-y", `ccusage@${target}`], "claude");
   const newCodex = await captureCcusage(["npx", "-y", `ccusage@${target}`], "codex");
   console.log(`    claude: ${newClaude.ok ? `${rowsCount(newClaude.raw)} rows` : `❌ ${newClaude.error}`}`);
@@ -3399,7 +3406,7 @@ program2.command("migrate").description("primus → z21labs 마이그레이션 (
   if (r.errors.length > 0)
     process.exit(1);
 });
-program2.command("compat-check").description("ccusage 신/구 버전 raw daily 출력 비교용 업로드 (글로벌 ccusage 미변경)").option("-t, --target <version>", "비교할 새 ccusage 버전", "20.0.6").action((opts) => runCompatCheck({ target: opts.target }));
+program2.command("compat-check").description("ccusage 현재 버전 vs 비교 대상 버전 raw daily 출력 업로드 (글로벌 ccusage 미변경)").requiredOption("-t, --target <version>", "비교할 ccusage 버전 (예: 20.0.6) — latest 류 금지, 명시 버전만").action((opts) => runCompatCheck({ target: opts.target }));
 if (process.argv[2] === "init" || process.argv.length <= 2) {
   program2.parse(["node", "usage-tracker", "init", ...process.argv.slice(3)]);
 } else {
