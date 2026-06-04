@@ -48,9 +48,9 @@ mac:
   gatekeeperAssess: false
   entitlements: build-resources/entitlements.mac.plist
   entitlementsInherit: build-resources/entitlements.mac.plist
-  # CSC_LINK / CSC_KEY_PASSWORD 환경변수 자동 인식. identity 명시 X
-  notarize:
-    teamId: "${env.APPLE_TEAM_ID}"
+  # CSC_LINK / CSC_KEY_PASSWORD 환경변수 자동 인식. identity 명시 X.
+  # electron-builder 25.x 부터 notarize.teamId 의 env substitution 동작 안 함 →
+  # APPLE_TEAM_ID 환경변수만 set 하면 자동 notarize (notarize 블록 자체 제거).
 
 dmg:
   writeUpdateInfo: false
