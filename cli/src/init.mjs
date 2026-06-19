@@ -521,11 +521,15 @@ function registerLaunchd(submitPath) {
 }
 function registerWindowsTask(submitPath) {
   const taskName = "Z21labsUsageTracker";
-  const wrapperPath = path.join(STABLE_DIR, "daily-sync.cmd");
+  const vbsPath = path.join(STABLE_DIR, "daily-sync.vbs");
   const xmlPath = path.join(STABLE_DIR, "task.xml");
-  fs.writeFileSync(wrapperPath, `@echo off\r
-"${process.execPath}" "${submitPath}"\r
-`);
+  const legacyCmd = path.join(STABLE_DIR, "daily-sync.cmd");
+  const vbs = `CreateObject("WScript.Shell").Run """${process.execPath}"" ""${submitPath}""", 0, False\r
+`;
+  fs.writeFileSync(vbsPath, Buffer.from("\uFEFF" + vbs, "utf16le"));
+  try {
+    fs.unlinkSync(legacyCmd);
+  } catch {}
   const xml = `<?xml version="1.0" encoding="UTF-16"?>
 <Task version="1.2" xmlns="http://schemas.microsoft.com/windows/2004/02/mit/task">
   <Triggers>
@@ -545,7 +549,10 @@ function registerWindowsTask(submitPath) {
     <MultipleInstancesPolicy>IgnoreNew</MultipleInstancesPolicy>
   </Settings>
   <Actions>
-    <Exec><Command>${wrapperPath}</Command></Exec>
+    <Exec>
+      <Command>wscript.exe</Command>
+      <Arguments>"${vbsPath}"</Arguments>
+    </Exec>
   </Actions>
 </Task>`;
   fs.writeFileSync(xmlPath, Buffer.from("\uFEFF" + xml, "utf16le"));

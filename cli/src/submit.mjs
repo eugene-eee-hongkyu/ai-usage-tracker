@@ -86,6 +86,7 @@ if (!process.env._USAGE_TRACKER_DETACHED) {
   const child = spawn(process.execPath, [submitInStable], {
     detached: true,
     stdio: "ignore",
+    windowsHide: true, // Windows: detached node 재생성 시 콘솔 창 깜빡임 방지
     env: { ...process.env, _USAGE_TRACKER_DETACHED: "1" },
   });
   child.unref();
@@ -152,6 +153,7 @@ function spawnCodeburn(provider, period) {
     const proc = spawn("codeburn", ["report", "--format", "json", "--provider", provider, "--period", period], {
       stdio: ["ignore", "pipe", "pipe"],
       shell: true,
+      windowsHide: true, // Windows: shell(cmd.exe) 경유 시 콘솔 창 깜빡임 방지
       env: childEnv,
     });
     proc.stdout.on("data", (d) => chunks.push(d));
@@ -179,6 +181,7 @@ function spawnCcusageDaily(provider) {
     const proc = spawn("ccusage", [provider, "daily", "--json"], {
       stdio: ["ignore", "pipe", "pipe"],
       shell: true,
+      windowsHide: true, // Windows: shell(cmd.exe) 경유 시 콘솔 창 깜빡임 방지
       env: childEnv,
     });
     proc.stdout.on("data", (d) => stdoutChunks.push(d));

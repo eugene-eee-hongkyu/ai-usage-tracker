@@ -597,10 +597,22 @@ function registerLaunchd(submitPath: string): void {
 
 function registerWindowsTask(submitPath: string): void {
   const taskName = "Z21labsUsageTracker";
-  const wrapperPath = path.join(STABLE_DIR, "daily-sync.cmd");
+  const vbsPath = path.join(STABLE_DIR, "daily-sync.vbs");
   const xmlPath = path.join(STABLE_DIR, "task.xml");
+  const legacyCmd = path.join(STABLE_DIR, "daily-sync.cmd");
 
-  fs.writeFileSync(wrapperPath, `@echo off\r\n"${process.execPath}" "${submitPath}"\r\n`);
+  // 콘솔 창 깜빡임 제거: node.exe(콘솔 서브시스템)를 직접 실행하면 작업 스케줄러가
+  // 매 실행마다 검은 터미널 창을 띄운다. wscript.exe(GUI 서브시스템)로 .vbs 런처를
+  // 거쳐 WindowStyle=0(숨김)으로 실행하면 창이 전혀 뜨지 않는다.
+  // VBS 문자열 안에서 큰따옴표는 ""(두 번)로 이스케이프.
+  const vbs =
+    `CreateObject("WScript.Shell").Run ` +
+    `"""${process.execPath}"" ""${submitPath}""", 0, False\r\n`;
+  // UTF-16LE BOM: 한글 사용자명 경로도 wscript가 정상 해석 (ANSI는 깨짐)
+  fs.writeFileSync(vbsPath, Buffer.from("﻿" + vbs, "utf16le"));
+
+  // 이전 버전이 만든 .cmd 래퍼는 콘솔 창 원인 → 정리.
+  try { fs.unlinkSync(legacyCmd); } catch {}
 
   // XML 등록: StartWhenAvailable=true → 꺼져 있다가 켜지면 즉시 실행.
   // 단일 CalendarTrigger + Repetition(PT1H/P1D) 으로 매일 0시 시작 → 1시간마다 24회 반복.
@@ -624,7 +636,10 @@ function registerWindowsTask(submitPath: string): void {
     <MultipleInstancesPolicy>IgnoreNew</MultipleInstancesPolicy>
   </Settings>
   <Actions>
-    <Exec><Command>${wrapperPath}</Command></Exec>
+    <Exec>
+      <Command>wscript.exe</Command>
+      <Arguments>"${vbsPath}"</Arguments>
+    </Exec>
   </Actions>
 </Task>`;
 
