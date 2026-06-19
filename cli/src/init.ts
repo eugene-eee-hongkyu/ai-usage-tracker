@@ -705,9 +705,13 @@ function runBackfill(apiKey: string) {
   // USAGE_TRACKER_DAYS 는 옛 의도였으나 sync.mjs 가 reader 가 없어 dead env.
   // 실제 sync 는 PERIODS = ['today','week','month','30days','all'] — 'all' 이
   // codeburn 의 전체 history 를 가져옴. 90일 의도와 결과적으로 비슷 또는 더 김.
+  // Windows: detached:true 는 windowsHide 를 무시해 콘솔 창을 띄움(nodejs/node#21825).
+  // win32 는 detached 끄고 windowsHide+unref 로 숨긴 채 백그라운드 실행.
+  const isWin = process.platform === "win32";
   const child = spawn(process.execPath, [scriptPath], {
-    detached: true,
+    detached: !isWin,
     stdio: "ignore",
+    windowsHide: true,
     env: {
       ...process.env,
       USAGE_TRACKER_API_KEY: apiKey,
@@ -720,9 +724,13 @@ function runBackfill(apiKey: string) {
 
 function runImmediateSync(apiKey: string) {
   if (!fs.existsSync(STABLE_SUBMIT)) return;
+  // Windows: detached:true 는 windowsHide 를 무시해 콘솔 창을 띄움(nodejs/node#21825).
+  // win32 는 detached 끄고 windowsHide+unref 로 숨긴 채 백그라운드 실행.
+  const isWin = process.platform === "win32";
   const child = spawn(process.execPath, [STABLE_SUBMIT], {
-    detached: true,
+    detached: !isWin,
     stdio: "ignore",
+    windowsHide: true,
     env: {
       ...process.env,
       USAGE_TRACKER_API_KEY: apiKey,

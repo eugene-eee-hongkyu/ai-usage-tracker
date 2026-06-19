@@ -2495,9 +2495,11 @@ function runBackfill(apiKey) {
   const scriptPath = fs.existsSync(syncScript) ? syncScript : fs.existsSync(syncTs) ? syncTs : null;
   if (!scriptPath)
     return;
+  const isWin = process.platform === "win32";
   const child = spawn(process.execPath, [scriptPath], {
-    detached: true,
+    detached: !isWin,
     stdio: "ignore",
+    windowsHide: true,
     env: {
       ...process.env,
       USAGE_TRACKER_API_KEY: apiKey,
@@ -2510,9 +2512,11 @@ function runBackfill(apiKey) {
 function runImmediateSync(apiKey) {
   if (!fs.existsSync(STABLE_SUBMIT))
     return;
+  const isWin = process.platform === "win32";
   const child = spawn(process.execPath, [STABLE_SUBMIT], {
-    detached: true,
+    detached: !isWin,
     stdio: "ignore",
+    windowsHide: true,
     env: {
       ...process.env,
       USAGE_TRACKER_API_KEY: apiKey,

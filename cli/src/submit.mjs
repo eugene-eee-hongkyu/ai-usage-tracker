@@ -78,20 +78,29 @@ function clearTelemetry() {
   try { unlinkSync(TELEMETRY_FILE); } catch {}
 }
 
+// 실행 경로 진단 로그 (Windows 콘솔 창 디버깅용). build 태그로 신/구 코드 구분.
+log(`platform=${process.platform} pid=${process.pid} detached_env=${process.env._USAGE_TRACKER_DETACHED ?? "0"} build=2026-06-19-winhide3`);
+
 // Self-detach: SessionEnd hook 부모 프로세스는 VS Code 종료 시 SIGKILL될 수 있음.
 // _USAGE_TRACKER_DETACHED 없으면 자신을 detached 백그라운드로 재생성하고 즉시 종료.
-if (!process.env._USAGE_TRACKER_DETACHED) {
+//
+// ⚠ Windows 제외: Node 의 detached:true 는 windowsHide:true 를 무시하고 콘솔 창을 띄운다
+// (알려진 버그 nodejs/node#21825). Windows 경로는 작업 스케줄러가 wscript(.vbs,
+// WindowStyle=0) 로 이미 숨겨진 백그라운드로 submit.mjs 를 실행하므로 self-detach 가
+// 불필요하고, 하면 오히려 detached 자식이 검은 콘솔 창을 띄운다 → win32 는 건너뛰고 inline 실행.
+if (!process.env._USAGE_TRACKER_DETACHED && process.platform !== "win32") {
   log("self-detach (parent will exit)");
   const submitInStable = join(STABLE_DIR_EARLY, "submit.mjs");
   const child = spawn(process.execPath, [submitInStable], {
     detached: true,
     stdio: "ignore",
-    windowsHide: true, // Windows: detached node 재생성 시 콘솔 창 깜빡임 방지
+    windowsHide: true,
     env: { ...process.env, _USAGE_TRACKER_DETACHED: "1" },
   });
   child.unref();
   process.exit(0);
 }
+if (process.platform === "win32") log("win32: self-detach 건너뜀 (wscript 가 이미 숨김 백그라운드 — inline 실행)");
 
 // launchd가 Node에 TZ env를 안 넘겨주면 codeburn이 UTC로 today 계산.
 // 시스템 timezone을 명시적으로 자식에 주입.
