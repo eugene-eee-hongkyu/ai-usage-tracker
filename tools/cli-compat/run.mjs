@@ -17,8 +17,9 @@ import { composeEmail } from "./email.mjs";
 import { CONTRACT } from "./manifest.mjs";
 
 const DRY = process.env.DRY_RUN === "1";
-const FROM = process.env.EMAIL_FROM ?? "AI Usage Tracker <noreply@aiusage.z21labs.world>";
-const TO = process.env.COMPAT_REPORT_TO_EMAIL ?? "info@z21labs.xyz";
+// GitHub Actions 는 미등록 secret 을 빈 문자열로 넘기므로 ?? 가 아니라 || 로 기본값 적용.
+const FROM = (process.env.EMAIL_FROM || "").trim() || "AI Usage Tracker <noreply@aiusage.z21labs.world>";
+const TO = (process.env.COMPAT_REPORT_TO_EMAIL || "").trim() || "info@z21labs.xyz";
 
 function log(...a) { console.log(...a); }
 
@@ -50,7 +51,9 @@ async function alreadyNotified(pkg, from, to) {
       [pkg, from, to]);
     return r.rowCount > 0;
   } catch (e) {
-    log(`  ⚠️ dedup 조회 실패: ${e.message} — 발송 진행`);
+    const inner = e.errors?.[0];
+    const detail = e.code || e.message || inner?.code || inner?.message || String(e);
+    log(`  ⚠️ dedup 조회 실패: ${detail} — 발송 진행`);
     return false;
   }
 }
@@ -58,9 +61,14 @@ async function alreadyNotified(pkg, from, to) {
 async function recordNotified(pkg, from, to, verdict) {
   const p = await getPool();
   if (!p || DRY) return;
-  await p.query(
-    "insert into cli_compat_notifications (pkg, from_version, to_version, verdict) values ($1,$2,$3,$4) on conflict do nothing",
-    [pkg, from, to, verdict]);
+  try {
+    await p.query(
+      "insert into cli_compat_notifications (pkg, from_version, to_version, verdict) values ($1,$2,$3,$4) on conflict do nothing",
+      [pkg, from, to, verdict]);
+  } catch (e) {
+    const inner = e.errors?.[0];
+    log(`  ⚠️ dedup 기록 실패: ${e.code || e.message || inner?.code || inner?.message || String(e)} (발송은 됨)`);
+  }
 }
 
 // ── Resend 발송 ───────────────────────────────────────────────────────────────
