@@ -1,0 +1,38 @@
+name: cli-compat-check
+
+# ccusage / codeburn 최신 버전을 격리 환경에서 실제 실행해, 우리가 읽는 명령·필드가
+# 구조적으로 유지되는지 실측 대조하고, 변경 시 1회만 이메일 발송.
+# (Vercel cron 으로는 바이너리 실행이 불가해 GitHub Actions 로 이전.)
+
+on:
+  schedule:
+    - cron: "0 9 * * *" # 매일 09:00 UTC (KST 18시)
+  workflow_dispatch: {} # 수동 실행
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cli-compat-check
+  cancel-in-progress: false
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Run cli-compat check
+        run: node tools/cli-compat/run.mjs
+        env:
+          # Actions 자동 주입 — 릴리즈 노트 GitHub API rate-limit 회피
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # 아래는 레포 Settings → Secrets 에 등록 필요 (없으면 발송/dedup 일부 skip)
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          EMAIL_FROM: ${{ secrets.EMAIL_FROM }}
+          COMPAT_REPORT_TO_EMAIL: ${{ secrets.COMPAT_REPORT_TO_EMAIL }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}

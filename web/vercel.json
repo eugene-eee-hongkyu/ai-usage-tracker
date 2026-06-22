@@ -4,10 +4,6 @@
     {
       "path": "/api/cron/anonymize-expired-users",
       "schedule": "0 2 * * *"
-    },
-    {
-      "path": "/api/cron/cli-compat-check",
-      "schedule": "0 9 * * *"
     }
   ]
 }
