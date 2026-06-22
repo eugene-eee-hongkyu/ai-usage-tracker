@@ -7,8 +7,7 @@
 //   RESEND_API_KEY              발송용 (없으면 발송 skip, 조립만)
 //   EMAIL_FROM                  기본 "AI Usage Tracker <noreply@aiusage.z21labs.world>"
 //   COMPAT_REPORT_TO_EMAIL      기본 "info@z21labs.xyz"
-//   SUPABASE_URL                예: https://<ref>.supabase.co (dedup용)
-//   SUPABASE_SERVICE_ROLE_KEY   dedup용 (RLS bypass)
+//   DATABASE_URL                dedup용 — 직접 postgres 연결 (앱과 동일 secret 재사용)
 //   GITHUB_TOKEN                릴리즈 노트 rate-limit 회피 (Actions 자동 주입)
 //   DRY_RUN=1                   발송·기록 안 하고 로그만
 
@@ -20,32 +19,48 @@ import { CONTRACT } from "./manifest.mjs";
 const DRY = process.env.DRY_RUN === "1";
 const FROM = process.env.EMAIL_FROM ?? "AI Usage Tracker <noreply@aiusage.z21labs.world>";
 const TO = process.env.COMPAT_REPORT_TO_EMAIL ?? "info@z21labs.xyz";
-const SB_URL = process.env.SUPABASE_URL;
-const SB_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 function log(...a) { console.log(...a); }
 
-// ── dedup (Supabase PostgREST, service key 가 RLS bypass) ──────────────────────
+// ── dedup (DATABASE_URL 직접 postgres 연결, 앱과 동일 secret 재사용) ───────────
+// cli_compat_notifications 테이블의 (pkg, from_version, to_version) UNIQUE 로 1회 보장.
+let _pool = null;
+let _poolInit = false;
+async function getPool() {
+  if (!process.env.DATABASE_URL) return null;
+  if (!_poolInit) {
+    _poolInit = true;
+    const { default: pg } = await import("pg");
+    const cs = process.env.DATABASE_URL;
+    _pool = new pg.Pool({
+      connectionString: cs,
+      ssl: cs.includes("sslmode=disable") ? false : { rejectUnauthorized: false },
+      max: 2,
+    });
+  }
+  return _pool;
+}
+
 async function alreadyNotified(pkg, from, to) {
-  if (!SB_URL || !SB_KEY) { log(`  ⚠️ Supabase 미설정 — dedup 비활성(중복 발송 가능)`); return false; }
-  const q = new URLSearchParams({ pkg: `eq.${pkg}`, from_version: `eq.${from}`, to_version: `eq.${to}`, select: "id" });
-  const res = await fetch(`${SB_URL}/rest/v1/cli_compat_notifications?${q}`, {
-    headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` },
-  });
-  if (!res.ok) { log(`  ⚠️ dedup 조회 실패 ${res.status} — 발송 진행`); return false; }
-  return (await res.json()).length > 0;
+  const p = await getPool();
+  if (!p) { log(`  ⚠️ DATABASE_URL 미설정 — dedup 비활성(중복 발송 가능)`); return false; }
+  try {
+    const r = await p.query(
+      "select 1 from cli_compat_notifications where pkg=$1 and from_version=$2 and to_version=$3 limit 1",
+      [pkg, from, to]);
+    return r.rowCount > 0;
+  } catch (e) {
+    log(`  ⚠️ dedup 조회 실패: ${e.message} — 발송 진행`);
+    return false;
+  }
 }
 
 async function recordNotified(pkg, from, to, verdict) {
-  if (!SB_URL || !SB_KEY || DRY) return;
-  await fetch(`${SB_URL}/rest/v1/cli_compat_notifications`, {
-    method: "POST",
-    headers: {
-      apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}`,
-      "Content-Type": "application/json", Prefer: "resolution=ignore-duplicates,return=minimal",
-    },
-    body: JSON.stringify({ pkg, from_version: from, to_version: to, verdict }),
-  });
+  const p = await getPool();
+  if (!p || DRY) return;
+  await p.query(
+    "insert into cli_compat_notifications (pkg, from_version, to_version, verdict) values ($1,$2,$3,$4) on conflict do nothing",
+    [pkg, from, to, verdict]);
 }
 
 // ── Resend 발송 ───────────────────────────────────────────────────────────────
@@ -100,6 +115,7 @@ async function main() {
   }
   log(`\n=== 요약 ===`);
   for (const s of summary) log(`  ${s.pkg}: ${s.action}` + (s.verdict ? ` (${s.verdict})` : "") + (s.error ? ` — ${s.error}` : ""));
+  if (_pool) await _pool.end();
 }
 
 main().catch((e) => { console.error("FATAL:", e.message); process.exit(1); });

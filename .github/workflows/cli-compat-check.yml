@@ -25,6 +25,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
+      - name: Install dedup deps (pg)
+        run: npm install --prefix tools/cli-compat --no-audit --no-fund
       - name: Run cli-compat check
         run: node tools/cli-compat/run.mjs
         env:
@@ -34,5 +36,4 @@ jobs:
           RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
           EMAIL_FROM: ${{ secrets.EMAIL_FROM }}
           COMPAT_REPORT_TO_EMAIL: ${{ secrets.COMPAT_REPORT_TO_EMAIL }}
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}

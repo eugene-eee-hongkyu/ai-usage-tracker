@@ -1,0 +1,9 @@
+{
+  "name": "cli-compat",
+  "private": true,
+  "type": "module",
+  "description": "ccusage/codeburn 호환성 실측 검사 + 이메일 자동화 (GitHub Actions)",
+  "dependencies": {
+    "pg": "^8.13.1"
+  }
+}

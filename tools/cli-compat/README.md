@@ -47,11 +47,11 @@ DRY_RUN=1 node tools/cli-compat/run.mjs            # 전체 흐름(발송·기�
 | Secret | 용도 | 없으면 |
 |---|---|---|
 | `RESEND_API_KEY` | 이메일 발송 | 발송 skip |
-| `SUPABASE_URL` | dedup (예: `https://<ref>.supabase.co`) | dedup 비활성(중복 발송 가능) |
-| `SUPABASE_SERVICE_ROLE_KEY` | dedup (RLS bypass) | dedup 비활성 |
+| `DATABASE_URL` | dedup (앱과 동일한 postgres 연결 문자열 재사용) | dedup 비활성(중복 발송 가능) |
 | `EMAIL_FROM` | 발신 주소 (선택) | 기본 `noreply@aiusage.z21labs.world` |
 | `COMPAT_REPORT_TO_EMAIL` | 수신 주소 (선택) | 기본 `info@z21labs.xyz` |
 
 `GITHUB_TOKEN` 은 Actions 가 자동 주입(릴리즈 노트 rate-limit 회피).
+dedup 은 `DATABASE_URL` 로 postgres 직결해 `cli_compat_notifications` 테이블에 접근한다 (`pg` 사용, 워크플로가 `npm install --prefix tools/cli-compat` 로 설치).
 
 dedup 은 기존 `cli_compat_notifications` 테이블 `(pkg, from_version, to_version)` 을 재사용한다.
