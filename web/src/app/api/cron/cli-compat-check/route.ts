@@ -15,8 +15,10 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { timingSafeEqual } from "node:crypto";
+import { and, eq } from "drizzle-orm";
 import { checkCliCompat, type PackageKey, type Verdict } from "@/lib/check-cli-compat";
 import { sendCompatReport } from "@/lib/email";
+import { db, cliCompatNotifications } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 
@@ -51,6 +53,7 @@ export async function GET(req: NextRequest) {
     to: string;
     verdict: Verdict;
     emailSent: boolean;
+    alreadyNotified?: boolean;
     emailError?: string;
   }> = [];
 
@@ -58,19 +61,58 @@ export async function GET(req: NextRequest) {
     try {
       const r = await checkCliCompat(pkg);
       let emailSent = false;
+      let alreadyNotified = false;
       let emailError: string | undefined;
       if (r.verdict === "caution" || r.verdict === "danger") {
-        const sent = await sendCompatReport({
-          pkg: r.pkg,
-          from: r.from,
-          to: r.to,
-          verdictLabel: VERDICT_LABEL[r.verdict],
-          markdown: r.reportMarkdown,
-        });
-        emailSent = sent.ok;
-        emailError = sent.error;
+        // 같은 (pkg, from, to) 조합으로 이미 메일을 보냈으면 재발송 안 함.
+        // 핀이 고정이라 latest 가 안 바뀌면 매일 같은 조합 → 1회만 발송 (버전 전환 시에만).
+        const existing = await db
+          .select({ id: cliCompatNotifications.id })
+          .from(cliCompatNotifications)
+          .where(
+            and(
+              eq(cliCompatNotifications.pkg, r.pkg),
+              eq(cliCompatNotifications.fromVersion, r.from),
+              eq(cliCompatNotifications.toVersion, r.to)
+            )
+          )
+          .limit(1);
+
+        if (existing.length > 0) {
+          alreadyNotified = true;
+        } else {
+          const sent = await sendCompatReport({
+            pkg: r.pkg,
+            from: r.from,
+            to: r.to,
+            verdictLabel: VERDICT_LABEL[r.verdict],
+            markdown: r.reportMarkdown,
+          });
+          emailSent = sent.ok;
+          emailError = sent.error;
+          // 발송 성공 시에만 기록 — 실패하면 다음 cron 에서 재시도.
+          if (sent.ok) {
+            await db
+              .insert(cliCompatNotifications)
+              .values({
+                pkg: r.pkg,
+                fromVersion: r.from,
+                toVersion: r.to,
+                verdict: r.verdict,
+              })
+              .onConflictDoNothing();
+          }
+        }
       }
-      results.push({ pkg: r.pkg, from: r.from, to: r.to, verdict: r.verdict, emailSent, emailError });
+      results.push({
+        pkg: r.pkg,
+        from: r.from,
+        to: r.to,
+        verdict: r.verdict,
+        emailSent,
+        alreadyNotified,
+        emailError,
+      });
     } catch (e) {
       results.push({
         pkg,

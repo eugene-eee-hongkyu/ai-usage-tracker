@@ -423,3 +423,26 @@ export const ccusageCompatRuns = pgTable(
     userRanIdx: index("ccusage_compat_runs_user_ran_idx").on(t.userId, t.ranAt),
   })
 );
+
+// 2026-06-22: cli-compat-check cron 이 (핀 from → npm latest to) 가 다를 때 메일을
+// 보내는데, 핀이 고정이라 latest 가 한 번 오르면 사람이 핀 bump 할 때까지 매일 같은
+// 조합으로 메일이 반복됐다. (pkg, from, to) 조합별 발송 이력을 남겨 "버전 전환 시 1회만"
+// 보내도록 dedup. cron(cloud) 전용 — 사용자 머신/local 무관.
+export const cliCompatNotifications = pgTable(
+  "cli_compat_notifications",
+  {
+    id: serial("id").primaryKey(),
+    pkg: text("pkg").notNull(),
+    fromVersion: text("from_version").notNull(),
+    toVersion: text("to_version").notNull(),
+    verdict: text("verdict").notNull(),
+    emailedAt: timestamp("emailed_at").defaultNow().notNull(),
+  },
+  (t) => ({
+    pkgFromToIdx: uniqueIndex("cli_compat_notifications_pkg_from_to_idx").on(
+      t.pkg,
+      t.fromVersion,
+      t.toVersion
+    ),
+  })
+);

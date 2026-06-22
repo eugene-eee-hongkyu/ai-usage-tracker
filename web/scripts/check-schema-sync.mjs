@@ -31,6 +31,7 @@ const SQLITE_IGNORED = new Set([
   "auditLogs",
   "suggestions",
   "ccusageCompatRuns",
+  "cliCompatNotifications",
 ]);
 
 // 마찬가지로 PG 에 없는 SQLite-only table (현재 없음). 미래용.

@@ -46,6 +46,8 @@ export const auditLogs = pgSchema.auditLogs;
 export const suggestions = pgSchema.suggestions;
 // 2026-06-01: ccusage/codeburn 호환 검증 history. cloud-only (검증은 prod 대상).
 export const ccusageCompatRuns = pgSchema.ccusageCompatRuns;
+// 2026-06-22: cli-compat-check 메일 dedup (pkg, from, to). cloud-only (cron 전용).
+export const cliCompatNotifications = pgSchema.cliCompatNotifications;
 
 // Phase 4.2 (M6a): multi-tenant. teams + team_members 신규.
 export const teams = pgSchema.teams;
