@@ -11,8 +11,6 @@ installer/
 │   ├── package.json         electron-builder config 포함
 │   ├── scripts/stage.js     standalone build + cli 를 staged/ 로 모음
 │   └── staged/              빌드 산출물 (gitignored)
-├── mac/                     legacy pkgbuild .pkg (Electron 도입 전, 보존만)
-├── launcher.mjs             CLI-only launcher (Electron 안 쓰는 시나리오용)
 └── README.md
 ```
 

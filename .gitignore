@@ -32,8 +32,6 @@ web/*.sqlite3-shm
 web/*.sqlite3-wal
 
 # ── 인스톨러 빌드 산출물 ────────────────────────
-installer/mac/build/
-installer/mac/dist/
 installer/windows/build/
 installer/windows/dist/
 installer/electron/staged/
