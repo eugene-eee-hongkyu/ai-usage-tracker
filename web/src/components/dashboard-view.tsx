@@ -30,6 +30,7 @@ import { PrivacyBanner } from "@/components/privacy-banner";
 import { StaleSyncBanner } from "@/components/stale-sync-banner";
 import { CliUpdateBanner } from "@/components/cli-update-banner";
 import { ProviderSegmentedControl } from "@/components/provider-segmented-control";
+import { DailyCostCard } from "@/components/cards/daily-cost-card";
 import { useProviderPreference } from "@/lib/use-provider-preference";
 import { track, EVENTS } from "@/lib/analytics/mixpanel";
 import { useTrackScrollDepth } from "@/lib/analytics/use-track-scroll-depth";
@@ -2206,43 +2207,7 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
 
   // Daily Cost block — main Row 1 (Daily Activity 옆) + 자세히 보기 안
   // Efficiency 옆 두 곳에서 재사용 (사용자 피드백: 진단성 차트로도 옆에).
-  const dailyCostBlock = (
-    <div data-testid="dash-card-daily-cost" data-track-dwell="daily_cost" className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-yellow-500 rounded">
-      <div className="px-3 py-2 border-b border-neutral-800 flex items-center justify-between">
-        <span className="text-xs font-mono font-bold text-yellow-400 uppercase tracking-wider">Daily Cost</span>
-        {chartData.length > 45 && (
-          <span className="flex items-center gap-1 text-[10px] font-mono bg-yellow-900/40 text-yellow-300 border border-yellow-700/60 rounded px-1.5 py-0.5">
-            ↕ scroll · {chartData.length}
-          </span>
-        )}
-      </div>
-      <div className="p-3">
-        {chartData.length === 0 ? (
-          <div className="h-32 flex items-center justify-center text-neutral-600 text-xs font-mono">no data</div>
-        ) : (
-          <div className={chartData.length > 45 ? "overflow-y-auto max-h-[300px] no-scrollbar" : ""}>
-            <div className="space-y-1">
-              {(() => {
-                const maxCost = Math.max(...chartData.map((d) => d.cost), 0.01);
-                return chartData.map((d) => (
-                  <div key={d.date} className={`flex items-center gap-1.5 text-xs font-mono ${d.empty ? "opacity-40" : ""}`}>
-                    <span className={`w-12 shrink-0 whitespace-nowrap ${d.empty ? "text-neutral-700" : "text-neutral-500"}`}>{d.date}</span>
-                    <div className="flex-1 h-1.5 bg-neutral-800 rounded overflow-hidden">
-                      {!d.empty && (
-                        <div className="h-full bg-yellow-500 rounded" style={{ width: `${(d.cost / maxCost) * 100}%` }} />
-                      )}
-                    </div>
-                    <span className={`w-16 text-right shrink-0 ${d.empty ? "text-neutral-700" : "text-yellow-400"}`}>{d.empty ? "—" : fmt$(d.cost)}</span>
-                    {d.sessions > 0 && <span className="text-neutral-600 w-8 text-right shrink-0">{d.sessions}s</span>}
-                  </div>
-                ));
-              })()}
-            </div>
-          </div>
-        )}
-      </div>
-    </div>
-  );
+  const dailyCostBlock = <DailyCostCard chartData={chartData} />;
 
   // Activity Heatmap (last 13 weeks, cost-based)
   const activityHeatmapBlock = (data.heatmapDaily ?? []).length > 0 ? (() => {
