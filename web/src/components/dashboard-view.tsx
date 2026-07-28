@@ -30,6 +30,7 @@ import { PrivacyBanner } from "@/components/privacy-banner";
 import { StaleSyncBanner } from "@/components/stale-sync-banner";
 import { CliUpdateBanner } from "@/components/cli-update-banner";
 import { ProviderSegmentedControl } from "@/components/provider-segmented-control";
+import { useRefetchOnVisible } from "@/lib/use-refetch-on-visible";
 import { DailyCostCard } from "@/components/cards/daily-cost-card";
 import { DailyTokensCard } from "@/components/cards/daily-tokens-card";
 import { OverviewBar } from "@/components/cards/overview-bar";
@@ -941,6 +942,9 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
   const [teamRankData, setTeamRankData] = useState<TeamRankPayload | null>(null);
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
+  // 탭 재활성화 시 즉시 refetch (team/unified 와 공유 훅). 메인 fetch effect deps 에 reloadKey 포함.
+  useRefetchOnVisible(() => setReloadKey((k) => k + 1));
   const [syncCopied, setSyncCopied] = useState(false);
   // 자세히 보기 토글 — by model / by project / top sessions / by activity /
   // core tools / shell commands / MCP / 체류 히트맵 모두 토글 안. localStorage
@@ -1115,7 +1119,7 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
       });
     return () => ctrl.abort();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [session, period, weekOffset, monthOffset, dayOffset, deviceId, provider, targetUserId, periodReady]);
+  }, [session, period, weekOffset, monthOffset, dayOffset, deviceId, provider, targetUserId, periodReady, reloadKey]);
 
   useEffect(() => {
     if (data?.user?.timezone) setUserTz(data.user.timezone);

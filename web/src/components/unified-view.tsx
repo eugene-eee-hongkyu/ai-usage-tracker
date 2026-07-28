@@ -20,6 +20,7 @@ import { TeamActivityCard } from "@/components/cards/team-activity-card";
 import { TeamCostCard } from "@/components/cards/team-cost-card";
 import { TeamByMemberCard } from "@/components/cards/team-by-member-card";
 import { TeamTotalCard } from "@/components/cards/team-total-card";
+import { useRefetchOnVisible } from "@/lib/use-refetch-on-visible";
 import { type DashboardData, type Period, expectedDateRange } from "@/components/dashboard-view";
 import { type TeamData, MEMBER_COLORS, dedupMembersByUserId } from "@/components/team-view";
 
@@ -49,20 +50,8 @@ export function UnifiedView() {
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
-
-  // 다른 브라우저 탭에 있다가 돌아오면(visible/focus) 데이터 자동 refetch.
-  // 개인/팀 뷰와 동일한 UX. next-auth 세션 참조 변경에 기대지 않고 명시적으로 트리거.
-  useEffect(() => {
-    const onVisible = () => {
-      if (document.visibilityState === "visible") setReloadKey((k) => k + 1);
-    };
-    document.addEventListener("visibilitychange", onVisible);
-    window.addEventListener("focus", onVisible);
-    return () => {
-      document.removeEventListener("visibilitychange", onVisible);
-      window.removeEventListener("focus", onVisible);
-    };
-  }, []);
+  // 탭 재활성화 시 즉시 refetch (dashboard/team 과 공유 훅).
+  useRefetchOnVisible(() => setReloadKey((k) => k + 1));
 
   // period localStorage 초기화 (읽기 완료 후에만 fetch 허용)
   useEffect(() => {

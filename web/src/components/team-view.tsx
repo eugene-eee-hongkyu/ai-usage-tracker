@@ -24,6 +24,7 @@ import { useTrackScrollDepth } from "@/lib/analytics/use-track-scroll-depth";
 import { useTrackSectionDwell } from "@/lib/analytics/use-track-section-dwell";
 import { ProviderSegmentedControl } from "@/components/provider-segmented-control";
 import { useProviderPreference } from "@/lib/use-provider-preference";
+import { useRefetchOnVisible } from "@/lib/use-refetch-on-visible";
 import { TeamActivityCard } from "@/components/cards/team-activity-card";
 import { TeamCostCard } from "@/components/cards/team-cost-card";
 import { TeamByMemberCard } from "@/components/cards/team-by-member-card";
@@ -440,6 +441,8 @@ export function TeamView({ adminMode = false }: { adminMode?: boolean }) {
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
+  // 탭 재활성화 시 즉시 refetch (dashboard/unified 와 공유 훅).
+  useRefetchOnVisible(() => setReloadKey((k) => k + 1));
   const isLocalMode = useLocalMode();
 
   // 자세히 보기 토글 — efficiency · Row 4 (Team Activities + By Model) 묶음.

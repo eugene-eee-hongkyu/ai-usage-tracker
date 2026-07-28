@@ -28,8 +28,11 @@ const LOCAL_SESSION: Session = {
 };
 
 export function Providers({ children }: { children: React.ReactNode }) {
+  // refetchOnWindowFocus=false — 창 포커스 시 /api/auth/session 왕복(+그로 인한 지연 데이터
+  // refetch) 제거. 탭 재활성화 refetch 는 각 뷰의 useRefetchOnVisible 로 즉시·일관 처리.
+  // 세션은 초기 로드/네비게이션 때 갱신.
   return (
-    <SessionProvider session={IS_LOCAL_BUILD ? LOCAL_SESSION : undefined}>
+    <SessionProvider session={IS_LOCAL_BUILD ? LOCAL_SESSION : undefined} refetchOnWindowFocus={false}>
       {!IS_LOCAL_BUILD && <SessionGuard />}
       {!IS_LOCAL_BUILD && <OnboardTeamGuard />}
       {/* Mixpanel init + 로그인 시 identifyUser. LOCAL_MODE 는 NEXT_PUBLIC_MIXPANEL_TOKEN
