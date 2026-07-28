@@ -48,6 +48,21 @@ export function UnifiedView() {
   const [teamHidden, setTeamHidden] = useState(false); // 팀 없음(403) 등 → 팀 영역 숨김
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
+
+  // 다른 브라우저 탭에 있다가 돌아오면(visible/focus) 데이터 자동 refetch.
+  // 개인/팀 뷰와 동일한 UX. next-auth 세션 참조 변경에 기대지 않고 명시적으로 트리거.
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState === "visible") setReloadKey((k) => k + 1);
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("focus", onVisible);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("focus", onVisible);
+    };
+  }, []);
 
   // period localStorage 초기화 (읽기 완료 후에만 fetch 허용)
   useEffect(() => {
@@ -106,10 +121,9 @@ export function UnifiedView() {
         setLoading(false);
       });
     return () => ctrl.abort();
-    // session 을 dep 에 포함 — next-auth SessionProvider 가 창 포커스 시 세션을
-    // 자동 재검증(refetchOnWindowFocus)하면 session 참조가 바뀌어 이 effect 재실행
-    // → 개인/팀 뷰처럼 탭 재활성화 때 데이터 refetch. (status 만으론 안 바뀌어 안 걸림)
-  }, [session, status, period, provider, periodReady]);
+    // reloadKey: 탭 재활성화(visible/focus) 시 명시적으로 refetch 트리거.
+    // session: next-auth 세션 재검증으로 참조 바뀔 때도 refetch (개인/팀 뷰와 동일).
+  }, [session, status, period, provider, periodReady, reloadKey]);
 
   const saveTz = async (tz: string) => {
     setUserTz(tz);
