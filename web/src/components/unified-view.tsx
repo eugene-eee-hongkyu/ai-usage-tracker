@@ -138,7 +138,9 @@ export function UnifiedView() {
   const isShortPeriod = period === "today" || period === "8days" || period === "month";
 
   const shell = (inner: React.ReactNode) => (
-    <div className="min-h-screen bg-neutral-950 text-neutral-100">
+    // 리페치 중(data 있는 상태)에는 전체를 opacity-50 으로 흐림 — 개인/팀 뷰와 동일한
+    // "탭 재활성화 시 회색 투명 오버레이 + 리프레시" UX (dashboard-view 와 같은 패턴).
+    <div className={`min-h-screen bg-neutral-950 text-neutral-100 transition-opacity duration-150 ${loading && dash ? "opacity-50 pointer-events-none" : ""}`}>
       <Nav />
       <div className="max-w-6xl mx-auto px-4 pt-3 pb-2">
         <div className="flex flex-wrap items-center gap-3 justify-between">
