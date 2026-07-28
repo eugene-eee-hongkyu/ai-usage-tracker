@@ -24,6 +24,10 @@ import { useTrackScrollDepth } from "@/lib/analytics/use-track-scroll-depth";
 import { useTrackSectionDwell } from "@/lib/analytics/use-track-section-dwell";
 import { ProviderSegmentedControl } from "@/components/provider-segmented-control";
 import { useProviderPreference } from "@/lib/use-provider-preference";
+import { TeamActivityCard } from "@/components/cards/team-activity-card";
+import { TeamCostCard } from "@/components/cards/team-cost-card";
+import { TeamByMemberCard } from "@/components/cards/team-by-member-card";
+import { TeamTotalCard } from "@/components/cards/team-total-card";
 
 type Period = "today" | "8days" | "month" | "30days" | "all";
 type GradeLevel = "exemplary" | "good" | "moderate" | "insufficient" | "warning";
@@ -134,7 +138,7 @@ interface IndustryComparison {
   perDevMonthMax: number;
 }
 
-interface TeamData {
+export interface TeamData {
   byEfficiency: MemberStat[];
   bySessions: MemberStat[];
   isAdminUser: boolean;
@@ -377,21 +381,6 @@ function toFiniteNum(v: number | string | undefined): number {
   return 0;
 }
 
-function MemberTooltip({ active, payload, label }: { active?: boolean; payload?: MemberTooltipPayload[]; label?: string }) {
-  if (!active || !payload?.length) return null;
-  const sorted = [...payload].sort((a, b) => toFiniteNum(b.value) - toFiniteNum(a.value));
-  return (
-    <div style={{ background: "#171717", border: "1px solid #404040", borderRadius: 6, fontSize: 11, fontFamily: "monospace", padding: "6px 10px" }}>
-      <div style={{ color: "#737373", marginBottom: 4 }}>{label}</div>
-      {sorted.map((p) => (
-        <div key={p.dataKey} style={{ color: p.color }}>
-          {memberLabel(p.dataKey)} : ${toFiniteNum(p.value).toFixed(2)}
-        </div>
-      ))}
-    </div>
-  );
-}
-
 function MemberTokenTooltip({ active, payload, label }: { active?: boolean; payload?: MemberTooltipPayload[]; label?: string }) {
   if (!active || !payload?.length) return null;
   const sorted = [...payload].sort((a, b) => toFiniteNum(b.value) - toFiniteNum(a.value));
@@ -595,104 +584,10 @@ export function TeamView({ adminMode = false }: { adminMode?: boolean }) {
     .join(" · ");
 
   // Stacked per-member
-  const byMemberBlock = (
-    <div data-testid="team-card-by-member" className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-cyan-500 rounded">
-      <div className="px-3 py-2 border-b border-neutral-800 flex items-center justify-between">
-        <span className="text-xs font-mono font-bold text-cyan-400 uppercase tracking-wider">By Member (cost)</span>
-        <div className="flex flex-wrap gap-x-3 gap-y-1 justify-end">
-          {(data.memberNames ?? []).map((key, i) => (
-            <span key={key} className="flex items-center gap-1 text-[10px] font-mono text-neutral-400">
-              <span className="w-2 h-2 rounded-full inline-block" style={{ background: MEMBER_COLORS[i % MEMBER_COLORS.length] }} />
-              {memberLabel(key)}
-            </span>
-          ))}
-        </div>
-      </div>
-      <div className="p-3">
-        <ResponsiveContainer width="100%" height={160}>
-          <AreaChart
-            data={(data.dailyByMember ?? []).map((row) => ({
-              ...row,
-              date: fmtDate(String(row.date)),
-            }))}
-            margin={{ top: 4, right: 8, left: 0, bottom: 0 }}
-          >
-            <defs>
-              {(data.memberNames ?? []).map((key, i) => (
-                <linearGradient key={key} id={`grad-${i}`} x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor={MEMBER_COLORS[i % MEMBER_COLORS.length]} stopOpacity={0.4} />
-                  <stop offset="95%" stopColor={MEMBER_COLORS[i % MEMBER_COLORS.length]} stopOpacity={0.05} />
-                </linearGradient>
-              ))}
-            </defs>
-            <CartesianGrid strokeDasharray="3 3" stroke="#262626" />
-            <XAxis dataKey="date" tick={{ fill: "#525252", fontSize: 10, fontFamily: "monospace" }} axisLine={false} tickLine={false} interval="preserveStartEnd" />
-            <YAxis tick={{ fill: "#525252", fontSize: 10, fontFamily: "monospace" }} axisLine={false} tickLine={false} tickFormatter={(v) => `$${v}`} width={40} />
-            <Tooltip content={<MemberTooltip />} />
-            {(data.memberNames ?? []).map((key, i) => (
-              <Area
-                key={key}
-                type="monotone"
-                dataKey={key}
-                stroke={MEMBER_COLORS[i % MEMBER_COLORS.length]}
-                strokeWidth={1.5}
-                fill={`url(#grad-${i})`}
-                // 데이터 1점이면 area/line 이 안 그려져 빈 차트로 보이므로 dot 표시.
-                dot={(data.dailyByMember ?? []).length === 1
-                  ? { r: 3, fill: MEMBER_COLORS[i % MEMBER_COLORS.length], stroke: "none" }
-                  : false}
-              />
-            ))}
-          </AreaChart>
-        </ResponsiveContainer>
-      </div>
-    </div>
-  );
+  const byMemberBlock = <TeamByMemberCard dailyByMember={data.dailyByMember} memberNames={data.memberNames} />;
 
   // Total aggregated
-  const totalBlock = (
-    <div data-testid="team-card-total" className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-cyan-500 rounded">
-      <div className="px-3 py-2 border-b border-neutral-800">
-        <span className="text-xs font-mono font-bold text-cyan-400 uppercase tracking-wider">Team Total (cost)</span>
-      </div>
-      <div className="p-3">
-        <ResponsiveContainer width="100%" height={160}>
-          <AreaChart
-            data={dailyTotal.map((row) => ({
-              date: fmtDate(row.date),
-              cost: row.cost,
-            }))}
-            margin={{ top: 4, right: 8, left: 0, bottom: 0 }}
-          >
-            <defs>
-              <linearGradient id="grad-total" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="#06b6d4" stopOpacity={0.35} />
-                <stop offset="95%" stopColor="#06b6d4" stopOpacity={0.03} />
-              </linearGradient>
-            </defs>
-            <CartesianGrid strokeDasharray="3 3" stroke="#262626" />
-            <XAxis dataKey="date" tick={{ fill: "#525252", fontSize: 10, fontFamily: "monospace" }} axisLine={false} tickLine={false} interval="preserveStartEnd" />
-            <YAxis tick={{ fill: "#525252", fontSize: 10, fontFamily: "monospace" }} axisLine={false} tickLine={false} tickFormatter={(v) => `$${v}`} width={40} />
-            <Tooltip
-              contentStyle={{ background: "#171717", border: "1px solid #404040", borderRadius: 6, fontSize: 11, fontFamily: "monospace" }}
-              formatter={(v) => [`$${Number(v).toFixed(2)}`, t.teamView.teamSum]}
-            />
-            <Area
-              type="monotone"
-              dataKey="cost"
-              stroke="#06b6d4"
-              strokeWidth={2}
-              fill="url(#grad-total)"
-              // 데이터 1점이면 area/line 이 안 그려져 빈 차트로 보이므로 dot 표시.
-              dot={dailyTotal.length === 1
-                ? { r: 4, fill: "#06b6d4", stroke: "none" }
-                : false}
-            />
-          </AreaChart>
-        </ResponsiveContainer>
-      </div>
-    </div>
-  );
+  const totalBlock = <TeamTotalCard dailyTotal={dailyTotal} />;
 
   // By Member (tokens) — 자세히 보기 안쪽. dailyByMember 와 같은 wide-format
   // 행이지만 값이 토큰. cost stacked area 와 동일 UX, Y축만 토큰.
@@ -800,92 +695,17 @@ export function TeamView({ adminMode = false }: { adminMode?: boolean }) {
 
   // Activity (tokens)
   const activityBlock = (
-    <div data-testid="team-card-activity" data-track-dwell="activity" className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-cyan-500 rounded">
-      <div className="px-3 py-2 border-b border-neutral-800">
-        <span className="text-xs font-mono font-bold text-cyan-400 uppercase tracking-wider">Activity</span>
-      </div>
-      <div className="p-3">
-        <div className="flex text-xs text-neutral-600 font-mono mb-1.5">
-          <span className="w-16 shrink-0" />
-          <span className="flex-1">member</span>
-          <span className="w-16 text-right">tokens</span>
-        </div>
-        <div className="space-y-1">
-          {byTokens.map((m) => {
-            const idx = members.findIndex((x) => x.userId === m.userId);
-            const isSelf = session?.user?.name === m.name;
-            return (
-              <div
-                key={`${m.userId}-${m.tokenId ?? "null"}`}
-                className={`flex items-center gap-1.5 text-xs font-mono ${isSelf ? "bg-emerald-500/5 ring-1 ring-inset ring-emerald-500/30 rounded px-1 -mx-1 py-0.5" : ""}`}
-              >
-                <div className="w-16 h-1.5 bg-neutral-800 rounded overflow-hidden shrink-0">
-                  <div
-                    className="h-full rounded"
-                    style={{
-                      width: `${(m.totalTokens / maxTokens) * 100}%`,
-                      background: MEMBER_COLORS[idx % MEMBER_COLORS.length],
-                    }}
-                  />
-                </div>
-                <span className="flex-1 text-neutral-300 truncate flex items-center gap-1.5">
-                  <span className="truncate">{m.name}{m.deviceLabel ? ` · ${m.deviceLabel}` : ""}</span>
-                  {isSelf && <span className="text-[10px] text-emerald-400">← 나</span>}
-                  <CcusageMissingBadge missing={m.ccusageMissing} userId={m.userId} />
-                </span>
-                <span className="w-16 text-cyan-300 text-right tabular-nums">{fmtTokens(m.totalTokens)}</span>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-    </div>
+    <TeamActivityCard
+      byTokens={byTokens}
+      members={members}
+      maxTokens={maxTokens}
+      memberColors={MEMBER_COLORS}
+      session={session}
+    />
   );
 
   // Cost
-  const costBlock = (
-    <div data-testid="team-card-cost" data-track-dwell="cost" className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-yellow-500 rounded">
-      <div className="px-3 py-2 border-b border-neutral-800">
-        <span className="text-xs font-mono font-bold text-yellow-400 uppercase tracking-wider">Cost</span>
-      </div>
-      <div className="p-3">
-        <div className="flex text-xs text-neutral-600 font-mono mb-1.5">
-          <span className="w-16 shrink-0" />
-          <span className="flex-1">member</span>
-          <span className="w-16 text-right">cost</span>
-          <span className="w-12 text-right">s</span>
-        </div>
-        <div className="space-y-1">
-          {byCost.map((m) => {
-            const idx = members.findIndex((x) => x.userId === m.userId);
-            const isSelf = session?.user?.name === m.name;
-            return (
-              <div
-                key={`${m.userId}-${m.tokenId ?? "null"}`}
-                className={`flex items-center gap-1.5 text-xs font-mono ${isSelf ? "bg-emerald-500/5 ring-1 ring-inset ring-emerald-500/30 rounded px-1 -mx-1 py-0.5" : ""}`}
-              >
-                <div className="w-16 h-1.5 bg-neutral-800 rounded overflow-hidden shrink-0">
-                  <div
-                    className="h-full rounded"
-                    style={{
-                      width: `${(m.totalCost / maxCost) * 100}%`,
-                      background: MEMBER_COLORS[idx % MEMBER_COLORS.length],
-                    }}
-                  />
-                </div>
-                <span className="flex-1 text-neutral-300 truncate flex items-center gap-1.5">
-                  <span className="truncate">{m.name}{m.deviceLabel ? ` · ${m.deviceLabel}` : ""}</span>
-                  {isSelf && <span className="text-[10px] text-emerald-400">← 나</span>}
-                </span>
-                <span className="w-16 text-yellow-400 text-right tabular-nums">${m.totalCost.toFixed(2)}</span>
-                <span className="w-12 text-neutral-600 text-right tabular-nums">{m.sessionsCount}s</span>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-    </div>
-  );
+  const costBlock = <TeamCostCard byCost={byCost} members={members} maxCost={maxCost} selfName={session?.user?.name} />;
 
   // 활용지수 순위 — period 분모가 멤버 동일 → 직접 비교 정확
   const powerRankBlock = (
