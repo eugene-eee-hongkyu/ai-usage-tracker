@@ -5,6 +5,7 @@ export const zh: DeepPartial<Messages> = {
   brand: "AI Usage Tracker",
   nav: {
     personal: "个人",
+    unified: "整合",
     team: "团队",
     setup: "设置",
     logout: "登出",

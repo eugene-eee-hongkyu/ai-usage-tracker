@@ -30,6 +30,11 @@ import { PrivacyBanner } from "@/components/privacy-banner";
 import { StaleSyncBanner } from "@/components/stale-sync-banner";
 import { CliUpdateBanner } from "@/components/cli-update-banner";
 import { ProviderSegmentedControl } from "@/components/provider-segmented-control";
+import { DailyCostCard } from "@/components/cards/daily-cost-card";
+import { DailyTokensCard } from "@/components/cards/daily-tokens-card";
+import { OverviewBar } from "@/components/cards/overview-bar";
+import { PlanSavingsCard } from "@/components/cards/plan-savings-card";
+import { ActivityHeatmapCard } from "@/components/cards/activity-heatmap-card";
 import { useProviderPreference } from "@/lib/use-provider-preference";
 import { track, EVENTS } from "@/lib/analytics/mixpanel";
 import { useTrackScrollDepth } from "@/lib/analytics/use-track-scroll-depth";
@@ -52,7 +57,7 @@ const ScoreDrilldown = dynamic(
   }
 );
 
-type Period = "today" | "8days" | "month" | "30days" | "all";
+export type Period = "today" | "8days" | "month" | "30days" | "all";
 
 interface Overview {
   cost: number;
@@ -146,7 +151,7 @@ interface PlanHealthApiResponse {
   } | null;
 }
 
-interface DashboardData {
+export interface DashboardData {
   user: { name: string; lastSyncedAt: string | null; timezone: string | null; planTier: string | null; codexPlanTier: string | null };
   planHealth?: PlanHealthApiResponse;
   powerIndex?: PowerIndexSummary;
@@ -303,7 +308,7 @@ function monthToDateRange(todayKey: string): string[] {
   return out;
 }
 
-function expectedDateRange(
+export function expectedDateRange(
   period: Period,
   userTz: string,
   snapshot: SnapshotInfo | null | undefined,
@@ -679,29 +684,6 @@ function badgeGradeFromScore(score: number | null): GradeLevel {
   return "warning";
 }
 
-function fmtSyncedAt(ts: string | null, tz: string): string {
-  if (!ts) return "—";
-  const d = new Date(ts);
-  const parts = new Intl.DateTimeFormat("en", {
-    timeZone: tz,
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-  }).formatToParts(d);
-  const get = (t: string) => parts.find((p) => p.type === t)?.value ?? "00";
-  return `${get("month")}-${get("day")} ${get("hour")}:${get("minute")}`;
-}
-
-function fmtTokens(n: number): string {
-  if (!Number.isFinite(n)) return "—";
-  if (n >= 1_000_000_000) return `${(n / 1_000_000_000).toFixed(1)}B`;
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
-  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}k`;
-  return String(n);
-}
-
 function formatWeekRange(periodStart: string): string {
   const [y, m, d] = periodStart.split("-").map(Number);
   const start = new Date(Date.UTC(y, m - 1, d));
@@ -734,47 +716,6 @@ function weekOffsetLabel(i: number, m: Messages): string {
 function monthOffsetLabel(i: number, m: Messages): string {
   return i === 1 ? m.dashboardView.monthOffsetLast : tmpl(m.dashboardView.monthOffsetN, { n: i });
 }
-
-function formatDateRange(start: string | null, end: string | null): string {
-  if (!start || !end) return "";
-  const fmt = (s: string) => {
-    const [, m, d] = s.split("-");
-    return `${parseInt(m)}/${parseInt(d)}`;
-  };
-  return `${fmt(start)}-${fmt(end)}`;
-}
-
-const TZ_ABBR_MAP: Record<string, string> = {
-  "Asia/Singapore": "SGT",
-  "Asia/Seoul": "KST",
-  "Asia/Tokyo": "JST",
-  "Asia/Hong_Kong": "HKT",
-  "Asia/Shanghai": "CST",
-  "Asia/Kolkata": "IST",
-  "UTC": "UTC",
-};
-
-function tzAbbr(tz: string): string {
-  const fromIntl = new Intl.DateTimeFormat("en", { timeZone: tz, timeZoneName: "short" })
-    .formatToParts(new Date())
-    .find((p) => p.type === "timeZoneName")?.value ?? tz;
-  return /^GMT[+-]/.test(fromIntl) ? (TZ_ABBR_MAP[tz] ?? fromIntl) : fromIntl;
-}
-
-const TIMEZONE_LIST: { label: string; value: string }[] = [
-  { label: "SGT — Singapore (UTC+8)", value: "Asia/Singapore" },
-  { label: "KST — Korea (UTC+9)", value: "Asia/Seoul" },
-  { label: "JST — Japan (UTC+9)", value: "Asia/Tokyo" },
-  { label: "HKT — Hong Kong (UTC+8)", value: "Asia/Hong_Kong" },
-  { label: "CST — China (UTC+8)", value: "Asia/Shanghai" },
-  { label: "IST — India (UTC+5:30)", value: "Asia/Kolkata" },
-  { label: "GMT/BST — UK", value: "Europe/London" },
-  { label: "CET — Central Europe", value: "Europe/Paris" },
-  { label: "EST/EDT — US Eastern", value: "America/New_York" },
-  { label: "CST/CDT — US Central", value: "America/Chicago" },
-  { label: "PST/PDT — US Pacific", value: "America/Los_Angeles" },
-  { label: "UTC", value: "UTC" },
-];
 
 function TipBtn({ label, onClick, variant = "action", testid }: { label: string; onClick: () => void; variant?: "explain" | "action"; testid?: string }) {
   return (
@@ -1748,195 +1689,7 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
   // Plan Savings KPI — fintech stat card pattern: 빅 넘버 (절약 금액) + 트렌드
   // 화살표 + 비교 막대. team 카드와 동일 디자인.
   const planSavingsBlock = (
-    <div data-testid="dash-card-plan-savings" data-track-dwell="plan_savings" className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-emerald-500 rounded">
-      <div className="px-3 py-2 border-b border-neutral-800">
-        <span className="text-xs font-mono font-bold text-emerald-400 uppercase tracking-wider">
-          {t.dashboard.cards.planSavings}
-        </span>
-      </div>
-      <div className="p-4">
-        {(() => {
-          const apiCost = chartData.reduce((s, d) => s + (d.cost ?? 0), 0);
-          const planCost = data.planHealth?.priceForPeriod ?? null;
-          const isApiTier = data.planHealth?.declaredLimits?.tier === "api";
-          // API tier (PAYG) — plan 가격이 0 이라 절감 개념 N/A. 실제 사용 비용만 표시.
-          if (isApiTier) {
-            const fmt = (v: number) =>
-              v >= 100 ? `$${Math.round(v).toLocaleString()}` :
-              v >= 1 ? `$${v.toFixed(2)}` : `$${v.toFixed(2)}`;
-            return (
-              <div className="space-y-2">
-                <p className="text-[11px] text-neutral-500 font-mono uppercase tracking-wider">API 종량제</p>
-                <div className="flex items-baseline gap-2">
-                  <span className="text-amber-300 text-3xl font-mono font-bold tracking-tight">{fmt(apiCost)}</span>
-                  <span className="text-xs text-neutral-500 font-mono">실제 사용 비용</span>
-                </div>
-                <p className="text-[11px] text-neutral-600 font-mono leading-relaxed">
-                  Plan 가격 비교 N/A — Anthropic API 직접 결제 (PAYG). Plan 절감 개념 적용 X.
-                </p>
-              </div>
-            );
-          }
-          if (planCost == null || planCost <= 0) {
-            // activity 0 + tier 미입력 케이스만 도달.
-            return (
-              <p className="text-neutral-600 text-xs font-mono">
-                {t.dashboard.cards.noActivityHint}
-              </p>
-            );
-          }
-          const saved = apiCost - planCost;
-          const savedPct = apiCost > 0 ? Math.round((saved / apiCost) * 100) : null;
-          const positive = saved > 0;
-          const fmt = (v: number) =>
-            v >= 1000 ? `$${(v / 1000).toFixed(1)}k`.replace(".0k", "k") :
-            v >= 100 ? `$${v.toFixed(0)}` :
-            v >= 1 ? `$${v.toFixed(1)}` : `$${v.toFixed(2)}`;
-          const fmtExact = (v: number) =>
-            v >= 100 ? `$${Math.round(v).toLocaleString()}` :
-            v >= 1 ? `$${v.toFixed(1)}` : `$${v.toFixed(2)}`;
-          const limits = data.planHealth?.declaredLimits ?? null;
-          const tierLabel = limits?.label ?? null;
-          const monthlyPrice = limits?.monthlyPriceUsd ?? null;
-          const barMax = Math.max(apiCost, planCost);
-          const apiPct = (apiCost / barMax) * 100;
-          const planPct = (planCost / barMax) * 100;
-          // 본전 회수 hero (이번 달, period 무관). monthRecovery 가 있으면
-          // 메인 framing — 사용자 인터뷰 "월 요금제 뽕 뽑기". 없으면 기존
-          // period 별 절감 hero 로 fallback (API tier / tier 미입력 / 데이터 0).
-          const mr = data.planHealth?.monthRecovery ?? null;
-          return (
-            <div className="space-y-4">
-              {/* HERO: 이번 달 본전 회수 (있을 때) — 회수율 + 절감액 + 본전 돌파일 */}
-              {/* 2026-05-30 정정: 모든 cost 값을 apiCost (chartData 합) 로 통일.
-                  본전 회수 % 와 절감액 의 분모 = planCost (priceForPeriod, period 따라 비례).
-                  즉 8days = $26.7 / today = $3.33 / month = $100 (1 인의 monthly price). */}
-              {mr && mr.monthlyPriceUsd > 0 ? (
-                <div data-testid="dash-plan-recovery-hero">
-                  <p className="text-[10px] font-mono text-neutral-500 uppercase tracking-wider mb-1">
-                    이번 달 본전 회수
-                  </p>
-                  <div className="flex items-baseline gap-3 flex-wrap">
-                    <span className={`text-3xl sm:text-4xl font-mono font-bold tracking-tight ${
-                      apiCost >= planCost ? "text-emerald-400" : "text-neutral-200"
-                    }`}>
-                      {planCost > 0 ? Math.round((apiCost / planCost) * 100) : 0}%
-                    </span>
-                    {apiCost >= planCost ? (
-                      <span className="text-emerald-300 text-sm font-mono">
-                        ▼ {fmtExact(apiCost - planCost)} 절감
-                      </span>
-                    ) : (
-                      <span className="text-neutral-400 text-sm font-mono">
-                        본전까지 {fmtExact(planCost - apiCost)}
-                      </span>
-                    )}
-                  </div>
-                  <p className="text-xs font-mono text-neutral-500 mt-1.5">
-                    Plan {fmtExact(planCost)} · 사용 {fmtExact(apiCost)}
-                  </p>
-                  <div className="text-[11px] font-mono text-neutral-500 mt-1 space-y-0.5">
-                    {mr.breakEvenDate ? (
-                      <p>본전 돌파일 <span className="text-emerald-300">{mr.breakEvenDate.slice(5)} ✓</span></p>
-                    ) : (
-                      <p>본전 미회수 · {mr.monthDaysTotal - mr.monthDaysElapsed}일 남음</p>
-                    )}
-                    {mr.remainingEstimateUsd > 0 && (
-                      <p>
-                        남은 기간 예상{" "}
-                        <span className={mr.recoveryPct >= 100 ? "text-emerald-300" : "text-neutral-300"}>
-                          {mr.recoveryPct >= 100 ? "+" : ""}{fmtExact(mr.remainingEstimateUsd)}
-                        </span>
-                      </p>
-                    )}
-                    {/* period 별 절감 보조 — 사용자가 토글한 period 의 절감액
-                        (이번 달 본전 회수와 별개 정보). period=month 면 본전
-                        회수와 중복이라 안 보임. */}
-                    {period !== "month" && savedPct !== null && positive && (
-                      <p className="pt-1 border-t border-neutral-800/60 mt-1">
-                        이번 {periodLabel(period, t)} 절감{" "}
-                        <span className="text-emerald-400">▼ {fmtExact(saved)}</span>{" "}
-                        <span className="text-neutral-600">({savedPct}%)</span>
-                      </p>
-                    )}
-                    {period !== "month" && savedPct !== null && !positive && (
-                      <p className="pt-1 border-t border-neutral-800/60 mt-1">
-                        이번 {periodLabel(period, t)}{" "}
-                        <span className="text-rose-400">▲ {fmtExact(Math.abs(saved))} 초과</span>
-                      </p>
-                    )}
-                  </div>
-                </div>
-              ) : (
-                <div>
-                  {savedPct !== null && positive && (
-                    <>
-                      <div className="flex items-baseline gap-2">
-                        <span className="text-emerald-400 text-3xl sm:text-4xl font-mono font-bold tracking-tight">
-                          ▼ {fmtExact(saved)}
-                        </span>
-                      </div>
-                      <p className="text-[13px] font-mono text-emerald-300/80 mt-1">
-                        {savedPct}% {t.dashboard.cards.planSavingsSavedLabel}
-                      </p>
-                    </>
-                  )}
-                  {savedPct !== null && !positive && (
-                    <>
-                      <div className="flex items-baseline gap-2">
-                        <span className="text-rose-400 text-3xl sm:text-4xl font-mono font-bold tracking-tight">
-                          ▲ {fmtExact(Math.abs(saved))}
-                        </span>
-                      </div>
-                      <p className="text-[13px] font-mono text-rose-300/80 mt-1">
-                        {Math.abs(savedPct)}% over
-                      </p>
-                    </>
-                  )}
-                </div>
-              )}
-
-              {/* 비교 막대 — Plan 없을 때 vs Plan 비용 비율 */}
-              <div className="space-y-2.5">
-                <div>
-                  <div className="flex items-baseline justify-between mb-1">
-                    <span className="text-[11px] font-mono text-neutral-500 uppercase tracking-wider">
-                      {t.dashboard.cards.planSavingsApiLabel}
-                    </span>
-                    <span className="text-amber-300 font-mono font-bold tabular-nums">{fmt(apiCost)}</span>
-                  </div>
-                  <div className="h-2 bg-neutral-800/60 rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-amber-500 rounded-full transition-all"
-                      style={{ width: `${apiPct}%` }}
-                    />
-                  </div>
-                </div>
-                <div>
-                  <div className="flex items-baseline justify-between mb-1">
-                    <span className="text-[11px] font-mono text-neutral-500 uppercase tracking-wider">
-                      {t.dashboard.cards.planSavingsPlanLabel}
-                      {tierLabel && monthlyPrice !== null && (
-                        <span className="ml-2 normal-case text-neutral-600">
-                          {tierLabel} · ${monthlyPrice}{t.dashboard.cards.planSavingsMonthlySuffix}
-                        </span>
-                      )}
-                    </span>
-                    <span className="text-neutral-100 font-mono font-bold tabular-nums">{fmt(planCost)}</span>
-                  </div>
-                  <div className="h-2 bg-neutral-800/60 rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-neutral-300 rounded-full transition-all"
-                      style={{ width: `${planPct}%` }}
-                    />
-                  </div>
-                </div>
-              </div>
-            </div>
-          );
-        })()}
-      </div>
-    </div>
+    <PlanSavingsCard planHealth={data.planHealth} chartData={chartData} period={period} />
   );
 
   // Efficiency Metrics
@@ -2206,94 +1959,10 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
 
   // Daily Cost block — main Row 1 (Daily Activity 옆) + 자세히 보기 안
   // Efficiency 옆 두 곳에서 재사용 (사용자 피드백: 진단성 차트로도 옆에).
-  const dailyCostBlock = (
-    <div data-testid="dash-card-daily-cost" data-track-dwell="daily_cost" className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-yellow-500 rounded">
-      <div className="px-3 py-2 border-b border-neutral-800 flex items-center justify-between">
-        <span className="text-xs font-mono font-bold text-yellow-400 uppercase tracking-wider">Daily Cost</span>
-        {chartData.length > 45 && (
-          <span className="flex items-center gap-1 text-[10px] font-mono bg-yellow-900/40 text-yellow-300 border border-yellow-700/60 rounded px-1.5 py-0.5">
-            ↕ scroll · {chartData.length}
-          </span>
-        )}
-      </div>
-      <div className="p-3">
-        {chartData.length === 0 ? (
-          <div className="h-32 flex items-center justify-center text-neutral-600 text-xs font-mono">no data</div>
-        ) : (
-          <div className={chartData.length > 45 ? "overflow-y-auto max-h-[300px] no-scrollbar" : ""}>
-            <div className="space-y-1">
-              {(() => {
-                const maxCost = Math.max(...chartData.map((d) => d.cost), 0.01);
-                return chartData.map((d) => (
-                  <div key={d.date} className={`flex items-center gap-1.5 text-xs font-mono ${d.empty ? "opacity-40" : ""}`}>
-                    <span className={`w-12 shrink-0 whitespace-nowrap ${d.empty ? "text-neutral-700" : "text-neutral-500"}`}>{d.date}</span>
-                    <div className="flex-1 h-1.5 bg-neutral-800 rounded overflow-hidden">
-                      {!d.empty && (
-                        <div className="h-full bg-yellow-500 rounded" style={{ width: `${(d.cost / maxCost) * 100}%` }} />
-                      )}
-                    </div>
-                    <span className={`w-16 text-right shrink-0 ${d.empty ? "text-neutral-700" : "text-yellow-400"}`}>{d.empty ? "—" : fmt$(d.cost)}</span>
-                    {d.sessions > 0 && <span className="text-neutral-600 w-8 text-right shrink-0">{d.sessions}s</span>}
-                  </div>
-                ));
-              })()}
-            </div>
-          </div>
-        )}
-      </div>
-    </div>
-  );
+  const dailyCostBlock = <DailyCostCard chartData={chartData} />;
 
   // Activity Heatmap (last 13 weeks, cost-based)
-  const activityHeatmapBlock = (data.heatmapDaily ?? []).length > 0 ? (() => {
-    const calData = (data.heatmapDaily ?? []).map((row) => {
-      const cost = row.cost;
-      // 임계 근거 (외부 + 내부 데이터):
-      //  - level 1 <$5: Anthropic 평균 사용자 ($6) 의 절반 이하
-      //  - level 2 $5~25: Anthropic 평균 ~ 엔터 평균 ($6~$13) 포함
-      //  - level 3 $25~100: 엔터 90th ($30) 이상 ~ 우리 p75 ($89) 위
-      //  - level 4 $100+: 외부 99th + 우리 p90 ($154) + "엄청 했음"
-      const level: 0 | 1 | 2 | 3 | 4 =
-        cost === 0 ? 0 :
-        cost < 5 ? 1 :
-        cost < 25 ? 2 :
-        cost < 100 ? 3 :
-        4;
-      return { date: row.date, count: Math.round(cost * 100), level };
-    });
-    return (
-      <div data-testid="dash-card-activity-heatmap" data-track-dwell="activity_heatmap" className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-indigo-500 rounded">
-        <div className="px-3 py-2 border-b border-neutral-800">
-          <span data-testid="dash-heatmap-activity" className="text-xs font-mono font-bold text-indigo-400 uppercase tracking-wider">{tmpl(t.dashboardView.activityHeatmapLabel, { weeks: Math.round((data.heatmapDaily ?? []).length / 7) })}</span>
-        </div>
-        <div className="p-3 flex justify-center [&>article]:!items-center">
-          <ActivityCalendar
-            data={calData}
-            colorScheme="dark"
-            theme={{ dark: ["#1e293b", "#4338ca", "#6366f1", "#818cf8", "#a5b4fc"] }}
-            labels={{ legend: { less: "$0", more: "$100+" } }}
-            showWeekdayLabels
-            blockSize={14}
-            blockMargin={4}
-            showTotalCount={false}
-            renderBlock={(block, activity) => {
-              // today 셀은 amber outline 으로 강조 — "오늘 어디?" 즉시 파악.
-              // hover 시 tooltip 으로 그 날 cost 표시 (잔디 패턴과 동일).
-              const todayKey = new Date().toISOString().slice(0, 10);
-              const isToday = activity.date === todayKey;
-              const cost = activity.count / 100; // calData 에서 *100 했던 거 복원
-              const label = activity.level === 0
-                ? `${tmpl(t.dashboardView.dayCellNoActivity, { date: activity.date })}${isToday ? t.dashboardView.todaySuffix : ""}`
-                : `${tmpl(t.dashboardView.dayCellCost, { date: activity.date, cost: cost.toFixed(2) })}${isToday ? t.dashboardView.todaySuffix : ""}`;
-              return isToday
-                ? React.cloneElement(block, { stroke: "#fbbf24", strokeWidth: 1.5 }, <title>{label}</title>)
-                : React.cloneElement(block, {}, <title>{label}</title>);
-            }}
-          />
-        </div>
-      </div>
-    );
-  })() : <div />;
+  const activityHeatmapBlock = <ActivityHeatmapCard heatmapDaily={data.heatmapDaily} />;
 
   return (
     <div className={`min-h-screen bg-neutral-950 text-neutral-100 transition-opacity duration-150 ${loading ? "opacity-50 pointer-events-none" : ""}`}>
@@ -2508,75 +2177,18 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
 
       {/* Overview Bar — 사용자 인터뷰에서 "activity + cost 만 본다" 답이 다수.
           폰트 키우고 hero 수준으로 시각 승격. */}
-      <div data-testid="dash-overview-bar" className="bg-neutral-900 border-b border-neutral-800">
-        <div className="max-w-6xl mx-auto px-4 py-3.5 flex flex-wrap items-baseline gap-x-6 gap-y-2 font-mono">
-          {viewOnly && (
-            <span className="text-indigo-400 font-semibold self-center mr-2">{data.user.name}</span>
-          )}
-          {/* hero — activity (tokens) + cost. 사용자 인터뷰 답변에서 가장 자주 보는 두 지표.
-              period="today" 면 ov.totalTokensStrictToday (오늘 하루) 사용 — codeburn 의
-              today period 가 KST/SGT 사용자에서 어제 + 오늘 spillover 되는 문제 회피. */}
-          <span className="flex items-baseline gap-1">
-            <span className="text-cyan-400 font-bold text-2xl tabular-nums">
-              {fmtTokens(
-                ov.totalTokensStrictToday !== null
-                  ? ov.totalTokensStrictToday
-                  : chartTokenData.reduce((s, d) => s + d.tokens, 0)
-              )}
-            </span>
-            <span className="text-neutral-500 text-xs">tokens</span>
-          </span>
-          <span className="flex items-baseline gap-1">
-            <span className="text-yellow-400 font-bold text-2xl tabular-nums">${ov.cost.toFixed(2)}</span>
-            <span className="text-neutral-500 text-xs">cost</span>
-          </span>
-          {/* secondary — 효율 지표 (cache hit / 1-shot) 만. calls·sessions 는
-              "얼마나 썼나" 는 token·cost 로 이미 알 수 있고 hero 띠는 한 줄
-              유지 우선이라 제거.
-              짧은 period 에서는 1-shot 도 hide (Efficiency 카드 자체가 사라지므로 일관). */}
-          <span className="text-sm"><span className="text-emerald-400 font-bold">{ov.cacheHitPct.toFixed(1)}%</span><span className="text-neutral-500 ml-1 text-xs">cache hit</span></span>
-          {!isShortPeriod && (
-            <span className="text-sm"><span className="text-violet-400 font-bold">{Math.round(ov.oneShotRate * 100)}%</span><span className="text-neutral-500 ml-1 text-xs">1-shot</span></span>
-          )}
-          <span className="text-neutral-600 text-xs self-center ml-auto flex items-center gap-3">
-            <span>{tmpl(t.dashboardView.activeNDays, { n: ov.activeDays })}</span>
-            {data.snapshot ? (
-              <span className="text-amber-400">
-                📌 captured {fmtSyncedAt(data.snapshot.capturedAt, userTz)} {tzAbbr(userTz)}
-                {data.snapshot.dataRangeStart && data.snapshot.dataRangeEnd && (
-                  <span className="text-neutral-500"> · {formatDateRange(data.snapshot.dataRangeStart, data.snapshot.dataRangeEnd)}</span>
-                )}
-              </span>
-            ) : !viewOnly ? (
-              <span className="relative">
-                {t.dashboardView.lastReceived}{" "}
-                <span className="text-neutral-500">{fmtSyncedAt(data.user.lastSyncedAt, userTz)}</span>{" "}
-                <button
-                  data-testid="dash-tz-btn"
-                  onClick={() => setShowTzPicker((v) => !v)}
-                  className="text-neutral-600 hover:text-neutral-300 text-[10px] font-mono border border-neutral-700 hover:border-neutral-500 rounded px-1 py-0.5 transition-colors"
-                  title={t.dashboardView.tzChangeTitle}
-                >{tzAbbr(userTz)}</button>
-                {showTzPicker && (
-                  <div data-testid="dash-tz-list" className="absolute right-0 top-full mt-1 z-50 bg-neutral-900 border border-neutral-700 rounded-lg shadow-xl w-64 py-1 text-left">
-                    {TIMEZONE_LIST.map((tz) => (
-                      <button
-                        key={tz.value}
-                        onClick={() => saveTz(tz.value)}
-                        className={`w-full text-left px-3 py-1.5 text-xs font-mono hover:bg-neutral-800 transition-colors ${userTz === tz.value ? "text-indigo-400" : "text-neutral-300"}`}
-                      >{tz.label}</button>
-                    ))}
-                  </div>
-                )}
-              </span>
-            ) : (
-              <span className="text-neutral-500">
-                {t.dashboardView.lastReceived} {fmtSyncedAt(data.user.lastSyncedAt, userTz)}
-              </span>
-            )}
-          </span>
-        </div>
-      </div>
+      <OverviewBar
+        viewOnly={viewOnly}
+        user={data.user}
+        ov={ov}
+        chartTokenData={chartTokenData}
+        isShortPeriod={isShortPeriod}
+        snapshot={data.snapshot}
+        userTz={userTz}
+        showTzPicker={showTzPicker}
+        setShowTzPicker={setShowTzPicker}
+        saveTz={saveTz}
+      />
 
       <main className="px-4 py-4 space-y-4 max-w-6xl mx-auto">
 
@@ -2584,40 +2196,7 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
 
           {/* Daily Activity (tokens) */}
-          <div data-testid="dash-card-daily-tokens" className="bg-neutral-900 border border-neutral-800 border-l-2 border-l-cyan-500 rounded">
-            <div className="px-3 py-2 border-b border-neutral-800 flex items-center justify-between">
-              <span className="text-xs font-mono font-bold text-cyan-400 uppercase tracking-wider">Daily Activity</span>
-              {chartTokenData.length > 45 && (
-                <span className="flex items-center gap-1 text-[10px] font-mono bg-cyan-900/40 text-cyan-300 border border-cyan-700/60 rounded px-1.5 py-0.5">
-                  ↕ scroll · {chartTokenData.length}
-                </span>
-              )}
-            </div>
-            <div className="p-3">
-              {chartTokenData.length === 0 ? (
-                <div className="h-32 flex items-center justify-center text-neutral-600 text-xs font-mono">no data</div>
-              ) : (
-                <div className={chartTokenData.length > 45 ? "overflow-y-auto max-h-[300px] no-scrollbar" : ""}>
-                  <div className="space-y-1">
-                    {(() => {
-                      const maxTokens = Math.max(...chartTokenData.map((d) => d.tokens), 1);
-                      return chartTokenData.map((d) => (
-                        <div key={d.date} className={`flex items-center gap-1.5 text-xs font-mono ${d.empty ? "opacity-40" : ""}`}>
-                          <span className={`w-12 shrink-0 whitespace-nowrap ${d.empty ? "text-neutral-700" : "text-neutral-500"}`}>{d.date}</span>
-                          <div className="flex-1 h-1.5 bg-neutral-800 rounded overflow-hidden">
-                            {!d.empty && (
-                              <div className="h-full bg-cyan-500 rounded" style={{ width: `${(d.tokens / maxTokens) * 100}%` }} />
-                            )}
-                          </div>
-                          <span className={`w-16 text-right shrink-0 ${d.empty ? "text-neutral-700" : "text-cyan-300"}`}>{d.empty ? "—" : fmtTokens(d.tokens)}</span>
-                        </div>
-                      ));
-                    })()}
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
+          <DailyTokensCard chartTokenData={chartTokenData} />
 
           {/* Daily Cost — main Row 1. 같은 dailyCostBlock 변수가 자세히
               보기 안 Efficiency 옆에서도 재사용. */}

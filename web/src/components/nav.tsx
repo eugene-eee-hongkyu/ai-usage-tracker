@@ -42,7 +42,10 @@ function NavInner() {
     hasNormalTeam?: boolean;
   } | undefined;
   type Tab = { href: string; label: string; external?: boolean };
-  const tabs: Tab[] = [{ href: "/dashboard", label: m.nav.personal }];
+  const tabs: Tab[] = [];
+  // 통합 탭 — 개인/팀을 한 화면에. 로그인 후 기본 랜딩. 로컬 단독 모드는 팀이 없어 제외.
+  if (!isLocalMode) tabs.push({ href: "/unified", label: m.nav.unified });
+  tabs.push({ href: "/dashboard", label: m.nav.personal });
   if (isLocalMode) {
     if (companyUrl) tabs.push({ href: `${companyUrl}/team`, label: m.nav.team, external: true });
   } else {

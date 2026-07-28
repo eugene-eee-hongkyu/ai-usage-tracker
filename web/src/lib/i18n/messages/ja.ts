@@ -5,6 +5,7 @@ export const ja: DeepPartial<Messages> = {
   brand: "AI Usage Tracker",
   nav: {
     personal: "個人",
+    unified: "統合",
     team: "チーム",
     setup: "セットアップ",
     logout: "ログアウト",

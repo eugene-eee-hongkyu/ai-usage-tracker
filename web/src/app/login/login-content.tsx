@@ -81,7 +81,7 @@ function LoginInner() {
           data-testid="login-btn-github"
           onClick={() => {
             track(EVENTS.OAUTH_START, { provider: "github" });
-            signIn("github", { callbackUrl: "/dashboard" });
+            signIn("github", { callbackUrl: "/unified" });
           }}
           className="flex items-center justify-center gap-3 px-6 py-3 bg-slate-100 text-slate-900 rounded-lg font-semibold hover:bg-white transition-colors"
         >
@@ -95,7 +95,7 @@ function LoginInner() {
           data-testid="login-btn-google"
           onClick={() => {
             track(EVENTS.OAUTH_START, { provider: "google" });
-            signIn("google", { callbackUrl: "/dashboard" });
+            signIn("google", { callbackUrl: "/unified" });
           }}
           className="flex items-center justify-center gap-3 px-6 py-3 bg-white text-slate-800 rounded-lg font-semibold hover:bg-slate-50 transition-colors border border-slate-200"
         >
