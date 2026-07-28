@@ -106,7 +106,10 @@ export function UnifiedView() {
         setLoading(false);
       });
     return () => ctrl.abort();
-  }, [status, period, provider, periodReady]);
+    // session 을 dep 에 포함 — next-auth SessionProvider 가 창 포커스 시 세션을
+    // 자동 재검증(refetchOnWindowFocus)하면 session 참조가 바뀌어 이 effect 재실행
+    // → 개인/팀 뷰처럼 탭 재활성화 때 데이터 refetch. (status 만으론 안 바뀌어 안 걸림)
+  }, [session, status, period, provider, periodReady]);
 
   const saveTz = async (tz: string) => {
     setUserTz(tz);
