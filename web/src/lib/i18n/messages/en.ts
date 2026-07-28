@@ -4,6 +4,7 @@ export interface Messages {
   brand: string;
   nav: {
     personal: string;
+    unified: string;
     team: string;
     ranking: string;
     setup: string;
@@ -696,6 +697,7 @@ export const en: Messages = {
   brand: "AI Usage Tracker",
   nav: {
     personal: "Personal",
+    unified: "Unified",
     team: "Team",
     ranking: "Ranking",
     setup: "Setup",

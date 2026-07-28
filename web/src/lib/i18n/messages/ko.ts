@@ -6,6 +6,7 @@ export const ko: DeepPartial<Messages> = {
   brand: "AI Usage Tracker",
   nav: {
     personal: "개인",
+    unified: "통합",
     team: "팀",
     ranking: "랭킹",
     setup: "세팅",

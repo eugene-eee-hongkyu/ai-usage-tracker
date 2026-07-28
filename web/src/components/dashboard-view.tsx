@@ -57,7 +57,7 @@ const ScoreDrilldown = dynamic(
   }
 );
 
-type Period = "today" | "8days" | "month" | "30days" | "all";
+export type Period = "today" | "8days" | "month" | "30days" | "all";
 
 interface Overview {
   cost: number;
@@ -308,7 +308,7 @@ function monthToDateRange(todayKey: string): string[] {
   return out;
 }
 
-function expectedDateRange(
+export function expectedDateRange(
   period: Period,
   userTz: string,
   snapshot: SnapshotInfo | null | undefined,

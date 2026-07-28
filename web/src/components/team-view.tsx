@@ -80,7 +80,7 @@ const GRADE_CELL_BG: Record<GradeLevel, string> = {
   warning:      "bg-red-500/30",
 };
 
-const MEMBER_COLORS = [
+export const MEMBER_COLORS = [
   "#4f46e5", "#10b981", "#f59e0b", "#ef4444",
   "#8b5cf6", "#06b6d4", "#f97316", "#ec4899",
 ];
@@ -310,7 +310,7 @@ function fmtDate(d: string): string {
 //   - lastSyncedAt — 더 최근 device 기준
 //   - deviceLabel / tokenId — null (합산 row sentinel)
 //   - ccusageMissing — 어느 device 라도 missing 이면 missing
-function dedupMembersByUserId(rows: MemberStat[]): MemberStat[] {
+export function dedupMembersByUserId(rows: MemberStat[]): MemberStat[] {
   const map = new Map<number, MemberStat>();
   for (const m of rows) {
     const existing = map.get(m.userId);
