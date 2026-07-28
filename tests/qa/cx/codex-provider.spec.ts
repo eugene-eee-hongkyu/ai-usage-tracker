@@ -16,9 +16,14 @@ import { seed, signInAs, clearSession, queryScalar } from "../_shared/auth-helpe
 
 test.describe.configure({ mode: "serial" });
 
+// [SKIPPED] Next 14 build 가 NODE_ENV=production 을 inline 강제해 E2E auth 우회가
+// 안 된다. 실행하려면 auth.ts 에 prod 우회 스위치(E2E_ENABLED)를 뚫어야 하는데,
+// 2026-05-28 보안 감사 결정("prod 우회 표면 0")과 충돌하므로 비활성 유지.
+// 테스트 하나보다 보안 표면 0 이 우선 — describe 전체 .skip.
+
 // ─── CX-1 segmented control 가시성 (smoke) ────────────────
 
-test.describe("CX-1 가시성", () => {
+test.describe.skip("CX-1 가시성", () => {
   test.beforeAll(() => seed("team-codex"));
   test.beforeEach(async ({ page }) => signInAs(page, "team-codex"));
 
@@ -75,7 +80,7 @@ test.describe("CX-1 가시성", () => {
 
 // ─── CX-2 disabled chip 분기 ──────────────────────────────
 
-test.describe("CX-2 disabled chip", () => {
+test.describe.skip("CX-2 disabled chip", () => {
   test.beforeAll(() => seed("team-codex"));
   test.beforeEach(async ({ page }) => signInAs(page, "team-codex-bob")); // bob: Claude only
 
@@ -96,7 +101,7 @@ test.describe("CX-2 disabled chip", () => {
 
 // ─── CX-3 Codex 데이터 실제 표시 ──────────────────────────
 
-test.describe("CX-3 Codex 데이터 표시", () => {
+test.describe.skip("CX-3 Codex 데이터 표시", () => {
   test.beforeAll(() => seed("team-codex"));
   test.beforeEach(async ({ page }) => signInAs(page, "team-codex"));
 
@@ -118,7 +123,7 @@ test.describe("CX-3 Codex 데이터 표시", () => {
 
 // ─── CX-4 modal 자동 open + Codex tier 옵션 ───────────────
 
-test.describe("CX-4 modal", () => {
+test.describe.skip("CX-4 modal", () => {
   test.beforeEach(async ({ page }) => {
     seed("P9"); // codex_plan_tier=NULL 시작
     await signInAs(page, "P9");
@@ -164,7 +169,7 @@ test.describe("CX-4 modal", () => {
 
 // ─── CX-5 Claude vs Codex 독립 입력 ──────────────────────
 
-test.describe("CX-5 독립 입력", () => {
+test.describe.skip("CX-5 독립 입력", () => {
   test.beforeEach(() => seed("P9")); // claude=pro, codex=NULL
 
   test("[CX-5-01] P9 Claude 탭 진입 → modal 안 뜸 (planTier=pro 입력됨)", async ({ page }) => {
@@ -194,7 +199,7 @@ test.describe("CX-5 독립 입력", () => {
 
 // ─── CX-6 useProviderPreference 화면 간 공유 ──────────────
 
-test.describe("CX-6 preference 공유", () => {
+test.describe.skip("CX-6 preference 공유", () => {
   test.beforeAll(() => seed("team-codex"));
 
   test("[CX-6-01] dashboard 에서 codex 선택 → localStorage.provider_pref='codex'", async ({ page }) => {
@@ -225,7 +230,7 @@ test.describe("CX-6 preference 공유", () => {
 
 // ─── CX-7 modal 안 외부 billing 링크 ─────────────────────
 
-test.describe("CX-7 외부 링크", () => {
+test.describe.skip("CX-7 외부 링크", () => {
   test.beforeEach(() => seed("P9"));
 
   test("[CX-7-01] Codex modal — OpenAI billing 링크 (platform.openai.com)", async ({ page }) => {
@@ -255,7 +260,7 @@ test.describe("CX-7 외부 링크", () => {
 
 // ─── CX-8 API 직접 (no-browser, 빠름) ────────────────────
 
-test.describe("CX-8 API 직접", () => {
+test.describe.skip("CX-8 API 직접", () => {
   test.beforeAll(() => seed("P9"));
   test.beforeEach(async ({ page }) => signInAs(page, "P9"));
 

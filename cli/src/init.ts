@@ -11,6 +11,8 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const SERVER_URL = process.env.USAGE_TRACKER_URL ?? "https://aiusage.z21labs.world";
 // Multi-provider (2026-05-29 M): 0.3.x 부터 Claude + Codex 분리 호출.
 // dashboard 가 envInfo.cliVersion >= 0.3.0 으로 Codex 탭 활성 분기.
+// ⚠ 버전 핀 동기화: 이 값 + 아래 codeburn/ccusage 핀은 web/src/lib/pinned-versions.ts
+//   (PINNED) 와 반드시 같이 bump. 한쪽만 고치면 조용히 어긋난다.
 export const CLI_VERSION = "0.3.4";
 
 // === 새 (z21labs) ===
@@ -776,6 +778,7 @@ function checkCodeburn(): boolean {
 async function installCodeburn(): Promise<boolean> {
   try {
     // 사용자에겐 npm 상세 출력 안 보임 — 'inherit' → 'pipe' + 실패시에만 stderr.
+    // 핀 동기화: web/src/lib/pinned-versions.ts 의 PINNED.CODEBURN 과 같이 bump.
     execSync("npm install -g codeburn@0.9.11", { stdio: ["ignore", "ignore", "pipe"] });
     return true;
   } catch (e) {
@@ -796,6 +799,7 @@ function checkCcusage(): boolean {
 
 async function installCcusage(): Promise<boolean> {
   try {
+    // 핀 동기화: web/src/lib/pinned-versions.ts 의 PINNED.CCUSAGE 과 같이 bump.
     execSync("npm install -g ccusage@20.0.6", { stdio: ["ignore", "ignore", "pipe"] });
     return true;
   } catch (e) {

@@ -1,4 +1,6 @@
 // 핀 정책 단일 출처. install.sh / cli/src/init.ts 와 동기화 유지.
+// ⚠ cli/src/init.ts 는 별도 패키지라 이 값을 import 못 하고 값을 하드코딩한다
+//   (CLI_VERSION + codeburn@ / ccusage@ 설치 라인). bump 시 양쪽 모두 고칠 것.
 // /api/about + /api/platform-admin/all-users 등 여러 곳에서 참조.
 //
 // USAGE_TRACKER_RECOMMENDED — ai-usage-tracker CLI 자체 (`@z21labs/usage-tracker`)
