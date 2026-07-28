@@ -919,8 +919,11 @@ export async function GET(req: NextRequest) {
   });
 
   // Team activities (top 10 by turns)
-  // memberKeys are "name__userId" to handle duplicate display names
-  const memberNames = byEfficiency.map((m) => `${m.name}__${m.userId}`);
+  // memberKeys are "name__userId" to handle duplicate display names.
+  // M6f multi-device: byEfficiency 에 같은 userId 가 device 별로 N row → 같은
+  // name__userId 키가 중복됨. Set 으로 유니크화(멤버 카드의 userId dedup 과 정합)
+  // — 없으면 By Member 차트/범례에 같은 멤버가 device 수만큼 중복 표시.
+  const memberNames = [...new Set(byEfficiency.map((m) => `${m.name}__${m.userId}`))];
   const teamActivities = [...activityAgg.entries()]
     .map(([name, { totalCost, totalTurns, members }]) => ({
       name,
