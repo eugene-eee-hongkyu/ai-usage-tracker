@@ -31,6 +31,7 @@ import { StaleSyncBanner } from "@/components/stale-sync-banner";
 import { CliUpdateBanner } from "@/components/cli-update-banner";
 import { ProviderSegmentedControl } from "@/components/provider-segmented-control";
 import { useRefetchOnVisible } from "@/lib/use-refetch-on-visible";
+import { useVisitTracking } from "@/lib/use-visit-tracking";
 import { DailyCostCard } from "@/components/cards/daily-cost-card";
 import { DailyTokensCard } from "@/components/cards/daily-tokens-card";
 import { OverviewBar } from "@/components/cards/overview-bar";
@@ -1008,54 +1009,9 @@ export function DashboardView({ targetUserId, onMemberSelect, storageKey = "dash
     if (status === "unauthenticated") router.push("/login");
   }, [status, router, isLocalMode]);
 
-  // Mount-time visit POST. session.user 만 카운트 (어드민이 viewOnly 로
-  // 다른 사람 보더라도 어드민 본인 row 가 +1). useEffect deps 가 [session]
-  // 이라 같은 세션에서 페이지 새로고침 시에만 1회 — period/offset 변경엔
-  // 재호출 안 됨. 실패해도 무시 (UI 영향 0).
-  useEffect(() => {
-    if (!session) return;
-    fetch("/api/visit", { method: "POST" }).catch(() => {});
-  }, [session]);
-
-  // Dwell time 추적: visibility-API 로 활성 시간 누적, hide / unload 시
-  // sendBeacon 으로 /api/visit-end 에 누적초 전송. 백그라운드 탭은 자연
-  // 정지. 같은 페이지에서 visible↔hidden 전환 가능 — 매 visible 마다 새
-  // segment 시작. 4시간 cap 은 서버측에서 적용.
-  useEffect(() => {
-    if (!session) return;
-    let visibleSince: number | null = document.visibilityState === "visible" ? Date.now() : null;
-    let accumulated = 0;
-    const flush = () => {
-      if (visibleSince) {
-        accumulated += Date.now() - visibleSince;
-        visibleSince = null;
-      }
-      const sec = Math.floor(accumulated / 1000);
-      if (sec <= 0) return;
-      accumulated = 0;
-      try {
-        const blob = new Blob([JSON.stringify({ sec })], { type: "application/json" });
-        navigator.sendBeacon("/api/visit-end", blob);
-      } catch {
-        // ignore
-      }
-    };
-    const onVis = () => {
-      if (document.visibilityState === "visible") {
-        visibleSince = Date.now();
-      } else {
-        flush();
-      }
-    };
-    const onUnload = () => flush();
-    document.addEventListener("visibilitychange", onVis);
-    window.addEventListener("pagehide", onUnload);
-    return () => {
-      flush(); // unmount 시에도 누적분 전송
-      document.removeEventListener("visibilitychange", onVis);
-      window.removeEventListener("pagehide", onUnload);
-    };
-  }, [session]);
+  // 방문 수(mount + 탭 복귀마다 +1) + 체류 시간 추적. 개인/팀/통합 3뷰 공유 훅.
+  // session.user 만 카운트 (어드민이 viewOnly 로 다른 사람 봐도 어드민 본인 row 가 +1).
+  useVisitTracking(!!session);
 
   useEffect(() => {
     if (!viewOnly || !session) return;

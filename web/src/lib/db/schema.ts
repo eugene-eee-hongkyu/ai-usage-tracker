@@ -369,9 +369,11 @@ export const suggestions = pgTable(
   })
 );
 
-// 사용자가 자기 dashboard 를 본 일자별 횟수. lower bar 가설 ("월 1회 보면
+// 사용자가 개인/팀/통합 뷰를 본 일자별 횟수. lower bar 가설 ("월 1회 보면
 // 성공") 의 직접 측정 + 본인 동기 부여 (visit heatmap 카드).
-// /api/visit POST 가 mount-time 1회 호출되어 (user_id, today) 행을 upsert.
+// /api/visit POST 가 뷰 mount 시 + 다른 탭 갔다 돌아올 때마다 호출되어
+// (user_id, team_id, today) 행을 upsert (count +1). "하루에 몇 번 봤는지"
+// 를 세는 것이 목적 (use-visit-tracking.ts).
 // today 는 사용자 timezone 기준 (users.timezone, NULL 이면 UTC).
 export const dailyVisits = pgTable(
   "daily_visits",

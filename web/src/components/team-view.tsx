@@ -25,6 +25,7 @@ import { useTrackSectionDwell } from "@/lib/analytics/use-track-section-dwell";
 import { ProviderSegmentedControl } from "@/components/provider-segmented-control";
 import { useProviderPreference } from "@/lib/use-provider-preference";
 import { useRefetchOnVisible } from "@/lib/use-refetch-on-visible";
+import { useVisitTracking } from "@/lib/use-visit-tracking";
 import { TeamActivityCard } from "@/components/cards/team-activity-card";
 import { TeamCostCard } from "@/components/cards/team-cost-card";
 import { TeamByMemberCard } from "@/components/cards/team-by-member-card";
@@ -443,6 +444,8 @@ export function TeamView({ adminMode = false }: { adminMode?: boolean }) {
   const [reloadKey, setReloadKey] = useState(0);
   // 탭 재활성화 시 즉시 refetch (dashboard/unified 와 공유 훅).
   useRefetchOnVisible(() => setReloadKey((k) => k + 1));
+  // 방문 수(mount + 탭 복귀마다 +1) + 체류 시간 추적 (3뷰 공유).
+  useVisitTracking(!!session);
   const isLocalMode = useLocalMode();
 
   // 자세히 보기 토글 — efficiency · Row 4 (Team Activities + By Model) 묶음.

@@ -21,6 +21,7 @@ import { TeamCostCard } from "@/components/cards/team-cost-card";
 import { TeamByMemberCard } from "@/components/cards/team-by-member-card";
 import { TeamTotalCard } from "@/components/cards/team-total-card";
 import { useRefetchOnVisible } from "@/lib/use-refetch-on-visible";
+import { useVisitTracking } from "@/lib/use-visit-tracking";
 import { type DashboardData, type Period, expectedDateRange } from "@/components/dashboard-view";
 import { type TeamData, MEMBER_COLORS, dedupMembersByUserId } from "@/components/team-view";
 
@@ -52,6 +53,8 @@ export function UnifiedView() {
   const [reloadKey, setReloadKey] = useState(0);
   // 탭 재활성화 시 즉시 refetch (dashboard/team 과 공유 훅).
   useRefetchOnVisible(() => setReloadKey((k) => k + 1));
+  // 방문 수(mount + 탭 복귀마다 +1) + 체류 시간 추적 (3뷰 공유).
+  useVisitTracking(!!session);
 
   // period localStorage 초기화 (읽기 완료 후에만 fetch 허용)
   useEffect(() => {
